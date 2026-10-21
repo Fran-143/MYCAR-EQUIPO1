@@ -1,0 +1,25 @@
+# Configuracion local y credenciales
+.env
+.env.*
+!.env.example
+**/local.properties
+*.jks
+*.keystore
+**/keystore.properties
+**/google-services.json
+**/service-account*.json
+
+# Archivos generados por Android Studio
+**/.idea/
+*.iml
+**/.gradle/
+**/.kotlin/
+**/build/
+*.apk
+*.aab
+
+# Archivos generados por el backend
+**/target/
+
+# Windows
+Thumbs.db
