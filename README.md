@@ -220,3 +220,27 @@ PostgreSQL está conectado y Flyway administra las migraciones.
 
 Las funcionalidades de negocio se desarrollarán después.
 
+## Conexión de Android con el backend durante el desarrollo
+
+La versión debug usa http://127.0.0.1:8080/.
+
+Para probarla:
+
+1. Iniciar Docker Desktop y PostgreSQL.
+2. Ejecutar el backend desde la carpeta backend.
+3. Encender un emulador de Android Studio.
+4. Crear el túnel desde PowerShell:
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" -e reverse tcp:8080 tcp:8080
+```
+
+5. Ejecutar MyCar y pulsar "Comprobar conexión".
+
+Resultado esperado: "Servidor disponible".
+
+Repetir el comando de ADB al reiniciar el emulador.
+Mantener el backend ejecutándose durante las pruebas.
+
+Esta configuración es para desarrollo local.
+La versión de publicación necesitará un backend con HTTPS.
