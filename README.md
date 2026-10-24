@@ -1,246 +1,125 @@
-\# MyCar — Equipo 1
+# MyCar — Base del MVP
 
+## Estado actual
 
+- Android: Kotlin y Jetpack Compose.
+- Backend actual: Java 21 y Spring Boot.
+- PostgreSQL 17 mediante Docker.
+- Base de datos de desarrollo: mycar_mvp.
+- Esquema: mycar.
+- Migraciones: Flyway, carpeta backend/src/main/resources/db/mvp.
+- Conexión Android → backend configurada.
 
-\## Tecnologías
+La base está preparada sin tablas del negocio.
+V1 crea únicamente el esquema inicial.
 
+La preparación del backend para Kotlin está pendiente.
+Las funciones del MVP todavía deben desarrollarse.
 
+## Requisitos
 
-\- Android: Kotlin y Jetpack Compose.
+- Git.
+- Docker Desktop.
+- JDK 21.
+- IntelliJ IDEA.
+- Android Studio y Android SDK.
 
-\- Backend: Java 21 y Spring Boot 3.
-
-\- Base de datos: PostgreSQL 17 mediante Docker.
-
-\- Migraciones: Flyway.
-
-
-
-\## Requisitos
-
-
-
-\- Git.
-
-\- Android Studio y sus componentes Android SDK.
-
-\- JDK 21 para el backend.
-
-\- Docker Desktop iniciado.
-
-\- IntelliJ IDEA para trabajar en el backend.
-
-
-
-\## Descargar el proyecto
-
-
+## Descargar el proyecto
 
 ```powershell
-
 git clone https://github.com/Fran-143/MYCAR-EQUIPO1.git
-
 cd MYCAR-EQUIPO1
-
 ```
 
+## Configuración local
 
-
-\## Preparar PostgreSQL
-
-
-
-Desde la carpeta principal del proyecto:
-
-
+En una instalación nueva:
 
 ```powershell
-
 Copy-Item .env.example .env
-
 notepad .env
-
 ```
 
+Configurar:
 
+- POSTGRES_DB=mycar_mvp
+- POSTGRES_USER=mycar
+- POSTGRES_PASSWORD con una contraseña local propia.
+- POSTGRES_PORT=5432
 
-Reemplazar la contraseña de ejemplo por una propia.
+No subir .env a GitHub.
+No sobrescribir un .env existente sin revisar sus valores.
 
-No subir el archivo .env a GitHub.
+## Iniciar PostgreSQL
 
-
-
-Iniciar PostgreSQL:
-
-
+Con Docker Desktop abierto:
 
 ```powershell
-
 docker compose up -d --wait postgres
-
 docker compose ps
-
 ```
 
+El servicio debe aparecer healthy.
 
+Si el volumen Docker ya existía, cambiar POSTGRES_DB no crea
+automáticamente otra base. Coordinar su preparación antes de continuar.
+No eliminar el volumen para resolverlo sin respaldo.
 
-El servicio postgres debe aparecer como healthy.
+## Iniciar el backend
 
-
-
-\## Ejecutar el backend
-
-
-
-Desde la carpeta principal:
-
-
+Desde la raíz del proyecto:
 
 ```powershell
-
 cd backend
-
-.\\mvnw.cmd spring-boot:run
-
+.\mvnw.cmd spring-boot:run
 ```
 
+Mantener esa terminal abierta.
 
+Flyway aplicará las migraciones pendientes de db/mvp.
+Si se ejecuta desde IntelliJ, usar backend como directorio de trabajo.
 
-Mantener esa ventana abierta.
-
-
-
-Comprobar en el navegador:
-
-
-
-http://localhost:8080/actuator/health
-
-
-
-Respuesta esperada:
-
-
-
-{"status":"UP"}
-
-
-
-También se puede abrir la carpeta backend en IntelliJ.
-
-Para ejecutar desde IntelliJ, configurar backend como
-
-directorio de trabajo, porque la aplicación lee ../.env.
-
-
-
-\## Ejecutar las pruebas del backend
-
-
-
-Con PostgreSQL funcionando, desde la carpeta backend:
-
-
+En otra terminal:
 
 ```powershell
-
-.\\mvnw.cmd verify
-
+Invoke-RestMethod http://localhost:8080/actuator/health
 ```
 
+Resultado esperado: status UP.
 
+## Ejecutar Android
 
-Resultado esperado: BUILD SUCCESS.
-
-
-
-\## Ejecutar Android
-
-
-
-1\. Abrir la carpeta android en Android Studio.
-
-2\. Esperar la sincronización de Gradle.
-
-3\. Iniciar un emulador.
-
-4\. Ejecutar la configuración app.
-
-
-
-\## Organización
-
-
-
-\- android/: aplicación móvil.
-
-\- backend/: servidor.
-
-\- compose.yml: PostgreSQL local.
-
-\- .env.example: configuración de ejemplo.
-
-\- .env: configuración privada de cada integrante.
-
-
-
-\## Trabajo en equipo
-
-
-
-Crear una rama para cada tarea, subir los cambios y abrir
-
-un Pull Request hacia main para que otro integrante revise.
-
-
-
-Los cambios de base de datos se guardan como migraciones
-
-en backend/src/main/resources/db/migration.
-
-
-
-No modificar migraciones ya compartidas y aplicadas.
-
-Coordinar los números de las siguientes migraciones.
-
-
-
-\## Estado inicial
-
-
-
-La app muestra la pantalla de inicio.
-
-El backend dispone de una comprobación de estado.
-
-PostgreSQL está conectado y Flyway administra las migraciones.
-
-
-
-Las funcionalidades de negocio se desarrollarán después.
-
-## Conexión de Android con el backend durante el desarrollo
-
-La versión debug usa http://127.0.0.1:8080/.
-
-Para probarla:
-
-1. Iniciar Docker Desktop y PostgreSQL.
-2. Ejecutar el backend desde la carpeta backend.
-3. Encender un emulador de Android Studio.
-4. Crear el túnel desde PowerShell:
+1. Abrir android en Android Studio.
+2. Sincronizar Gradle.
+3. Iniciar un emulador.
+4. Ejecutar en PowerShell:
 
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" -e reverse tcp:8080 tcp:8080
 ```
 
-5. Ejecutar MyCar y pulsar "Comprobar conexión".
+5. Ejecutar app desde Android Studio.
+6. Pulsar Comprobar conexión.
 
-Resultado esperado: "Servidor disponible".
+Resultado esperado: Servidor disponible.
 
-Repetir el comando de ADB al reiniciar el emulador.
-Mantener el backend ejecutándose durante las pruebas.
+Esta configuración corresponde al desarrollo local.
+La dirección pública de producción todavía está pendiente.
 
-Esta configuración es para desarrollo local.
-La versión de publicación necesitará un backend con HTTPS.
+## Alcance previsto del MVP
+
+- Elsa: RF01, RF02 y RF06.
+- Francesca: RF08, RF09, RF10 y RF14.
+- Nayu: RF17, RF18, RF22 y RF23.
+- Sebastián: soporte de planes e integración.
+
+## Trabajo compartido
+
+- Crear una rama por tarea.
+- Integrar mediante pull request revisado.
+- Coordinar cambios de configuración y dependencias.
+- Coordinar el número de cada migración nueva.
+- No modificar una migración que ya fue aplicada.
+- No ejecutar los SQL del modelo anterior sobre mycar_mvp.
+- No crear tablas manualmente que después se repetirán con Flyway.
+- No subir contraseñas, tokens ni respaldos de la BD.
