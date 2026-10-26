@@ -10,11 +10,15 @@
 - Migraciones: Flyway, carpeta backend/src/main/resources/db/mvp.
 - Conexión Android → backend configurada.
 
-La base está preparada sin tablas del negocio.
-V1 crea únicamente el esquema inicial.
+La base incorpora 21 tablas de negocio/soporte del MVP mediante Flyway.
+V1 conserva el esquema inicial; V2 crea las tablas, V3 carga los catálogos
+y V4 incorpora funciones y triggers. No ejecutar el instalador SQL manual.
 
-La preparación del backend para Kotlin está pendiente.
-Las funciones del MVP todavía deben desarrollarse.
+El backend se mantiene en Java 21. Los endpoints y flujos Android de los
+11 RF todavía deben implementarse sobre estos contratos de persistencia.
+
+Documentación, correcciones y responsabilidades del backend:
+[Base de datos MVP](docs/db/mvp/README.md).
 
 ## Requisitos
 
@@ -86,6 +90,21 @@ Invoke-RestMethod http://localhost:8080/actuator/health
 ```
 
 Resultado esperado: status UP.
+
+## Pruebas de PostgreSQL aisladas
+
+Con Docker Desktop, JDK 21 y Python 3 instalados, desde la raíz:
+
+```powershell
+py -3 scripts/test_mvp_db.py
+```
+
+En Linux/macOS: `python3 scripts/test_mvp_db.py`.
+
+El ejecutor crea PostgreSQL 17 con credenciales aleatorias y puerto local
+temporal; prueba Flyway, integridad, transacciones, concurrencia, Spring Boot
+y health. No utiliza .env ni el volumen Compose de desarrollo. Al terminar
+retira exclusivamente su propio contenedor y sus datos de prueba.
 
 ## Ejecutar Android
 
