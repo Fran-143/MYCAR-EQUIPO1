@@ -92,4 +92,26 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<profile>
+			<id>db-mvp-tests</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<includes>
+								<include>**/MvpDatabaseTest.java</include>
+							</includes>
+							<systemPropertyVariables>
+								<mycar.db.tests>true</mycar.db.tests>
+							</systemPropertyVariables>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
 </project>

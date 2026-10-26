@@ -1,0 +1,8 @@
+PostgreSQL: 17.11 (Debian 17.11-1.pgdg13+2)
+[INFO] Tests run: 34, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.987 s -- in backend.db.MvpDatabaseTest
+[INFO] Tests run: 34, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+BackendApplicationTests: PASÓ
+HTTP /actuator/health: {"status": "UP"}
+PASÓ: Flyway, restricciones, concurrencia, prueba Spring y arranque HTTP.
+Contenedor y datos desechables retirados.
