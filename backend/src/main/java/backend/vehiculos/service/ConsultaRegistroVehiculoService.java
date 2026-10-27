@@ -5,6 +5,9 @@ import backend.vehiculos.dao.CondicionesRegistroVehiculoDao;
 import backend.vehiculos.dao.ConsultaRegistroVehiculoDao;
 import backend.vehiculos.domain.ErrorRegistroVehiculo;
 import backend.vehiculos.dto.DatosCatalogosVehiculo;
+import backend.vehiculos.dto.DatosListadoVehiculos;
+import java.util.Locale;
+import java.util.Set;
 import backend.vehiculos.dto.DatosCupoRegistro;
 import backend.vehiculos.dto.DatosEstadoOperacionVehiculo;
 import backend.vehiculos.dto.ResultadoRegistroVehiculo;
@@ -43,6 +46,31 @@ public class ConsultaRegistroVehiculoService {
     public DatosCupoRegistro consultarCupo(long idUsuarioAutenticado) {
         condiciones.exigirCuentaActiva(idUsuarioAutenticado);
         return consultas.consultarCupo(idUsuarioAutenticado);
+    }
+
+    public DatosListadoVehiculos listarVehiculos(
+            long idUsuarioAutenticado, String filtro, String busqueda
+    ) {
+        condiciones.exigirCuentaActiva(idUsuarioAutenticado);
+        String estado = filtro == null ? "TODOS" : filtro;
+        if (!Set.of("TODOS", "ACTIVO", "INACTIVO").contains(estado)) {
+            throw new ErrorRegistroVehiculo("FILTRO_INVALIDO", Set.of("filtro"));
+        }
+        String texto = busqueda == null ? "" : busqueda.strip().replaceAll("\\s+", " ");
+        String buscar = texto.toUpperCase(Locale.ROOT);
+        var propios = consultas.listarPropios(idUsuarioAutenticado);
+        long activos = propios.stream().filter(v -> "ACTIVO".equals(v.estadoVehiculo())).count();
+        var resultados = propios.stream()
+                .filter(v -> "TODOS".equals(estado) || estado.equals(v.estadoVehiculo()))
+                .filter(v -> buscar.isEmpty()
+                        || v.placa().toUpperCase(Locale.ROOT).contains(buscar)
+                        || v.marca().toUpperCase(Locale.ROOT).contains(buscar)
+                        || v.modelo().toUpperCase(Locale.ROOT).contains(buscar)
+                        || (v.marca() + " " + v.modelo()).toUpperCase(Locale.ROOT).contains(buscar))
+                .toList();
+        return new DatosListadoVehiculos(resultados,
+                new DatosListadoVehiculos.ResumenEstados(
+                        propios.size(), activos, propios.size() - activos), estado, texto);
     }
 
     public DatosEstadoOperacionVehiculo consultarOperacion(

@@ -1,6 +1,7 @@
 package backend.vehiculos.controller;
 
 import backend.vehiculos.dto.DatosCatalogosVehiculo;
+import backend.vehiculos.dto.DatosListadoVehiculos;
 import backend.vehiculos.dto.DatosCupoRegistro;
 import backend.vehiculos.dto.DatosEstadoOperacionVehiculo;
 import backend.vehiculos.dto.DatosRegistroVehiculo;
@@ -32,6 +33,15 @@ public class VehiculosController {
         this.identidades = identidades;
         this.registro = registro;
         this.consultas = consultas;
+    }
+
+    @GetMapping
+    public DatosListadoVehiculos listar(
+            Authentication autenticacion,
+            @RequestParam(required = false) String filtro,
+            @RequestParam(required = false) String busqueda
+    ) {
+        return consultas.listarVehiculos(usuario(autenticacion), filtro, busqueda);
     }
 
     @GetMapping("/catalogos")

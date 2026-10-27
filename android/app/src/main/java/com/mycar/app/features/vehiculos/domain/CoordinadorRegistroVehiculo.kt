@@ -29,7 +29,7 @@ class CoordinadorRegistroVehiculo(
     fun cambiar(campo: String, valor: String) {
         if (estado.fase != FaseRegistro.FORMULARIO || estado.pendiente != null) return
         estado = estado.copy(formulario = estado.formulario.cambiar(campo, valor, estado.catalogos),
-            errores = estado.errores - campo, mensaje = null)
+            errores = estado.errores - estado.formulario.camposAfectados(campo), mensaje = null)
     }
 
     suspend fun cargar() {

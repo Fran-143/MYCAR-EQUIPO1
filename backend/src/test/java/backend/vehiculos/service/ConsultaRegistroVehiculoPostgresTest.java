@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Consultas reales de solo lectura; exclusivamente en BD desechable. */
 @EnabledIfSystemProperty(named = "mycar.rf08.tests", matches = "true")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK, properties = {
         "spring.config.import=optional:file:./target/rf08-sin-env.properties",
         "spring.flyway.enabled=false"
 })
