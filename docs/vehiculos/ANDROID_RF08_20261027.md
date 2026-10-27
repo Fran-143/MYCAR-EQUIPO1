@@ -1,0 +1,70 @@
+# Android RF08 — formulario y recuperación
+
+27 de octubre de 2026. Base: feat/vehiculos-mvp, commit af69fca. El bloque añade archivos nuevos y conserva MainActivity, Inicio, ApiClient de health, Gradle, manifiestos, backend y migraciones.
+
+## Qué está implementado
+
+- Formulario Compose con marca, modelo, uso, placa, año, color, motor, combustible cuando aplica y kilometraje inicial.
+- Datos adicionales opcionales contraídos: VIN, serie, número de motor y aceite. Los errores de estos campos abren la sección para corregirlos.
+- Listas de uso/motor/combustible/aceite recibidas desde la API real.
+- OTRO exige especificación; seleccionar ELÉCTRICO limpia y envía null para combustible, aceite, número de motor y sus especificaciones.
+- Imagen predeterminada vectorial incluida en el APK. Sin carga de fotos, TIVE, SOAT ni otros RF fuera del MVP.
+- Validación local coherente con el backend, que sigue siendo la autoridad. No modifica mayúsculas ni recorta espacios silenciosamente; un opcional sin escribir se envía como null.
+- Consulta de cupo antes de abrir un formulario nuevo, sin inventar disponibilidad ante un error.
+- Registro por Retrofit, confirmación solo tras una respuesta válida y opciones Ver mis vehículos / Ir a inicio sin otro POST.
+- Manejo de sesión requerida, cuenta sin acceso, cupo agotado, errores de campos y resultado incierto.
+
+## Flujo de una operación
+
+1. Al entrar, comprobar primero si hay una solicitud pendiente de esa cuenta/servidor.
+2. Si existe, consultar su resultado ANTES de consultar cupo o cargar un formulario nuevo.
+3. Si no hay pendiente, consultar cupo y luego catálogos. No abrir formulario con cupo agotado.
+4. Validar el formulario. Generar UUID una vez por solicitud nueva válida.
+5. Conservar UUID y contenido en archivo privado antes del POST. Si no se puede conservar, no enviar.
+6. Después de timeout/error técnico, conservar la solicitud y comprobar el resultado.
+7. Un 404 no acredita rollback: permitir comprobar de nuevo o reenviar EXACTAMENTE la misma solicitud. No cambiar UUID ni datos.
+8. EN_PROCESO no se presenta como éxito. Fallos de autenticación tampoco borran solicitudes inciertas.
+9. Un rechazo funcional inequívoco (datos inválidos, duplicados, límite/plan) permite cerrar esa solicitud sin éxito. Una corrección posterior usa una solicitud nueva.
+10. CONFIRMADA recupera el resultado original. Se mantiene la solicitud local hasta navegar desde la confirmación, para poder recuperarla tras reiniciar.
+
+La selección de otro motor/combustible/aceite limpia especificaciones anteriores que dejaron de aplicar. El historial de kilometraje, el plan y el vehículo no se escriben directamente desde Android: todo pasa por la API y su transacción.
+
+## Almacenamiento y sesión
+
+ArchivoSolicitudRegistroPendiente usa AtomicFile dentro de noBackupFilesDir. Está separado por URL del servidor + id de cuenta, no incluye contraseñas ni tokens y no forma parte del backup Android. Después de escribir vuelve a comprobar que pueda recuperar la misma solicitud antes de permitir el POST. Si un archivo es ilegible no lo borra ni genera una nueva operación automáticamente.
+
+La identidad que se usa para separar archivos locales no autoriza peticiones: el backend obtiene la identidad de la sesión. Se conserva la solicitud de cada cuenta al cambiar de cuenta, sin enviarla bajo otra sesión. La configuración del host debe crear el almacenamiento con la cuenta realmente autenticada y la URL de esa sesión.
+
+Los campos del borrador sin enviar usan SavedStateHandle para recreación del proceso cuando Android restaura su estado. La solicitud ya enviada se conserva adicionalmente en el archivo privado, para recuperación aunque no se restaure ese estado.
+
+## Punto de integración con Elsa y navegación
+
+RegistroVehiculoRoute requiere:
+
+- Un RegistroVehiculoRepository real, construido con RemoteRegistroVehiculoRepository y un RegistroVehiculoApi obtenido del Retrofit autenticado que acuerde el equipo.
+- Una instancia de ArchivoSolicitudRegistroPendiente por servidor/cuenta, creada con contexto, URL y el Long de cuenta obtenido del login real. No usar un id fijo.
+- claveCuenta para el ViewModel: identificar servidor, cuenta y ciclo de sesión sin incluir contraseñas ni tokens. Cambiar la clave al cambiar de cuenta o de sesión, para no reutilizar un cliente de otra sesión.
+- onIniciarSesion, onVolver, onVerVehiculos y onIrInicio conectados a la navegación real del host. RF09 aún está pendiente: no sustituirlo por una lista vacía ficticia.
+
+No se modificó ApiClient ni se presupone Bearer, cookies o un nombre de cabecera. Elsa debe acordar el cliente autenticado, renovación/revocación, CSRF si aplica, y el adaptador IdentidadVehiculos del backend.
+
+MainActivity sigue mostrando Inicio y la prueba de conexión. No se añadió un acceso sin sesión al formulario de producción ni se simuló un alta desde el APK. La integración de esta Route al flujo real se realiza cuando existan sesión/cupo autorizados.
+
+## Vista de diseño independiente
+
+Archivo: android/app/src/debug/java/com/mycar/app/features/vehiculos/ui/RegistroVehiculoPreview.kt.
+
+Abrir en Android Studio con variante debug y activar Split/Design. Su @Preview permite revisar el formulario con catálogos de ejemplo exclusivos de debug. En modo interactivo permite escribir y validar, pero no crea cuenta, sesión ni vehículo ni invoca el backend. No forma parte del código de release.
+
+La interfaz es una propuesta de presentación usando los componentes Material3 existentes. Conserva las reglas funcionales congeladas; no reemplaza sus diagramas ni afirma una aceptación visual final.
+
+## Verificación
+
+Desde android: `.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug`.
+
+- 18 pruebas de validación de formulario.
+- 22 pruebas del coordinador: persistir antes de enviar, doble toque, respuesta perdida, nueva instancia, misma clave/carga en reenvío, 404 incierto, recuperación antes del cupo, cuenta/sesión, errores definitivos, almacenamiento fallido, cancelación y confirmación.
+- 6 pruebas del adaptador Retrofit/JSON.
+- 1 prueba existente del proyecto.
+
+No se añaden dependencias ni plugins. La verificación del asistente compiló el formulario y el APK usando Gradle 9.6.0, AGP 9.4.1 y SDK 37.0; los detalles del JDK temporal están en el informe del paquete. No hubo prueba con emulador ni login real.
