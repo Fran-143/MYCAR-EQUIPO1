@@ -1,8 +1,17 @@
 # MyCar — Ajustes RF08, listado RF09 y navegación preparada
 
 Base: main e65c90d (PR #7 integrado). 27/10/2026.
-El paquete contiene 31 archivos de proyecto e incluye la entrada DEBUG entregada anteriormente.
-No necesitas aplicar otra vez el ZIP anterior. No contiene migraciones, .env ni cambios de Gradle.
+El paquete contiene 33 archivos de proyecto e incluye la entrada DEBUG entregada anteriormente.
+No necesitas aplicar otra vez el ZIP anterior. No contiene migraciones ni .env. Ajusta las dependencias androidTest para API 37 en libs.versions.toml y app/build.gradle.kts.
+
+## Actualización para el error de Espresso en API 37
+
+Si ya aplicaste el bloque y apareció InputManager.getInstance, corrige únicamente:
+- En android/gradle/libs.versions.toml, sección versions: junitVersion="1.3.0", espressoCore="3.7.0" y añade testRunner="1.7.0".
+- En la sección libraries añade: androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "testRunner" }.
+- En dependencies de android/app/build.gradle.kts añade: androidTestImplementation(libs.androidx.test.runner).
+Guarda y vuelve a ejecutar connectedDebugAndroidTest con el emulador encendido.
+Este ZIP ya incorpora esa corrección.
 
 ## Qué puedes hacer ahora
 
@@ -40,7 +49,7 @@ Si un comando falla, detente en ese paso. No continúes suponiendo que cambiaste
 
 Descarga MyCar_Bloque_RF08_RF09.zip, extráelo y copia el contenido de ARCHIVOS a
 C:\Proyectos\MyCarEquipo1, conservando todas las carpetas.
-Acepta reemplazar los archivos del bloque; LISTA_ARCHIVOS.txt enumera los 31.
+Acepta reemplazar los archivos del bloque; LISTA_ARCHIVOS.txt enumera los 33.
 No copies la carpeta ARCHIVOS como una carpeta adicional dentro del proyecto.
 
 Alternativa PowerShell si el ZIP está con ese nombre exacto en Descargas:
@@ -118,7 +127,7 @@ git -C "C:\Proyectos\MyCarEquipo1" diff --cached --stat
 ```
 
 Revisa que solo aparezcan archivos del bloque; si ya habías confirmado el paquete anterior,
-el número de archivos nuevos del commit puede ser menor de 31.
+el número de archivos nuevos del commit puede ser menor de 33.
 
 ```powershell
 git -C "C:\Proyectos\MyCarEquipo1" commit -m "feat: completar validacion RF08 y preparar listado RF09"

@@ -38,7 +38,7 @@ No se integró su backend porque todavía no está disponible su rama.
 El host autenticado debe suministrar dependencias a VehiculosRoute y acordar/conectar la limpieza RF06.
 RF10, RF14, fotos, SOAT y TIVE no se implementan en este bloque.
 Los ejemplos se limitan a DEBUG y no insertan vehículos ni lecturas.
-No se modifican tablas, datos, migraciones V1–V5, pom, dependencias ni Gradle del proyecto.
+No se modifican tablas, datos, migraciones V1–V5 ni pom. Se actualizan solo las dependencias androidTest de Gradle según la corrección API 37 descrita abajo.
 
 ## Entorno
 
@@ -47,3 +47,21 @@ Gradle 9.6.0 y SDK Android 37.0.
 En la copia temporal se apartó la selección automática de JDK 25 solo para ejecutar Gradle
 con el JDK disponible. Se restauró idéntica al original; el paquete no contiene ese ajuste.
 La configuración de proxy/cachés de herramientas tampoco se distribuye.
+
+## Actualización por fallo de Espresso en API 37 (27/10/2026)
+
+El equipo ejecutó las pruebas en su emulador API 37 con las dependencias anteriores y obtuvo
+NoSuchMethodException: android.hardware.input.InputManager.getInstance dentro de Espresso 3.5.1.
+Se actualizan a versiones estables verificadas en Google Maven:
+- androidx.test.espresso:espresso-core:3.7.0
+- androidx.test.ext:junit:1.3.0
+- androidx.test:runner:1.7.0, declarado explícitamente.
+
+El código fuente oficial de Espresso 3.7.0 obtiene InputManager mediante getSystemService en API >=23.
+La llamada getInstance queda limitada a API <23; MyCar tiene minSdk 26.
+Se verificaron las versiones resueltas en debugAndroidTestRuntimeClasspath.
+
+Comprobaciones tras actualizar: assembleDebug y assembleDebugAndroidTest correctos,
+56 pruebas JVM correctas, lintDebug correcto. No se ejecutó aquí connectedDebugAndroidTest;
+es necesario repetirlo en el emulador del equipo y revisar cualquier fallo posterior de las aserciones.
+Las comprobaciones anteriores del backend permanecen vigentes: sus archivos no cambiaron con este ajuste.
