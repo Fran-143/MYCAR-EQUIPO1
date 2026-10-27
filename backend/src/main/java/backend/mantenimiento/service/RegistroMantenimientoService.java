@@ -36,12 +36,15 @@ public class RegistroMantenimientoService {
             Long idUsuario,
             SolicitudRegistroMantenimiento solicitud
     ) {
+        if (idUsuario == null || idUsuario <= 0) {
+            throw new IllegalArgumentException("idUsuario: identidad autenticada requerida");
+        }
         if (solicitud == null) {
             throw new IllegalArgumentException(
                     "solicitud: es obligatoria"
             );
         }
-        if (solicitud.idVehiculo() == null) {
+        if (solicitud.idVehiculo() == null || solicitud.idVehiculo() <= 0) {
             throw new IllegalArgumentException(
                     "idVehiculo: es obligatorio"
             );
