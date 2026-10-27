@@ -1,0 +1,86 @@
+{
+  "base_main": "e39c0c253511b288286c70f51179d3fa471313e8",
+  "modulo": "android",
+  "archivos": [
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/historial/ui/HistorialMantenimientoPantallasTest.kt",
+      "original": null,
+      "nuevo": "65c51e941b633767b4703ee522951659acfcbe15edbc1d1f54f6e38bf67b3bca"
+    },
+    {
+      "ruta": "android/app/src/debug/AndroidManifest.xml",
+      "original": "64a12b74946da957bd79df458b573251a5fc3abaeeb31ba10968f1f490485ae9",
+      "nuevo": "8ddc48c260c5c87b8f636098822eee69f91fea1271778b47f1d78ebd70be4e93"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/historial/ui/HistorialMantenimientoPreview.kt",
+      "original": null,
+      "nuevo": "b4b139c2fc3e6d2407649498307b5cc38bb3ac92564871f52343a85356963861"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/historial/ui/HistorialPreviewActivity.kt",
+      "original": null,
+      "nuevo": "f899c1a304ac498137aaa4e83577f1477533dcde6ea3a9916f600cfd39540f40"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/MainActivity.kt",
+      "original": "7029f52ccdd4102be15f6d2c0e1143f0882b02cca8dcb243b2e4da4a0bea05f7",
+      "nuevo": "828f40f3dc2976ab51e630ee0a70ced4a690c375dd2da06258fadf72d61a3fc7"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/data/HistorialApi.kt",
+      "original": null,
+      "nuevo": "a3b215e3c606e3812b753ceebec7b2e48d42ddede9bab902241ff080e41c37eb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/data/RemoteHistorialRepository.kt",
+      "original": null,
+      "nuevo": "a1f62a5d7be3fcb95ded5c82932853a19fd6972b5ca826a7e379108a3d4ebbbe"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/domain/CoordinadorHistorial.kt",
+      "original": null,
+      "nuevo": "7b1144e9b42a865fbf93361e89a75b0a1a943a1971fdfae0151537cfd12b88c7"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/domain/HistorialModels.kt",
+      "original": null,
+      "nuevo": "e53eb8439b393fddaa168e9da1e03a2503e6fede8ad21511a2decaf5910f1489"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/ui/EntradaHistorialMantenimiento.kt",
+      "original": null,
+      "nuevo": "72c141f69ef055c2fa3687ddfacb5d203b8191efb6dfbfc7a287ea9ab648f04f"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/ui/HistorialMantenimientoScreen.kt",
+      "original": null,
+      "nuevo": "fe33ea737364621bbcc1eb0d4988d28617ddbb39f7415dda25d3eaea3ab82bb5"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/viewmodel/HistorialViewModel.kt",
+      "original": null,
+      "nuevo": "8eafbdcd685136475150a02a34eb93147066432a35af6b45f018c1ee0a80af7e"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/HomeScreen.kt",
+      "original": "4049ea12b6816e88528f78fd1f49945f2e1386b9a6d1c30f7ba1ce2277dc5fb9",
+      "nuevo": "474cae5568839889db17744629afe1f6f5e00a4e106c6d44237d7099ce1cde2d"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/ResultadoMantenimientoScreen.kt",
+      "original": "250facf9fa9ad314f5340c4cb8444bf6e25bfa036a8b6ac7b31a95ac94540483",
+      "nuevo": "a6324a72fb6b93c9508c22c8fed211c6c6dfc2c1c0fcbc4d40fb0a6cbf82d82d"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/historial/CoordinadorHistorialTest.kt",
+      "original": null,
+      "nuevo": "fe5c998348043c2747df5ab1ff83fc72492eaeb4aec11733371522fcacdc35f6"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/historial/RemoteHistorialRepositoryTest.kt",
+      "original": null,
+      "nuevo": "7eda5002cee5989031d23a522d7342421267d4df5f481a9ff34510abbfa2f488"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "fecha": "2026-10-27",
+  "base_main": "e39c0c253511b288286c70f51179d3fa471313e8",
+  "jdk_ejecucion_backend": 25,
+  "java_release_backend": 21,
+  "postgresql": "17.11",
+  "rf18_backend": [
+    {
+      "name": "backend.historial.api.HistorialAutenticadoPostgresTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.historial.service.HistorialMantenimientoServiceTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.historial.dao.HistorialMantenimientoPostgresTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.historial.api.HistorialMantenimientoControllerTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "backend_regresion": {
+    "reportados": 476,
+    "ejecutados": 384,
+    "omitidos": 92,
+    "fallos": 0,
+    "errores": 0,
+    "nota": "Incluye RF18, RF17, RF08 y pruebas unitarias/web del login. 42 pruebas MvpDatabaseTest se ejecutaron aparte en una base nueva; otras 50 integraciones de Elsa requieren sus variables y bases especificas."
+  },
+  "backend_esquema": {
+    "ejecutados": 42,
+    "fallos": 0,
+    "errores": 0
+  },
+  "rf18_android_unitarias": [
+    {
+      "name": "com.mycar.app.features.historial.RemoteHistorialRepositoryTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.mycar.app.features.historial.CoordinadorHistorialTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "android_total_unitarias": 67,
+  "android_debug": "BUILD SUCCESSFUL",
+  "android_release_kotlin": "BUILD SUCCESSFUL",
+  "android_apk_pruebas": "BUILD SUCCESSFUL",
+  "android_instrumentacion": {
+    "definidas": 8,
+    "compiladas": 8,
+    "ejecutadas_en_este_entorno": 0,
+    "nota": "Ejecutar PROBAR_PANTALLAS_RF18.ps1 en el emulador de Nayu."
+  },
+  "limite": "La conexion del cliente Android con la sesion compartida requiere inyectar los repositorios autenticados y la clave opaca de cuenta. El backend RF18 si se probo con login, JWT, cierre de sesion y PostgreSQL reales via MockMvc; no se inventaron identidades en esa prueba."
+}

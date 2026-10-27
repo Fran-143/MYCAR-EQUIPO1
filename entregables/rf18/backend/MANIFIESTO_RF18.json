@@ -1,0 +1,86 @@
+{
+  "base_main": "e39c0c253511b288286c70f51179d3fa471313e8",
+  "modulo": "backend",
+  "archivos": [
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/web/LoginSecurityConfiguration.java",
+      "original": "22a2b8c8e03036c2b9986939a014144eb3a2f450c312d4c9b6c5ff3e758b50a8",
+      "nuevo": "0f0ecd00d88951f68cdd682ca4b04acf28067e02be9c015401ef8a5b4ac76312"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/cierresesion/web/LogoutSecurityConfiguration.java",
+      "original": "0486dd3a3396ce3060331f6b890fe83018eceb3f831aead8f8f56e231e881de1",
+      "nuevo": "ca75d863b2f4c0a9bb5d262f44833b00c0850e8169a6c8e1cfd259c961ff6a8c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/api/ErroresHistorialController.java",
+      "original": null,
+      "nuevo": "e9df212d00f8c1da515a9750d8b37302219aa7274fbd0d91ec19b38e893446a1"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/api/HistorialMantenimientoController.java",
+      "original": null,
+      "nuevo": "d4b50486a37b83540d3f70c78b154c956f583f0786be9a3c0872a3179a103fb3"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/dao/HistorialMantenimientoDao.java",
+      "original": null,
+      "nuevo": "2b984633ca93e6833101e0c1a79de1349caa2790545ef01b20d9ed8f65ca94a5"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/dao/HistorialMantenimientoJdbcDao.java",
+      "original": null,
+      "nuevo": "6b2acf0e137371928764b02bd9048b9a8bda4f5ebb1899c40bbbf146383de72f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/model/DatosHistorial.java",
+      "original": null,
+      "nuevo": "dbbc12ad7924c875f4542a25abe722a7396084b13bb7e34c8890ab81c876341d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/model/HistorialInconsistente.java",
+      "original": null,
+      "nuevo": "9d003e792166275085f55979ded6edd09e08296cdcdc1b55bbe1865f680520a6"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/model/HistorialNoDisponible.java",
+      "original": null,
+      "nuevo": "1ce8bdfa82d8bc68afd2adea99bfcdd606087096bf5267f6306b1c28ab00e1ed"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/seguridad/HistorialSecurityConfiguration.java",
+      "original": null,
+      "nuevo": "d77bb5e5ce8beadbbef4bb10b8377ca44646f8a498d0cf963f8f12e294b5b24c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/service/HistorialMantenimientoService.java",
+      "original": null,
+      "nuevo": "5a029f31b8ced02f989cad6f92a96837626f7b1dcb4f3004a354bb623a74ccb0"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/web/RegistrationSecurityConfiguration.java",
+      "original": "fad90314e2742a8ab8c2bdb83e75a4f20187c3b6d06a08856406ef572541c0ed",
+      "nuevo": "22ad5a9eff934e2541474bf151a37c019eea38100c82e8409e3e359b773a5611"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/api/HistorialAutenticadoPostgresTest.java",
+      "original": null,
+      "nuevo": "7bf0a4a12c51cb5eae2f0b15ea5c681708ff15c3f4c49b237142ca007bbbac1c"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/api/HistorialMantenimientoControllerTest.java",
+      "original": null,
+      "nuevo": "e4b94744109404da50264e379726a2ff3a5490722c9b8648c416f773f4d06d59"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/dao/HistorialMantenimientoPostgresTest.java",
+      "original": null,
+      "nuevo": "55573c4d743fca014511acd3cb6802cf615e8c51cf6e15ab205cd261e85121f9"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/service/HistorialMantenimientoServiceTest.java",
+      "original": null,
+      "nuevo": "eca4fa7384341110692ff771db595033d05ef93cf9e515fc9c0b3d54eb74bd00"
+    }
+  ]
+}
