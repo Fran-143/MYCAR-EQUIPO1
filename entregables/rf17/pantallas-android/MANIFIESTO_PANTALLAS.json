@@ -1,0 +1,87 @@
+﻿[
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\MainActivity.kt",
+    "Anteriores": [
+      "3B9207B6F7AEBB8E55FA341A99A355784FA0C698A0F5313AF5BEC944E2A7095A",
+      "7029F52CCDD4102BE15F6D2C0E1143F0882B02CCA8DCB243B2E4DA4A0BEA05F7"
+    ],
+    "Nuevo": "7029F52CCDD4102BE15F6D2C0E1143F0882B02CCA8DCB243B2E4DA4A0BEA05F7",
+    "Accion": "Reemplazar completo"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\inicio\\HomeScreen.kt",
+    "Anteriores": [
+      "4049EA12B6816E88528F78FD1F49945F2E1386B9A6D1C30F7BA1CE2277DC5FB9",
+      "E2A4D62AC64E06DD29E86473FF134E8F1C1D4316008299937D29D4D8D86285E5"
+    ],
+    "Nuevo": "4049EA12B6816E88528F78FD1F49945F2E1386B9A6D1C30F7BA1CE2277DC5FB9",
+    "Accion": "Reemplazar completo"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\mantenimiento\\viewmodel\\MantenimientoViewModel.kt",
+    "Anteriores": [
+      "CE6B24768465569305932947051BA2C06465A3D5073E3BA937778D6244CC1963",
+      "EC7CE409446D05B3CE84974C27B2078F7E65E9B64401CE457D8406F32140FBA6"
+    ],
+    "Nuevo": "CE6B24768465569305932947051BA2C06465A3D5073E3BA937778D6244CC1963",
+    "Accion": "Reemplazar completo"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\RegistrarMantenimientoScreen.kt",
+    "Anteriores": [
+      "187053005E3DFDD19DE0E7C7A2DD0DFE40A36CEE15DD8090D42EA8C2415C6DD3",
+      "DE3E4C144E0B14E387EF71119ED3BB1412F20910D48DF4F3B48AA2DA6C0E30DB",
+      "FD3259A42AA36DF18669E233B513C28AD7FFB0D6646838624EBCD4F9814E5211"
+    ],
+    "Nuevo": "E3C7501D0136D1B3D168CC09FE91C656EC1CE41F0EEF1D918F6F0734B9ECCE2B",
+    "Accion": "Reemplazar completo"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\AccionesMantenimiento.kt",
+    "Anteriores": [
+      "791D0D44050C6EA1059D2F68B18FE66C66EDB1C48337284E4276D276E5A5E644"
+    ],
+    "Nuevo": "791D0D44050C6EA1059D2F68B18FE66C66EDB1C48337284E4276D276E5A5E644",
+    "Accion": "Crear"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\EntradaRegistroMantenimiento.kt",
+    "Anteriores": [
+      "1A85F2D6A36494190CA4D64B12FAB25672681CB62BB59E18CA20B60A81FFF2BC"
+    ],
+    "Nuevo": "4854F15765FDD2E7FDD0FDA0FE7BC667FDD84726AE0CB1808BD4CECFF62A70A6",
+    "Accion": "Crear"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\ComponentesMantenimiento.kt",
+    "Anteriores": [],
+    "Nuevo": "9BAE190FA31767ADCB4445996A46B1134B6E70C99A811AA82B5040A010275055",
+    "Accion": "Crear"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\RepuestoMantenimientoDialog.kt",
+    "Anteriores": [],
+    "Nuevo": "BB844E2AA16C8A632F37AC6428EBA0B4102F91787153B28483B6AA93E95D1125",
+    "Accion": "Crear"
+  },
+  {
+    "Ruta": "app\\src\\main\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\ResultadoMantenimientoScreen.kt",
+    "Anteriores": [],
+    "Nuevo": "250FACF9FA9AD314F5340C4CB8444BF6E25BFA036A8B6AC7B31A95AC94540483",
+    "Accion": "Crear"
+  },
+  {
+    "Ruta": "app\\src\\debug\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\RegistrarMantenimientoPreview.kt",
+    "Anteriores": [
+      "5BB53E779D356F9774D53045A89CDBDB94164B5513ED92361A38030682C2CAE3"
+    ],
+    "Nuevo": "A19285711F57B1C4A555074752E52FC604CE40BDDFB8185B137781886ADFF2E7",
+    "Accion": "Crear"
+  },
+  {
+    "Ruta": "app\\src\\androidTest\\java\\com\\mycar\\app\\features\\mantenimiento\\ui\\RegistroMantenimientoPantallasTest.kt",
+    "Anteriores": [],
+    "Nuevo": "BADBB04318081027F37ECB24DB63E9F94B3F81EF4145457B11D28627F3EF17D1",
+    "Accion": "Crear"
+  }
+]
