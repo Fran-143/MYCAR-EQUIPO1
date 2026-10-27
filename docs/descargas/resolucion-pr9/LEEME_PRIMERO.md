@@ -2,12 +2,16 @@
 
 Revisión: 27/10/2026.
 Rama de Francesca: feat/cierre-rf08-listado-rf09, HEAD revisado 90f5a3edf0f3a67261a999b015704e3647e25202.
-main revisado: ce609aed68637c05522667f44aaa1269b4c45576 (incluye PR #6 de Nayu).
+main revisado: e39c0c253511b288286c70f51179d3fa471313e8 (incluye PR #6 de Nayu y PR #8 de Elsa).
 
-Este paquete NO es el bloque completo de RF08/RF09. Contiene solo 3 archivos:
+Este paquete NO es el bloque completo de RF08/RF09. Contiene 7 archivos:
 1. android/app/src/debug/AndroidManifest.xml: combina permiso de red local de Nayu con el launcher DEBUG de vehículos.
 2. android/gradle/libs.versions.toml: conserva Espresso 3.7.0, JUnit 1.3.0 y runner explícito 1.7.0.
 3. android/app/src/debug/java/com/mycar/app/debug/RegistroVehiculoDemoActivity.kt: añade acceso Inicio y mantenimientos al menú DEBUG.
+
+Los archivos 4–7 adaptan las pruebas de servicio/DAO de vehículos de WebEnvironment.NONE a MOCK,
+para cargar la nueva configuración Spring Security de Elsa en el entorno de pruebas.
+No se desactivan filtros ni se cambian respuestas funcionales para hacer pasar las pruebas.
 
 El tercer archivo permite abrir la MainActivity de Nayu desde la demostración; no modifica su módulo.
 MainActivity, HomeScreen y todos los archivos de mantenimiento se incorporan mediante merge de main.
@@ -27,7 +31,7 @@ Con el árbol limpio:
 git -C "C:\Proyectos\MyCarEquipo1" switch feat/cierre-rf08-listado-rf09
 git -C "C:\Proyectos\MyCarEquipo1" fetch origin
 $mainPr9MyCar = git -C "C:\Proyectos\MyCarEquipo1" rev-parse origin/main
-if ($mainPr9MyCar -eq "ce609aed68637c05522667f44aaa1269b4c45576") {
+if ($mainPr9MyCar -eq "e39c0c253511b288286c70f51179d3fa471313e8") {
     git -C "C:\Proyectos\MyCarEquipo1" merge --no-commit origin/main
 } else {
     throw "main cambio desde la revision; no apliques estos archivos sin revisar la nueva version."
@@ -38,10 +42,10 @@ En este punto se esperan los mismos dos CONFLICT que informó GitHub.
 Eso deja el merge pendiente en TU rama; todavía no integra tu PR en main.
 Si aparecen archivos en conflicto distintos de los dos revisados, detente y comparte la salida.
 
-## 2. Reemplaza únicamente los 3 archivos del paquete
+## 2. Reemplaza únicamente los 7 archivos del paquete
 
 Extrae MyCar_Resolucion_PR9.zip y copia el contenido de ARCHIVOS dentro de C:\Proyectos\MyCarEquipo1.
-Conserva las carpetas y reemplaza esos tres archivos.
+Conserva las carpetas y reemplaza esos siete archivos.
 No vuelvas a aplicar el paquete completo anterior encima de este merge; su base era un main anterior a Nayu.
 
 Alternativa PowerShell si el ZIP está con ese nombre exacto en Descargas:
@@ -62,7 +66,7 @@ Get-ChildItem -LiteralPath $origenPr9MyCar -Recurse -File | ForEach-Object {
 ## 3. Marca la resolución y comprueba
 
 ```powershell
-git -C "C:\Proyectos\MyCarEquipo1" add -- android/app/src/debug/AndroidManifest.xml android/gradle/libs.versions.toml android/app/src/debug/java/com/mycar/app/debug/RegistroVehiculoDemoActivity.kt
+git -C "C:\Proyectos\MyCarEquipo1" add -- android/app/src/debug/AndroidManifest.xml android/gradle/libs.versions.toml android/app/src/debug/java/com/mycar/app/debug/RegistroVehiculoDemoActivity.kt backend/src/test/java/backend/vehiculos/service/RegistroVehiculoServicePostgresTest.java backend/src/test/java/backend/vehiculos/service/ConsultaRegistroVehiculoPostgresTest.java backend/src/test/java/backend/vehiculos/service/ListadoVehiculosPostgresTest.java backend/src/test/java/backend/vehiculos/dao/CatalogosVehiculoDaoTest.java
 git --no-pager -C "C:\Proyectos\MyCarEquipo1" diff --name-only --diff-filter=U
 git --no-pager -C "C:\Proyectos\MyCarEquipo1" diff --cached --check
 ```
