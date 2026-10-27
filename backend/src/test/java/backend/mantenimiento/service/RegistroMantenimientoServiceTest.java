@@ -1,6 +1,13 @@
 package backend.mantenimiento.service;
 
 import backend.mantenimiento.dao.RegistroMantenimientoDao;
+import backend.mantenimiento.integracion.JsonOperacionMantenimiento;
+import backend.mantenimiento.dao.OperacionMantenimientoDao;
+import backend.mantenimiento.model.OperacionMantenimiento;
+import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
+import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import backend.mantenimiento.model.DatosRegistroMantenimiento;
 import backend.mantenimiento.model.DatosRegistroMantenimiento.OrigenKmServicio;
 import backend.mantenimiento.model.DatosRepuesto;
@@ -31,6 +38,7 @@ class RegistroMantenimientoServiceTest {
     private LecturaKmMantenimientoService lecturas;
     private RegistroMantenimientoDao dao;
     private RegistroMantenimientoService servicio;
+    private OperacionMantenimientoDao operaciones;
 
     @BeforeEach
     void preparar() {
@@ -40,6 +48,14 @@ class RegistroMantenimientoServiceTest {
         tipos = mock(TipoMantenimientoService.class);
         lecturas = mock(LecturaKmMantenimientoService.class);
         dao = mock(RegistroMantenimientoDao.class);
+        operaciones = mock(OperacionMantenimientoDao.class);
+        var pendiente = new AtomicReference<OperacionMantenimiento>();
+        when(operaciones.intentarCrear(any(), anyLong(), anyString())).thenAnswer(i -> {
+            pendiente.set(new OperacionMantenimiento(i.getArgument(0), i.getArgument(1),
+                    "REGISTRAR_MANTENIMIENTO", i.getArgument(2), "EN_PROCESO", null));
+            return true;
+        });
+        when(operaciones.buscarYBloquear(any())).thenAnswer(i -> Optional.ofNullable(pendiente.get()));
 
         servicio = new RegistroMantenimientoService(
                 validador,
@@ -47,7 +63,7 @@ class RegistroMantenimientoServiceTest {
                 vehiculos,
                 tipos,
                 lecturas,
-                dao
+                dao, operaciones
         );
 
         when(vehiculos.obtenerVehiculoPropioActivoParaRegistro(1L, 10L))
@@ -159,7 +175,7 @@ class RegistroMantenimientoServiceTest {
                         Instant.parse("2026-10-26T15:00:00Z"),
                         ZoneId.of("America/Lima")
                 )),
-                validadorRepuesto, vehiculos, tipos, lecturas, dao
+                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones
         );
 
         assertThrows(IllegalArgumentException.class,
@@ -216,7 +232,7 @@ class RegistroMantenimientoServiceTest {
                         Instant.parse("2026-10-26T15:00:00Z"),
                         ZoneId.of("America/Lima")
                 )),
-                validadorRepuesto, vehiculos, tipos, lecturas, dao
+                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones
         );
 
         assertThrows(IllegalArgumentException.class,
@@ -233,7 +249,7 @@ class RegistroMantenimientoServiceTest {
         );
         var servicioConValidadorReal = new RegistroMantenimientoService(
                 validador, new ValidadorRepuesto(), vehiculos,
-                tipos, lecturas, dao
+                tipos, lecturas, dao, operaciones
         );
 
         assertThrows(IllegalArgumentException.class,
@@ -316,6 +332,80 @@ class RegistroMantenimientoServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> servicio.registrar(1L, solicitud));
         verifyNoInteractions(dao);
+    }
+
+    @Test
+    void revision_reintentoConfirmadoNoRevalidaNiInserta() {
+        var solicitud = solicitudConRepuesto(1);
+        var resultado = new ResultadoRegistroMantenimiento(solicitud.idOperacion(), 10L,
+                900L, "REALIZADO", 21000, solicitud.datos().fechaServicio(), null, 1);
+        when(operaciones.intentarCrear(any(), anyLong(), anyString())).thenReturn(false);
+        when(operaciones.buscarYBloquear(solicitud.idOperacion())).thenReturn(Optional.of(
+                new OperacionMantenimiento(solicitud.idOperacion(), 1L,
+                        "REGISTRAR_MANTENIMIENTO", JsonOperacionMantenimiento.huella(solicitud),
+                        "CONFIRMADA", JsonOperacionMantenimiento.escribir(resultado))));
+
+        assertEquals(resultado, servicio.registrarResultado(1L, solicitud));
+        verifyNoInteractions(validador, validadorRepuesto, vehiculos, tipos, lecturas, dao);
+        verify(operaciones, never()).confirmar(any(), anyLong(), any());
+    }
+
+    @Test
+    void revision_rechazaHuellaDistintaAntesDeInsertar() {
+        var solicitud = solicitudConRepuesto(1);
+        when(operaciones.buscarYBloquear(any())).thenReturn(Optional.of(
+                new OperacionMantenimiento(solicitud.idOperacion(), 1L,
+                        "REGISTRAR_MANTENIMIENTO", "f".repeat(64), "CONFIRMADA", "{}")));
+        assertThrows(ConflictoOperacionMantenimientoException.class,
+                () -> servicio.registrar(1L, solicitud));
+        verifyNoInteractions(dao, vehiculos, tipos, lecturas);
+    }
+
+    @Test
+    void revision_rechazaOperacionDeOtroUsuarioAntesDeLeerRespuesta() {
+        var solicitud = solicitudConRepuesto(1);
+        when(operaciones.buscarYBloquear(any())).thenReturn(Optional.of(
+                new OperacionMantenimiento(solicitud.idOperacion(), 2L,
+                        "REGISTRAR_MANTENIMIENTO", JsonOperacionMantenimiento.huella(solicitud),
+                        "CONFIRMADA", "respuesta ajena no interpretable")));
+        assertThrows(ConflictoOperacionMantenimientoException.class,
+                () -> servicio.registrar(1L, solicitud));
+        verifyNoInteractions(dao);
+    }
+
+    @Test
+    void revision_rechazaOperacionDeOtroTipo() {
+        var solicitud = solicitudConRepuesto(1);
+        when(operaciones.buscarYBloquear(any())).thenReturn(Optional.of(
+                new OperacionMantenimiento(solicitud.idOperacion(), 1L,
+                        "ACTUALIZAR_KM", JsonOperacionMantenimiento.huella(solicitud),
+                        "CONFIRMADA", "{}")));
+        assertThrows(ConflictoOperacionMantenimientoException.class,
+                () -> servicio.registrar(1L, solicitud));
+        verifyNoInteractions(dao);
+    }
+
+    @Test
+    void revision_huellaIncluyeObservacionesRepuestosYVehiculo() {
+        var original = solicitudConRepuesto(1);
+        String huella = JsonOperacionMantenimiento.huella(original);
+        assertNotEquals(huella, JsonOperacionMantenimiento.huella(
+                new SolicitudRegistroMantenimiento(original.idOperacion(), 11L,
+                        original.datos(), original.observaciones(), original.repuestos())));
+        assertNotEquals(huella, JsonOperacionMantenimiento.huella(
+                new SolicitudRegistroMantenimiento(original.idOperacion(), 10L,
+                        original.datos(), "Otra observación", original.repuestos())));
+        assertNotEquals(huella, JsonOperacionMantenimiento.huella(
+                new SolicitudRegistroMantenimiento(original.idOperacion(), 10L,
+                        original.datos(), original.observaciones(), List.of())));
+    }
+
+    @Test
+    void revision_exigeIdOperacion() {
+        var original = solicitudConRepuesto(1);
+        assertThrows(IllegalArgumentException.class, () -> servicio.registrar(1L,
+                new SolicitudRegistroMantenimiento(null, 10L, original.datos(), null, List.of())));
+        verifyNoInteractions(operaciones, dao);
     }
 
     private SolicitudRegistroMantenimiento solicitudConRepuesto(

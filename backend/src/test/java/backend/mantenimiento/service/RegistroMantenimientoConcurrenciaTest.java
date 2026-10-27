@@ -2,10 +2,14 @@ package backend.mantenimiento.service;
 
 import backend.mantenimiento.dao.LecturaKmMantenimientoJdbcDao;
 import backend.mantenimiento.dao.RegistroMantenimientoDao;
+import backend.mantenimiento.dao.OperacionMantenimientoJdbcDao;
 import backend.mantenimiento.dao.RegistroMantenimientoJdbcDao;
 import backend.mantenimiento.dao.TipoMantenimientoJdbcDao;
 import backend.mantenimiento.dao.VehiculoMantenimientoJdbcDao;
 import backend.mantenimiento.model.DatosRegistroMantenimiento;
+import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
+import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
+import backend.mantenimiento.dao.OperacionMantenimientoDao;
 import backend.mantenimiento.model.DatosRegistroMantenimiento.OrigenKmServicio;
 import backend.mantenimiento.model.SolicitudRegistroMantenimiento;
 import org.flywaydb.core.Flyway;
@@ -138,7 +142,178 @@ class RegistroMantenimientoConcurrenciaTest {
         }
     }
 
+    @Test
+    void revision_mismaSolicitudDevuelveMismoIdYUnaSolaCopiaDeRepuestos() {
+        var f = crearFixtureConfirmada();
+        var original = solicitud(f);
+        var pedido = new SolicitudRegistroMantenimiento(original.idOperacion(), f.idVehiculo(),
+                original.datos(), "Revisión", List.of(new backend.mantenimiento.model.DatosRepuesto(
+                        "Filtro", null, 2, new java.math.BigDecimal("12.50"))));
+        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
+        var primero = servicio.registrarResultado(f.idUsuario(), pedido);
+        var segundo = servicio.registrarResultado(f.idUsuario(), pedido);
+        assertEquals(primero, segundo);
+        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
+        assertEquals(1L, new JdbcTemplate(dataSource).queryForObject(
+                "SELECT count(*) FROM mycar.repuesto WHERE id_usuario = ?", Long.class, f.idUsuario()));
+        assertEquals(1L, new JdbcTemplate(dataSource).queryForObject(
+                "SELECT count(*) FROM mycar.mantenimiento_repuesto WHERE id_mantenimiento = ?",
+                Long.class, primero.idMantenimiento()));
+        assertEquals("CONFIRMADA", servicio.consultarOperacion(
+                f.idUsuario(), pedido.idOperacion()).estado());
+    }
+
+    @Test
+    void revision_mismaOperacionConContenidoDistintoSeRechaza() {
+        var f = crearFixtureConfirmada();
+        var pedido = solicitud(f);
+        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
+        servicio.registrar(f.idUsuario(), pedido);
+        var cambiado = new SolicitudRegistroMantenimiento(pedido.idOperacion(), pedido.idVehiculo(),
+                pedido.datos(), "Contenido diferente", pedido.repuestos());
+        assertThrows(ConflictoOperacionMantenimientoException.class,
+                () -> servicio.registrar(f.idUsuario(), cambiado));
+        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
+    }
+
+    @Test
+    void revision_reintentoDevuelveSnapshotAunqueVehiculoEsteInactivo() {
+        var f = crearFixtureConfirmada();
+        var pedido = solicitud(f);
+        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
+        var original = servicio.registrarResultado(f.idUsuario(), pedido);
+        new JdbcTemplate(dataSource).update(
+                "UPDATE mycar.vehiculo SET estado_vehiculo = 'INACTIVO' WHERE id_vehiculo = ?",
+                f.idVehiculo());
+        assertEquals(original, servicio.registrarResultado(f.idUsuario(), pedido));
+        assertEquals(original, servicio.consultarOperacion(f.idUsuario(), pedido.idOperacion()).resultado());
+        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
+    }
+
+    @Test
+    void revision_noPermiteReusarNiConsultarOperacionDeOtroUsuarioOTipo() {
+        var f = crearFixtureConfirmada();
+        var ajeno = crearFixtureConfirmada();
+        var pedido = solicitud(f);
+        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
+        servicio.registrar(f.idUsuario(), pedido);
+        assertThrows(ConflictoOperacionMantenimientoException.class,
+                () -> servicio.registrar(ajeno.idUsuario(), pedido));
+        assertThrows(ConflictoOperacionMantenimientoException.class,
+                () -> servicio.consultarOperacion(ajeno.idUsuario(), pedido.idOperacion()));
+        var otroTipo = new SolicitudRegistroMantenimiento(f.operacionRf14(), f.idVehiculo(),
+                pedido.datos(), null, List.of());
+        assertThrows(ConflictoOperacionMantenimientoException.class,
+                () -> servicio.registrar(f.idUsuario(), otroTipo));
+        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
+    }
+
+    @Test
+    @Timeout(30)
+    void revision_dosSolicitudesSimultaneasSoloGuardanUnaVez() throws Exception {
+        var f = crearFixtureConfirmada();
+        var pedido = solicitud(f);
+        var insertando = new CountDownLatch(1);
+        var continuar = new CountDownLatch(1);
+        var segundoIntento = new CountDownLatch(1);
+        RegistroMantenimientoDao pausado = (usuario, tipo, solicitud) -> {
+            insertando.countDown();
+            try {
+                if (!continuar.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Sin señal");
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(ex);
+            }
+            return new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource))
+                    .insertar(usuario, tipo, solicitud);
+        };
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var primero = pool.submit(() -> servicio(pausado).registrar(f.idUsuario(), pedido));
+            assertTrue(insertando.await(10, TimeUnit.SECONDS));
+            var segundo = pool.submit(() -> {
+                segundoIntento.countDown();
+                return servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)))
+                        .registrar(f.idUsuario(), pedido);
+            });
+            assertTrue(segundoIntento.await(10, TimeUnit.SECONDS));
+            assertThrows(java.util.concurrent.TimeoutException.class,
+                    () -> segundo.get(300, TimeUnit.MILLISECONDS));
+            continuar.countDown();
+            assertEquals(primero.get(10, TimeUnit.SECONDS), segundo.get(10, TimeUnit.SECONDS));
+            assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
+        } finally {
+            continuar.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void revision_falloAlConfirmarRevierteTodoYPermiteReintentarMismaOperacion() {
+        var f = crearFixtureConfirmada();
+        var original = solicitud(f);
+        var pedido = new SolicitudRegistroMantenimiento(original.idOperacion(), f.idVehiculo(),
+                original.datos(), null, List.of(new backend.mantenimiento.model.DatosRepuesto(
+                        "Filtro", null, 1, null)));
+        var jdbc = new JdbcTemplate(dataSource);
+        var operaciones = new OperacionMantenimientoJdbcDao(jdbc) {
+            @Override
+            public void confirmar(UUID id, Long usuario, ResultadoRegistroMantenimiento resultado) {
+                super.confirmar(id, usuario, resultado);
+                throw new IllegalStateException("Fallo controlado antes del COMMIT");
+            }
+        };
+        assertThrows(IllegalStateException.class,
+                () -> servicio(new RegistroMantenimientoJdbcDao(jdbc), operaciones)
+                        .registrar(f.idUsuario(), pedido));
+        assertEquals(0L, cantidadMantenimientos(f.idVehiculo()));
+        assertEquals(0L, jdbc.queryForObject(
+                "SELECT count(*) FROM mycar.repuesto WHERE id_usuario = ?", Long.class, f.idUsuario()));
+        assertEquals(0L, jdbc.queryForObject(
+                "SELECT count(*) FROM mycar.operacion_idempotente WHERE id_operacion = ?",
+                Long.class, pedido.idOperacion()));
+        var servicio = servicio(new RegistroMantenimientoJdbcDao(jdbc));
+        servicio.registrar(f.idUsuario(), pedido);
+        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
+    }
+
+    @Test
+    void revision_lecturaAntiguaNoPermiteServicioActualConKmInferiorAlDeAyer() {
+        var f = crearFixtureConfirmada();
+        var jdbc = new JdbcTemplate(dataSource);
+        Long inicial = jdbc.queryForObject(
+                "SELECT id_lectura_km FROM mycar.lectura_kilometraje WHERE id_vehiculo = ?",
+                Long.class, f.idVehiculo());
+        jdbc.update("""
+                INSERT INTO mycar.lectura_kilometraje
+                    (id_vehiculo, valor_km, origen, fecha_lectura_utc, id_operacion)
+                VALUES (?, 30000, 'ACTUALIZACION', ?, ?)
+                """, f.idVehiculo(), f.fechaServicio().atTime(12, 0).atZone(LIMA).toOffsetDateTime(),
+                f.operacionRf14());
+        var pedido = new SolicitudRegistroMantenimiento(UUID.randomUUID(), f.idVehiculo(),
+                new DatosRegistroMantenimiento("MANTENIMIENTO_GENERAL", LocalDate.now(LIMA),
+                        20000, OrigenKmServicio.LECTURA, inicial, null, null, null, null), null, List.of());
+        var servicio = servicio(new RegistroMantenimientoJdbcDao(jdbc));
+        assertThrows(IllegalArgumentException.class, () -> servicio.registrar(f.idUsuario(), pedido));
+        assertEquals(0L, cantidadMantenimientos(f.idVehiculo()));
+        assertEquals(0L, jdbc.queryForObject(
+                "SELECT count(*) FROM mycar.operacion_idempotente WHERE id_operacion = ?",
+                Long.class, pedido.idOperacion()));
+        // El mismo kilometraje sí es válido para el servicio histórico del día de su lectura.
+        var historico = new SolicitudRegistroMantenimiento(UUID.randomUUID(), f.idVehiculo(),
+                new DatosRegistroMantenimiento("MANTENIMIENTO_GENERAL", f.fechaServicio().minusDays(1),
+                        20000, OrigenKmServicio.LECTURA, inicial, null, null, null, null), null, List.of());
+        servicio.registrar(f.idUsuario(), historico);
+        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
+    }
+
     private RegistroMantenimientoService servicio(RegistroMantenimientoDao dao) {
+        return servicio(dao, new OperacionMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
+    }
+
+    private RegistroMantenimientoService servicio(
+            RegistroMantenimientoDao dao, OperacionMantenimientoDao operaciones) {
         var jdbc = new JdbcTemplate(dataSource);
         var target = new RegistroMantenimientoService(
                 new ValidadorRegistroMantenimiento(Clock.system(LIMA)),
@@ -146,7 +321,7 @@ class RegistroMantenimientoConcurrenciaTest {
                 new VehiculoMantenimientoService(new VehiculoMantenimientoJdbcDao(jdbc)),
                 new TipoMantenimientoService(new TipoMantenimientoJdbcDao(jdbc)),
                 new LecturaKmMantenimientoService(new LecturaKmMantenimientoJdbcDao(jdbc)),
-                dao
+                dao, operaciones
         );
         var interceptor = new TransactionInterceptor();
         interceptor.setTransactionManager(new DataSourceTransactionManager(dataSource));

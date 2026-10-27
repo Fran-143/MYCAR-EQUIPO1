@@ -268,6 +268,49 @@ class LecturaKmMantenimientoServiceTest {
         verify(dao, never()).buscarPorId(any());
     }
 
+    @Test
+    void revision_rechazaLecturaAntiguaSiOtraAnteriorAlServicioYaEsMayor() {
+        var dao = mock(LecturaKmMantenimientoDao.class);
+        var fecha = LocalDate.of(2026, 10, 26);
+        when(dao.buscarPorId(701L)).thenReturn(Optional.of(new LecturaKmReferencia(
+                701L, 10L, 21000, Instant.parse("2026-10-20T15:00:00Z"))));
+        when(dao.buscarUltimaLecturaAnterior(10L, fecha)).thenReturn(Optional.of(
+                new LecturaKmReferencia(702L, 10L, 30000,
+                        Instant.parse("2026-10-25T15:00:00Z"))));
+        assertThrows(IllegalArgumentException.class,
+                () -> new LecturaKmMantenimientoService(dao)
+                        .validarReferencia(10L, datosConLectura()));
+    }
+
+    @Test
+    void revision_lecturaTambienRespetaElLimitePosterior() {
+        var dao = mock(LecturaKmMantenimientoDao.class);
+        when(dao.buscarPorId(701L)).thenReturn(Optional.of(new LecturaKmReferencia(
+                701L, 10L, 21000, Instant.parse("2026-10-20T15:00:00Z"))));
+        when(dao.buscarPrimeraLecturaPosterior(10L, LocalDate.of(2026, 10, 26)))
+                .thenReturn(Optional.of(new LecturaKmReferencia(702L, 10L, 20500,
+                        Instant.parse("2026-10-27T15:00:00Z"))));
+        assertThrows(IllegalArgumentException.class,
+                () -> new LecturaKmMantenimientoService(dao)
+                        .validarReferencia(10L, datosConLectura()));
+    }
+
+    @Test
+    void revision_permiteServicioHistoricoConLecturaMenorQueLaActual() {
+        var dao = mock(LecturaKmMantenimientoDao.class);
+        var fecha = LocalDate.of(2026, 10, 26);
+        when(dao.buscarPorId(701L)).thenReturn(Optional.of(new LecturaKmReferencia(
+                701L, 10L, 21000, Instant.parse("2026-10-25T15:00:00Z"))));
+        when(dao.buscarUltimaLecturaAnterior(10L, fecha)).thenReturn(Optional.of(
+                new LecturaKmReferencia(701L, 10L, 21000,
+                        Instant.parse("2026-10-25T15:00:00Z"))));
+        when(dao.buscarPrimeraLecturaPosterior(10L, fecha)).thenReturn(Optional.of(
+                new LecturaKmReferencia(702L, 10L, 30000,
+                        Instant.parse("2026-10-27T15:00:00Z"))));
+        assertDoesNotThrow(() -> new LecturaKmMantenimientoService(dao)
+                .validarReferencia(10L, datosConLectura()));
+    }
+
     private LecturaKmMantenimientoService servicioConLectura(
             Long idVehiculo,
             Integer valorKm,

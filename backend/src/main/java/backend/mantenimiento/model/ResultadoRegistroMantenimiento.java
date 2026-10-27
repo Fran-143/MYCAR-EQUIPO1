@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Snapshot de respuesta: el adaptador compartido debe conservarlo tras COMMIT. */
+/** Snapshot de respuesta conservado en operacion_idempotente al confirmar RF17. */
 public record ResultadoRegistroMantenimiento(
         UUID idOperacion, Long idVehiculo, Long idMantenimiento,
         String estado, Integer kmServicio, LocalDate fechaServicio,
