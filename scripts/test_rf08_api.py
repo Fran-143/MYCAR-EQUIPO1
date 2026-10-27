@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--maven-settings", help="settings.xml externo, si la red requiere proxy")
     parser.add_argument("--maven-repo", help="caché Maven opcional")
+    parser.add_argument("--incluir-rf09", action="store_true", help="Añade el listado y las pruebas RF09")
     args = parser.parse_args()
     container = "mycar-mvp-test-" + uuid.uuid4().hex[:12]
     db_name = "mycar_mvp_test_" + uuid.uuid4().hex[:12]
@@ -69,9 +70,12 @@ def main():
         env["MYCAR_ENV_FILE"] = "optional:file:" + (target / "rf08-sin-env.properties").as_posix()
 
         # Ejecuta las validaciones existentes y el servicio RF08 real sobre la BD ya migrada.
-        run(command + ["-Dtest=Validador*Test,Validacion*Test,RegistroVehiculoServicePostgresTest,VehiculosControllerTest,ConsultaRegistroVehiculoPostgresTest",
+        pruebas = "Validador*Test,Validacion*Test,RegistroVehiculoServicePostgresTest,VehiculosControllerTest,ConsultaRegistroVehiculoPostgresTest"
+        if args.incluir_rf09:
+            pruebas += ",ListadoVehiculosPostgresTest,ListadoVehiculosControllerTest"
+        run(command + ["-Dtest=" + pruebas,
                        "-Dmycar.rf08.tests=true", "test"], cwd=ROOT / "backend", env=env)
-        print("Servicio RF08, consultas, contrato MVC y validaciones: PASÓ", flush=True)
+        print("Servicio RF08" + ("/RF09" if args.incluir_rf09 else "") + ", consultas, contrato MVC y validaciones: PASÓ", flush=True)
 
         # Comprobar también la prueba Spring existente contra el mismo PostgreSQL aislado.
         env.update(MYCAR_ENV_FILE="optional:file:" + (target / "sin-env-local.properties").as_posix(),
@@ -111,10 +115,13 @@ def main():
                 raise RuntimeError("Health no devolvió UP en 60 segundos")
         # Seguridad REAL actual: sin credenciales ninguna ruta debe exponer datos ni aceptar altas.
         base_http = f"http://127.0.0.1:{match.group(1)}"
-        for method, path in [("GET", "/api/v1/vehiculos/catalogos"),
+        rutas = [("GET", "/api/v1/vehiculos/catalogos"),
                              ("GET", "/api/v1/vehiculos/cupo-registro"),
                              ("GET", "/api/v1/vehiculos/operaciones/" + str(uuid.uuid4())),
-                             ("POST", "/api/v1/vehiculos")]:
+                             ("POST", "/api/v1/vehiculos")]
+        if args.incluir_rf09:
+            rutas.append(("GET", "/api/v1/vehiculos"))
+        for method, path in rutas:
             request = urllib.request.Request(base_http + path,
                 data=b"{}" if method == "POST" else None, method=method,
                 headers={"Accept": "application/json", "Content-Type": "application/json"})
@@ -124,7 +131,7 @@ def main():
             except urllib.error.HTTPError as rejected:
                 if rejected.code not in (401, 403):
                     raise RuntimeError("Estado inesperado para petición anónima: " + str(rejected.code))
-        print("HTTP vehículos: 4 peticiones anónimas rechazadas (401/403).", flush=True)
+        print(f"HTTP vehículos: {len(rutas)} peticiones anónimas rechazadas (401/403).", flush=True)
         print("HTTP /actuator/health:", json.dumps(health), flush=True)
         print("PASÓ: BD MVP, servicio RF08, consultas, contrato MVC, contexto Spring y HTTP protegido.", flush=True)
         return 0

@@ -53,6 +53,13 @@ data class FormularioRegistroVehiculo(
         else -> this
     }
 
+    fun camposAfectados(campo: String): Set<String> = when (campo) {
+        "idTipoMotor" -> setOf(campo, "tipoMotorOtro", "idCombustible", "combustibleOtro", "idTipoAceite", "tipoAceiteOtro", "numeroMotor")
+        "idCombustible" -> setOf(campo, "combustibleOtro")
+        "idTipoAceite" -> setOf(campo, "tipoAceiteOtro")
+        else -> setOf(campo)
+    }
+
     companion object {
         fun desde(s: SolicitudRegistroVehiculoDto) = FormularioRegistroVehiculo(
             s.marca, s.modelo, s.usoVehiculoCodigo, s.placa, s.anioFabricacion.toString(), s.color,

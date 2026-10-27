@@ -88,6 +88,11 @@ fun RegistroVehiculoScreen(
     onIrInicio: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var camposEditados by rememberSaveable { mutableStateOf(listOf<String>()) }
+    val erroresLocales = estado.catalogos?.let { ValidadorFormularioRegistro.validar(estado.formulario, it) }
+    val puedeGuardar = !estado.ocupado && erroresLocales != null && erroresLocales.isEmpty()
+    val estadoVisible = estado.copy(errores = estado.errores +
+        erroresLocales.orEmpty().filterKeys { it in camposEditados })
     TemaRegistroVehiculo {
         Scaffold(
             modifier = modifier.fillMaxSize().imePadding(),
@@ -116,7 +121,7 @@ fun RegistroVehiculoScreen(
                             OutlinedButton(onClick = onVolver, enabled = !estado.ocupado,
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f).heightIn(min = 50.dp)) { Text("Cancelar") }
-                            Button(onClick = onGuardar, enabled = !estado.ocupado,
+                            Button(onClick = onGuardar, enabled = puedeGuardar,
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1.4f).heightIn(min = 50.dp)) {
                                 Text(if (estado.ocupado) "Guardando…" else "Guardar vehículo")
@@ -141,7 +146,15 @@ fun RegistroVehiculoScreen(
                 }
                 when (estado.fase) {
                     FaseRegistro.CARGANDO -> Text("Cargando información…")
-                    FaseRegistro.FORMULARIO -> FormularioRegistroContenido(estado, onCambiar)
+                    FaseRegistro.FORMULARIO -> {
+                        if (!puedeGuardar && !estado.ocupado) Text(
+                            "Completa los campos obligatorios y corrige los datos para habilitar Guardar.",
+                            style = MaterialTheme.typography.bodySmall)
+                        FormularioRegistroContenido(estadoVisible) { campo, valor ->
+                            if (campo !in camposEditados) camposEditados = camposEditados + campo
+                            onCambiar(campo, valor)
+                        }
+                    }
                     FaseRegistro.SESION_REQUERIDA -> {
                         Text("Inicia sesión para registrar tu vehículo.")
                         Button(onClick = onIniciarSesion, enabled = !estado.ocupado) { Text("Iniciar sesión") }
@@ -185,12 +198,9 @@ private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambia
     var generales by rememberSaveable { mutableStateOf(true) }
     var identificacion by rememberSaveable { mutableStateOf(false) }
     var motor by rememberSaveable { mutableStateOf(true) }
-    // Los errores de Guardar o del servidor nunca quedan ocultos en una sección cerrada.
-    LaunchedEffect(estado.errores) {
-        if (estado.errores.keys.any { it in camposGenerales }) generales = true
-        if (estado.errores.keys.any { it in camposIdentificacion }) identificacion = true
-        if (estado.errores.keys.any { it in camposMotor }) motor = true
-    }
+    val errorGeneral = estado.errores.keys.any { it in camposGenerales }
+    val errorIdentificacion = estado.errores.keys.any { it in camposIdentificacion }
+    val errorMotor = estado.errores.keys.any { it in camposMotor }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -204,8 +214,8 @@ private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambia
         }
     }
     Text("* Campos obligatorios", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    SeccionRegistro("Información general", R.drawable.ic_rf08_informacion, generales,
-        { generales = !generales }, habilitado, estado.errores.keys.any { it in camposGenerales }) {
+    SeccionRegistro("Información general", R.drawable.ic_rf08_informacion, generales || errorGeneral,
+        { generales = if (errorGeneral) true else !generales }, habilitado, errorGeneral) {
         CampoRegistro("Marca *", "marca", f.marca, estado, onCambiar, ejemplo = "Ej. Toyota")
         CampoRegistro("Modelo *", "modelo", f.modelo, estado, onCambiar, ejemplo = "Ej. Corolla")
         SelectorRegistro("Uso del vehículo *", f.usoVehiculoCodigo,
@@ -216,8 +226,8 @@ private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambia
             numerico = true, ejemplo = "Ej. 2020", ayuda = "Solo el año, no una fecha completa.")
         CampoRegistro("Color *", "color", f.color, estado, onCambiar, ejemplo = "Ej. Gris")
     }
-    SeccionRegistro("Identificación adicional (opcional)", R.drawable.ic_rf08_identificacion, identificacion,
-        { identificacion = !identificacion }, habilitado, estado.errores.keys.any { it in camposIdentificacion }) {
+    SeccionRegistro("Identificación adicional (opcional)", R.drawable.ic_rf08_identificacion, identificacion || errorIdentificacion,
+        { identificacion = if (errorIdentificacion) true else !identificacion }, habilitado, errorIdentificacion) {
         Text("Puedes completar estos datos ahora o dejarlos vacíos.", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         CampoRegistro("VIN", "numeroVin", f.numeroVin, estado, onCambiar, mayusculas = true,
@@ -227,8 +237,8 @@ private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambia
         if (tipo?.esElectrico != true) CampoRegistro("Número de motor", "numeroMotor", f.numeroMotor, estado,
             onCambiar, mayusculas = true, ayuda = "De 5 a 15 caracteres; admite guiones y espacios.")
     }
-    SeccionRegistro("Motor y mantenimiento", R.drawable.ic_rf08_motor, motor,
-        { motor = !motor }, habilitado, estado.errores.keys.any { it in camposMotor }) {
+    SeccionRegistro("Motor y mantenimiento", R.drawable.ic_rf08_motor, motor || errorMotor,
+        { motor = if (errorMotor) true else !motor }, habilitado, errorMotor) {
         SelectorRegistro("Tipo de motor *", f.idTipoMotor,
             catalogos.tiposMotor.map { it.idTipoMotor.toString() to it.nombre }, estado.errores["idTipoMotor"], habilitado) { onCambiar("idTipoMotor", it) }
         if (tipo?.codigo == "OTRO") CampoRegistro("Especifica el tipo de motor *", "tipoMotorOtro", f.tipoMotorOtro, estado, onCambiar)
