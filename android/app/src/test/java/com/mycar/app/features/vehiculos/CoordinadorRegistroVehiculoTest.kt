@@ -140,4 +140,30 @@ class CoordinadorRegistroVehiculoTest {
         try { c.guardar(); fail("Debe propagar la cancelación") } catch (_: CancellationException) { }
         assertNotNull(s.actual)
     }
+    @Test fun codigoSesionDeElsaConservaOperacionParaRecuperarla() = runBlocking<Unit> {
+        val s = PendientesPrueba(); val r = RepositoryPrueba().apply {
+            alEnviar = { throw FalloRegistroVehiculo("SESION_INVALIDA", 401) }
+        }
+        val c = CoordinadorRegistroVehiculo(r, s, DatosPruebaRf08.formulario)
+        c.cargar(); c.guardar()
+        val original = s.actual!!
+        assertEquals(FaseRegistro.SESION_REQUERIDA, c.estado.fase)
+        r.alConsultar = { EstadoOperacionRegistroDto(it, "CONFIRMADA", DatosPruebaRf08.resultado(original)) }
+        c.cargar()
+        assertEquals(FaseRegistro.CONFIRMADA, c.estado.fase)
+        assertEquals(1, r.envios.size)
+        assertEquals(original.idOperacion, c.estado.resultado!!.idOperacion)
+    }
+    @Test fun cambiarMotorLimpiaErroresDeCamposEliminadosSinOcultarVin() = runBlocking<Unit> {
+        val r = RepositoryPrueba().apply { alEnviar = {
+            throw FalloRegistroVehiculo("DATOS_INVALIDOS", 400, setOf("numeroMotor", "idCombustible", "tipoAceiteOtro", "numeroVin"))
+        } }
+        val c = CoordinadorRegistroVehiculo(r, PendientesPrueba(), DatosPruebaRf08.formulario)
+        c.cargar(); c.guardar()
+        val electrico = DatosPruebaRf08.catalogos.tiposMotor.first { it.esElectrico }.idTipoMotor.toString()
+        c.cambiar("idTipoMotor", electrico)
+        assertEquals(setOf("numeroVin"), c.estado.errores.keys)
+        assertEquals("", c.estado.formulario.idCombustible)
+        assertEquals("", c.estado.formulario.numeroMotor)
+    }
 }

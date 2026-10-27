@@ -7,7 +7,7 @@ Base revisada: main f4fd107 (PR #5 integrada). Actualización: 27/10/2026.
 - Cabecera «Agregar vehículo», tonos azules y tarjetas con bordes redondeados.
 - Tres secciones desplegables: Información general; Identificación adicional (opcional); Motor y mantenimiento.
 - Identificación adicional comienza contraída. Sus datos se conservan al cerrar la sección.
-- Las secciones con errores se abren cuando se publican errores de validación o del servidor.
+- Las secciones con errores permanecen abiertas hasta corregirlos; un nuevo intento con errores idénticos no los oculta.
 - Cancelar y Guardar vehículo permanecen al pie, fuera del área desplazable. Se deshabilitan durante una operación.
 - Atrás del sistema también queda bloqueado mientras el ViewModel está ocupado, igual que el botón visible.
 - Rótulos, ejemplos, ayudas de formato, unidad km, selectores anclados y controles de al menos 48 dp.
@@ -17,7 +17,7 @@ Base revisada: main f4fd107 (PR #5 integrada). Actualización: 27/10/2026.
 
 Los valores de los catálogos reales proceden de la API. Los ejemplos del Preview no se usan en ejecución.
 El formulario utiliza las mismas validaciones y el mismo coordinador de guardado de main.
-Las validaciones se ejecutan al pulsar Guardar; el teclado numérico por sí solo no valida entradas.
+La interfaz valida al editar y habilita Guardar solo con datos locales válidos y sin una operación en curso. El coordinador y el backend vuelven a validar al guardar. El teclado numérico por sí solo no valida entradas.
 No se convierte automáticamente una entrada inválida en un dato diferente.
 
 ## Diferencias necesarias con la imagen de referencia
@@ -33,10 +33,10 @@ No se convierte automáticamente una entrada inválida en un dato diferente.
 1. Abre el proyecto android en Android Studio y espera la sincronización de Gradle.
 2. Abre app/src/debug/java/com/mycar/app/features/vehiculos/ui/RegistroVehiculoPreview.kt.
 3. Selecciona Split o Design y pulsa Build & Refresh si hace falta.
-4. Prueba RegistroVehiculoPreview en modo interactivo. Desplázate por el formulario y pulsa Guardar para ver los errores.
+4. Prueba RegistroVehiculoPreview en modo interactivo. Desplázate, escribe datos inválidos y comprueba los errores. Guardar permanece deshabilitado hasta corregirlos.
 5. Cambia a RegistroVehiculoConDatosPreview para ver un formulario con datos de ejemplo.
 6. Selecciona Eléctrico para revisar los campos que desaparecen. Selecciona Otro para mostrar la especificación.
-7. Comprueba el formato de año, placa, VIN, serie y número de motor al Guardar.
+7. Comprueba el formato de año, placa, VIN, serie y número de motor antes de habilitar Guardar.
 8. Revisa los Previews de 320 dp, letra grande y modo oscuro en tu IDE.
 
 El Preview permite revisar diseño y validaciones locales. No inicia sesión ni registra vehículos.
