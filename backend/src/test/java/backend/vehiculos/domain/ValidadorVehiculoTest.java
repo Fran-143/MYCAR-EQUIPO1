@@ -14,7 +14,7 @@ class ValidadorVehiculoTest {
     @ParameterizedTest
     @ValueSource(ints = {1, 1800, 2025, 2026})
     void aceptaAnioPositivoQueNoSeaFuturo(int anio) {
-        // ARRANGE: año de referencia fijo.
+        // ARRANGE
         int anioActual = ANIO_ACTUAL_DE_PRUEBA;
 
         // ACT
@@ -43,7 +43,7 @@ class ValidadorVehiculoTest {
     @ParameterizedTest
     @ValueSource(ints = {1, 100, 250000})
     void aceptaKilometrajeInicialPositivo(int kilometraje) {
-        // ARRANGE: kilometraje proporcionado por ValueSource.
+        // ARRANGE: kilometraje proporcionado por las anotaciones.
 
         // ACT
         boolean resultado =

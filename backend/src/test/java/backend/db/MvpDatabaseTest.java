@@ -12,6 +12,10 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import backend.vehiculos.dao.VehiculoDao;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import backend.vehiculos.dto.DatosRegistroVehiculo;
 
 /** PostgreSQL real, opt-in y exclusivamente en bases desechables mycar_mvp_test_*. */
 @EnabledIfSystemProperty(named = "mycar.db.tests", matches = "true")
@@ -41,7 +45,7 @@ class MvpDatabaseTest {
             exec(db, "CREATE TABLE public.evidencia_preservada(valor TEXT PRIMARY KEY)");
             exec(db, "INSERT INTO public.evidencia_preservada VALUES ('no modificar')");
         }
-        assertEquals(3, flyway(url, null).migrate().migrationsExecuted);
+        assertEquals(4, flyway(url, null).migrate().migrationsExecuted);
         flyway(url, null).validate();
     }
 
@@ -56,6 +60,369 @@ class MvpDatabaseTest {
         }
     }
 
+    @Test
+    void vehiculoDaoBuscaGlobalmenteYCuentaActivosEInactivosPorUsuario()
+            throws Exception {
+
+        // ARRANGE: reutilizamos la conexión de prueba y su rollback.
+        var fuente = new SingleConnectionDataSource(c, true);
+        var dao = new VehiculoDao(new JdbcTemplate(fuente));
+
+        long propietario = account(c);
+
+        long otroPropietario = accountWith(
+                c,
+                "otro-dao@example.test",
+                LocalDate.now(LIMA).minusYears(30)
+        );
+
+        assertEquals(0L, dao.contarRegistrados(propietario));
+
+        rawVehicle(
+                c, propietario, "A1B234",
+                "COMBUSTION", "GASOLINA", null
+        );
+
+        long inactivo = rawVehicle(
+                c, propietario, "C3D456",
+                "COMBUSTION", "GASOLINA", null
+        );
+
+        long ajeno = rawVehicle(
+                c, otroPropietario, "E5F678",
+                "COMBUSTION", "GASOLINA", null
+        );
+
+        String vinInactivo = "1HGCM82633A004352";
+        String vinAjeno = "1HGCM82633A004353";
+
+        exec(
+                c,
+                """
+                UPDATE mycar.vehiculo
+                SET estado_vehiculo = 'INACTIVO', numero_vin = ?
+                WHERE id_vehiculo = ?
+                """,
+                vinInactivo,
+                inactivo
+        );
+
+        exec(
+                c,
+                """
+                UPDATE mycar.vehiculo
+                SET numero_vin = ?
+                WHERE id_vehiculo = ?
+                """,
+                vinAjeno,
+                ajeno
+        );
+
+        // ACT / ASSERT: placa global, incluyendo inactivos y otras cuentas.
+        assertTrue(dao.existePlaca("A1B234"));
+        assertTrue(dao.existePlaca("C3D456"));
+        assertTrue(dao.existePlaca("E5F678"));
+        assertFalse(dao.existePlaca("Z9Z999"));
+
+        // VIN global y opcional.
+        assertTrue(dao.existeVin(vinInactivo));
+        assertTrue(dao.existeVin(vinAjeno));
+        assertFalse(dao.existeVin("1HGCM82633A004354"));
+        assertFalse(dao.existeVin(null));
+
+        // El conteo incluye inactivos y distingue propietarios.
+        assertEquals(2L, dao.contarRegistrados(propietario));
+        assertEquals(1L, dao.contarRegistrados(otroPropietario));
+    }
+
+    @Test
+    void vehiculoDaoInsertaVehiculoConPropietarioYDatosCorrectos()
+            throws Exception {
+
+        // ARRANGE
+        var fuente = new SingleConnectionDataSource(c, true);
+        var dao = new VehiculoDao(new JdbcTemplate(fuente));
+
+        long propietario = account(c);
+
+        long idMotor = number(
+                c,
+                """
+                SELECT id_tipo_motor
+                FROM mycar.tipo_motor
+                WHERE codigo = 'COMBUSTION'
+                """
+        );
+
+        long idCombustible = number(
+                c,
+                """
+                SELECT id_combustible
+                FROM mycar.combustible
+                WHERE codigo = 'GASOLINA'
+                """
+        );
+
+        var datos = new DatosRegistroVehiculo(
+                UUID.randomUUID(),
+                "Toyota",
+                "Corolla",
+                "PARTICULAR",
+                "A1B234",
+                2020,
+                "Blanco",
+                idMotor,
+                idCombustible,
+                50000,
+                "1HGCM82633A004352",
+                "SERIE123",
+                "MOTOR123",
+                null,
+                null,
+                null,
+                null
+        );
+
+        // ACT
+        long idVehiculo =
+                dao.insertarVehiculo(propietario, datos, true);
+
+        // ASSERT
+        assertTrue(idVehiculo > 0);
+
+        assertEquals(
+                propietario,
+                number(
+                        c,
+                        "SELECT id_usuario FROM mycar.vehiculo WHERE id_vehiculo=?",
+                        idVehiculo
+                )
+        );
+
+        assertEquals(
+                "A1B234",
+                text(
+                        c,
+                        "SELECT placa FROM mycar.vehiculo WHERE id_vehiculo=?",
+                        idVehiculo
+                )
+        );
+
+        assertEquals(
+                "Toyota|Corolla|Blanco",
+                text(
+                        c,
+                        """
+                        SELECT marca || '|' || modelo || '|' || color
+                        FROM mycar.vehiculo
+                        WHERE id_vehiculo=?
+                        """,
+                        idVehiculo
+                )
+        );
+
+        assertEquals(
+                "1HGCM82633A004352",
+                text(
+                        c,
+                        "SELECT numero_vin FROM mycar.vehiculo WHERE id_vehiculo=?",
+                        idVehiculo
+                )
+        );
+
+        assertEquals(
+                "SERIE123",
+                text(
+                        c,
+                        "SELECT numero_serie FROM mycar.vehiculo WHERE id_vehiculo=?",
+                        idVehiculo
+                )
+        );
+
+        assertEquals(
+                "MOTOR123",
+                text(
+                        c,
+                        "SELECT numero_motor FROM mycar.vehiculo WHERE id_vehiculo=?",
+                        idVehiculo
+                )
+        );
+
+        assertEquals(
+                "ACTIVO",
+                text(
+                        c,
+                        "SELECT estado_vehiculo FROM mycar.vehiculo WHERE id_vehiculo=?",
+                        idVehiculo
+                )
+        );
+
+        assertEquals(
+                1L,
+                number(
+                        c,
+                        """
+                        SELECT count(*)
+                        FROM mycar.vehiculo
+                        WHERE id_vehiculo=? AND es_principal
+                        """,
+                        idVehiculo
+                )
+        );
+    }
+
+    @Test
+    void bdValidaFormatoVinYPermiteOmitirlo() throws Exception {
+        // ARRANGE
+        long propietario = account(c);
+        long vehiculo = rawVehicle(
+                c, propietario, "A1B234",
+                "COMBUSTION", "GASOLINA", null
+        );
+
+        String actualizar =
+                "UPDATE mycar.vehiculo SET numero_vin=? WHERE id_vehiculo=?";
+
+        // ACT / ASSERT: valores permitidos.
+        for (String vin : List.of(
+                "1HGCM82633A004352",
+                "12345678901234567"
+        )) {
+            exec(c, actualizar, vin, vehiculo);
+
+            assertEquals(
+                    vin,
+                    text(
+                            c,
+                            "SELECT numero_vin FROM mycar.vehiculo WHERE id_vehiculo=?",
+                            vehiculo
+                    )
+            );
+        }
+
+        // Formatos que deben producir una violación CHECK.
+        for (String vin : List.of(
+                "IHGCM82633A004352",
+                "OHGCM82633A004352",
+                "QHGCM82633A004352",
+                "1hgcm82633a004352",
+                "1HGCM82633A00435-"
+        )) {
+            invalid("23514", () -> exec(c, actualizar, vin, vehiculo));
+        }
+
+        exec(c, actualizar, null, vehiculo);
+
+        assertNull(text(
+                c,
+                "SELECT numero_vin FROM mycar.vehiculo WHERE id_vehiculo=?",
+                vehiculo
+        ));
+    }
+
+    @Test
+    void bdValidaNumeroMotorYPermiteOmitirlo() throws Exception {
+        // ARRANGE
+        long propietario = account(c);
+        long vehiculo = rawVehicle(
+                c, propietario, "A1B234",
+                "COMBUSTION", "GASOLINA", null
+        );
+
+        String actualizar =
+                "UPDATE mycar.vehiculo SET numero_motor=? WHERE id_vehiculo=?";
+
+        // ACT / ASSERT: límites y caracteres permitidos.
+        for (String motor : List.of(
+                "AB-12",
+                "AB 12",
+                "MOTOR123",
+                "ABCDEFGHIJKLMNO"
+        )) {
+            exec(c, actualizar, motor, vehiculo);
+
+            assertEquals(
+                    motor,
+                    text(
+                            c,
+                            "SELECT numero_motor FROM mycar.vehiculo WHERE id_vehiculo=?",
+                            vehiculo
+                    )
+            );
+        }
+
+        for (String motor : List.of(
+                "AB12",
+                "ABCDEFGHIJKLMNOP",
+                "motor123",
+                "AB_12",
+                "     ",
+                "AB\t12",
+                "AB\n12"
+        )) {
+            invalid("23514", () -> exec(c, actualizar, motor, vehiculo));
+        }
+
+        exec(c, actualizar, null, vehiculo);
+
+        assertNull(text(
+                c,
+                "SELECT numero_motor FROM mycar.vehiculo WHERE id_vehiculo=?",
+                vehiculo
+        ));
+    }
+
+    @Test
+    void bdValidaNumeroSerieYPermiteOmitirlo() throws Exception {
+        // ARRANGE
+        long propietario = account(c);
+        long vehiculo = rawVehicle(
+                c, propietario, "A1B234",
+                "COMBUSTION", "GASOLINA", null
+        );
+
+        String actualizar =
+                "UPDATE mycar.vehiculo SET numero_serie=? WHERE id_vehiculo=?";
+
+        // ACT / ASSERT: mínimo y máximo permitidos.
+        for (String serie : List.of("ABC123", "A".repeat(80))) {
+            exec(c, actualizar, serie, vehiculo);
+
+            assertEquals(
+                    serie,
+                    text(
+                            c,
+                            "SELECT numero_serie FROM mycar.vehiculo WHERE id_vehiculo=?",
+                            vehiculo
+                    )
+            );
+        }
+
+        for (String serie : List.of(
+                "ABC12",
+                "",
+                "abc123",
+                "ABC 123",
+                "ABC-123",
+                "ABC_123"
+        )) {
+            invalid("23514", () -> exec(c, actualizar, serie, vehiculo));
+        }
+
+        invalid(
+                "22001",
+                () -> exec(c, actualizar, "A".repeat(81), vehiculo)
+        );
+
+        exec(c, actualizar, null, vehiculo);
+
+        assertNull(text(
+                c,
+                "SELECT numero_serie FROM mycar.vehiculo WHERE id_vehiculo=?",
+                vehiculo
+        ));
+    }
+
     @Test void flywayV1IntactaActualizaYReintentaSinModificarDatos() throws Exception {
         try (var in = getClass().getResourceAsStream("/db/mvp/V1__esquema_mvp.sql")) {
             assertNotNull(in);
@@ -63,7 +430,7 @@ class MvpDatabaseTest {
                     HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
                             new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8))));
         }
-        assertEquals(4, number(c, "SELECT count(*) FROM mycar.flyway_schema_history WHERE version IS NOT NULL AND success"));
+        assertEquals(5, number(c, "SELECT count(*) FROM mycar.flyway_schema_history WHERE version IS NOT NULL AND success"));
         assertEquals(0, flyway(url, null).migrate().migrationsExecuted);
         assertEquals("no modificar", text(c, "SELECT valor FROM public.evidencia_preservada"));
         assertEquals(7, number(c, "SELECT count(*) FROM mycar.tipo_mantenimiento"));
