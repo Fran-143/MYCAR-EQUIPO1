@@ -17,6 +17,10 @@ public class ValidadorRepuesto {
             );
         }
 
+        LimitesAlmacenamiento.texto("nombre", datos.nombre(), 140);
+        LimitesAlmacenamiento.texto("marca", datos.marca(), 120);
+        LimitesAlmacenamiento.importe("precioUnitario", datos.precioUnitario());
+
         if (datos.cantidad() == null || datos.cantidad() <= 0) {
             throw new IllegalArgumentException(
                     "cantidad: es obligatoria y debe ser mayor que cero"

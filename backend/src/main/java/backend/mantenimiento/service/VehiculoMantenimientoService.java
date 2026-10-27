@@ -2,6 +2,7 @@ package backend.mantenimiento.service;
 
 import backend.mantenimiento.dao.VehiculoMantenimientoDao;
 import backend.mantenimiento.model.VehiculoMantenimiento;
+import backend.mantenimiento.model.MantenimientoNoDisponibleException;
 
 import java.util.Objects;
 
@@ -20,9 +21,7 @@ public class VehiculoMantenimientoService {
             Long idVehiculo
     ) {
         VehiculoMantenimiento vehiculo = dao.buscarPorId(idVehiculo)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "idVehiculo: no existe"
-                ));
+                .orElseThrow(() -> new MantenimientoNoDisponibleException());
 
         return verificarPropiedadYEstado(idUsuario, vehiculo);
     }
@@ -32,9 +31,7 @@ public class VehiculoMantenimientoService {
             Long idVehiculo
     ) {
         VehiculoMantenimiento vehiculo = dao.buscarPorIdParaRegistro(idVehiculo)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "idVehiculo: no existe"
-                ));
+                .orElseThrow(() -> new MantenimientoNoDisponibleException());
 
         return verificarPropiedadYEstado(idUsuario, vehiculo);
     }
@@ -42,15 +39,11 @@ public class VehiculoMantenimientoService {
     private VehiculoMantenimiento verificarPropiedadYEstado(
             Long idUsuario, VehiculoMantenimiento vehiculo) {
         if (!Objects.equals(vehiculo.idUsuario(), idUsuario)) {
-            throw new IllegalArgumentException(
-                    "idVehiculo: no pertenece al usuario"
-            );
+            throw new MantenimientoNoDisponibleException();
         }
 
         if (!"ACTIVO".equals(vehiculo.estadoVehiculo())) {
-            throw new IllegalArgumentException(
-                    "idVehiculo: debe estar activo"
-            );
+            throw new MantenimientoNoDisponibleException();
         }
 
         return vehiculo;

@@ -35,6 +35,13 @@ public class ValidadorRegistroMantenimiento {
             );
         }
 
+        LimitesAlmacenamiento.texto("codigoTipoMantenimiento", datos.codigoTipoMantenimiento(), 50);
+        LimitesAlmacenamiento.texto("servicioOtro", datos.servicioOtro(), 160);
+        LimitesAlmacenamiento.importe("costoTotal", datos.costoTotal());
+        if (datos.idLecturaKmReferencia() != null && datos.idLecturaKmReferencia() <= 0) {
+            throw new IllegalArgumentException("idLecturaKmReferencia: debe ser positiva");
+        }
+
         LocalDate hoy = LocalDate.now(
                 reloj.withZone(ZoneId.of("America/Lima"))
         );
