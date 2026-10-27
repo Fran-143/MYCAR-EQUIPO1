@@ -1,0 +1,158 @@
+{
+  "origen": {
+    "repositorio": "Fran-143/MYCAR-EQUIPO1",
+    "rama": "feat/mantenimientos-alertas-rf17-rf27",
+    "commit": "a5d2264f661d138445340d471c59e414da21efe2"
+  },
+  "cambios": [
+    {
+      "archivo": "backend/CONTRATO_RF17_PROPUESTO.md",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/README_RF17.md",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/api/ErroresMantenimientoController.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/api/IntegracionRf17PendienteException.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/api/MantenimientoController.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/api/dto/ContratoRf17.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/dao/ContextoMantenimientoJdbcDao.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimiento.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/model/EstadoOperacionRegistro.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/model/MantenimientoNoDisponibleException.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/model/ResultadoRegistroMantenimiento.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/seguridad/IdentidadMantenimiento.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/seguridad/SesionMantenimientoNoValidada.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/service/LimitesAlmacenamiento.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/service/MantenimientoHttpService.java",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/service/RegistroMantenimientoService.java",
+      "estado": "MODIFICADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/service/ValidadorRegistroMantenimiento.java",
+      "estado": "MODIFICADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/service/ValidadorRepuesto.java",
+      "estado": "MODIFICADO"
+    },
+    {
+      "archivo": "backend/src/main/java/backend/mantenimiento/service/VehiculoMantenimientoService.java",
+      "estado": "MODIFICADO"
+    },
+    {
+      "archivo": "android/README_RF17.md",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/ArchivoRegistroPendiente.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/MantenimientoApi.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/MantenimientoApiAdapter.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/RemoteMantenimientoRepository.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/domain/BorradorMantenimiento.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/domain/MantenimientoRepository.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/RegistrarMantenimientoRoute.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/RegistrarMantenimientoScreen.kt",
+      "estado": "CREADO"
+    },
+    {
+      "archivo": "android/app/src/main/java/com/mycar/app/features/mantenimiento/viewmodel/MantenimientoViewModel.kt",
+      "estado": "CREADO"
+    }
+  ],
+  "conservados_sin_cambios": [
+    "backend/src/test/java/backend/BackendApplicationTests.java",
+    "backend/src/test/java/backend/db/MvpDatabaseTest.java",
+    "backend/src/test/java/backend/mantenimiento/dao/LecturaKmMantenimientoJdbcDaoTest.java",
+    "backend/src/test/java/backend/mantenimiento/dao/RegistroMantenimientoJdbcDaoTest.java",
+    "backend/src/test/java/backend/mantenimiento/dao/TipoMantenimientoJdbcDaoTest.java",
+    "backend/src/test/java/backend/mantenimiento/dao/VehiculoMantenimientoJdbcDaoTest.java",
+    "backend/src/test/java/backend/mantenimiento/service/LecturaKmMantenimientoServiceTest.java",
+    "backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoConcurrenciaTest.java",
+    "backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoServiceTest.java",
+    "backend/src/test/java/backend/mantenimiento/service/TipoMantenimientoServiceTest.java",
+    "backend/src/test/java/backend/mantenimiento/service/ValidadorRegistroMantenimientoTest.java",
+    "backend/src/test/java/backend/mantenimiento/service/ValidadorRepuestoTest.java",
+    "backend/src/test/java/backend/mantenimiento/service/VehiculoMantenimientoServiceTest.java",
+    "backend/src/test/resources/db/mvp/dictionary_columns.json",
+    "backend/src/test/resources/db/mvp/smoke_rollback.sql",
+    "backend/src/main/resources/db/mvp/V1__esquema_mvp.sql",
+    "backend/src/main/resources/db/mvp/V2__tablas_mvp.sql",
+    "backend/src/main/resources/db/mvp/V3__catalogos_mvp.sql",
+    "backend/src/main/resources/db/mvp/V4__funciones_y_triggers_mvp.sql"
+  ],
+  "validacion": {
+    "backend": "COMPILA: test-compile, JDK25 release21",
+    "android": "COMPILA: compileDebugKotlin",
+    "suites": "NO EJECUTADAS",
+    "e2e": "NO VERIFICADO"
+  },
+  "contratos_pendientes": [
+    "Identidad de Elsa",
+    "HTTP e idempotencia compartidos",
+    "Navegación/Retrofit/RF14",
+    "Igualdad/mismo día/coherencia futura"
+  ]
+}
