@@ -1,0 +1,74 @@
+{
+  "paquete": "02_RF18_ANDROID_v2.zip",
+  "base_android": "032aef221e796fad68cc2772fe98b7a6b9333ba9",
+  "cambio": "Preserva el launcher DEBUG de RF08/RF09; agrega alias explicito al inicio y Activity de diseno RF18. Actualiza scripts adb para no abrir MainActivity no exportada directamente.",
+  "android_unitarias": {
+    "tests": 76,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "rf18_unitarias": 20,
+  "debug_apk": "BUILD SUCCESSFUL",
+  "apk_pruebas": "BUILD SUCCESSFUL",
+  "release_kotlin": "BUILD SUCCESSFUL",
+  "manifest_debug": [
+    {
+      "tipo": "activity",
+      "nombre": "com.mycar.app.MainActivity",
+      "exportada": "false",
+      "destino": null,
+      "launcher": false
+    },
+    {
+      "tipo": "activity-alias",
+      "nombre": "com.mycar.app.features.historial.ui.HistorialEntrada",
+      "exportada": "true",
+      "destino": "com.mycar.app.MainActivity",
+      "launcher": false
+    },
+    {
+      "tipo": "activity",
+      "nombre": "com.mycar.app.debug.RegistroVehiculoDemoActivity",
+      "exportada": "true",
+      "destino": null,
+      "launcher": true
+    },
+    {
+      "tipo": "activity",
+      "nombre": "com.mycar.app.features.historial.ui.HistorialPreviewActivity",
+      "exportada": "true",
+      "destino": null,
+      "launcher": false
+    },
+    {
+      "tipo": "activity",
+      "nombre": "androidx.compose.ui.tooling.PreviewActivity",
+      "exportada": "true",
+      "destino": null,
+      "launcher": false
+    },
+    {
+      "tipo": "activity",
+      "nombre": "androidx.activity.ComponentActivity",
+      "exportada": "true",
+      "destino": null,
+      "launcher": false
+    }
+  ],
+  "manifest_release": [
+    {
+      "tipo": "activity",
+      "nombre": "com.mycar.app.MainActivity",
+      "exportada": "true",
+      "destino": null,
+      "launcher": true
+    }
+  ],
+  "interfaz_instrumentada": {
+    "compiladas": 8,
+    "ejecutadas_en_este_entorno": 0
+  },
+  "backend": "No modificado ni reinstalado en esta revision. Nayu ya confirmo 18 pruebas unitarias correctas en su PC.",
+  "instaladores_windows": "Preparados para ejecucion en la PC de Nayu; no ejecutados en este entorno Linux."
+}

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <application android:networkSecurityConfig="@xml/debug_network_security_config">
+        <!-- Solo DEBUG: una entrada de pruebas. Release conserva MainActivity. -->
+        <activity android:name=".MainActivity" android:exported="false" tools:replace="android:exported">
+            <intent-filter tools:node="removeAll" />
+        </activity>
+        <activity
+            android:name=".debug.RegistroVehiculoDemoActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyCar"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <!-- RF18: accesos explicitos sin cambiar el launcher de prueba de vehiculos. -->
+        <activity android:name=".features.historial.ui.HistorialPreviewActivity"
+            android:exported="true" android:label="RF18 · Diseño con ejemplos" />
+        <activity-alias android:name=".features.historial.ui.HistorialEntrada"
+            android:targetActivity=".MainActivity" android:exported="true"
+            android:label="MyCar · Historial" />
+    </application>
+</manifest>
