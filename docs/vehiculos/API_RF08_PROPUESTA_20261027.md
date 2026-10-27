@@ -81,6 +81,7 @@ JSON: `{"codigo":"...","mensaje":"...","campos":[...]}`.
 | 403 | CUENTA_NO_AUTORIZADA; también puede provenir de filtros actuales |
 | 404 | OPERACION_NO_ENCONTRADA, para ausencia/ajena/otro tipo por igual |
 | 409 | PLAN_FREE_NO_DISPONIBLE, LIMITE_FREE, PLACA_DUPLICADA, VIN_DUPLICADO, CONFLICTO_REGISTRO, CONFLICTO_IDEMPOTENCIA, OPERACION_EN_PROCESO |
+| 415 | FORMATO_NO_ADMITIDO: el cuerpo debe enviarse como JSON |
 | 503 | SERVICIO_NO_DISPONIBLE |
 | 500 | ERROR_INTERNO |
 
@@ -95,3 +96,9 @@ Las pruebas MVC usan identidad/servicios simulados para verificar el contrato y 
 ## Siguiente bloque independiente
 
 Formulario Android con campos obligatorios, opciones OTRO/ELÉCTRICO, datos opcionales contraídos, validación local y estado de reintento. Los ejemplos de catálogo solo podrán usarse en previews/tests; el formulario de ejecución debe recibir catálogos y cupo reales tras autenticar. La aceptación completa requiere el adaptador de Elsa y el acuerdo Free de Sebastián.
+
+## Corrección de revisión PR #5
+
+Los campos anioFabricacion, kilometrajeInicial, idTipoMotor, idCombustible e idTipoAceite exigen números enteros JSON dentro del rango Integer/Long. Se rechazan decimales (incluso 2020.0), cadenas numéricas y desbordamientos antes de invocar el servicio. Los null de identificadores opcionales se conservan. Esta regla se aplica solo al DTO de RF08 y no cambia la configuración JSON de otros módulos ni la huella de serialización de solicitudes válidas.
+
+Content-Type no soportado devuelve HTTP 415 con FORMATO_NO_ADMITIDO, sin ejecutar el registro. Las pruebas del controlador pasan de 26 a 47 casos. La ejecución conjunta del script pasa de 143 a 164 pruebas, además de las 42 pruebas de BD.
