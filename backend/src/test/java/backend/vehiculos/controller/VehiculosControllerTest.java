@@ -13,6 +13,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
@@ -220,6 +223,64 @@ class VehiculosControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(datos())))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         assertEquals(json.readTree(uno), json.readTree(dos));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"anioFabricacion,2020.7", "kilometrajeInicial,50000.9", "idTipoMotor,1.7",
+            "idCombustible,1.7", "idTipoAceite,1.7", "anioFabricacion,2020.0", "kilometrajeInicial,50000.0"})
+    void decimalesNoSeTruncanNiLleganAlServicio(String campo, String numero) throws Exception {
+        ObjectNode cuerpo = json.valueToTree(datos());
+        cuerpo.put(campo, new BigDecimal(numero));
+        mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(cuerpo)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("codigo").value("SOLICITUD_INVALIDA"));
+        verifyNoInteractions(registro);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"anioFabricacion", "kilometrajeInicial", "idTipoMotor", "idCombustible", "idTipoAceite"})
+    void camposEnterosNoAceptanNumerosEnCadenas(String campo) throws Exception {
+        ObjectNode cuerpo = json.valueToTree(datos());
+        cuerpo.put(campo, "1");
+        mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(cuerpo)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(registro);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"anioFabricacion,2147483648", "kilometrajeInicial,2147483648",
+            "idTipoMotor,9223372036854775808", "idCombustible,9223372036854775808", "idTipoAceite,9223372036854775808"})
+    void enterosFueraDeRangoSeRechazanAntesDelServicio(String campo, String numero) throws Exception {
+        ObjectNode cuerpo = json.valueToTree(datos());
+        cuerpo.put(campo, new BigInteger(numero));
+        mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(cuerpo)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(registro);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"text/plain", "application/xml", "application/x-www-form-urlencoded"})
+    void contenidoNoSoportadoDevuelve415SinLlamarAlServicio(String tipo) throws Exception {
+        mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
+                        .contentType(tipo).content("texto"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("codigo").value("FORMATO_NO_ADMITIDO"));
+        verifyNoInteractions(registro);
+    }
+
+    @Test void identificadoresOpcionalesPuedenSeguirSiendoNull() throws Exception {
+        ObjectNode cuerpo = json.valueToTree(datos());
+        cuerpo.put("idTipoMotor", 2);
+        cuerpo.putNull("idCombustible");
+        cuerpo.putNull("idTipoAceite");
+        when(registro.registrar(eq(17L), any())).thenReturn(resultado());
+        mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(cuerpo)))
+                .andExpect(status().isCreated());
+        verify(registro).registrar(eq(17L), argThat(d -> d.idTipoMotor() == 2L
+                && d.idCombustible() == null && d.idTipoAceite() == null));
     }
 
     private DatosRegistroVehiculo datos() {
