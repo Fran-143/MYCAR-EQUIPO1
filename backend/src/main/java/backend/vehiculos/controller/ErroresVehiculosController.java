@@ -24,7 +24,7 @@ public class ErroresVehiculosController {
     @ExceptionHandler(ErrorRegistroVehiculo.class)
     public ResponseEntity<ErrorApiVehiculos> funcional(ErrorRegistroVehiculo error) {
         HttpStatus estado = switch (error.codigo()) {
-            case "DATOS_INVALIDOS" -> HttpStatus.BAD_REQUEST;
+            case "DATOS_INVALIDOS", "FILTRO_INVALIDO" -> HttpStatus.BAD_REQUEST;
             case "CUENTA_NO_AUTORIZADA" -> HttpStatus.FORBIDDEN;
             case "OPERACION_NO_ENCONTRADA" -> HttpStatus.NOT_FOUND;
             case "PLAN_FREE_NO_DISPONIBLE", "LIMITE_FREE", "PLACA_DUPLICADA",
@@ -34,6 +34,7 @@ public class ErroresVehiculosController {
         };
         String mensaje = switch (error.codigo()) {
             case "DATOS_INVALIDOS" -> "Revisa los campos señalados.";
+            case "FILTRO_INVALIDO" -> "Selecciona Todos, Activos o Inactivos.";
             case "CUENTA_NO_AUTORIZADA" -> "Tu cuenta no tiene acceso a esta operación.";
             case "OPERACION_NO_ENCONTRADA" -> "No se encontró una operación disponible para tu cuenta.";
             case "PLAN_FREE_NO_DISPONIBLE" -> "No hay un plan Free disponible para registrar el vehículo.";
