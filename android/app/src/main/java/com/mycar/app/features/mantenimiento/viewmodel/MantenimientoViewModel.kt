@@ -23,9 +23,10 @@ data class MantenimientoUiState(
     val resultado: ResultadoRf17Dto? = null, val mensaje: String? = null,
     val errores: Map<String,String> = emptyMap(), val editor: RepuestoBorrador? = null,
     val erroresEditor: Map<String,String> = emptyMap(), val confirmarSalida: Boolean = false,
-    val vehiculoPendiente: Long? = null, val recuperacionBloqueada: Boolean = false
+    val vehiculoPendiente: Long? = null, val recuperacionBloqueada: Boolean = false,
+    val requiereSesion: Boolean = false
 ) {
-    val editable get() = !enviando && !incierto && resultado == null && !recuperacionBloqueada
+    val editable get() = !requiereSesion && !enviando && !incierto && resultado == null && !recuperacionBloqueada
 }
 
 class MantenimientoViewModel(
