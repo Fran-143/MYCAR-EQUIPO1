@@ -1,0 +1,93 @@
+{
+  "fecha": "2026-10-27",
+  "compilacion_release": 21,
+  "jdk_ejecucion": 25,
+  "postgresql": "17.11",
+  "total": 102,
+  "fallos": 0,
+  "errores": 0,
+  "omitidas": 0,
+  "health": {
+    "http": 200,
+    "status": "UP"
+  },
+  "suites": [
+    {
+      "name": "backend.mantenimiento.service.ValidadorRegistroMantenimientoTest",
+      "tests": "20",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.service.ValidadorRepuestoTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.service.TipoMantenimientoServiceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.dao.LecturaKmMantenimientoJdbcDaoTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.service.RegistroMantenimientoServiceTest",
+      "tests": "21",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.dao.TipoMantenimientoJdbcDaoTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.dao.RegistroMantenimientoJdbcDaoTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.dao.VehiculoMantenimientoJdbcDaoTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.service.RegistroMantenimientoConcurrenciaTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.service.VehiculoMantenimientoServiceTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "backend.mantenimiento.service.LecturaKmMantenimientoServiceTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ]
+}

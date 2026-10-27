@@ -1,0 +1,94 @@
+{
+  "archivos": [
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/api/ErroresMantenimientoController.java",
+      "original": "ea9b88942fd7f1ba058aca51ad265ce7292290b633ad48979bb8f0007fd6689a",
+      "nuevo": "8d33503cca046a1499ea27e8aaadd66eab302528d7752c8c39608b8745ec9e0a"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/config/MantenimientoConfiguracion.java",
+      "original": "3e59cfa6b6266234e2c3b26592663508fdf8a9b1570adcc5d00dc6c9954cb843",
+      "nuevo": "347096f65e3283b97219b768c6f4758006550d101dfdcd4c6e1c2fe3b043dc67"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/OperacionMantenimientoDao.java",
+      "original": "677608ed228aa2f48645858cf2f5187dc917365127271ba13d4df1e776b36381",
+      "nuevo": "6723a8da5e29c80bea0a6971d16ada3d97edf73b25b763e24f222f9de8ff343a"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/OperacionMantenimientoJdbcDao.java",
+      "original": null,
+      "nuevo": "622beb40a56fb2195cc534e143e6e58cb01add01939217c379f00a2a0b54a45f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/integracion/JsonOperacionMantenimiento.java",
+      "original": null,
+      "nuevo": "8055e3d73e4ca9a6ef49581d7e0b00b66b9e05c6e3df59082e299131504c4ba9"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimiento.java",
+      "original": "46af74e0c15a1283ff26408588d53d555eab18f90086473c4465ed6a2872edbe",
+      "nuevo": "5b5e014ab80abe0fe16b61095aa14e547fce186d6c1e7611e0291f7e0ae344ab"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimientoService.java",
+      "original": null,
+      "nuevo": "f155b2d7b9051433838df1bdf9b3fe85d4e3b4f1ed4e1b8ccb39f6a065ce6079"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/ConflictoOperacionMantenimientoException.java",
+      "original": null,
+      "nuevo": "21719f2288962eb914b087aa2dfc0c39da7bb094eb3d6a078ba2fb94d61b78a2"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/EstadoOperacionRegistro.java",
+      "original": "ca827a0c28d9d6cb46b7471607f00c991168fd38d35c448eafb35b0b408e0445",
+      "nuevo": "6142a68e216726b908d92f853f3a92d993faf57deba2beb0530fbf16b7164e4c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/OperacionMantenimiento.java",
+      "original": "33a08cfab63416d215312fc41e25336042d73592339e64c92238144a85e927c5",
+      "nuevo": "29fc1ee71138ed6790fbf0042d0f109c653751bcef4f601a3c8181af007e3fff"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/ResultadoRegistroMantenimiento.java",
+      "original": "08749f2bc97a85017659a9d088b1762de811ebad26b95fc715c5588407a435b3",
+      "nuevo": "704f6e3cd6ba05c3aa8a58470e0b5efa58dc9a3b0c69379255b613ba622f4bac"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/LecturaKmMantenimientoService.java",
+      "original": "b51b866deb2c6e36d1563079e4bd932becc446355de5f2c1d4a8c71aa564c93e",
+      "nuevo": "9478d9db8e138b041077c0a04313938f56cba3a8658ecfb4f1d9ab19b21c46c1"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/MantenimientoHttpService.java",
+      "original": "d1eda0c865a4c3eee25639f50258b0266c63e84904d8e9aa70a5659d7f96b13e",
+      "nuevo": "6f63ae098d80745cb3860f3410db6e451b12a2d3f1b530c4d14bb20f44707cdc"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/RegistroMantenimientoService.java",
+      "original": "eb1745eb80c8c691ffa9343c58606bd637a766add0300b7d67b3641eeb5f3d98",
+      "nuevo": "746ec4a4bc510178f300e0facb8d9af5b263b471702a48c63166caa919501563"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/dao/RegistroMantenimientoJdbcDaoTest.java",
+      "original": "e2af6ca3f785c64e112fd54c04e48a5d1d7c122311c7b79087065dfdf435ef09",
+      "nuevo": "79ed5e6e3e090e8248c33f1c17619dfe3b1b5198046904793a361c275a8e98f7"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/LecturaKmMantenimientoServiceTest.java",
+      "original": "0b7db96f0615481698242551454a8b64d6be28889b019d3e4918cc1639912185",
+      "nuevo": "a0a2581a07fa348f775d4f6f04a4941a027a4663d55df8970c5c1d0bcb8478de"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoConcurrenciaTest.java",
+      "original": "daeb0fdbe49c56822b7ac31463290d305e4def500860dc6dd3593d147c7cdc4e",
+      "nuevo": "0ee25fa6c559df3b773b81bdb94bfd6b4b8bce1af21bae109ec964fde3393413"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoServiceTest.java",
+      "original": "fd5d0786be37fb38733e0e0f6ac9ba282ec1b3ad133daa2a55dd6ac4489a4179",
+      "nuevo": "f0bcb751ba0a5439e3c8ff84879a7542040745717c03ccea6b518023e71200d8"
+    }
+  ]
+}

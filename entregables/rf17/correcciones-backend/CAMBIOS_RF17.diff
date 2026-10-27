@@ -1,0 +1,973 @@
+--- a/backend/src/main/java/backend/mantenimiento/api/ErroresMantenimientoController.java
++++ b/backend/src/main/java/backend/mantenimiento/api/ErroresMantenimientoController.java
+@@ -2,6 +2,7 @@
+ 
+ import backend.mantenimiento.api.dto.ContratoRf17.ErrorResponse;
+ import backend.mantenimiento.model.MantenimientoNoDisponibleException;
++import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
+ import backend.mantenimiento.seguridad.SesionMantenimientoNoValidada;
+ import org.springframework.dao.DataIntegrityViolationException;
+ import org.springframework.http.ResponseEntity;
+@@ -48,6 +49,10 @@
+     public ResponseEntity<ErrorResponse> vehiculo(MantenimientoNoDisponibleException ex) {
+         return respuesta(404,"VEHICULO_NO_DISPONIBLE",ex.getMessage(),Map.of(),false);
+     }
++    @ExceptionHandler(ConflictoOperacionMantenimientoException.class)
++    public ResponseEntity<ErrorResponse> operacion(ConflictoOperacionMantenimientoException ex) {
++        return respuesta(409,"OPERACION_NO_REUTILIZABLE",ex.getMessage(),Map.of(),false);
++    }
+     @ExceptionHandler(IllegalArgumentException.class)
+     public ResponseEntity<ErrorResponse> dato(IllegalArgumentException ex) {
+         String mensaje=ex.getMessage()==null ? "Revisa los datos del mantenimiento" : ex.getMessage();
+--- a/backend/src/main/java/backend/mantenimiento/config/MantenimientoConfiguracion.java
++++ b/backend/src/main/java/backend/mantenimiento/config/MantenimientoConfiguracion.java
+@@ -2,6 +2,7 @@
+ 
+ import backend.mantenimiento.dao.LecturaKmMantenimientoDao;
+ import backend.mantenimiento.dao.RegistroMantenimientoDao;
++import backend.mantenimiento.dao.OperacionMantenimientoDao;
+ import backend.mantenimiento.dao.VehiculoMantenimientoDao;
+ import backend.mantenimiento.service.LecturaKmMantenimientoService;
+ import backend.mantenimiento.service.RegistroMantenimientoService;
+@@ -53,7 +54,8 @@
+             VehiculoMantenimientoService vehiculos,
+             TipoMantenimientoService tipos,
+             LecturaKmMantenimientoService lecturas,
+-            RegistroMantenimientoDao dao
++            RegistroMantenimientoDao dao,
++            OperacionMantenimientoDao operaciones
+     ) {
+         return new RegistroMantenimientoService(
+                 validador,
+@@ -61,7 +63,8 @@
+                 vehiculos,
+                 tipos,
+                 lecturas,
+-                dao
++                dao,
++                operaciones
+         );
+     }
+ }--- a/backend/src/main/java/backend/mantenimiento/dao/OperacionMantenimientoDao.java
++++ b/backend/src/main/java/backend/mantenimiento/dao/OperacionMantenimientoDao.java
+@@ -1,6 +1,7 @@
+ package backend.mantenimiento.dao;
+ 
+ import backend.mantenimiento.model.OperacionMantenimiento;
++import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
+ 
+ import java.util.Optional;
+ import java.util.UUID;
+@@ -20,6 +21,6 @@
+     void confirmar(
+             UUID idOperacion,
+             Long idUsuario,
+-            Long idMantenimiento
++            ResultadoRegistroMantenimiento resultado
+     );
+-}+}
+--- /dev/null
++++ b/backend/src/main/java/backend/mantenimiento/dao/OperacionMantenimientoJdbcDao.java
+@@ -0,0 +1,65 @@
++package backend.mantenimiento.dao;
++
++import backend.mantenimiento.model.OperacionMantenimiento;
++import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
++import backend.mantenimiento.integracion.JsonOperacionMantenimiento;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Repository;
++import org.springframework.transaction.support.TransactionSynchronizationManager;
++import java.util.Optional;
++import java.util.UUID;
++
++@Repository
++public class OperacionMantenimientoJdbcDao implements OperacionMantenimientoDao {
++    private final JdbcTemplate jdbc;
++
++    public OperacionMantenimientoJdbcDao(JdbcTemplate jdbc) {
++        this.jdbc = jdbc;
++    }
++
++    @Override
++    public boolean intentarCrear(UUID id, Long usuario, String huella) {
++        exigirTransaccion();
++        // La PK también serializa dos peticiones simultáneas con el mismo UUID.
++        return jdbc.update("""
++                INSERT INTO mycar.operacion_idempotente
++                    (id_operacion, id_usuario, tipo_operacion, hash_solicitud)
++                VALUES (?, ?, 'REGISTRAR_MANTENIMIENTO', ?)
++                ON CONFLICT (id_operacion) DO NOTHING
++                """, id, usuario, huella) == 1;
++    }
++
++    @Override
++    public Optional<OperacionMantenimiento> buscarYBloquear(UUID id) {
++        exigirTransaccion();
++        return jdbc.query("""
++                SELECT id_operacion, id_usuario, tipo_operacion, hash_solicitud,
++                       estado, respuesta_json::text AS respuesta
++                FROM mycar.operacion_idempotente
++                WHERE id_operacion = ? FOR UPDATE
++                """, (rs, fila) -> new OperacionMantenimiento(
++                rs.getObject("id_operacion", UUID.class), rs.getLong("id_usuario"),
++                rs.getString("tipo_operacion"), rs.getString("hash_solicitud"),
++                rs.getString("estado"), rs.getString("respuesta")), id).stream().findFirst();
++    }
++
++    @Override
++    public void confirmar(UUID id, Long usuario, ResultadoRegistroMantenimiento resultado) {
++        exigirTransaccion();
++        int filas = jdbc.update("""
++                UPDATE mycar.operacion_idempotente
++                SET estado = 'CONFIRMADA', respuesta_json = CAST(? AS jsonb)
++                WHERE id_operacion = ? AND id_usuario = ?
++                  AND tipo_operacion = 'REGISTRAR_MANTENIMIENTO' AND estado = 'EN_PROCESO'
++                """, JsonOperacionMantenimiento.escribir(resultado), id, usuario);
++        if (filas != 1) {
++            throw new IllegalStateException("No se pudo confirmar la operación RF17");
++        }
++    }
++
++    private void exigirTransaccion() {
++        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
++            throw new IllegalStateException("La operación RF17 requiere una transacción activa");
++        }
++    }
++}
+--- /dev/null
++++ b/backend/src/main/java/backend/mantenimiento/integracion/JsonOperacionMantenimiento.java
+@@ -0,0 +1,69 @@
++package backend.mantenimiento.integracion;
++
++import backend.mantenimiento.model.DatosRegistroMantenimiento;
++import backend.mantenimiento.model.DatosRepuesto;
++import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
++import backend.mantenimiento.model.SolicitudRegistroMantenimiento;
++import com.fasterxml.jackson.core.JsonProcessingException;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import com.fasterxml.jackson.databind.SerializationFeature;
++import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
++import java.math.BigDecimal;
++import java.nio.charset.StandardCharsets;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.util.HexFormat;
++import java.util.LinkedHashMap;
++import java.util.List;
++
++/** Formato RF17 v1 estable: no depende de la configuración HTTP de Jackson. */
++public final class JsonOperacionMantenimiento {
++    private static final ObjectMapper JSON = new ObjectMapper()
++            .registerModule(new JavaTimeModule())
++            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
++
++    private JsonOperacionMantenimiento() { }
++
++    public static String huella(SolicitudRegistroMantenimiento s) {
++        var d = s.datos();
++        var normalizados = new DatosRegistroMantenimiento(d.codigoTipoMantenimiento(),
++                d.fechaServicio(), d.kmServicio(), d.origenKmServicio(),
++                d.idLecturaKmReferencia(), numero(d.costoTotal()), d.servicioOtro(),
++                d.proximaFechaSugerida(), d.proximoKmSugerido());
++        List<DatosRepuesto> repuestos = s.repuestos() == null ? List.of()
++                : s.repuestos().stream().map(p -> p == null ? null : new DatosRepuesto(
++                        p.nombre(), p.marca(), p.cantidad(), numero(p.precioUnitario()))).toList();
++        var contenido = new LinkedHashMap<String, Object>();
++        contenido.put("contrato", "RF17_REGISTRAR_MANTENIMIENTO_V1");
++        contenido.put("idVehiculo", s.idVehiculo());
++        contenido.put("datos", normalizados);
++        contenido.put("observaciones", s.observaciones());
++        contenido.put("repuestos", repuestos);
++        try {
++            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
++                    .digest(escribir(contenido).getBytes(StandardCharsets.UTF_8)));
++        } catch (NoSuchAlgorithmException ex) {
++            throw new IllegalStateException("SHA-256 no disponible", ex);
++        }
++    }
++
++    private static BigDecimal numero(BigDecimal n) {
++        return n == null ? null : n.stripTrailingZeros();
++    }
++
++    public static String escribir(Object valor) {
++        try {
++            return JSON.writeValueAsString(valor);
++        } catch (JsonProcessingException ex) {
++            throw new IllegalStateException("No se pudo serializar la operación RF17", ex);
++        }
++    }
++
++    public static ResultadoRegistroMantenimiento leerResultado(String json) {
++        try {
++            return JSON.readValue(json, ResultadoRegistroMantenimiento.class);
++        } catch (JsonProcessingException | IllegalArgumentException ex) {
++            throw new IllegalStateException("El resultado confirmado RF17 es inválido", ex);
++        }
++    }
++}
+--- a/backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimiento.java
++++ b/backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimiento.java
+@@ -6,12 +6,9 @@
+ import java.util.UUID;
+ 
+ /**
+- * PUERTO PENDIENTE DE CONTRATO COMPARTIDO. No se suministra un bean por defecto.
+- * El adaptador del equipo debe reservar idOperacion, comprobar usuario/tipo/huella,
+- * invocar RegistroMantenimientoService y conservar el resultado en UNA transacción.
+- * En reintentos debe devolver el snapshot confirmado sin volver a insertar.
+- * consultar debe autorizar usuario/tipo; nunca consultar por UUID sin autorización.
+- * No implementar un protocolo alternativo hasta confirmar el acuerdo del equipo.
++ * Registro y consulta de operaciones RF17 autorizadas por usuario y tipo.
++ * La implementación usa operacion_idempotente y confirma el snapshot junto con
++ * el mantenimiento y sus repuestos en una sola transacción.
+  */
+ public interface RegistroIdempotenteMantenimiento {
+     ResultadoRegistroMantenimiento registrar(
+--- /dev/null
++++ b/backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimientoService.java
+@@ -0,0 +1,28 @@
++package backend.mantenimiento.integracion;
++
++import backend.mantenimiento.model.EstadoOperacionRegistro;
++import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
++import backend.mantenimiento.model.SolicitudRegistroMantenimiento;
++import backend.mantenimiento.service.RegistroMantenimientoService;
++import org.springframework.stereotype.Service;
++import java.util.UUID;
++
++/** Adaptador RF17: el servicio existente controla la transacción completa. */
++@Service
++public class RegistroIdempotenteMantenimientoService implements RegistroIdempotenteMantenimiento {
++    private final RegistroMantenimientoService servicio;
++
++    public RegistroIdempotenteMantenimientoService(RegistroMantenimientoService servicio) {
++        this.servicio = servicio;
++    }
++
++    @Override
++    public ResultadoRegistroMantenimiento registrar(long usuario, SolicitudRegistroMantenimiento solicitud) {
++        return servicio.registrarResultado(usuario, solicitud);
++    }
++
++    @Override
++    public EstadoOperacionRegistro consultar(long usuario, UUID id) {
++        return servicio.consultarOperacion(usuario, id);
++    }
++}
+--- /dev/null
++++ b/backend/src/main/java/backend/mantenimiento/model/ConflictoOperacionMantenimientoException.java
+@@ -0,0 +1,7 @@
++package backend.mantenimiento.model;
++
++public class ConflictoOperacionMantenimientoException extends IllegalArgumentException {
++    public ConflictoOperacionMantenimientoException() {
++        super("idOperacion: no se puede reutilizar esta operación para esta solicitud");
++    }
++}
+--- a/backend/src/main/java/backend/mantenimiento/model/EstadoOperacionRegistro.java
++++ b/backend/src/main/java/backend/mantenimiento/model/EstadoOperacionRegistro.java
+@@ -2,7 +2,7 @@
+ 
+ import java.util.UUID;
+ 
+-/** Contrato propuesto de consulta; no representa un motor idempotente implementado. */
++/** Estado de una operación RF17; la consulta exige usuario y tipo autorizados. */
+ public record EstadoOperacionRegistro(
+         UUID idOperacion, String estado, ResultadoRegistroMantenimiento resultado
+ ) { }
+--- a/backend/src/main/java/backend/mantenimiento/model/OperacionMantenimiento.java
++++ b/backend/src/main/java/backend/mantenimiento/model/OperacionMantenimiento.java
+@@ -8,6 +8,6 @@
+         String tipoOperacion,
+         String hashSolicitud,
+         String estado,
+-        Long idMantenimiento
++        String respuestaJson
+ ) {
+-}+}
+--- a/backend/src/main/java/backend/mantenimiento/model/ResultadoRegistroMantenimiento.java
++++ b/backend/src/main/java/backend/mantenimiento/model/ResultadoRegistroMantenimiento.java
+@@ -5,7 +5,7 @@
+ import java.util.Objects;
+ import java.util.UUID;
+ 
+-/** Snapshot de respuesta: el adaptador compartido debe conservarlo tras COMMIT. */
++/** Snapshot de respuesta conservado en operacion_idempotente al confirmar RF17. */
+ public record ResultadoRegistroMantenimiento(
+         UUID idOperacion, Long idVehiculo, Long idMantenimiento,
+         String estado, Integer kmServicio, LocalDate fechaServicio,
+--- a/backend/src/main/java/backend/mantenimiento/service/LecturaKmMantenimientoService.java
++++ b/backend/src/main/java/backend/mantenimiento/service/LecturaKmMantenimientoService.java
+@@ -23,41 +23,47 @@
+             Long idVehiculo,
+             DatosRegistroMantenimiento datos
+     ) {
+-        if (datos.origenKmServicio()
+-                == OrigenKmServicio.HISTORICO_MANUAL) {
+-            dao.buscarUltimaLecturaAnterior(idVehiculo, datos.fechaServicio())
+-                    .ifPresent(lectura -> {
+-                        LocalDate fechaLectura = fechaEnLima(lectura);
+-                        if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
+-                                || !fechaLectura.isBefore(datos.fechaServicio())) {
+-                            throw new IllegalArgumentException(
+-                                    "La lectura anterior no corresponde al vehículo y fecha del servicio"
+-                            );
+-                        }
+-                        if (datos.kmServicio() < lectura.valorKm()) {
+-                            throw new IllegalArgumentException(
+-                                    "kmServicio: es inferior a la última lectura anterior"
+-                            );
+-                        }
+-                    });
+-            dao.buscarPrimeraLecturaPosterior(idVehiculo, datos.fechaServicio())
+-                    .ifPresent(lectura -> {
+-                        LocalDate fechaLectura = fechaEnLima(lectura);
+-                        if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
+-                                || !fechaLectura.isAfter(datos.fechaServicio())) {
+-                            throw new IllegalArgumentException(
+-                                    "La lectura posterior no corresponde al vehículo y fecha del servicio"
+-                            );
+-                        }
+-                        if (datos.kmServicio() > lectura.valorKm()) {
+-                            throw new IllegalArgumentException(
+-                                    "kmServicio: supera la primera lectura posterior"
+-                            );
+-                        }
+-                    });
+-            return;
++        if (datos.origenKmServicio() == OrigenKmServicio.LECTURA) {
++            validarLecturaSeleccionada(idVehiculo, datos);
+         }
++        validarCronologia(idVehiculo, datos);
++    }
+ 
++    private void validarCronologia(Long idVehiculo, DatosRegistroMantenimiento datos) {
++        dao.buscarUltimaLecturaAnterior(idVehiculo, datos.fechaServicio())
++                .ifPresent(lectura -> {
++                    LocalDate fechaLectura = fechaEnLima(lectura);
++                    if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
++                            || !fechaLectura.isBefore(datos.fechaServicio())) {
++                        throw new IllegalArgumentException(
++                                "La lectura anterior no corresponde al vehículo y fecha del servicio"
++                        );
++                    }
++                    if (datos.kmServicio() < lectura.valorKm()) {
++                        throw new IllegalArgumentException(
++                                "kmServicio: es inferior a la última lectura anterior"
++                        );
++                    }
++                });
++        dao.buscarPrimeraLecturaPosterior(idVehiculo, datos.fechaServicio())
++                .ifPresent(lectura -> {
++                    LocalDate fechaLectura = fechaEnLima(lectura);
++                    if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
++                            || !fechaLectura.isAfter(datos.fechaServicio())) {
++                        throw new IllegalArgumentException(
++                                "La lectura posterior no corresponde al vehículo y fecha del servicio"
++                        );
++                    }
++                    if (datos.kmServicio() > lectura.valorKm()) {
++                        throw new IllegalArgumentException(
++                                "kmServicio: supera la primera lectura posterior"
++                        );
++                    }
++                });
++    }
++
++    private void validarLecturaSeleccionada(
++            Long idVehiculo, DatosRegistroMantenimiento datos) {
+         LecturaKmReferencia lectura = dao
+                 .buscarPorId(datos.idLecturaKmReferencia())
+                 .orElseThrow(() -> new IllegalArgumentException(
+--- a/backend/src/main/java/backend/mantenimiento/service/MantenimientoHttpService.java
++++ b/backend/src/main/java/backend/mantenimiento/service/MantenimientoHttpService.java
+@@ -18,17 +18,13 @@
+ public class MantenimientoHttpService {
+     private static final ZoneId LIMA = ZoneId.of("America/Lima");
+     private final ContextoMantenimientoJdbcDao contexto;
+-    private final ValidadorRegistroMantenimiento validador;
+-    private final ValidadorRepuesto validadorRepuesto;
+     private final VehiculoMantenimientoService vehiculos;
+     private final ObjectProvider<RegistroIdempotenteMantenimiento> registros;
+ 
+     public MantenimientoHttpService(ContextoMantenimientoJdbcDao contexto,
+             VehiculoMantenimientoService vehiculos,
+-            ObjectProvider<RegistroIdempotenteMantenimiento> registros,
+-            ValidadorRegistroMantenimiento validador, ValidadorRepuesto validadorRepuesto) {
++            ObjectProvider<RegistroIdempotenteMantenimiento> registros) {
+         this.contexto=contexto; this.vehiculos=vehiculos; this.registros=registros;
+-        this.validador=validador; this.validadorRepuesto=validadorRepuesto;
+     }
+ 
+     public ContextoResponse contexto(long usuario) {
+@@ -55,8 +51,6 @@
+                 .map(p -> new DatosRepuesto(p.nombre(),p.marca(),p.cantidad(),p.precioUnitario())).toList();
+         var solicitud=new SolicitudRegistroMantenimiento(r.idOperacion(),vehiculo,datos,
+                 r.observaciones(),repuestos);
+-        validador.validar(datos);
+-        repuestos.forEach(validadorRepuesto::validar);
+         var adaptador=exigirAdaptador();
+         // El adaptador confirmado debe invocar el servicio existente dentro de esta transacción.
+         var resultado=adaptador.registrar(usuario,solicitud);
+--- a/backend/src/main/java/backend/mantenimiento/service/RegistroMantenimientoService.java
++++ b/backend/src/main/java/backend/mantenimiento/service/RegistroMantenimientoService.java
+@@ -1,6 +1,16 @@
+ package backend.mantenimiento.service;
+ 
+ import backend.mantenimiento.dao.RegistroMantenimientoDao;
++import backend.mantenimiento.integracion.JsonOperacionMantenimiento;
++import backend.mantenimiento.dao.OperacionMantenimientoDao;
++import backend.mantenimiento.model.OperacionMantenimiento;
++import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
++import backend.mantenimiento.model.EstadoOperacionRegistro;
++import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
++import java.util.Collections;
++import java.util.ArrayList;
++import java.util.Objects;
++import java.util.UUID;
+ import backend.mantenimiento.model.DatosRegistroMantenimiento;
+ import backend.mantenimiento.model.DatosRepuesto;
+ import backend.mantenimiento.model.SolicitudRegistroMantenimiento;
+@@ -14,6 +24,7 @@
+     private final TipoMantenimientoService tipos;
+     private final LecturaKmMantenimientoService lecturas;
+     private final RegistroMantenimientoDao dao;
++    private final OperacionMantenimientoDao operaciones;
+ 
+     public RegistroMantenimientoService(
+             ValidadorRegistroMantenimiento validador,
+@@ -21,7 +32,8 @@
+             VehiculoMantenimientoService vehiculos,
+             TipoMantenimientoService tipos,
+             LecturaKmMantenimientoService lecturas,
+-            RegistroMantenimientoDao dao
++            RegistroMantenimientoDao dao,
++            OperacionMantenimientoDao operaciones
+     ) {
+         this.validador = validador;
+         this.validadorRepuesto = validadorRepuesto;
+@@ -29,6 +41,7 @@
+         this.tipos = tipos;
+         this.lecturas = lecturas;
+         this.dao = dao;
++        this.operaciones = operaciones;
+     }
+ 
+     @Transactional
+@@ -36,6 +49,12 @@
+             Long idUsuario,
+             SolicitudRegistroMantenimiento solicitud
+     ) {
++        return registrarResultado(idUsuario, solicitud).idMantenimiento();
++    }
++
++    @Transactional
++    public ResultadoRegistroMantenimiento registrarResultado(
++            Long idUsuario, SolicitudRegistroMantenimiento solicitud) {
+         if (idUsuario == null || idUsuario <= 0) {
+             throw new IllegalArgumentException("idUsuario: identidad autenticada requerida");
+         }
+@@ -54,6 +73,30 @@
+             throw new IllegalArgumentException(
+                     "datos: el mantenimiento es obligatorio"
+             );
++        }
++
++        if (solicitud.idOperacion() == null) {
++            throw new IllegalArgumentException("idOperacion: es obligatoria");
++        }
++        // Una copia fija evita que la lista cambie entre la huella y la escritura.
++        solicitud = new SolicitudRegistroMantenimiento(solicitud.idOperacion(),
++                solicitud.idVehiculo(), datos, solicitud.observaciones(),
++                solicitud.repuestos() == null ? null
++                        : Collections.unmodifiableList(new ArrayList<>(solicitud.repuestos())));
++        String huella = JsonOperacionMantenimiento.huella(solicitud);
++        boolean nueva = operaciones.intentarCrear(solicitud.idOperacion(), idUsuario, huella);
++        var operacion = operaciones.buscarYBloquear(solicitud.idOperacion())
++                .orElseThrow(() -> new IllegalStateException("No se encontró la operación RF17"));
++        exigirPropietarioYTipo(idUsuario, operacion);
++        if (!Objects.equals(operacion.hashSolicitud(), huella)) {
++            throw new ConflictoOperacionMantenimientoException();
++        }
++        // El resultado confirmado se devuelve antes de revalidar catálogos o lecturas.
++        if ("CONFIRMADA".equals(operacion.estado())) {
++            return resultadoConfirmado(operacion);
++        }
++        if (!nueva || !"EN_PROCESO".equals(operacion.estado())) {
++            throw new ConflictoOperacionMantenimientoException();
+         }
+ 
+         validador.validar(datos);
+@@ -78,10 +121,46 @@
+                 datos
+         );
+ 
+-        return dao.insertar(
++        Long idMantenimiento = dao.insertar(
+                 idUsuario,
+                 tipo.idTipoMantenimiento(),
+                 solicitud
+         );
++        var resultado = new ResultadoRegistroMantenimiento(solicitud.idOperacion(),
++                solicitud.idVehiculo(), idMantenimiento, "REALIZADO", datos.kmServicio(),
++                datos.fechaServicio(), datos.costoTotal(),
++                solicitud.repuestos() == null ? 0 : solicitud.repuestos().size());
++        operaciones.confirmar(solicitud.idOperacion(), idUsuario, resultado);
++        return resultado;
++    }
++
++    @Transactional
++    public EstadoOperacionRegistro consultarOperacion(Long usuario, UUID id) {
++        if (usuario == null || usuario <= 0 || id == null) {
++            throw new IllegalArgumentException("Usuario y operación requeridos");
++        }
++        var encontrada = operaciones.buscarYBloquear(id);
++        if (encontrada.isEmpty()) {
++            return new EstadoOperacionRegistro(id, "NO_ENCONTRADA", null);
++        }
++        var operacion = encontrada.get();
++        exigirPropietarioYTipo(usuario, operacion);
++        return new EstadoOperacionRegistro(id, operacion.estado(),
++                "CONFIRMADA".equals(operacion.estado()) ? resultadoConfirmado(operacion) : null);
++    }
++
++    private void exigirPropietarioYTipo(Long usuario, OperacionMantenimiento operacion) {
++        if (!Objects.equals(usuario, operacion.idUsuario())
++                || !"REGISTRAR_MANTENIMIENTO".equals(operacion.tipoOperacion())) {
++            throw new ConflictoOperacionMantenimientoException();
++        }
++    }
++
++    private ResultadoRegistroMantenimiento resultadoConfirmado(OperacionMantenimiento operacion) {
++        var resultado = JsonOperacionMantenimiento.leerResultado(operacion.respuestaJson());
++        if (resultado == null || !Objects.equals(resultado.idOperacion(), operacion.idOperacion())) {
++            throw new IllegalStateException("El resultado no corresponde a la operación RF17");
++        }
++        return resultado;
+     }
+ }
+--- a/backend/src/test/java/backend/mantenimiento/dao/RegistroMantenimientoJdbcDaoTest.java
++++ b/backend/src/test/java/backend/mantenimiento/dao/RegistroMantenimientoJdbcDaoTest.java
+@@ -610,7 +610,7 @@
+                 new LecturaKmMantenimientoService(
+                         new LecturaKmMantenimientoJdbcDao(jdbc)
+                 ),
+-                daoRegistro
++                daoRegistro, new OperacionMantenimientoJdbcDao(jdbc)
+         );
+ 
+         // Aplicamos el control transaccional de Spring al servicio.
+--- a/backend/src/test/java/backend/mantenimiento/service/LecturaKmMantenimientoServiceTest.java
++++ b/backend/src/test/java/backend/mantenimiento/service/LecturaKmMantenimientoServiceTest.java
+@@ -266,6 +266,49 @@
+                 () -> servicio.validarReferencia(10L, datos)
+         );
+         verify(dao, never()).buscarPorId(any());
++    }
++
++    @Test
++    void revision_rechazaLecturaAntiguaSiOtraAnteriorAlServicioYaEsMayor() {
++        var dao = mock(LecturaKmMantenimientoDao.class);
++        var fecha = LocalDate.of(2026, 10, 26);
++        when(dao.buscarPorId(701L)).thenReturn(Optional.of(new LecturaKmReferencia(
++                701L, 10L, 21000, Instant.parse("2026-10-20T15:00:00Z"))));
++        when(dao.buscarUltimaLecturaAnterior(10L, fecha)).thenReturn(Optional.of(
++                new LecturaKmReferencia(702L, 10L, 30000,
++                        Instant.parse("2026-10-25T15:00:00Z"))));
++        assertThrows(IllegalArgumentException.class,
++                () -> new LecturaKmMantenimientoService(dao)
++                        .validarReferencia(10L, datosConLectura()));
++    }
++
++    @Test
++    void revision_lecturaTambienRespetaElLimitePosterior() {
++        var dao = mock(LecturaKmMantenimientoDao.class);
++        when(dao.buscarPorId(701L)).thenReturn(Optional.of(new LecturaKmReferencia(
++                701L, 10L, 21000, Instant.parse("2026-10-20T15:00:00Z"))));
++        when(dao.buscarPrimeraLecturaPosterior(10L, LocalDate.of(2026, 10, 26)))
++                .thenReturn(Optional.of(new LecturaKmReferencia(702L, 10L, 20500,
++                        Instant.parse("2026-10-27T15:00:00Z"))));
++        assertThrows(IllegalArgumentException.class,
++                () -> new LecturaKmMantenimientoService(dao)
++                        .validarReferencia(10L, datosConLectura()));
++    }
++
++    @Test
++    void revision_permiteServicioHistoricoConLecturaMenorQueLaActual() {
++        var dao = mock(LecturaKmMantenimientoDao.class);
++        var fecha = LocalDate.of(2026, 10, 26);
++        when(dao.buscarPorId(701L)).thenReturn(Optional.of(new LecturaKmReferencia(
++                701L, 10L, 21000, Instant.parse("2026-10-25T15:00:00Z"))));
++        when(dao.buscarUltimaLecturaAnterior(10L, fecha)).thenReturn(Optional.of(
++                new LecturaKmReferencia(701L, 10L, 21000,
++                        Instant.parse("2026-10-25T15:00:00Z"))));
++        when(dao.buscarPrimeraLecturaPosterior(10L, fecha)).thenReturn(Optional.of(
++                new LecturaKmReferencia(702L, 10L, 30000,
++                        Instant.parse("2026-10-27T15:00:00Z"))));
++        assertDoesNotThrow(() -> new LecturaKmMantenimientoService(dao)
++                .validarReferencia(10L, datosConLectura()));
+     }
+ 
+     private LecturaKmMantenimientoService servicioConLectura(
+--- a/backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoConcurrenciaTest.java
++++ b/backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoConcurrenciaTest.java
+@@ -2,10 +2,14 @@
+ 
+ import backend.mantenimiento.dao.LecturaKmMantenimientoJdbcDao;
+ import backend.mantenimiento.dao.RegistroMantenimientoDao;
++import backend.mantenimiento.dao.OperacionMantenimientoJdbcDao;
+ import backend.mantenimiento.dao.RegistroMantenimientoJdbcDao;
+ import backend.mantenimiento.dao.TipoMantenimientoJdbcDao;
+ import backend.mantenimiento.dao.VehiculoMantenimientoJdbcDao;
+ import backend.mantenimiento.model.DatosRegistroMantenimiento;
++import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
++import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
++import backend.mantenimiento.dao.OperacionMantenimientoDao;
+ import backend.mantenimiento.model.DatosRegistroMantenimiento.OrigenKmServicio;
+ import backend.mantenimiento.model.SolicitudRegistroMantenimiento;
+ import org.flywaydb.core.Flyway;
+@@ -138,7 +142,178 @@
+         }
+     }
+ 
++    @Test
++    void revision_mismaSolicitudDevuelveMismoIdYUnaSolaCopiaDeRepuestos() {
++        var f = crearFixtureConfirmada();
++        var original = solicitud(f);
++        var pedido = new SolicitudRegistroMantenimiento(original.idOperacion(), f.idVehiculo(),
++                original.datos(), "Revisión", List.of(new backend.mantenimiento.model.DatosRepuesto(
++                        "Filtro", null, 2, new java.math.BigDecimal("12.50"))));
++        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
++        var primero = servicio.registrarResultado(f.idUsuario(), pedido);
++        var segundo = servicio.registrarResultado(f.idUsuario(), pedido);
++        assertEquals(primero, segundo);
++        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
++        assertEquals(1L, new JdbcTemplate(dataSource).queryForObject(
++                "SELECT count(*) FROM mycar.repuesto WHERE id_usuario = ?", Long.class, f.idUsuario()));
++        assertEquals(1L, new JdbcTemplate(dataSource).queryForObject(
++                "SELECT count(*) FROM mycar.mantenimiento_repuesto WHERE id_mantenimiento = ?",
++                Long.class, primero.idMantenimiento()));
++        assertEquals("CONFIRMADA", servicio.consultarOperacion(
++                f.idUsuario(), pedido.idOperacion()).estado());
++    }
++
++    @Test
++    void revision_mismaOperacionConContenidoDistintoSeRechaza() {
++        var f = crearFixtureConfirmada();
++        var pedido = solicitud(f);
++        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
++        servicio.registrar(f.idUsuario(), pedido);
++        var cambiado = new SolicitudRegistroMantenimiento(pedido.idOperacion(), pedido.idVehiculo(),
++                pedido.datos(), "Contenido diferente", pedido.repuestos());
++        assertThrows(ConflictoOperacionMantenimientoException.class,
++                () -> servicio.registrar(f.idUsuario(), cambiado));
++        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
++    }
++
++    @Test
++    void revision_reintentoDevuelveSnapshotAunqueVehiculoEsteInactivo() {
++        var f = crearFixtureConfirmada();
++        var pedido = solicitud(f);
++        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
++        var original = servicio.registrarResultado(f.idUsuario(), pedido);
++        new JdbcTemplate(dataSource).update(
++                "UPDATE mycar.vehiculo SET estado_vehiculo = 'INACTIVO' WHERE id_vehiculo = ?",
++                f.idVehiculo());
++        assertEquals(original, servicio.registrarResultado(f.idUsuario(), pedido));
++        assertEquals(original, servicio.consultarOperacion(f.idUsuario(), pedido.idOperacion()).resultado());
++        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
++    }
++
++    @Test
++    void revision_noPermiteReusarNiConsultarOperacionDeOtroUsuarioOTipo() {
++        var f = crearFixtureConfirmada();
++        var ajeno = crearFixtureConfirmada();
++        var pedido = solicitud(f);
++        var servicio = servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
++        servicio.registrar(f.idUsuario(), pedido);
++        assertThrows(ConflictoOperacionMantenimientoException.class,
++                () -> servicio.registrar(ajeno.idUsuario(), pedido));
++        assertThrows(ConflictoOperacionMantenimientoException.class,
++                () -> servicio.consultarOperacion(ajeno.idUsuario(), pedido.idOperacion()));
++        var otroTipo = new SolicitudRegistroMantenimiento(f.operacionRf14(), f.idVehiculo(),
++                pedido.datos(), null, List.of());
++        assertThrows(ConflictoOperacionMantenimientoException.class,
++                () -> servicio.registrar(f.idUsuario(), otroTipo));
++        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
++    }
++
++    @Test
++    @Timeout(30)
++    void revision_dosSolicitudesSimultaneasSoloGuardanUnaVez() throws Exception {
++        var f = crearFixtureConfirmada();
++        var pedido = solicitud(f);
++        var insertando = new CountDownLatch(1);
++        var continuar = new CountDownLatch(1);
++        var segundoIntento = new CountDownLatch(1);
++        RegistroMantenimientoDao pausado = (usuario, tipo, solicitud) -> {
++            insertando.countDown();
++            try {
++                if (!continuar.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Sin señal");
++            } catch (InterruptedException ex) {
++                Thread.currentThread().interrupt();
++                throw new IllegalStateException(ex);
++            }
++            return new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource))
++                    .insertar(usuario, tipo, solicitud);
++        };
++        var pool = Executors.newFixedThreadPool(2);
++        try {
++            var primero = pool.submit(() -> servicio(pausado).registrar(f.idUsuario(), pedido));
++            assertTrue(insertando.await(10, TimeUnit.SECONDS));
++            var segundo = pool.submit(() -> {
++                segundoIntento.countDown();
++                return servicio(new RegistroMantenimientoJdbcDao(new JdbcTemplate(dataSource)))
++                        .registrar(f.idUsuario(), pedido);
++            });
++            assertTrue(segundoIntento.await(10, TimeUnit.SECONDS));
++            assertThrows(java.util.concurrent.TimeoutException.class,
++                    () -> segundo.get(300, TimeUnit.MILLISECONDS));
++            continuar.countDown();
++            assertEquals(primero.get(10, TimeUnit.SECONDS), segundo.get(10, TimeUnit.SECONDS));
++            assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
++        } finally {
++            continuar.countDown();
++            pool.shutdownNow();
++            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
++        }
++    }
++
++    @Test
++    void revision_falloAlConfirmarRevierteTodoYPermiteReintentarMismaOperacion() {
++        var f = crearFixtureConfirmada();
++        var original = solicitud(f);
++        var pedido = new SolicitudRegistroMantenimiento(original.idOperacion(), f.idVehiculo(),
++                original.datos(), null, List.of(new backend.mantenimiento.model.DatosRepuesto(
++                        "Filtro", null, 1, null)));
++        var jdbc = new JdbcTemplate(dataSource);
++        var operaciones = new OperacionMantenimientoJdbcDao(jdbc) {
++            @Override
++            public void confirmar(UUID id, Long usuario, ResultadoRegistroMantenimiento resultado) {
++                super.confirmar(id, usuario, resultado);
++                throw new IllegalStateException("Fallo controlado antes del COMMIT");
++            }
++        };
++        assertThrows(IllegalStateException.class,
++                () -> servicio(new RegistroMantenimientoJdbcDao(jdbc), operaciones)
++                        .registrar(f.idUsuario(), pedido));
++        assertEquals(0L, cantidadMantenimientos(f.idVehiculo()));
++        assertEquals(0L, jdbc.queryForObject(
++                "SELECT count(*) FROM mycar.repuesto WHERE id_usuario = ?", Long.class, f.idUsuario()));
++        assertEquals(0L, jdbc.queryForObject(
++                "SELECT count(*) FROM mycar.operacion_idempotente WHERE id_operacion = ?",
++                Long.class, pedido.idOperacion()));
++        var servicio = servicio(new RegistroMantenimientoJdbcDao(jdbc));
++        servicio.registrar(f.idUsuario(), pedido);
++        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
++    }
++
++    @Test
++    void revision_lecturaAntiguaNoPermiteServicioActualConKmInferiorAlDeAyer() {
++        var f = crearFixtureConfirmada();
++        var jdbc = new JdbcTemplate(dataSource);
++        Long inicial = jdbc.queryForObject(
++                "SELECT id_lectura_km FROM mycar.lectura_kilometraje WHERE id_vehiculo = ?",
++                Long.class, f.idVehiculo());
++        jdbc.update("""
++                INSERT INTO mycar.lectura_kilometraje
++                    (id_vehiculo, valor_km, origen, fecha_lectura_utc, id_operacion)
++                VALUES (?, 30000, 'ACTUALIZACION', ?, ?)
++                """, f.idVehiculo(), f.fechaServicio().atTime(12, 0).atZone(LIMA).toOffsetDateTime(),
++                f.operacionRf14());
++        var pedido = new SolicitudRegistroMantenimiento(UUID.randomUUID(), f.idVehiculo(),
++                new DatosRegistroMantenimiento("MANTENIMIENTO_GENERAL", LocalDate.now(LIMA),
++                        20000, OrigenKmServicio.LECTURA, inicial, null, null, null, null), null, List.of());
++        var servicio = servicio(new RegistroMantenimientoJdbcDao(jdbc));
++        assertThrows(IllegalArgumentException.class, () -> servicio.registrar(f.idUsuario(), pedido));
++        assertEquals(0L, cantidadMantenimientos(f.idVehiculo()));
++        assertEquals(0L, jdbc.queryForObject(
++                "SELECT count(*) FROM mycar.operacion_idempotente WHERE id_operacion = ?",
++                Long.class, pedido.idOperacion()));
++        // El mismo kilometraje sí es válido para el servicio histórico del día de su lectura.
++        var historico = new SolicitudRegistroMantenimiento(UUID.randomUUID(), f.idVehiculo(),
++                new DatosRegistroMantenimiento("MANTENIMIENTO_GENERAL", f.fechaServicio().minusDays(1),
++                        20000, OrigenKmServicio.LECTURA, inicial, null, null, null, null), null, List.of());
++        servicio.registrar(f.idUsuario(), historico);
++        assertEquals(1L, cantidadMantenimientos(f.idVehiculo()));
++    }
++
+     private RegistroMantenimientoService servicio(RegistroMantenimientoDao dao) {
++        return servicio(dao, new OperacionMantenimientoJdbcDao(new JdbcTemplate(dataSource)));
++    }
++
++    private RegistroMantenimientoService servicio(
++            RegistroMantenimientoDao dao, OperacionMantenimientoDao operaciones) {
+         var jdbc = new JdbcTemplate(dataSource);
+         var target = new RegistroMantenimientoService(
+                 new ValidadorRegistroMantenimiento(Clock.system(LIMA)),
+@@ -146,7 +321,7 @@
+                 new VehiculoMantenimientoService(new VehiculoMantenimientoJdbcDao(jdbc)),
+                 new TipoMantenimientoService(new TipoMantenimientoJdbcDao(jdbc)),
+                 new LecturaKmMantenimientoService(new LecturaKmMantenimientoJdbcDao(jdbc)),
+-                dao
++                dao, operaciones
+         );
+         var interceptor = new TransactionInterceptor();
+         interceptor.setTransactionManager(new DataSourceTransactionManager(dataSource));
+--- a/backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoServiceTest.java
++++ b/backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoServiceTest.java
+@@ -1,6 +1,13 @@
+ package backend.mantenimiento.service;
+ 
+ import backend.mantenimiento.dao.RegistroMantenimientoDao;
++import backend.mantenimiento.integracion.JsonOperacionMantenimiento;
++import backend.mantenimiento.dao.OperacionMantenimientoDao;
++import backend.mantenimiento.model.OperacionMantenimiento;
++import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
++import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
++import java.util.Optional;
++import java.util.concurrent.atomic.AtomicReference;
+ import backend.mantenimiento.model.DatosRegistroMantenimiento;
+ import backend.mantenimiento.model.DatosRegistroMantenimiento.OrigenKmServicio;
+ import backend.mantenimiento.model.DatosRepuesto;
+@@ -31,6 +38,7 @@
+     private LecturaKmMantenimientoService lecturas;
+     private RegistroMantenimientoDao dao;
+     private RegistroMantenimientoService servicio;
++    private OperacionMantenimientoDao operaciones;
+ 
+     @BeforeEach
+     void preparar() {
+@@ -40,6 +48,14 @@
+         tipos = mock(TipoMantenimientoService.class);
+         lecturas = mock(LecturaKmMantenimientoService.class);
+         dao = mock(RegistroMantenimientoDao.class);
++        operaciones = mock(OperacionMantenimientoDao.class);
++        var pendiente = new AtomicReference<OperacionMantenimiento>();
++        when(operaciones.intentarCrear(any(), anyLong(), anyString())).thenAnswer(i -> {
++            pendiente.set(new OperacionMantenimiento(i.getArgument(0), i.getArgument(1),
++                    "REGISTRAR_MANTENIMIENTO", i.getArgument(2), "EN_PROCESO", null));
++            return true;
++        });
++        when(operaciones.buscarYBloquear(any())).thenAnswer(i -> Optional.ofNullable(pendiente.get()));
+ 
+         servicio = new RegistroMantenimientoService(
+                 validador,
+@@ -47,7 +63,7 @@
+                 vehiculos,
+                 tipos,
+                 lecturas,
+-                dao
++                dao, operaciones
+         );
+ 
+         when(vehiculos.obtenerVehiculoPropioActivoParaRegistro(1L, 10L))
+@@ -159,7 +175,7 @@
+                         Instant.parse("2026-10-26T15:00:00Z"),
+                         ZoneId.of("America/Lima")
+                 )),
+-                validadorRepuesto, vehiculos, tipos, lecturas, dao
++                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones
+         );
+ 
+         assertThrows(IllegalArgumentException.class,
+@@ -216,7 +232,7 @@
+                         Instant.parse("2026-10-26T15:00:00Z"),
+                         ZoneId.of("America/Lima")
+                 )),
+-                validadorRepuesto, vehiculos, tipos, lecturas, dao
++                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones
+         );
+ 
+         assertThrows(IllegalArgumentException.class,
+@@ -233,7 +249,7 @@
+         );
+         var servicioConValidadorReal = new RegistroMantenimientoService(
+                 validador, new ValidadorRepuesto(), vehiculos,
+-                tipos, lecturas, dao
++                tipos, lecturas, dao, operaciones
+         );
+ 
+         assertThrows(IllegalArgumentException.class,
+@@ -316,6 +332,80 @@
+         assertThrows(IllegalArgumentException.class,
+                 () -> servicio.registrar(1L, solicitud));
+         verifyNoInteractions(dao);
++    }
++
++    @Test
++    void revision_reintentoConfirmadoNoRevalidaNiInserta() {
++        var solicitud = solicitudConRepuesto(1);
++        var resultado = new ResultadoRegistroMantenimiento(solicitud.idOperacion(), 10L,
++                900L, "REALIZADO", 21000, solicitud.datos().fechaServicio(), null, 1);
++        when(operaciones.intentarCrear(any(), anyLong(), anyString())).thenReturn(false);
++        when(operaciones.buscarYBloquear(solicitud.idOperacion())).thenReturn(Optional.of(
++                new OperacionMantenimiento(solicitud.idOperacion(), 1L,
++                        "REGISTRAR_MANTENIMIENTO", JsonOperacionMantenimiento.huella(solicitud),
++                        "CONFIRMADA", JsonOperacionMantenimiento.escribir(resultado))));
++
++        assertEquals(resultado, servicio.registrarResultado(1L, solicitud));
++        verifyNoInteractions(validador, validadorRepuesto, vehiculos, tipos, lecturas, dao);
++        verify(operaciones, never()).confirmar(any(), anyLong(), any());
++    }
++
++    @Test
++    void revision_rechazaHuellaDistintaAntesDeInsertar() {
++        var solicitud = solicitudConRepuesto(1);
++        when(operaciones.buscarYBloquear(any())).thenReturn(Optional.of(
++                new OperacionMantenimiento(solicitud.idOperacion(), 1L,
++                        "REGISTRAR_MANTENIMIENTO", "f".repeat(64), "CONFIRMADA", "{}")));
++        assertThrows(ConflictoOperacionMantenimientoException.class,
++                () -> servicio.registrar(1L, solicitud));
++        verifyNoInteractions(dao, vehiculos, tipos, lecturas);
++    }
++
++    @Test
++    void revision_rechazaOperacionDeOtroUsuarioAntesDeLeerRespuesta() {
++        var solicitud = solicitudConRepuesto(1);
++        when(operaciones.buscarYBloquear(any())).thenReturn(Optional.of(
++                new OperacionMantenimiento(solicitud.idOperacion(), 2L,
++                        "REGISTRAR_MANTENIMIENTO", JsonOperacionMantenimiento.huella(solicitud),
++                        "CONFIRMADA", "respuesta ajena no interpretable")));
++        assertThrows(ConflictoOperacionMantenimientoException.class,
++                () -> servicio.registrar(1L, solicitud));
++        verifyNoInteractions(dao);
++    }
++
++    @Test
++    void revision_rechazaOperacionDeOtroTipo() {
++        var solicitud = solicitudConRepuesto(1);
++        when(operaciones.buscarYBloquear(any())).thenReturn(Optional.of(
++                new OperacionMantenimiento(solicitud.idOperacion(), 1L,
++                        "ACTUALIZAR_KM", JsonOperacionMantenimiento.huella(solicitud),
++                        "CONFIRMADA", "{}")));
++        assertThrows(ConflictoOperacionMantenimientoException.class,
++                () -> servicio.registrar(1L, solicitud));
++        verifyNoInteractions(dao);
++    }
++
++    @Test
++    void revision_huellaIncluyeObservacionesRepuestosYVehiculo() {
++        var original = solicitudConRepuesto(1);
++        String huella = JsonOperacionMantenimiento.huella(original);
++        assertNotEquals(huella, JsonOperacionMantenimiento.huella(
++                new SolicitudRegistroMantenimiento(original.idOperacion(), 11L,
++                        original.datos(), original.observaciones(), original.repuestos())));
++        assertNotEquals(huella, JsonOperacionMantenimiento.huella(
++                new SolicitudRegistroMantenimiento(original.idOperacion(), 10L,
++                        original.datos(), "Otra observación", original.repuestos())));
++        assertNotEquals(huella, JsonOperacionMantenimiento.huella(
++                new SolicitudRegistroMantenimiento(original.idOperacion(), 10L,
++                        original.datos(), original.observaciones(), List.of())));
++    }
++
++    @Test
++    void revision_exigeIdOperacion() {
++        var original = solicitudConRepuesto(1);
++        assertThrows(IllegalArgumentException.class, () -> servicio.registrar(1L,
++                new SolicitudRegistroMantenimiento(null, 10L, original.datos(), null, List.of())));
++        verifyNoInteractions(operaciones, dao);
+     }
+ 
+     private SolicitudRegistroMantenimiento solicitudConRepuesto(
