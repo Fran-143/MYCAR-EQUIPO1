@@ -36,8 +36,13 @@ function Preparar-RF18([string]$Repositorio) {
         }
         if ($LASTEXITCODE -ne 0) { throw 'No se pudo abrir la rama de RF18.' }
     }
-    & git -C $Repositorio merge-base --is-ancestor e39c0c253511b288286c70f51179d3fa471313e8 HEAD
-    if ($LASTEXITCODE -ne 0) {
+    $incluyeLogin = $false
+    $baseConocida = & git -C $Repositorio rev-parse --verify --quiet 'e39c0c253511b288286c70f51179d3fa471313e8^{commit}'
+    if ($LASTEXITCODE -eq 0 -and $baseConocida) {
+        & git -C $Repositorio merge-base --is-ancestor e39c0c253511b288286c70f51179d3fa471313e8 HEAD
+        $incluyeLogin = $LASTEXITCODE -eq 0
+    }
+    if (-not $incluyeLogin) {
         $pendientes = & git -C $Repositorio status --porcelain
         if ($LASTEXITCODE -ne 0 -or $pendientes) { throw 'Falta el main con el login integrado y hay cambios pendientes. Revisa git status antes de continuar.' }
         & git -C $Repositorio fetch origin 'refs/heads/main:refs/remotes/origin/main'
