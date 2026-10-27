@@ -16,6 +16,8 @@ import backend.vehiculos.dao.VehiculoDao;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import backend.vehiculos.dto.DatosRegistroVehiculo;
+import backend.vehiculos.dao.OperacionVehiculoDao;
+import backend.vehiculos.dao.OperacionVehiculoDao;
 
 /** PostgreSQL real, opt-in y exclusivamente en bases desechables mycar_mvp_test_*. */
 @EnabledIfSystemProperty(named = "mycar.db.tests", matches = "true")
@@ -421,6 +423,269 @@ class MvpDatabaseTest {
                 "SELECT numero_serie FROM mycar.vehiculo WHERE id_vehiculo=?",
                 vehiculo
         ));
+    }
+
+    @Test
+    void reservaOperacionSinDuplicarlaNiCambiarSuContenido()
+            throws Exception {
+
+        // ARRANGE
+        var fuente = new SingleConnectionDataSource(c, true);
+        var dao = new OperacionVehiculoDao(new JdbcTemplate(fuente));
+
+        long propietario = account(c);
+
+        long otroPropietario = accountWith(
+                c,
+                "otra-operacion@example.test",
+                LocalDate.now(LIMA).minusYears(30)
+        );
+
+        UUID idOperacion = UUID.randomUUID();
+
+        // Huellas ficticias utilizadas exclusivamente en esta prueba.
+        String hashOriginal = "a".repeat(64);
+        String hashDistinto = "b".repeat(64);
+
+        // ACT / ASSERT: la primera solicitud reserva la operación.
+        assertTrue(dao.reservar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashOriginal
+        ));
+
+        // Repetir la clave no inserta otra fila.
+        assertFalse(dao.reservar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashOriginal
+        ));
+
+        // Tampoco reemplaza el contenido original.
+        assertFalse(dao.reservar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashDistinto
+        ));
+
+        // La clave es global: otra cuenta tampoco puede reemplazarla.
+        assertFalse(dao.reservar(
+                idOperacion,
+                otroPropietario,
+                "REGISTRAR_VEHICULO",
+                hashOriginal
+        ));
+
+        assertEquals(
+                1L,
+                number(
+                        c,
+                        """
+                        SELECT count(*)
+                        FROM mycar.operacion_idempotente
+                        WHERE id_operacion=?
+                        """,
+                        idOperacion
+                )
+        );
+
+        assertEquals(
+                propietario,
+                number(
+                        c,
+                        """
+                        SELECT id_usuario
+                        FROM mycar.operacion_idempotente
+                        WHERE id_operacion=?
+                        """,
+                        idOperacion
+                )
+        );
+
+        assertEquals(
+                hashOriginal,
+                text(
+                        c,
+                        """
+                        SELECT hash_solicitud
+                        FROM mycar.operacion_idempotente
+                        WHERE id_operacion=?
+                        """,
+                        idOperacion
+                )
+        );
+
+        assertEquals(
+                1L,
+                number(
+                        c,
+                        """
+                        SELECT count(*)
+                        FROM mycar.operacion_idempotente
+                        WHERE id_operacion=?
+                          AND tipo_operacion='REGISTRAR_VEHICULO'
+                          AND estado='EN_PROCESO'
+                          AND respuesta_json IS NULL
+                        """,
+                        idOperacion
+                )
+        );
+    }
+
+    @Test
+    void consultaOperacionSoloParaSuPropietarioYTipo()
+            throws Exception {
+
+        var fuente = new SingleConnectionDataSource(c, true);
+        var dao = new OperacionVehiculoDao(new JdbcTemplate(fuente));
+
+        long propietario = account(c);
+
+        long otroPropietario = accountWith(
+                c,
+                "consulta-operacion@example.test",
+                LocalDate.now(LIMA).minusYears(30)
+        );
+
+        UUID idOperacion = UUID.randomUUID();
+        String hashSolicitud = "a".repeat(64);
+
+        assertTrue(dao.reservar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashSolicitud
+        ));
+
+        var operacion = dao.buscarParaActualizar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO"
+        ).orElseThrow();
+
+        assertEquals(hashSolicitud, operacion.hashSolicitud());
+        assertEquals("EN_PROCESO", operacion.estado());
+        assertNull(operacion.respuestaJson());
+
+        // Otra cuenta no puede consultar esta operación.
+        assertTrue(dao.buscarParaActualizar(
+                idOperacion,
+                otroPropietario,
+                "REGISTRAR_VEHICULO"
+        ).isEmpty());
+
+        // Tampoco se recupera como un tipo de operación distinto.
+        assertTrue(dao.buscarParaActualizar(
+                idOperacion,
+                propietario,
+                "ACTUALIZAR_KM"
+        ).isEmpty());
+
+        // Un identificador inexistente no devuelve resultados.
+        assertTrue(dao.buscarParaActualizar(
+                UUID.randomUUID(),
+                propietario,
+                "REGISTRAR_VEHICULO"
+        ).isEmpty());
+    }
+
+    @Test
+    void confirmaOperacionSoloSiCoincidenPropietarioTipoYHash()
+            throws Exception {
+
+        var fuente = new SingleConnectionDataSource(c, true);
+        var dao = new OperacionVehiculoDao(new JdbcTemplate(fuente));
+
+        long propietario = account(c);
+
+        long otroPropietario = accountWith(
+                c,
+                "confirmacion-operacion@example.test",
+                LocalDate.now(LIMA).minusYears(30)
+        );
+
+        UUID idOperacion = UUID.randomUUID();
+        String hashOriginal = "a".repeat(64);
+        String hashDistinto = "b".repeat(64);
+
+        // Respuesta ficticia exclusiva de esta prueba.
+        String respuesta = "{\"prueba\":\"confirmacion\"}";
+
+        assertTrue(dao.reservar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashOriginal
+        ));
+
+        assertFalse(dao.confirmar(
+                idOperacion,
+                otroPropietario,
+                "REGISTRAR_VEHICULO",
+                hashOriginal,
+                respuesta
+        ));
+
+        assertFalse(dao.confirmar(
+                idOperacion,
+                propietario,
+                "ACTUALIZAR_KM",
+                hashOriginal,
+                respuesta
+        ));
+
+        assertFalse(dao.confirmar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashDistinto,
+                respuesta
+        ));
+
+        var pendiente = dao.buscarParaActualizar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO"
+        ).orElseThrow();
+
+        assertEquals("EN_PROCESO", pendiente.estado());
+        assertNull(pendiente.respuestaJson());
+
+        assertTrue(dao.confirmar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashOriginal,
+                respuesta
+        ));
+
+        // Una operación confirmada no puede reemplazar su respuesta.
+        assertFalse(dao.confirmar(
+                idOperacion,
+                propietario,
+                "REGISTRAR_VEHICULO",
+                hashOriginal,
+                "{\"prueba\":\"reemplazo\"}"
+        ));
+
+        assertEquals(
+                1L,
+                number(
+                        c,
+                        """
+                        SELECT count(*)
+                        FROM mycar.operacion_idempotente
+                        WHERE id_operacion = ?
+                          AND estado = 'CONFIRMADA'
+                          AND respuesta_json = CAST(? AS jsonb)
+                        """,
+                        idOperacion,
+                        respuesta
+                )
+        );
     }
 
     @Test void flywayV1IntactaActualizaYReintentaSinModificarDatos() throws Exception {
