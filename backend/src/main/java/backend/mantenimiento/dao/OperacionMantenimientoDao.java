@@ -1,6 +1,7 @@
 package backend.mantenimiento.dao;
 
 import backend.mantenimiento.model.OperacionMantenimiento;
+import backend.mantenimiento.model.ResultadoRegistroMantenimiento;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,6 @@ public interface OperacionMantenimientoDao {
     void confirmar(
             UUID idOperacion,
             Long idUsuario,
-            Long idMantenimiento
+            ResultadoRegistroMantenimiento resultado
     );
 }

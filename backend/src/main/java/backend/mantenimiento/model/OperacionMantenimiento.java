@@ -8,6 +8,6 @@ public record OperacionMantenimiento(
         String tipoOperacion,
         String hashSolicitud,
         String estado,
-        Long idMantenimiento
+        String respuestaJson
 ) {
 }

@@ -18,17 +18,13 @@ import java.util.UUID;
 public class MantenimientoHttpService {
     private static final ZoneId LIMA = ZoneId.of("America/Lima");
     private final ContextoMantenimientoJdbcDao contexto;
-    private final ValidadorRegistroMantenimiento validador;
-    private final ValidadorRepuesto validadorRepuesto;
     private final VehiculoMantenimientoService vehiculos;
     private final ObjectProvider<RegistroIdempotenteMantenimiento> registros;
 
     public MantenimientoHttpService(ContextoMantenimientoJdbcDao contexto,
             VehiculoMantenimientoService vehiculos,
-            ObjectProvider<RegistroIdempotenteMantenimiento> registros,
-            ValidadorRegistroMantenimiento validador, ValidadorRepuesto validadorRepuesto) {
+            ObjectProvider<RegistroIdempotenteMantenimiento> registros) {
         this.contexto=contexto; this.vehiculos=vehiculos; this.registros=registros;
-        this.validador=validador; this.validadorRepuesto=validadorRepuesto;
     }
 
     public ContextoResponse contexto(long usuario) {
@@ -55,8 +51,6 @@ public class MantenimientoHttpService {
                 .map(p -> new DatosRepuesto(p.nombre(),p.marca(),p.cantidad(),p.precioUnitario())).toList();
         var solicitud=new SolicitudRegistroMantenimiento(r.idOperacion(),vehiculo,datos,
                 r.observaciones(),repuestos);
-        validador.validar(datos);
-        repuestos.forEach(validadorRepuesto::validar);
         var adaptador=exigirAdaptador();
         // El adaptador confirmado debe invocar el servicio existente dentro de esta transacción.
         var resultado=adaptador.registrar(usuario,solicitud);

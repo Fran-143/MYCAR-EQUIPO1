@@ -23,41 +23,47 @@ public class LecturaKmMantenimientoService {
             Long idVehiculo,
             DatosRegistroMantenimiento datos
     ) {
-        if (datos.origenKmServicio()
-                == OrigenKmServicio.HISTORICO_MANUAL) {
-            dao.buscarUltimaLecturaAnterior(idVehiculo, datos.fechaServicio())
-                    .ifPresent(lectura -> {
-                        LocalDate fechaLectura = fechaEnLima(lectura);
-                        if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
-                                || !fechaLectura.isBefore(datos.fechaServicio())) {
-                            throw new IllegalArgumentException(
-                                    "La lectura anterior no corresponde al vehículo y fecha del servicio"
-                            );
-                        }
-                        if (datos.kmServicio() < lectura.valorKm()) {
-                            throw new IllegalArgumentException(
-                                    "kmServicio: es inferior a la última lectura anterior"
-                            );
-                        }
-                    });
-            dao.buscarPrimeraLecturaPosterior(idVehiculo, datos.fechaServicio())
-                    .ifPresent(lectura -> {
-                        LocalDate fechaLectura = fechaEnLima(lectura);
-                        if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
-                                || !fechaLectura.isAfter(datos.fechaServicio())) {
-                            throw new IllegalArgumentException(
-                                    "La lectura posterior no corresponde al vehículo y fecha del servicio"
-                            );
-                        }
-                        if (datos.kmServicio() > lectura.valorKm()) {
-                            throw new IllegalArgumentException(
-                                    "kmServicio: supera la primera lectura posterior"
-                            );
-                        }
-                    });
-            return;
+        if (datos.origenKmServicio() == OrigenKmServicio.LECTURA) {
+            validarLecturaSeleccionada(idVehiculo, datos);
         }
+        validarCronologia(idVehiculo, datos);
+    }
 
+    private void validarCronologia(Long idVehiculo, DatosRegistroMantenimiento datos) {
+        dao.buscarUltimaLecturaAnterior(idVehiculo, datos.fechaServicio())
+                .ifPresent(lectura -> {
+                    LocalDate fechaLectura = fechaEnLima(lectura);
+                    if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
+                            || !fechaLectura.isBefore(datos.fechaServicio())) {
+                        throw new IllegalArgumentException(
+                                "La lectura anterior no corresponde al vehículo y fecha del servicio"
+                        );
+                    }
+                    if (datos.kmServicio() < lectura.valorKm()) {
+                        throw new IllegalArgumentException(
+                                "kmServicio: es inferior a la última lectura anterior"
+                        );
+                    }
+                });
+        dao.buscarPrimeraLecturaPosterior(idVehiculo, datos.fechaServicio())
+                .ifPresent(lectura -> {
+                    LocalDate fechaLectura = fechaEnLima(lectura);
+                    if (!Objects.equals(lectura.idVehiculo(), idVehiculo)
+                            || !fechaLectura.isAfter(datos.fechaServicio())) {
+                        throw new IllegalArgumentException(
+                                "La lectura posterior no corresponde al vehículo y fecha del servicio"
+                        );
+                    }
+                    if (datos.kmServicio() > lectura.valorKm()) {
+                        throw new IllegalArgumentException(
+                                "kmServicio: supera la primera lectura posterior"
+                        );
+                    }
+                });
+    }
+
+    private void validarLecturaSeleccionada(
+            Long idVehiculo, DatosRegistroMantenimiento datos) {
         LecturaKmReferencia lectura = dao
                 .buscarPorId(datos.idLecturaKmReferencia())
                 .orElseThrow(() -> new IllegalArgumentException(

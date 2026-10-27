@@ -2,6 +2,7 @@ package backend.mantenimiento.config;
 
 import backend.mantenimiento.dao.LecturaKmMantenimientoDao;
 import backend.mantenimiento.dao.RegistroMantenimientoDao;
+import backend.mantenimiento.dao.OperacionMantenimientoDao;
 import backend.mantenimiento.dao.VehiculoMantenimientoDao;
 import backend.mantenimiento.service.LecturaKmMantenimientoService;
 import backend.mantenimiento.service.RegistroMantenimientoService;
@@ -53,7 +54,8 @@ public class MantenimientoConfiguracion {
             VehiculoMantenimientoService vehiculos,
             TipoMantenimientoService tipos,
             LecturaKmMantenimientoService lecturas,
-            RegistroMantenimientoDao dao
+            RegistroMantenimientoDao dao,
+            OperacionMantenimientoDao operaciones
     ) {
         return new RegistroMantenimientoService(
                 validador,
@@ -61,7 +63,8 @@ public class MantenimientoConfiguracion {
                 vehiculos,
                 tipos,
                 lecturas,
-                dao
+                dao,
+                operaciones
         );
     }
 }

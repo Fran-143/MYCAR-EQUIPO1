@@ -2,6 +2,7 @@ package backend.mantenimiento.api;
 
 import backend.mantenimiento.api.dto.ContratoRf17.ErrorResponse;
 import backend.mantenimiento.model.MantenimientoNoDisponibleException;
+import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
 import backend.mantenimiento.seguridad.SesionMantenimientoNoValidada;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -47,6 +48,10 @@ public class ErroresMantenimientoController {
     @ExceptionHandler(MantenimientoNoDisponibleException.class)
     public ResponseEntity<ErrorResponse> vehiculo(MantenimientoNoDisponibleException ex) {
         return respuesta(404,"VEHICULO_NO_DISPONIBLE",ex.getMessage(),Map.of(),false);
+    }
+    @ExceptionHandler(ConflictoOperacionMantenimientoException.class)
+    public ResponseEntity<ErrorResponse> operacion(ConflictoOperacionMantenimientoException ex) {
+        return respuesta(409,"OPERACION_NO_REUTILIZABLE",ex.getMessage(),Map.of(),false);
     }
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> dato(IllegalArgumentException ex) {
