@@ -22,6 +22,7 @@ import com.mycar.app.features.inicio.viewmodel.HomeViewModel
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    onRegistrarMantenimiento: (() -> Unit)? = null,
     homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModel.Factory
     )
@@ -50,6 +51,11 @@ fun HomeScreen(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        onRegistrarMantenimiento?.let { abrir ->
+            Button(onClick = abrir) { Text("Registrar mantenimiento") }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         Button(
             onClick = homeViewModel::checkConnection,

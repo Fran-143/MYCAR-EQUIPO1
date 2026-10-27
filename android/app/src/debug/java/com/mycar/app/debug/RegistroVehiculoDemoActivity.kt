@@ -1,6 +1,9 @@
 package com.mycar.app.debug
 
 import android.os.Bundle
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
+import com.mycar.app.MainActivity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -28,6 +31,7 @@ class RegistroVehiculoDemoActivity : ComponentActivity() {
 
 @Composable
 private fun NavegacionPrueba() {
+    val context = LocalContext.current
     var pantalla by rememberSaveable { mutableStateOf("registro") }
     BackHandler(enabled = pantalla != "inicio") { pantalla = if (pantalla == "registro") "autos" else "inicio" }
     when (pantalla) {
@@ -54,6 +58,10 @@ private fun NavegacionPrueba() {
                 Spacer(Modifier.height(24.dp))
                 Button(onClick = { pantalla = "autos" }, modifier = Modifier.fillMaxWidth()) {
                     Text("Mis vehículos · prueba")
+                }
+                OutlinedButton(onClick = { context.startActivity(Intent(context, MainActivity::class.java)) },
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text("Inicio y mantenimientos")
                 }
                 OutlinedButton(onClick = { pantalla = "conexion" }, modifier = Modifier.fillMaxWidth()) {
                     Text("Comprobar conexión")
