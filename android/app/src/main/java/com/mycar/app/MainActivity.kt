@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.mycar.app.features.historial.ui.FlujoHistorialMantenimiento
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.mycar.app.features.autenticacion.ui.AuthGate
 import com.mycar.app.ui.theme.MyCarTheme
 import com.mycar.app.features.inicio.ui.HomeScreen
 
@@ -26,17 +27,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyCarTheme {
                 var mostrarHistorial by rememberSaveable { mutableStateOf(false) }
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    if (mostrarHistorial) {
-                        FlujoHistorialMantenimiento(
-                            onVolverInicio = { mostrarHistorial = false },
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    } else {
-                        HomeScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            onVerHistorial = { mostrarHistorial = true }
-                        )
+                AuthGate(onLocalSessionCleared = { mostrarHistorial = false }) {
+                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                        if (mostrarHistorial) {
+                            FlujoHistorialMantenimiento(
+                                onVolverInicio = { mostrarHistorial = false },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        } else {
+                            HomeScreen(
+                                modifier = Modifier.padding(innerPadding),
+                                onVerHistorial = { mostrarHistorial = true }
+                            )
+                        }
                     }
                 }
             }
