@@ -23,6 +23,8 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     val kilometraje = RemoteActualizarKilometrajeRepository(cliente.retrofit.create(KilometrajeApi::class.java))
     val mantenimiento = com.mycar.app.features.mantenimiento.data.MantenimientoApiAdapter.desde(cliente.retrofit)
     val historial = com.mycar.app.features.historial.data.HistorialApiAdapter.desde(cliente.retrofit)
+    val alertas = com.mycar.app.features.alertas.data.RemoteAlertasRepository(
+        cliente.retrofit.create(com.mycar.app.features.alertas.data.AlertasApi::class.java))
     val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(listado,historial,mantenimiento)
     override fun toString() = "CuentaVehiculos[REDACTED]"
 }
