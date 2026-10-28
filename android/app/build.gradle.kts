@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Sólo valores legales aprobados externamente; nunca se proporciona una versión ficticia.
+fun legalConfigString(value: String) = "\"" +
+    value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
+
 android {
     namespace = "com.mycar.app"
 
@@ -18,14 +22,22 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.
+        buildConfigField("String", "PRIVACY_SOURCE", legalConfigString("external"))
+        buildConfigField("String", "PRIVACY_VERSION",
+            legalConfigString(providers.gradleProperty("mycar.privacy.version").getOrElse("")))
+        buildConfigField("String", "PRIVACY_DOCUMENT_URL",
+            legalConfigString(providers.gradleProperty("mycar.privacy.documentUrl").getOrElse("")))
     }
 
     buildTypes {
         debug {
+            buildConfigField("String", "PRIVACY_SOURCE",
+                legalConfigString(providers.gradleProperty("mycar.privacy.source").getOrElse("local-academic")))
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"http://10.0.2.2:8081/\""
+                "\"${providers.gradleProperty("mycar.apiBaseUrl").getOrElse("http://10.0.2.2:8080/")}\""
             )
         }
 
@@ -51,6 +63,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    sourceSets.getByName("test").resources.srcDir("src/main/res/raw")
 
     buildFeatures {
         compose = true
