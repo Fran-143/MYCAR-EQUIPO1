@@ -16,6 +16,7 @@ object AuthGraph {
     @Volatile private var instance: AuthRepository? = null
     fun repository(context: Context): AuthRepository = instance ?: synchronized(this) {
         instance ?: run {
+            val app = context.applicationContext
             val client = OkHttpClient.Builder()
                 .retryOnConnectionFailure(false)
                 .followRedirects(false)
@@ -27,8 +28,9 @@ object AuthGraph {
             val api = Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL)
                 .client(client).addConverterFactory(GsonConverterFactory.create()).build()
                 .create(AuthApi::class.java)
-            AuthRepository(api, KeystoreCredentialStore(context.applicationContext, BuildConfig.API_BASE_URL),
-                registrationPolicy = privacyPolicy())
+            AuthRepository(api, KeystoreCredentialStore(app, BuildConfig.API_BASE_URL),
+                registrationPolicy = privacyPolicy(),
+                clearPrivateData = { com.mycar.app.features.sesion.data.DatosPrivadosSesion.limpiar(app) })
                 .also { instance = it }
         }
     }

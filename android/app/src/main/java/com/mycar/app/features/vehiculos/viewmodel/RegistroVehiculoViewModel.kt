@@ -62,8 +62,8 @@ class RegistroVehiculoViewModel(
     }
     companion object {
         private const val BORRADOR = "rf08.formulario.v1"
-        fun factory(repository: RegistroVehiculoRepository, pendientes: SolicitudRegistroPendienteStore) = viewModelFactory {
-            initializer { RegistroVehiculoViewModel(createSavedStateHandle(), repository, pendientes) }
+        fun factory(repository: RegistroVehiculoRepository, pendientes: SolicitudRegistroPendienteStore, estadoEnSistema: Boolean = true) = viewModelFactory {
+            initializer { RegistroVehiculoViewModel(if (estadoEnSistema) createSavedStateHandle() else SavedStateHandle(), repository, pendientes) }
         }
     }
 }

@@ -125,7 +125,7 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
     if (logout.confirmation) {
         AlertDialog(onDismissRequest = vm::cancelLogout,
             title = { Text("¿Cerrar sesión?") },
-            text = { Text("Cerrarás sesión en este dispositivo.") },
+            text = { Text("Cerrarás sesión y se eliminarán los borradores y solicitudes pendientes de vehículos y mantenimientos de este dispositivo. Los registros guardados en el servidor se conservan.") },
             confirmButton = { TextButton(onClick = vm::confirmedLogout) { Text("Cerrar sesión") } },
             dismissButton = { TextButton(onClick = vm::cancelLogout) { Text("Cancelar") } })
     }
@@ -185,8 +185,9 @@ private fun LoginScreen(state: LoginState, onBack: () -> Unit,
     val context = LocalContext.current
     DisposableEffect(context) {
         val window = (context as? Activity)?.window
+        val protegidaAntes = window?.attributes?.flags?.and(WindowManager.LayoutParams.FLAG_SECURE) != 0
         window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        onDispose { if (!protegidaAntes) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
     BackHandler { if (!state.busy) onBack() }
     val submit = { keyboard?.hide(); onSubmit(email, password) }

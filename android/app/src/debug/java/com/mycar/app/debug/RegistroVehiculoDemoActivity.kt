@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import com.mycar.app.MainActivity
+import com.mycar.app.features.sesion.ui.SesionVehiculosActivity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -15,7 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.mycar.app.features.inicio.ui.HomeScreen
+import com.mycar.app.features.inicio.ui.ConexionServidorScreen
 import com.mycar.app.features.vehiculos.ui.RegistroVehiculoDemo
 import com.mycar.app.features.vehiculos.ui.ListadoVehiculosDemo
 import com.mycar.app.ui.theme.MyCarTheme
@@ -32,7 +33,7 @@ class RegistroVehiculoDemoActivity : ComponentActivity() {
 @Composable
 private fun NavegacionPrueba() {
     val context = LocalContext.current
-    var pantalla by rememberSaveable { mutableStateOf("registro") }
+    var pantalla by rememberSaveable { mutableStateOf("inicio") }
     BackHandler(enabled = pantalla != "inicio") { pantalla = if (pantalla == "registro") "autos" else "inicio" }
     when (pantalla) {
         "registro" -> RegistroVehiculoDemo(onVolver = { pantalla = "autos" })
@@ -47,7 +48,7 @@ private fun NavegacionPrueba() {
                     }
                 }
             }
-        ) { padding -> HomeScreen(modifier = Modifier.padding(padding)) }
+        ) { padding -> ConexionServidorScreen(modifier = Modifier.padding(padding)) }
         else -> Scaffold { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 verticalArrangement = Arrangement.Center,
@@ -59,9 +60,13 @@ private fun NavegacionPrueba() {
                 Button(onClick = { pantalla = "autos" }, modifier = Modifier.fillMaxWidth()) {
                     Text("Mis vehículos · prueba")
                 }
+                Button(onClick = { context.startActivity(Intent(context, SesionVehiculosActivity::class.java)) },
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text("Vehículos · sesión real")
+                }
                 OutlinedButton(onClick = { context.startActivity(Intent(context, MainActivity::class.java)) },
                     modifier = Modifier.fillMaxWidth()) {
-                    Text("Inicio y mantenimientos")
+                    Text("Inicio principal")
                 }
                 OutlinedButton(onClick = { pantalla = "conexion" }, modifier = Modifier.fillMaxWidth()) {
                     Text("Comprobar conexión")

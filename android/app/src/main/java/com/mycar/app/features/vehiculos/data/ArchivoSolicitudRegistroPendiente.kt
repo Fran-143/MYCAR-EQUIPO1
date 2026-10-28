@@ -29,6 +29,13 @@ class ArchivoSolicitudRegistroPendiente(
         archivo = AtomicFile(File(directorio, "$huella.json"))
     }
 
+    /** RF06 elimina también un archivo incompleto; no necesita deserializar una operación incierta. */
+    @Synchronized fun borrarAlCerrarSesion() {
+        archivo.delete()
+        if (archivo.baseFile.exists() || File(archivo.baseFile.path + ".bak").exists()
+            || File(archivo.baseFile.path + ".new").exists()) throw IOException("No se pudo limpiar el registro local")
+    }
+
     @Synchronized override fun cargar(): SolicitudRegistroVehiculoDto? {
         if (!archivo.baseFile.exists() && !File(archivo.baseFile.path + ".bak").exists()) return null
         try {
