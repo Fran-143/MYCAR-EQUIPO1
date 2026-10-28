@@ -30,17 +30,22 @@ fun FlujoHistorialMantenimiento(
     mantenimientoRepository: MantenimientoRepository? = null,
     claveCuenta: String? = null,
     onIniciarSesion: (() -> Unit)? = null,
-    onActualizarKm: ((Long) -> Unit)? = null
+    onActualizarKm: ((Long) -> Unit)? = null,
+    idVehiculoInicial: Long? = null,
+    archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
+    estadoEnSistema: Boolean = true,
+    onRegistroAbierto: (Boolean) -> Unit = {}
 ) {
     key(claveCuenta) {
         var registrando by rememberSaveable { mutableStateOf(false) }
-        var vehiculoElegido by rememberSaveable { mutableStateOf<Long?>(null) }
+        var vehiculoElegido by rememberSaveable { mutableStateOf<Long?>(idVehiculoInicial) }
+        LaunchedEffect(registrando) { onRegistroAbierto(registrando) }
         if (registrando) {
             AmbitoHistorial {
                 EntradaRegistroMantenimiento(onCerrar = { registrando = false }, modifier = modifier,
                     repository = mantenimientoRepository, claveCuentaBorrador = claveCuenta,
                     idVehiculoInicial = vehiculoElegido, onActualizarKm = onActualizarKm,
-                    onSesionRequerida = onIniciarSesion)
+                    onSesionRequerida = onIniciarSesion, archivoPendiente = archivoPendiente, estadoEnSistema = estadoEnSistema)
             }
         } else {
             AmbitoHistorial {

@@ -61,8 +61,8 @@ class ListadoVehiculosViewModel(private val saved: SavedStateHandle,
         }
     }
     companion object {
-        fun factory(repository: ListadoVehiculosRepository) = viewModelFactory {
-            initializer { ListadoVehiculosViewModel(createSavedStateHandle(), repository) }
+        fun factory(repository: ListadoVehiculosRepository, estadoEnSistema: Boolean = true) = viewModelFactory {
+            initializer { ListadoVehiculosViewModel(if (estadoEnSistema) createSavedStateHandle() else SavedStateHandle(), repository) }
         }
     }
 }

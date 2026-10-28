@@ -22,9 +22,9 @@ import com.mycar.app.features.vehiculos.viewmodel.*
 @Composable
 fun ListadoVehiculosRoute(claveCuenta: String, repository: ListadoVehiculosRepository,
                          onVolver: () -> Unit, onAgregar: () -> Unit, onIniciarSesion: () -> Unit,
-                         modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null) {
+                         modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null, estadoEnSistema: Boolean = true) {
     val vm: ListadoVehiculosViewModel = viewModel(key = "rf09-$claveCuenta",
-        factory = remember(repository, claveCuenta) { ListadoVehiculosViewModel.factory(repository) })
+        factory = remember(repository, claveCuenta) { ListadoVehiculosViewModel.factory(repository, estadoEnSistema) })
     val estado by vm.estado.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.cargar() }
     ListadoVehiculosScreen(estado, vm::cambiarBusqueda, vm::filtrar, vm::cargar,

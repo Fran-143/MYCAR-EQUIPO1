@@ -31,6 +31,10 @@ data class SessionState(
 
 class AuthProblem(message: String) : Exception(message)
 
+/** Identifica un ciclo validado; no contiene credenciales ni autoriza al backend por sí mismo. */
+data class AuthenticatedContext(val sessionId: Long, val version: Long)
+class SessionRequired : IOException("SESION_NO_VALIDA")
+
 /**
  * Único dueño de las credenciales. Un Mutex serializa login/validación/rotación.
  * La UI sólo recibe estado, nunca tokens. El reloj local programa comprobaciones;
@@ -40,7 +44,8 @@ class AuthRepository(
     private val api: AuthApi,
     private val store: CredentialStore,
     private val clock: Clock = Clock.systemUTC(),
-    private val registrationPolicy: PrivacyPolicyConfiguration = PrivacyPolicyConfiguration()
+    private val registrationPolicy: PrivacyPolicyConfiguration = PrivacyPolicyConfiguration(),
+    private val clearPrivateData: () -> Unit = {}
 ) : RegistrationService {
     private val registrationMutex = Mutex()
 
@@ -108,6 +113,39 @@ class AuthRepository(
     private fun publish(expected: Long, state: SessionState) = synchronized(localLock) {
         ensureCurrent(expected)
         mutableSession.value = state.copy(contextVersion = generation)
+    }
+
+    fun authenticatedContext(): AuthenticatedContext? = synchronized(localLock) {
+        if (cleanupBlocked || mutableSession.value.phase != SessionPhase.AUTHENTICATED) null
+        else vault?.tokens?.let { AuthenticatedContext(it.idSesion, generation) }
+    }
+
+    /** Único emisor para los clientes del equipo. Serializa renovación; jamás reintenta su POST. */
+    suspend fun authorization(context: AuthenticatedContext): String = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val previous = synchronized(localLock) {
+                ensureContext(context)
+                requireNotNull(vault?.tokens)
+            }
+            if (!clock.instant().isBefore(Instant.parse(previous.accessTokenExpiraUtc).minusSeconds(10))) {
+                try { renew(previous, context.version) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { retry(context.version) }
+            }
+            synchronized(localLock) {
+                ensureContext(context)
+                "Bearer ${requireNotNull(vault?.tokens).accessToken}"
+            }
+        }
+    }
+    private fun ensureContext(context: AuthenticatedContext) {
+        if (cleanupBlocked || generation != context.version || vault?.tokens?.idSesion != context.sessionId)
+            throw SessionRequired()
+        when (mutableSession.value.phase) {
+            SessionPhase.AUTHENTICATED -> Unit
+            SessionPhase.RETRY -> throw IOException("No se pudo validar la sesión; vuelve a intentarlo.")
+            else -> throw SessionRequired()
+        }
     }
 
     suspend fun login(email: String, password: String) {
@@ -218,6 +256,8 @@ class AuthRepository(
             cleanupBlocked = true // Invalida inmediatamente las operaciones iniciadas antes del cierre.
             try {
                 proof = existing.tokens?.accessToken
+                // Primero cerrar escritores y limpiar RF08/RF17; un fallo bloquea el cambio de cuenta.
+                clearPrivateData()
                 store.clearSession(existing.installation)
                 vault = CredentialVault(existing.installation, null)
                 cleanupBlocked = false
@@ -251,10 +291,7 @@ class AuthRepository(
     }
 
     suspend fun maintainSession() {
-        synchronized(localLock) {
-            if (!cleanupBlocked && mutableSession.value.phase != SessionPhase.SIGNED_OUT)
-                mutableSession.value = SessionState(SessionPhase.CHECKING, contextVersion = generation)
-        }
+        // Al volver del segundo plano conservar el ámbito autenticado mientras se valida.
         while (currentCoroutineContext().isActive) {
             if (!synchronized(localLock) { cleanupBlocked }) validateSession()
             val wait = synchronized(localLock) {
