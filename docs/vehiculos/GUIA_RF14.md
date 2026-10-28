@@ -22,6 +22,8 @@ cd C:\Proyectos\MyCarEquipo1
 .\scripts\iniciar_backend_integracion_local.ps1
 ```
 
+Por defecto el script habilita registro académico (`privacidad` **1.0**, igual que la app Debug). Más adelante en producción se usará la versión legal aprobada (`-VersionPrivacidad` explícita).
+
 Comprobar:
 
 ```powershell
