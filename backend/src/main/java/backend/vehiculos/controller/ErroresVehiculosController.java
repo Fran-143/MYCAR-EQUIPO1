@@ -26,7 +26,7 @@ public class ErroresVehiculosController {
         HttpStatus estado = switch (error.codigo()) {
             case "DATOS_INVALIDOS", "FILTRO_INVALIDO" -> HttpStatus.BAD_REQUEST;
             case "CUENTA_NO_AUTORIZADA" -> HttpStatus.FORBIDDEN;
-            case "OPERACION_NO_ENCONTRADA" -> HttpStatus.NOT_FOUND;
+            case "OPERACION_NO_ENCONTRADA", "VEHICULO_NO_ENCONTRADO" -> HttpStatus.NOT_FOUND;
             case "PLAN_FREE_NO_DISPONIBLE", "LIMITE_FREE", "PLACA_DUPLICADA",
                  "VIN_DUPLICADO", "CONFLICTO_REGISTRO", "CONFLICTO_IDEMPOTENCIA",
                  "OPERACION_EN_PROCESO" -> HttpStatus.CONFLICT;
@@ -37,6 +37,7 @@ public class ErroresVehiculosController {
             case "FILTRO_INVALIDO" -> "Selecciona Todos, Activos o Inactivos.";
             case "CUENTA_NO_AUTORIZADA" -> "Tu cuenta no tiene acceso a esta operación.";
             case "OPERACION_NO_ENCONTRADA" -> "No se encontró una operación disponible para tu cuenta.";
+            case "VEHICULO_NO_ENCONTRADO" -> "No se encontró el vehículo en tu cuenta.";
             case "PLAN_FREE_NO_DISPONIBLE" -> "No hay un plan Free disponible para registrar el vehículo.";
             case "LIMITE_FREE" -> "El plan Free permite un vehículo registrado, incluyendo inactivos.";
             case "PLACA_DUPLICADA" -> "La placa ya está registrada.";

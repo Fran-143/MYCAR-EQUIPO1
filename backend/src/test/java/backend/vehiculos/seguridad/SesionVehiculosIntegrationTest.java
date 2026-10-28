@@ -90,6 +90,10 @@ class SesionVehiculosIntegrationTest {
         String ajeno="Bearer "+login(otra,UUID.randomUUID()).get("accessToken").asText();
         mvc.perform(get("/api/v1/vehiculos").header("Authorization",ajeno)).andExpect(status().isOk()).andExpect(jsonPath("$.resumen.todos").value(0));
         mvc.perform(get("/api/v1/vehiculos/operaciones/"+op).header("Authorization",ajeno)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/vehiculos/"+vehiculo).header("Authorization",bearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.idVehiculo").value(vehiculo));
+        mvc.perform(get("/api/v1/vehiculos/"+vehiculo).header("Authorization",ajeno)).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("VEHICULO_NO_ENCONTRADO"));
     }
     @Test void sinBearerOFalsificadoNingunaRutaExponeDatos() throws Exception {
         for(String ruta: List.of("", "/catalogos", "/cupo-registro", "/identidad", "/operaciones/"+UUID.randomUUID())) {
