@@ -30,17 +30,19 @@ fun RegistrarMantenimientoRoute(
     modifier: Modifier = Modifier,
     idVehiculoInicial: Long? = null,
     onActualizarKm: ((Long) -> Unit)? = null,
-    onSesionRequerida: (() -> Unit)? = null
+    onSesionRequerida: (() -> Unit)? = null,
+    archivoPendiente: ArchivoRegistroPendiente? = null,
+    estadoEnSistema: Boolean = true
 ) {
     val context = LocalContext.current.applicationContext
-    val factory = remember(repository, claveCuentaBorrador, idVehiculoInicial) {
+    val factory = remember(repository, claveCuentaBorrador, idVehiculoInicial, archivoPendiente, estadoEnSistema) {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 require(modelClass.isAssignableFrom(MantenimientoViewModel::class.java))
                 return MantenimientoViewModel(repository,
-                    ArchivoRegistroPendiente(context, claveCuentaBorrador),
-                    extras.createSavedStateHandle(), idVehiculoInicial) as T
+                    archivoPendiente ?: ArchivoRegistroPendiente(context, claveCuentaBorrador),
+                    if (estadoEnSistema) extras.createSavedStateHandle() else androidx.lifecycle.SavedStateHandle(), idVehiculoInicial) as T
             }
         }
     }

@@ -14,10 +14,14 @@ import java.util.UUID
 
 class CuentaVehiculos(val usuario: Long, val ciclo: String, val credenciales: CredencialesSesion,
     val cliente: ClienteVehiculosAutenticado, val pendientes: PendientesSesionVehiculos,
-    val modelos: ViewModelStore = ViewModelStore()) : ViewModelStoreOwner {
+    val modelos: ViewModelStore = ViewModelStore(),
+    val archivoMantenimiento: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null) : ViewModelStoreOwner {
     override val viewModelStore get() = modelos
     val registro = RemoteRegistroVehiculoRepository(cliente.retrofit.create(RegistroVehiculoApi::class.java))
     val listado = RemoteListadoVehiculosRepository(cliente.retrofit.create(ListadoVehiculosApi::class.java))
+    val mantenimiento = com.mycar.app.features.mantenimiento.data.MantenimientoApiAdapter.desde(cliente.retrofit)
+    val historial = com.mycar.app.features.historial.data.HistorialApiAdapter.desde(cliente.retrofit)
+    val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(listado,historial,mantenimiento)
     override fun toString() = "CuentaVehiculos[REDACTED]"
 }
 
@@ -68,11 +72,16 @@ class SesionVehiculosViewModel(application: Application) : AndroidViewModel(appl
                 val archivo = withContext(Dispatchers.IO) {
                     ArchivoSolicitudRegistroPendiente(getApplication(), BuildConfig.API_BASE_URL, usuario)
                 }
-                val cuenta = CuentaVehiculos(usuario, UUID.randomUUID().toString(), credenciales,
-                    ClienteVehiculosAutenticado(BuildConfig.API_BASE_URL, credenciales),
-                    PendientesSesionVehiculos(archivo, archivo::borrarAlCerrarSesion))
+                val archivoMantenimiento = withContext(Dispatchers.IO) {
+                    com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente(getApplication(), "${BuildConfig.API_BASE_URL}|$usuario")
+                }
+                val ciclo = UUID.randomUUID().toString()
+                val cuenta = CuentaVehiculos(usuario, ciclo, credenciales,
+                    ClienteVehiculosAutenticado(BuildConfig.API_BASE_URL, credenciales,
+                        alCaducar={ viewModelScope.launch { sesionRequerida(ciclo) } }),
+                    PendientesSesionVehiculos(archivo, archivo::borrarAlCerrarSesion), archivoMantenimiento=archivoMantenimiento)
                 if (revision == intento) _estado.value = EstadoAcceso(cuenta=cuenta)
-                else { cuenta.credenciales.retirarParaCierre(); cuenta.cliente.cancelar(); cuenta.pendientes.cerrar(false); cuenta.modelos.clear() }
+                else { cuenta.credenciales.retirarParaCierre(); cuenta.cliente.cancelar(); cuenta.pendientes.cerrar(false); cuenta.archivoMantenimiento?.cerrar(false); cuenta.modelos.clear() }
             } catch (e: CancellationException) { credenciales?.retirarParaCierre(); throw e }
             catch (_: Exception) {
                 credenciales?.retirarParaCierre()
@@ -85,6 +94,7 @@ class SesionVehiculosViewModel(application: Application) : AndroidViewModel(appl
         val cuenta = _estado.value.cuenta?.takeIf { it.ciclo == cicloEsperado } ?: return
         ++revision
         cuenta.credenciales.retirarParaCierre(); cuenta.cliente.cancelar()
+        cuenta.archivoMantenimiento?.cerrar(false)
         cuenta.pendientes.cerrar(false) // Recuperable exclusivamente después de autenticar la misma cuenta.
         cuenta.modelos.clear()
         _estado.value = EstadoAcceso(mensaje="Inicia sesión nuevamente. Tu solicitud pendiente se conserva para esta cuenta.")
@@ -97,7 +107,7 @@ class SesionVehiculosViewModel(application: Application) : AndroidViewModel(appl
         val cierre = ++revision
         cuenta.cliente.cancelar(); cuenta.modelos.clear()
         cuentaConLimpiezaPendiente = cuenta
-        val limpia = runCatching { cuenta.pendientes.cerrar(true) }.isSuccess
+        val limpia = limpiarArchivos(cuenta)
         if (limpia) cuentaConLimpiezaPendiente = null
         _estado.value = EstadoAcceso(mensaje=if (limpia) "Sesión cerrada en este dispositivo. Comprobando el cierre remoto…"
             else "Acceso cerrado. No se pudo completar la limpieza local; pulsa Reintentar limpieza.")
@@ -111,13 +121,18 @@ class SesionVehiculosViewModel(application: Application) : AndroidViewModel(appl
     }
     fun reintentarLimpieza() {
         val cuenta = cuentaConLimpiezaPendiente ?: return
-        if (runCatching { cuenta.pendientes.cerrar(true) }.isSuccess) {
+        if (limpiarArchivos(cuenta)) {
             cuentaConLimpiezaPendiente = null
             _estado.value = EstadoAcceso(mensaje="Datos locales limpiados. El cierre remoto no está confirmado.")
         }
     }
+    private fun limpiarArchivos(cuenta: CuentaVehiculos): Boolean {
+        val vehiculos=runCatching { cuenta.pendientes.cerrar(true) }.isSuccess
+        val mantenimiento=runCatching { cuenta.archivoMantenimiento?.cerrar(true) }.isSuccess
+        return vehiculos && mantenimiento
+    }
     override fun onCleared() {
-        _estado.value.cuenta?.let { it.credenciales.retirarParaCierre(); it.cliente.cancelar(); it.modelos.clear(); it.pendientes.cerrar(false) }
+        _estado.value.cuenta?.let { it.credenciales.retirarParaCierre(); it.cliente.cancelar(); it.modelos.clear(); it.pendientes.cerrar(false); it.archivoMantenimiento?.cerrar(false) }
         super.onCleared()
     }
 }

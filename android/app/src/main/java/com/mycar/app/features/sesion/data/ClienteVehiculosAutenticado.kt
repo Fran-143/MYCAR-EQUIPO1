@@ -17,7 +17,7 @@ object ClientesSesion {
         .addConverterFactory(GsonConverterFactory.create()).build()
 }
 
-class ClienteVehiculosAutenticado(baseUrl: String, credenciales: CredencialesSesion) {
+class ClienteVehiculosAutenticado(baseUrl: String, credenciales: CredencialesSesion, alCaducar: () -> Unit = {}) {
     private val origen = baseUrl.toHttpUrl()
     private val cliente = OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false)
         .followSslRedirects(false).callTimeout(30, TimeUnit.SECONDS)
@@ -27,9 +27,14 @@ class ClienteVehiculosAutenticado(baseUrl: String, credenciales: CredencialesSes
                 throw IOException("Origen HTTP no autorizado")
             val prueba = try { credenciales.autorizacion() } catch (_: IOException) { null }
             if (prueba == null) {
+                alCaducar()
                 Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(401).message("Sesión requerida")
                     .body("{\"codigo\":\"SESION_NO_VALIDA\"}".toResponseBody("application/json".toMediaType())).build()
-            } else cadena.proceed(r.newBuilder().header("Authorization", prueba).build())
+            } else {
+                val respuesta=cadena.proceed(r.newBuilder().header("Authorization", prueba).build())
+                if(respuesta.code==401) alCaducar()
+                respuesta
+            }
         }.build()
     val retrofit: Retrofit = Retrofit.Builder().baseUrl(baseUrl).client(cliente)
         .addConverterFactory(GsonConverterFactory.create()).build()

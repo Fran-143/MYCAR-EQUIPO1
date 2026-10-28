@@ -27,14 +27,15 @@ import com.mycar.app.ui.theme.MyCarTheme
 class SesionVehiculosActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        enableEdgeToEdge()
-        setContent { MyCarTheme { AccesoVehiculos(onSalir = ::finish) } }
+        startActivity(android.content.Intent(this, com.mycar.app.MainActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra("abrir_vehiculos",true))
+        finish()
     }
 }
 
 @Composable
-private fun AccesoVehiculos(onSalir: () -> Unit, vm: SesionVehiculosViewModel = viewModel()) {
+fun AccesoVehiculos(onSalir: () -> Unit, vm: SesionVehiculosViewModel = viewModel()) {
     val estado by vm.estado.collectAsStateWithLifecycle()
     val cuenta = estado.cuenta
     var confirmar by remember { mutableStateOf(false) }
