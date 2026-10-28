@@ -19,7 +19,6 @@ import com.mycar.app.R
 import com.mycar.app.features.historial.ui.FlujoHistorialMantenimiento
 import com.mycar.app.features.inicio.domain.*
 import com.mycar.app.features.inicio.viewmodel.ResumenInicioViewModel
-import com.mycar.app.features.sesion.ui.AccesoVehiculos
 import com.mycar.app.features.sesion.viewmodel.SesionVehiculosViewModel
 import com.mycar.app.features.vehiculos.ui.VehiculosRoute
 
@@ -32,7 +31,6 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
     var secundariaNombre by rememberSaveable { mutableStateOf<String?>(null) }
     var vehiculoMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
     var formularioAbierto by remember { mutableStateOf(false) }
-    var confirmarCierre by remember { mutableStateOf(false) }
     val navegacion=NavegacionInicio(SeccionMyCar.valueOf(seccionNombre),secundariaNombre?.let(SecundariaMyCar::valueOf))
     fun navegar(n: NavegacionInicio) { seccionNombre=n.seccion.name; secundariaNombre=n.secundaria?.name; formularioAbierto=false }
     LaunchedEffect(solicitudVehiculos) { if(solicitudVehiculos>0) navegar(navegacion.abrir(SeccionMyCar.VEHICULOS)) }
@@ -68,13 +66,15 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                 } else if(navegacion.seccion==SeccionMyCar.ALERTAS) {
                     PantallaProximamente("Alertas",onVolver={ navegar(navegacion.atras()) },mostrarVolver=false)
                 } else if(cuenta==null) {
-                    if(navegacion.seccion==SeccionMyCar.INICIO) HomeScreen(EstadoResumenInicio(mensaje=acceso.mensaje),{},
-                        onVehiculos={ navegar(navegacion.abrir(SeccionMyCar.VEHICULOS)) },onMantenimientos={},
-                        onAlertas={ navegar(navegacion.abrir(SeccionMyCar.ALERTAS)) },
-                        onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
-                        onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },onRecargar={},
-                        onVerVehiculo={},onActualizarKm={},modifier=Modifier.statusBarsPadding())
-                    else AccesoVehiculos(onSalir={ navegar(navegacion.atras()) },vm=sesion)
+                    Column(Modifier.fillMaxSize().statusBarsPadding().padding(24.dp),
+                        verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                        Text("Preparando tu cuenta",style=MaterialTheme.typography.titleLarge)
+                        if(acceso.ocupada) CircularProgressIndicator()
+                        else {
+                            Text(acceso.mensaje ?: "No se pudo cargar tu cuenta.")
+                            Button(onClick=sesion::reintentar) { Text("Volver a intentar") }
+                        }
+                    }
                 } else key(cuenta.ciclo) {
                     CompositionLocalProvider(LocalViewModelStoreOwner provides cuenta) {
                         when(navegacion.seccion) {
@@ -104,9 +104,6 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                                     onActualizarKm={ navegar(navegacion.abrir(SecundariaMyCar.KILOMETRAJE)) },modifier=Modifier.statusBarsPadding())
                             }
                             SeccionMyCar.VEHICULOS -> Column {
-                                Row(Modifier.fillMaxWidth().statusBarsPadding(),horizontalArrangement=Arrangement.End) {
-                                    TextButton(onClick={ confirmarCierre=true }) { Text("Cerrar sesión") }
-                                }
                                 VehiculosRoute(cuenta.ciclo,cuenta.registro,cuenta.listado,cuenta.pendientes,
                                     onIrInicio={ navegar(navegacion.atras()) },onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     estadoEnSistema=false,modifier=Modifier.weight(1f),onFormularioAbierto={ formularioAbierto=it })
@@ -124,10 +121,7 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                 }
             }
         }
-        if(confirmarCierre && cuenta!=null) AlertDialog(onDismissRequest={ confirmarCierre=false },
-            title={ Text("¿Cerrar sesión?") },text={ Text("Se eliminarán los borradores y solicitudes pendientes de vehículos y mantenimientos en este dispositivo.") },
-            confirmButton={ TextButton(onClick={ confirmarCierre=false; sesion.cerrarConfirmado(); navegar(NavegacionInicio()) }) { Text("Cerrar sesión") } },
-            dismissButton={ TextButton(onClick={ confirmarCierre=false }) { Text("Cancelar") } })
+
     }
 }
 

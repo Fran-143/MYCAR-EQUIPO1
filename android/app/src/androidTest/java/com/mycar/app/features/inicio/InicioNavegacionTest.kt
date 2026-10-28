@@ -6,33 +6,57 @@ import androidx.test.espresso.Espresso
 import com.mycar.app.MainActivity
 import org.junit.Rule
 import org.junit.Test
+import android.os.Build
+import androidx.test.platform.app.InstrumentationRegistry
+import com.mycar.app.BuildConfig
+import com.mycar.app.features.sesion.domain.PoliticaRedLocal
+import org.junit.rules.TestRule
+import org.junit.runners.model.Statement
 
-/** Solo navegación sin sesión: no crea usuarios, sesiones ni registros. */
+/** Ejecutar sin sesión activa en el emulador de pruebas; no crea cuentas ni registros. */
 class InicioNavegacionTest {
-    @get:Rule val compose=createAndroidComposeRule<MainActivity>()
-    @Test fun inicioNoMuestraLosDatosDeEjemploDeLaReferencia() {
-        compose.onNodeWithText("Hola").assertExists()
+    // Conceder antes de lanzar MainActivity: el diálogo del sistema no es parte de estos tests de navegación.
+    @get:Rule(order = 0) val redLocal = TestRule { base, _ ->
+        object : Statement() {
+            override fun evaluate() {
+                if (Build.VERSION.SDK_INT >= 37 && PoliticaRedLocal.requierePermiso(
+                    BuildConfig.DEBUG, Build.VERSION.SDK_INT, BuildConfig.API_BASE_URL)) {
+                    val instrumentacion = InstrumentationRegistry.getInstrumentation()
+                    instrumentacion.uiAutomation.grantRuntimePermission(
+                        instrumentacion.targetContext.packageName, PoliticaRedLocal.PERMISO)
+                }
+                base.evaluate()
+            }
+        }
+    }
+    @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
+    private fun bienvenida() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("Crear cuenta").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+    @Test fun entradaUsaBienvenidaRealSinDatosDeEjemplo() {
+        bienvenida()
+        compose.onNodeWithText("Iniciar sesión").assertExists()
         compose.onNodeWithText("Hola, Carlos").assertDoesNotExist()
         compose.onNodeWithText("58 240 km").assertDoesNotExist()
-        listOf("Inicio","Vehículos","Mantenimientos","Alertas").forEach { compose.onNodeWithText(it).assertExists() }
+        compose.onNodeWithText("Comprobar conexión").assertDoesNotExist()
     }
-    @Test fun perfilRegresaAInicioYAlertasConservaLaBarra() {
-        compose.onNodeWithContentDescription("Perfil").performClick()
-        compose.onNodeWithText("Próximamente").assertExists()
-        Espresso.pressBack()
-        compose.onNodeWithText("Hola").assertExists()
-        compose.onNodeWithText("Alertas").performClick()
-        compose.onNodeWithText("Próximamente").assertExists()
-        compose.onNodeWithText("Vehículos").assertExists()
-        Espresso.pressBack()
-        compose.onNodeWithText("Hola").assertExists()
-    }
-    @Test fun vehiculosUsaElAccesoRealYNoElFormularioDemo() {
-        compose.onNodeWithText("Vehículos").performClick()
-        compose.onNodeWithText("Correo").assertExists()
+    @Test fun loginDeElsaRegresaABienvenida() {
+        bienvenida()
+        compose.onNodeWithText("Iniciar sesión").performClick()
+        compose.onNodeWithText("Correo electrónico").assertExists()
         compose.onNodeWithText("Contraseña").assertExists()
+        Espresso.pressBack()
+        compose.onNodeWithText("Crear cuenta").assertExists()
+    }
+    @Test fun registroDeCuentaUsaLaPantallaReal() {
+        bienvenida()
+        compose.onNodeWithText("Crear cuenta").performClick()
+        compose.onNodeWithText("Nombre").assertExists()
+        compose.onNodeWithText("Fecha de nacimiento").assertExists()
         compose.onNodeWithText("Modo de prueba · no guarda vehículos en la BD").assertDoesNotExist()
         Espresso.pressBack()
-        compose.onNodeWithText("Hola").assertExists()
+        compose.onNodeWithText("Iniciar sesión").assertExists()
     }
 }
