@@ -1,0 +1,15 @@
+Política de Privacidad — MyCar
+
+Versión interna: 1.0
+
+1. Recopilación de datos: MyCar recopila nombres, correo electrónico, fecha de nacimiento, información de vehículos, kilometraje e historial de mantenimiento necesarios para el funcionamiento de la aplicación.
+
+2. Uso y protección: Los datos se utilizan para administrar cuentas, vehículos y mantenimientos. Se aplican medidas de seguridad para proteger la información.
+
+3. Eliminación de cuenta: El usuario puede solicitar la eliminación de su cuenta. Una vez completado el proceso, perderá definitivamente el acceso a su cuenta y a la información registrada. Los datos personales serán eliminados conforme al procedimiento establecido, salvo conservación legalmente justificada.
+
+4. Derechos del usuario: Puede solicitar acceso, rectificación o cancelación de sus datos personales conforme a la legislación peruana.
+
+5. Legislación: Ley N.º 29733, Ley de Protección de Datos Personales del Perú, y su Reglamento aprobado por Decreto Supremo N.º 016-2024-JUS.
+
+6. Aceptación: El usuario debe consultar la política y aceptarla expresamente mediante una casilla inicialmente desmarcada.

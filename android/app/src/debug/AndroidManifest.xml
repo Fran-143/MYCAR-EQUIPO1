@@ -17,6 +17,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Acceso RF02 real; conserva el launcher y las rutas de prueba del equipo. -->
+        <activity-alias android:name=".AuthEntrada"
+            android:targetActivity=".MainActivity" android:exported="true"
+            android:label="MyCar · Acceso real">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <!-- RF18: accesos explicitos sin cambiar el launcher de prueba de vehiculos. -->
         <activity android:name=".features.historial.ui.HistorialPreviewActivity"
             android:exported="true" android:label="RF18 · Diseño con ejemplos" />
