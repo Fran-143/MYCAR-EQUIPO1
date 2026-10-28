@@ -34,7 +34,7 @@ internal fun ResultadoMantenimientoScreen(r: ResultadoRf17Dto, modifier: Modifie
             }
         }
         AvisoMantenimiento("Las recomendaciones se conservaron sin crear una alerta.")
-        Button(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver al inicio") }
+        Button(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
     }
 }
 
