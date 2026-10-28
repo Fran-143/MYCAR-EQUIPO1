@@ -1,0 +1,158 @@
+{
+  "rama": "feat/integracion-sesion-vehiculos",
+  "mainEntrante": "529927ac0398d09f71c6a40d0c6dbf67a8b3f621",
+  "conflictos": [
+    "android/app/src/debug/AndroidManifest.xml",
+    "android/app/src/main/java/com/mycar/app/MainActivity.kt"
+  ],
+  "archivos": [
+    {
+      "ruta": "android/app/build.gradle.kts",
+      "sha256": "ba54ff0234316f3b053367933fbed838d2b0522a2dfb73c1040913b0e0f6854e",
+      "sha256Base": "696adf3eaaa1a931584db776773a26e34823f5f9050b9e525056a606935f7119",
+      "referenciaBase": ":android/app/build.gradle.kts"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/inicio/InicioNavegacionTest.kt",
+      "sha256": "4754ecfb589b21a0b8f361e8ff36fe27dc3aa41129ed4eba3b9d2623a1c01f5c",
+      "sha256Base": "df8497958afa9e6ac4a97114dfdd86def86aa71a7fa4f4f5718d87eaa4e0b59b",
+      "referenciaBase": ":android/app/src/androidTest/java/com/mycar/app/features/inicio/InicioNavegacionTest.kt"
+    },
+    {
+      "ruta": "android/app/src/debug/AndroidManifest.xml",
+      "sha256": "f91ecc39742a6fbf5b6740b13c18482bb0c6ff61e8f74dac87918640ceaa7243",
+      "sha256Base": "f91ecc39742a6fbf5b6740b13c18482bb0c6ff61e8f74dac87918640ceaa7243",
+      "referenciaBase": "HEAD:android/app/src/debug/AndroidManifest.xml"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/MainActivity.kt",
+      "sha256": "af88d7aea6774eb4c110830f1d91f94d3549ca4e8425475aa951bfc530d2d8fb",
+      "sha256Base": "d361e9206d9b9e710d654a9ef955ae51ba8c470fdcdcb12ce41451824c8d6c4d",
+      "referenciaBase": "HEAD:android/app/src/main/java/com/mycar/app/MainActivity.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthGraph.kt",
+      "sha256": "5a966a3e44541f3cdafdd238ea0c418d558a25391fa97ae23ac914a9bf971a77",
+      "sha256Base": "e31df70a0e5e8bd1393ca2681f3e393d69491af026fbede06d82673e71e1deb4",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthGraph.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthRepository.kt",
+      "sha256": "87c6f6a36ec3ce39afca9a36deb320bd062cbaf4f0b639e1873fbe4eba762894",
+      "sha256Base": "0ea917bb8f20c88a31c08568b633b2c4929b59ee84a51e8b5e39c358c482e2d5",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthRepository.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/ui/AuthGate.kt",
+      "sha256": "4e12e4e43c02c6bb545d6536eb39865a4e8b231c9368609e834020339704e012",
+      "sha256Base": "80fddb5a2d8304f6fff579be9f780ce163e9d38beb4de2f0a96d4b80985dfb78",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/autenticacion/ui/AuthGate.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/ui/RegistrationScreen.kt",
+      "sha256": "a35255b07054ee6a8d00eacc4485aa6c74eea02cfef5cab214b3dc42ad27ea40",
+      "sha256Base": "fe46feb95c9b303c286968ee0a135458186f025655e4b9c3ff714fea8272d571",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/autenticacion/ui/RegistrationScreen.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/ui/MyCarNavigation.kt",
+      "sha256": "7740c768d9bd22abd4dd7a5b0686210457fac0dd03c468cd56abca069dd7075b",
+      "sha256Base": "a8ae29a40e9a0e06a75a807c30cc6aa0b08bfaa5634ad24d2127dcbaa009e941",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/inicio/ui/MyCarNavigation.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/data/ClienteVehiculosAutenticado.kt",
+      "sha256": "69afe43143d683dbb0712ee71a25f27d92b4d76688c454f17bfa596d4f096701",
+      "sha256Base": "529d2be5322dbffce5682c1b8cae59ff81e8565d381e857005d1b6f9fd21fc97",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/sesion/data/ClienteVehiculosAutenticado.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/data/DatosPrivadosSesion.kt",
+      "sha256": "6fe4ee58a755aa027f7c1720df4bccc3131699d49f82fc3d64076944609fb0ab",
+      "sha256Base": null,
+      "referenciaBase": null
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/ui/SesionVehiculosActivity.kt",
+      "sha256": "cbe876c9063c7ee02ff996c9efe0ffc3b338784c5a9e363e403dac91ccdc8639",
+      "sha256Base": "4a24e6c4ec46135472e17acaa37a68c27d6369dc3fdf37a729939483f5aade19",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/sesion/ui/SesionVehiculosActivity.kt"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/viewmodel/SesionVehiculosViewModel.kt",
+      "sha256": "e6bd8687d173b7ad6daafcdc80514471ca01585334942449fbe245f5c053e23b",
+      "sha256Base": "9c553cc07b8d88640999dc6e940eb6337463d4ec0cbbd4653f90681bae1d0009",
+      "referenciaBase": ":android/app/src/main/java/com/mycar/app/features/sesion/viewmodel/SesionVehiculosViewModel.kt"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/autenticacion/SessionModulesIntegrationTest.kt",
+      "sha256": "bbc1fbfb3c8c9d44cb9aa58939a1dc1a4bfba496cf6f37b7c9dcd68e209b2c86",
+      "sha256Base": null,
+      "referenciaBase": null
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/inicio/LimpiezaSesionCompartidaTest.kt",
+      "sha256": "f721634c4c6707fdb47026171e6f1402b2bc7806f9c015c18588c008cf48e723",
+      "sha256Base": null,
+      "referenciaBase": null
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/sesion/ClienteSesionCompartidaTest.kt",
+      "sha256": "5de36734453876a30b6035de6286c7c87da231ac44fd9e5faf7e523a72448e89",
+      "sha256Base": null,
+      "referenciaBase": null
+    },
+    {
+      "ruta": "docs/inicio/INTEGRACION_ELSA_RF50.md",
+      "sha256": "e1938968ea970efee708580fa056fde73d7fef1c4f2093cd1403963cde13ad66",
+      "sha256Base": null,
+      "referenciaBase": null
+    },
+    {
+      "ruta": "docs/inicio/RF50_INICIO_Y_NAVEGACION.md",
+      "sha256": "7f283f542fb3c69f98e7f74f6e381affa91c4f0d2df5597b82e67ec079817a50",
+      "sha256Base": "cdd5e21160b866f425faeb2084b81bbc4daa483d4306796967d7f92607f73ed6",
+      "referenciaBase": ":docs/inicio/RF50_INICIO_Y_NAVEGACION.md"
+    },
+    {
+      "ruta": "docs/vehiculos/INTEGRACION_SESION_VEHICULOS.md",
+      "sha256": "26fcdef7f0aa9fea4ce1e5ad9ddedb6c9a8c2c9eb2511a86e628c5e43f958f97",
+      "sha256Base": "55482d95d35ed24d32861a17abec9a975228957579c0ffc32c8da298ea48307e",
+      "referenciaBase": ":docs/vehiculos/INTEGRACION_SESION_VEHICULOS.md"
+    }
+  ],
+  "prerequisitos": [
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/seguridad/IdentidadSesionVehiculos.java",
+      "sha256": "683fac6b38a034b009076420ada5c554b70edc5c01f504f2d26ccaa62ccf2944"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/seguridad/IntegracionSesionMantenimiento.java",
+      "sha256": "8ef23c2705b358c462cd4cc045281d84426c1cfd2768a42031cacb960094376c"
+    },
+    {
+      "ruta": "scripts/iniciar_backend_integracion_local.ps1",
+      "sha256": "44ff796385e048713170ab14ce5ccee91fbece50c984ef326c978cd12e458397"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V1__esquema_mvp.sql",
+      "sha256": "65e5a7bef83ce744310d3540fb4055b382819c8e3ae70ce8ec6b5535142e319b"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V2__tablas_mvp.sql",
+      "sha256": "f9ba558cb207f3ed56a62668eea17f1b5fbe1486b4118347f15a4f76fa012e87"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V3__catalogos_mvp.sql",
+      "sha256": "f8c976de162090edc24c7848720e52662aea1678680d4e8acaaf60a065172fd8"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V4__funciones_y_triggers_mvp.sql",
+      "sha256": "e2174746f86cbef80102402b01a7f961b3422cce4fa59c86d9815d37b758eff8"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V5__validacion_identificadores_vehiculo.sql",
+      "sha256": "ab5669d0e5e2881d14ca580f735ca69436593b3feba525cac63ccf8bb53a7d66"
+    }
+  ]
+}
