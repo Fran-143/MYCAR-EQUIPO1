@@ -19,6 +19,7 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     override val viewModelStore get() = modelos
     val registro = RemoteRegistroVehiculoRepository(cliente.retrofit.create(RegistroVehiculoApi::class.java))
     val listado = RemoteListadoVehiculosRepository(cliente.retrofit.create(ListadoVehiculosApi::class.java))
+    val detalle = RemoteDetalleVehiculosRepository(cliente.retrofit.create(DetalleVehiculoApi::class.java))
     val mantenimiento = com.mycar.app.features.mantenimiento.data.MantenimientoApiAdapter.desde(cliente.retrofit)
     val historial = com.mycar.app.features.historial.data.HistorialApiAdapter.desde(cliente.retrofit)
     val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(listado,historial,mantenimiento)
