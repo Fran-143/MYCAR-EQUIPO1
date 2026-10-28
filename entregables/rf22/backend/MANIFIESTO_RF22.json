@@ -1,0 +1,102 @@
+{
+  "componente": "backend",
+  "baseCommit": "529927ac0398d09f71c6a40d0c6dbf67a8b3f621",
+  "rama": "feat/programar-alerta-rf22",
+  "archivos": [
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/api/ConfiguracionRf22.java",
+      "sha256": "2630440dbce5286627c681547ad6dfb53305ba57616564b4380dc684bd747af9",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/api/ErroresProgramacionController.java",
+      "sha256": "c7a88572073bf66ec2f17fe87fe14eed319a6aba15085589585949127224c9b0",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/api/ProgramacionAlertaController.java",
+      "sha256": "3b6c1f67122d00acbcac55943197934c1da19c6e2e66148ef474d79b3da4f97a",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/dao/ProgramacionAlertaDao.java",
+      "sha256": "c0522e2a3a34a97e310757d15e64ef4a76b1bffaf9043bc71ac6a592253b5979",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/dao/ProgramacionAlertaJdbcDao.java",
+      "sha256": "cfa01627843ba5a1b057640ed1030adb431a9ba7414a238fe04cfe4575f42332",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/model/EnterosRf22.java",
+      "sha256": "ee9e4481239e9e8dca88a2c8f137fb5b445ba0cd4155ff0e0030cddcd2a90342",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/model/ErrorProgramacion.java",
+      "sha256": "982e4abc40f000370dec1ad7f81a8c5cceb08441a44539422a9af8c3253197b5",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/model/ProgramacionAlerta.java",
+      "sha256": "35fcdce0ff927ce53875e181a00cfa803be83826a4270b04aaa8b2c141c53488",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/service/CalculadorProgramacion.java",
+      "sha256": "214d17229ef19df81ab2c8ced4917055dcc2e993f715e4c89d58ac9c9e45b4c2",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/service/ProgramacionAlertaService.java",
+      "sha256": "f4d13bd1c5b602c0f30d6cd19198bf6cd61ac0223bd87b86e155184ceb4cfc60",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V6__rf22_tiempo_sin_lectura.sql",
+      "sha256": "a22a073bb2b60ce752cb8ade38249cb4b5950fd6beb64d503806f395fa971d07",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/programacion/CalculadorProgramacionTest.java",
+      "sha256": "34359480fbd63074cbe89e80224e8f837ef167fc8a976a74e858c156af5a1c6c",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/programacion/ProgramacionAlertaPostgresTest.java",
+      "sha256": "5ac71fdc5cf57059ea883b16afbf2de4b98386fbd90173dc49b8f62551d09636",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/programacion/ProgramacionAlertaServiceTest.java",
+      "sha256": "72faf2d822e871218233a8041887e5c4bd4b8c20f15ff356b9dff00a363fa778",
+      "sha256Base": null
+    },
+    {
+      "ruta": "backend/src/test/java/backend/db/MvpDatabaseTest.java",
+      "sha256": "ffff6ceb38ba6ff1c2c9b85a09c535bf16fba42ec122b095396652c3b30d6f49",
+      "sha256Base": "043445e44064b52c2a34af66f9bb2070d152246c675f00130bc55d2ae85d7e81"
+    },
+    {
+      "ruta": "docs/rf22/CP_RF22.md",
+      "sha256": "6242a5bd1403897bf542e67f7fc0dd915ec00d2ad7a03f62b9ba7546f72ea8ba",
+      "sha256Base": null
+    },
+    {
+      "ruta": "docs/rf22/LEEME_RF22.md",
+      "sha256": "11de312b8db8ced080d1c1141e6a11afd89d3f76835c9f8aa392c896dcce39cb",
+      "sha256Base": null
+    },
+    {
+      "ruta": "scripts/iniciar_backend_rf22.ps1",
+      "sha256": "c4fbd8e8c65af32cfc4965dfbc45bdd71c88bf065c0e6c1663cc55e1c5c8433f",
+      "sha256Base": null
+    },
+    {
+      "ruta": "scripts/probar_postgres_rf22.ps1",
+      "sha256": "52d21b4b9d5202ebca4af7d6c249406e74da457cac3c4d76a56f67295ac74e10",
+      "sha256Base": null
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "fecha": "2026-10-28",
+  "baseMain": "529927ac0398d09f71c6a40d0c6dbf67a8b3f621",
+  "dependencia": "PR #11 RF01/RF02/RF06 de Elsa integrado y preservado",
+  "backendRF22": {
+    "reportadas": 38,
+    "ejecutadas": 38,
+    "fallos": 0,
+    "errores": 0,
+    "omitidas": 0
+  },
+  "regresionBackend": {
+    "reportadas": 530,
+    "ejecutadas": 358,
+    "fallos": 0,
+    "errores": 0,
+    "omitidas": 172
+  },
+  "esquemaPostgreSQL": {
+    "ejecutadas": 42,
+    "fallos": 0,
+    "errores": 0,
+    "omitidas": 0,
+    "ejecucion": "Separada sobre una base nueva; resumen registrado en rf22-esquema.log"
+  },
+  "httpReal": {
+    "servidor": "Spring Boot HTTP real, PostgreSQL temporal",
+    "health": "UP",
+    "login": 200,
+    "confirmacion": 201,
+    "reintento": 201,
+    "mismaRespuesta": true,
+    "consultaConfirmada": true,
+    "historialInicialUnico": true,
+    "sinBaseDelEquipo": true
+  },
+  "androidUnitarias": {
+    "reportadas": 183,
+    "ejecutadas": 183,
+    "fallos": 0,
+    "errores": 0,
+    "omitidas": 0
+  },
+  "androidRF22": {
+    "reportadas": 27,
+    "ejecutadas": 27,
+    "fallos": 0,
+    "errores": 0,
+    "omitidas": 0
+  },
+  "apkDebugCompilada": true,
+  "apkPruebasCompilada": true,
+  "kotlinReleaseCompilado": true,
+  "lint": {
+    "errores": 0,
+    "advertencias": 17,
+    "advertenciasNuevasEnRF22": 0
+  },
+  "instrumentacionRF22": {
+    "casos": 5,
+    "compilados": true,
+    "ejecutados": false,
+    "motivo": "Cloud no dispone de emulador; ejecutar PROBAR_PANTALLAS_RF22.ps1 en el PC"
+  },
+  "powershell": {
+    "version": "7.4.6 Linux",
+    "scriptsAnalizados": 11,
+    "instalacionBackend": true,
+    "reinstalacion": true,
+    "instalacionAndroid": true,
+    "aceptaCrLfBom": true,
+    "rechazaCambiosAjenosAntesDeCopiar": true,
+    "respaldoFueraDelRepo": true,
+    "rechazaOtraMigracionV6": true,
+    "arranqueSimulado": {
+      "rf22Habilitada": true,
+      "puerto": 8081,
+      "claveFueraDeGit": true
+    },
+    "windowsPowerShellNoEjecutado": true,
+    "incorporaBasePorAvanceDirectoEnRF22": true,
+    "conservaRamaMain": true
+  },
+  "manifestDebug": {
+    "launchers": [
+      "com.mycar.app.debug.RegistroVehiculoDemoActivity",
+      "com.mycar.app.AuthEntrada"
+    ],
+    "rf22": [
+      {
+        "nombre": "com.mycar.app.features.alertas.programacion.ui.ProgramacionPreviewActivity",
+        "exportada": "true",
+        "destino": null
+      },
+      {
+        "nombre": "com.mycar.app.features.alertas.programacion.ui.ProgramarAlertaActivity",
+        "exportada": "false",
+        "destino": null
+      },
+      {
+        "nombre": "com.mycar.app.features.alertas.programacion.ui.EntradaRf22",
+        "exportada": "true",
+        "destino": "com.mycar.app.features.alertas.programacion.ui.ProgramarAlertaActivity"
+      }
+    ]
+  },
+  "manifestRelease": {
+    "launchers": [
+      "com.mycar.app.MainActivity"
+    ],
+    "rf22": [
+      {
+        "nombre": "com.mycar.app.features.alertas.programacion.ui.ProgramarAlertaActivity",
+        "exportada": "false",
+        "destino": null
+      }
+    ]
+  },
+  "migracionesV1AV5Intactas": {
+    "V1__esquema_mvp.sql": "65e5a7bef83ce744310d3540fb4055b382819c8e3ae70ce8ec6b5535142e319b",
+    "V2__tablas_mvp.sql": "f9ba558cb207f3ed56a62668eea17f1b5fbe1486b4118347f15a4f76fa012e87",
+    "V3__catalogos_mvp.sql": "f8c976de162090edc24c7848720e52662aea1678680d4e8acaaf60a065172fd8",
+    "V4__funciones_y_triggers_mvp.sql": "e2174746f86cbef80102402b01a7f961b3422cce4fa59c86d9815d37b758eff8",
+    "V5__validacion_identificadores_vehiculo.sql": "ab5669d0e5e2881d14ca580f735ca69436593b3feba525cac63ccf8bb53a7d66"
+  },
+  "migracionNueva": "V6__rf22_tiempo_sin_lectura.sql: solo tr_validar_alerta; no modifica RF23",
+  "limites": [
+    "RF23 listado y navegación aún pendientes; botón Próximamente",
+    "Inyección Android RF17/RF18 aún pendiente",
+    "Sin notificaciones, SOAT, licencia, scheduler ni alertas desde RF17",
+    "No se aplicó nada a la BD ni al PC del usuario"
+  ]
+}
