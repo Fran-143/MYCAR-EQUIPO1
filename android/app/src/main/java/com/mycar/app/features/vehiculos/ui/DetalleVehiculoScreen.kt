@@ -28,6 +28,7 @@ fun DetalleVehiculoRoute(
     repository: DetalleVehiculosRepository,
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
+    onActualizarKm: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val vm: DetalleVehiculoViewModel = viewModel(
@@ -35,7 +36,7 @@ fun DetalleVehiculoRoute(
         factory = remember(repository, idVehiculo) { DetalleVehiculoViewModel.factory(idVehiculo, repository) }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
-    DetalleVehiculoScreen(estado, vm::cargar, onVolver, onIniciarSesion, modifier)
+    DetalleVehiculoScreen(estado, vm::cargar, onVolver, onIniciarSesion, onActualizarKm, modifier)
 }
 
 @Composable
@@ -44,6 +45,7 @@ fun DetalleVehiculoScreen(
     onRecargar: () -> Unit,
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
+    onActualizarKm: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Scaffold(modifier = modifier.fillMaxSize(), topBar = {
@@ -73,7 +75,14 @@ fun DetalleVehiculoScreen(
                         OutlinedButton(onClick = onRecargar) { Text("Reintentar") }
                     }
                 }
-                FaseDetalle.LISTO -> estado.detalle?.let { ContenidoDetalle(it) }
+                FaseDetalle.LISTO -> estado.detalle?.let { det ->
+                    ContenidoDetalle(det)
+                    if (onActualizarKm != null && det.estadoVehiculo == "ACTIVO") {
+                        OutlinedButton(onClick = onActualizarKm, modifier = Modifier.fillMaxWidth()) {
+                            Text("Actualizar kilometraje")
+                        }
+                    }
+                }
             }
         }
     }

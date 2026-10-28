@@ -48,14 +48,20 @@ public class ConsultaRegistroVehiculoDao {
     }
 
     public Optional<OperacionConsultada> consultarOperacion(UUID idOperacion, long idUsuario) {
+        return consultarOperacionPorTipo(idOperacion, idUsuario, "REGISTRAR_VEHICULO");
+    }
+
+    public Optional<OperacionConsultada> consultarOperacionPorTipo(
+            UUID idOperacion, long idUsuario, String tipoOperacion
+    ) {
         return jdbc.query("""
                 SELECT estado, respuesta_json
                 FROM mycar.operacion_idempotente
                 WHERE id_operacion = ? AND id_usuario = ?
-                  AND tipo_operacion = 'REGISTRAR_VEHICULO'
+                  AND tipo_operacion = ?
                 """, (rs, fila) -> new OperacionConsultada(
                         rs.getString("estado"), rs.getString("respuesta_json")
-                ), idOperacion, idUsuario).stream().findFirst();
+                ), idOperacion, idUsuario, tipoOperacion).stream().findFirst();
     }
 
     /** Una lectura SQL obtiene solo filas propias, con su última lectura efectiva. No escribe. */

@@ -7,7 +7,7 @@ Actualización: 28/10/2026. Rama: `feat/detalle-vehiculo-rf10`.
 - Consulta de un vehículo **propio** autenticado (misma sesión que RF08/RF09).
 - Campos alineados con el registro RF08 y la tarjeta RF09, más identificadores opcionales y aceite cuando aplica.
 - Navegación desde listado RF09 («Ver detalles») e Inicio RF50 («Ver vehículo →»).
-- RF14 (actualizar kilometraje) sigue en «Próximamente».
+- RF14 se implementa en `feat/actualizar-kilometraje-rf14` (ver `BLOQUE_RF14.md` y `GUIA_RF14.md`).
 
 ## Backend
 
