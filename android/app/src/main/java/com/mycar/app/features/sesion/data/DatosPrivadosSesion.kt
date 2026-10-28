@@ -7,7 +7,15 @@ import java.io.IOException
 /** Sólo datos locales de RF08/RF17. No toca PostgreSQL ni credenciales. */
 open class GestorDatosPrivadosSesion {
     private val ciclos = linkedMapOf<String, (Boolean) -> Unit>()
-    @Synchronized fun registrar(ciclo: String, cerrar: (Boolean) -> Unit) { ciclos[ciclo] = cerrar }
+    @Synchronized fun registrar(ciclo: String, cerrar: (Boolean) -> Unit) {
+        registrar(ciclo, cerrar, alRegistrar = {})
+    }
+
+    /** Registra el cierre y prepara el almacén sin soltar el bloqueo de la limpieza. */
+    @Synchronized fun registrar(ciclo: String, cerrar: (Boolean) -> Unit, alRegistrar: () -> Unit) {
+        ciclos[ciclo] = cerrar
+        alRegistrar()
+    }
     @Synchronized fun retirar(ciclo: String) {
         ciclos[ciclo]?.invoke(false)
         ciclos.remove(ciclo)
