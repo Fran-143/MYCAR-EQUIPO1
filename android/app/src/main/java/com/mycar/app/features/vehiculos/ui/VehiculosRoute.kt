@@ -26,10 +26,12 @@ fun VehiculosRoute(
     onIniciarSesion: () -> Unit,
     modifier: Modifier = Modifier,
     onVerDetalle: ((Long) -> Unit)? = null,
-    estadoEnSistema: Boolean = true
+    estadoEnSistema: Boolean = true,
+    onFormularioAbierto: (Boolean) -> Unit = {}
 ) {
     key(claveCuenta) {
         var pantalla by rememberSaveable(claveCuenta) { mutableStateOf("lista") }
+        LaunchedEffect(pantalla) { onFormularioAbierto(pantalla == "registro") }
         var comprobando by remember(claveCuenta) { mutableStateOf(false) }
         var mensaje by remember(claveCuenta) { mutableStateOf<String?>(null) }
         val scope = rememberCoroutineScope()

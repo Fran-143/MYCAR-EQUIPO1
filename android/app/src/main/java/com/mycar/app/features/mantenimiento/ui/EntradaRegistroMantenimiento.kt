@@ -17,14 +17,17 @@ fun EntradaRegistroMantenimiento(
     claveCuentaBorrador: String? = null,
     idVehiculoInicial: Long? = null,
     onActualizarKm: ((Long) -> Unit)? = null,
-    onSesionRequerida: (() -> Unit)? = null
+    onSesionRequerida: (() -> Unit)? = null,
+    archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
+    estadoEnSistema: Boolean = true
 ) {
     if (repository != null && !claveCuentaBorrador.isNullOrBlank()) {
         RegistrarMantenimientoRoute(
             repository = repository, claveCuentaBorrador = claveCuentaBorrador,
             onCerrar = onCerrar, modifier = modifier,
             idVehiculoInicial = idVehiculoInicial,
-            onActualizarKm = onActualizarKm, onSesionRequerida = onSesionRequerida
+            onActualizarKm = onActualizarKm, onSesionRequerida = onSesionRequerida,
+            archivoPendiente = archivoPendiente, estadoEnSistema = estadoEnSistema
         )
     } else {
         BackHandler(onBack = onCerrar)

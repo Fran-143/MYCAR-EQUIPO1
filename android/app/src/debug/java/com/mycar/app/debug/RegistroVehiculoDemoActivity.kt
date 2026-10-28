@@ -16,7 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.mycar.app.features.inicio.ui.HomeScreen
+import com.mycar.app.features.inicio.ui.ConexionServidorScreen
 import com.mycar.app.features.vehiculos.ui.RegistroVehiculoDemo
 import com.mycar.app.features.vehiculos.ui.ListadoVehiculosDemo
 import com.mycar.app.ui.theme.MyCarTheme
@@ -48,7 +48,7 @@ private fun NavegacionPrueba() {
                     }
                 }
             }
-        ) { padding -> HomeScreen(modifier = Modifier.padding(padding)) }
+        ) { padding -> ConexionServidorScreen(modifier = Modifier.padding(padding)) }
         else -> Scaffold { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 verticalArrangement = Arrangement.Center,

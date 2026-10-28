@@ -23,7 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @EnabledIfSystemProperty(named="mycar.sesion.vehiculos.tests", matches="true")
 @SpringBootTest(properties={"mycar.registro.privacidad.version-vigente=FIXTURE-INTEGRACION-NO-LEGAL",
-        "mycar.auth.access-ttl=PT5M", "mycar.auth.session-ttl=P1D"})
+        "mycar.auth.access-ttl=PT5M", "mycar.auth.session-ttl=P1D",
+        "mycar.rf17.api-habilitada=true", "mycar.rf18.api-habilitada=true"})
 @AutoConfigureMockMvc(print=MockMvcPrint.NONE)
 class SesionVehiculosIntegrationTest {
     @DynamicPropertySource static void database(DynamicPropertyRegistry p) {
@@ -118,4 +119,28 @@ class SesionVehiculosIntegrationTest {
         mvc.perform(post("/api/v1/auth/renovar").contentType("application/json").content(json.writeValueAsString(
                 Map.of("idInstalacion",instalacion,"refreshToken",refresh)))).andExpect(status().isUnauthorized());
     }
+    @Test void mismaSesionAbreMantenimientoYRegistraEnHistorialSinOtroLogin() throws Exception {
+        JsonNode vehiculo=cuerpo(mvc.perform(post("/api/v1/vehiculos").header("Authorization",bearer())
+                .contentType("application/json").content(json.writeValueAsString(solicitud(UUID.randomUUID())))).andExpect(status().isCreated()));
+        long id=vehiculo.get("idVehiculo").asLong();
+        JsonNode contexto=cuerpo(mvc.perform(get("/api/v1/rf17/contexto").header("Authorization",bearer())).andExpect(status().isOk()));
+        JsonNode referencia=null;
+        for(JsonNode v:contexto.get("vehiculos")) if(v.get("idVehiculo").asLong()==id) referencia=v;
+        assertNotNull(referencia); assertTrue(contexto.get("registroDisponible").asBoolean());
+        Map<String,Object> mantenimiento=Map.of("idOperacion",UUID.randomUUID(),"codigoTipoMantenimiento","MANTENIMIENTO_GENERAL",
+                "fechaServicio",contexto.get("fechaServidor").asText(),"kmServicio",referencia.get("kmActual").asInt(),
+                "origenKmServicio","LECTURA","idLecturaKmReferencia",referencia.get("idLecturaActual").asLong(),"repuestos",List.of());
+        mvc.perform(post("/api/v1/rf17/vehiculos/"+id+"/mantenimientos").header("Authorization",bearer())
+                .contentType("application/json").content(json.writeValueAsString(mantenimiento))).andExpect(status().isCreated());
+        mvc.perform(get("/api/v1/rf18/vehiculos/"+id+"/mantenimientos").header("Authorization",bearer()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1));
+    }
+    @Test void logoutInvalidaTambienLosClientesDeMantenimientoYHistorial() throws Exception {
+        mvc.perform(post("/api/v1/auth/logout").header("Authorization",bearer())).andExpect(status().isNoContent());
+        for(String ruta:List.of("/api/v1/rf17/contexto","/api/v1/rf18/contexto")) {
+            mvc.perform(get(ruta).header("Authorization",bearer())).andExpect(status().isUnauthorized());
+            mvc.perform(get(ruta)).andExpect(status().isUnauthorized());
+        }
+    }
+
 }
