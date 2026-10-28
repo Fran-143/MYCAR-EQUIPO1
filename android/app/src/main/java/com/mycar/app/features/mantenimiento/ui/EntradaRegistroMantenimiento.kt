@@ -55,6 +55,7 @@ private object AccionesSinSesion : AccionesMantenimiento {
     override fun cerrarEditor() {}
     override fun confirmarRepuesto() {}
     override fun quitarRepuesto(id: String) {}
+    override fun proponerAceiteVehiculo() {}
     override fun guardar() {}
     override fun reintentarMismaOperacion() {}
     override fun consultarOperacion() {}
