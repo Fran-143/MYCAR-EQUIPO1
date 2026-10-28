@@ -28,6 +28,7 @@ $configMyCar = @{
     "server.port" = $Puerto
     "mycar.rf17.api-habilitada" = "true"
     "mycar.rf18.api-habilitada" = "true"
+    "mycar.rf22.api-habilitada" = "true"
 }
 if ($VersionPrivacidad) { $configMyCar["mycar.registro.privacidad.version-vigente"] = $VersionPrivacidad }
 $entornoAnteriorMyCar = $env:SPRING_APPLICATION_JSON
