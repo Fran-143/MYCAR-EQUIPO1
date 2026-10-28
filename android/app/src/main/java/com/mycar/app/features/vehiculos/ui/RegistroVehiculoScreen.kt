@@ -40,10 +40,11 @@ fun RegistroVehiculoRoute(
     onIniciarSesion: () -> Unit,
     onVerVehiculos: () -> Unit,
     onIrInicio: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    estadoEnSistema: Boolean = true
 ) {
     val vm: RegistroVehiculoViewModel = viewModel(key = "rf08-$claveCuenta",
-        factory = remember(claveCuenta, repository, pendientes) { RegistroVehiculoViewModel.factory(repository, pendientes) })
+        factory = remember(claveCuenta, repository, pendientes) { RegistroVehiculoViewModel.factory(repository, pendientes, estadoEnSistema) })
     val estado by vm.estado.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.cargar() }
     BackHandler {

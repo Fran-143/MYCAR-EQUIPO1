@@ -1,6 +1,8 @@
 package com.mycar.app
 
 import android.os.Bundle
+import android.content.Intent
+import com.mycar.app.features.sesion.ui.SesionVehiculosActivity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -35,7 +37,8 @@ class MainActivity : ComponentActivity() {
                     } else {
                         HomeScreen(
                             modifier = Modifier.padding(innerPadding),
-                            onRegistrarMantenimiento = { mostrarRegistro = true }
+                            onRegistrarMantenimiento = { mostrarRegistro = true },
+                            onAbrirVehiculos = { startActivity(Intent(this, SesionVehiculosActivity::class.java)) }
                         )
                     }
                 }
