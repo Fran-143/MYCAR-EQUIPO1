@@ -1,0 +1,5 @@
+android/app/src/androidTest/java/com/mycar/app/features/inicio/InicioNavegacionTest.kt
+android/app/src/main/java/com/mycar/app/MainActivity.kt
+android/app/src/main/java/com/mycar/app/features/sesion/domain/PoliticaRedLocal.kt
+android/app/src/test/java/com/mycar/app/features/sesion/PoliticaRedLocalTest.kt
+docs/inicio/PERMISO_RED_LOCAL_DEBUG.md

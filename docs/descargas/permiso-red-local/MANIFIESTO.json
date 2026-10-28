@@ -1,0 +1,30 @@
+{
+  "rama": "feat/integracion-sesion-vehiculos",
+  "archivos": [
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/inicio/InicioNavegacionTest.kt",
+      "sha256": "68081449b2d2260551bba67015f8cb4a24a4988c9d7c89cf7aead41a4b58cea5",
+      "sha256Base": "4754ecfb589b21a0b8f361e8ff36fe27dc3aa41129ed4eba3b9d2623a1c01f5c"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/MainActivity.kt",
+      "sha256": "981547c1f9376a84ead3b9075406adbb2a79b4afe6937891bc54a03b58c833e3",
+      "sha256Base": "af88d7aea6774eb4c110830f1d91f94d3549ca4e8425475aa951bfc530d2d8fb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/domain/PoliticaRedLocal.kt",
+      "sha256": "d69aea5a8f4d8aee22250ba21f42db0e2411e57f5c814680b144f5e29742b281",
+      "sha256Base": null
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/sesion/PoliticaRedLocalTest.kt",
+      "sha256": "84ba1a5dbe1abbc05320a40e62e6e88bfb548890570d97989202b53221a64a37",
+      "sha256Base": null
+    },
+    {
+      "ruta": "docs/inicio/PERMISO_RED_LOCAL_DEBUG.md",
+      "sha256": "ab076c667176d1ecaf03280fcdb0b6451571889842019b568b8211f603e54edc",
+      "sha256Base": null
+    }
+  ]
+}
