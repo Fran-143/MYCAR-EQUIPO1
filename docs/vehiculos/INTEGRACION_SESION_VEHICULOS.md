@@ -1,3 +1,6 @@
+> Actualización: la integración vigente con el login de Elsa (PR #11) se describe en
+> [INTEGRACION_ELSA_RF50.md](../inicio/INTEGRACION_ELSA_RF50.md). Las referencias al login temporal de esta guía son históricas.
+
 # Integración RF02/RF06 → RF08/RF09
 
 Base revisada: main 032aef221e796fad68cc2772fe98b7a6b9333ba9, después del PR #9.

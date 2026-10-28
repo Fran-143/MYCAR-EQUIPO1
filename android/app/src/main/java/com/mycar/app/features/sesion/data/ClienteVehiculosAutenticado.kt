@@ -8,6 +8,8 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
+import com.mycar.app.features.autenticacion.data.SessionRequired
 import java.util.concurrent.TimeUnit
 
 object ClientesSesion {
@@ -17,7 +19,11 @@ object ClientesSesion {
         .addConverterFactory(GsonConverterFactory.create()).build()
 }
 
-class ClienteVehiculosAutenticado(baseUrl: String, credenciales: CredencialesSesion, alCaducar: () -> Unit = {}) {
+class ClienteVehiculosAutenticado(baseUrl: String, autorizacion: () -> String, alCaducar: () -> Unit = {}) {
+    // Compatibilidad de las pruebas antiguas; el host real usa exclusivamente AuthRepository.
+    constructor(baseUrl: String, credenciales: CredencialesSesion, alCaducar: () -> Unit = {}) : this(
+        baseUrl, { try { credenciales.autorizacion() } catch (_: IOException) { throw SessionRequired() } }, alCaducar)
+    private val activo = AtomicBoolean(true)
     private val origen = baseUrl.toHttpUrl()
     private val cliente = OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false)
         .followSslRedirects(false).callTimeout(30, TimeUnit.SECONDS)
@@ -25,12 +31,14 @@ class ClienteVehiculosAutenticado(baseUrl: String, credenciales: CredencialesSes
             val r = cadena.request()
             if (r.url.scheme != origen.scheme || r.url.host != origen.host || r.url.port != origen.port)
                 throw IOException("Origen HTTP no autorizado")
-            val prueba = try { credenciales.autorizacion() } catch (_: IOException) { null }
+            if (!activo.get()) throw IOException("El ciclo de cuenta terminó")
+            val prueba = try { autorizacion() } catch (_: SessionRequired) { null }
             if (prueba == null) {
                 alCaducar()
                 Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(401).message("Sesión requerida")
                     .body("{\"codigo\":\"SESION_NO_VALIDA\"}".toResponseBody("application/json".toMediaType())).build()
             } else {
+                if (!activo.get()) throw IOException("El ciclo de cuenta terminó")
                 val respuesta=cadena.proceed(r.newBuilder().header("Authorization", prueba).build())
                 if(respuesta.code==401) alCaducar()
                 respuesta
@@ -38,5 +46,5 @@ class ClienteVehiculosAutenticado(baseUrl: String, credenciales: CredencialesSes
         }.build()
     val retrofit: Retrofit = Retrofit.Builder().baseUrl(baseUrl).client(cliente)
         .addConverterFactory(GsonConverterFactory.create()).build()
-    fun cancelar() = cliente.dispatcher.cancelAll()
+    fun cancelar() { activo.set(false); cliente.dispatcher.cancelAll() }
 }
