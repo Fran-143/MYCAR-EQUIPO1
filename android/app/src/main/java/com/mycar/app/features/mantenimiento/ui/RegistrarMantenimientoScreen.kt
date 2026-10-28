@@ -94,6 +94,12 @@ internal fun FormularioRegistroMantenimiento(
                     style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                 vehiculo?.fechaLecturaActual?.let { Text(fechaLecturaVisible(it), style = MaterialTheme.typography.bodySmall) }
                 Text("Aceite registrado: ${vehiculo?.aceiteRegistrado ?: "No informado"}", style = MaterialTheme.typography.bodySmall)
+                if (b.codigoTipo == "CAMBIO_ACEITE" && !vehiculo?.aceiteRegistrado.isNullOrBlank()) {
+                    OutlinedButton(onClick = vm::proponerAceiteVehiculo, enabled = enabled && b.codigoTipo == "CAMBIO_ACEITE") {
+                        Text("Usar aceite registrado del vehículo")
+                    }
+                    Text("Es una sugerencia; confirma el repuesto real del servicio.", style = MaterialTheme.typography.bodySmall)
+                }
                 Text("Taller: Sin taller", style = MaterialTheme.typography.bodySmall)
                 if (!s.requiereSesion) {
                     OutlinedButton(onClick = { b.idVehiculo?.let { onActualizarKm?.invoke(it) } },
@@ -174,7 +180,8 @@ internal fun FormularioRegistroMantenimiento(
                 CampoMantenimiento("Próximo kilometraje sugerido", b.proximoKm, enabled,
                     s.errores["proximoKmSugerido"], KeyboardType.Number) { v -> vm.actualizar { it.copy(proximoKm = v) } }
                 if (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank()) {
-                    OutlinedButton(onClick = {}, enabled = false) { Text("Sí, crear alerta · Próximamente") }
+                    Text("Tras guardar, puedes programar una alerta equivalente desde Alertas (RF22).",
+                        style = MaterialTheme.typography.bodySmall)
                 }
             }
             Spacer(Modifier.height(4.dp))

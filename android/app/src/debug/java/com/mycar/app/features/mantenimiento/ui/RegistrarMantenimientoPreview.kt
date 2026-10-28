@@ -117,6 +117,11 @@ private class ControlPreview(private val inicial: MantenimientoUiState) : Accion
         cerrarEditor()
     }
     override fun quitarRepuesto(id: String) { actualizar { it.copy(repuestos = it.repuestos.filterNot { r -> r.idLocal == id }) } }
+    override fun proponerAceiteVehiculo() {
+        val aceite = estado.contexto?.vehiculos?.firstOrNull()?.aceiteRegistrado ?: return
+        editarRepuesto()
+        estado.editor?.let { estado = estado.copy(editor = it.copy(nombre = aceite)) }
+    }
     override fun guardar() {
         if (!estado.editable || estado.cargando || estado.contexto?.registroDisponible != true) return
         val errores = ValidacionFormularioMantenimiento.formulario(estado.borrador, estado.contexto)

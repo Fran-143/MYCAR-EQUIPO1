@@ -18,6 +18,7 @@ internal interface AccionesMantenimiento {
     fun cerrarEditor()
     fun confirmarRepuesto()
     fun quitarRepuesto(id: String)
+    fun proponerAceiteVehiculo()
     fun guardar()
     fun reintentarMismaOperacion()
     fun consultarOperacion()
@@ -40,6 +41,7 @@ internal class AccionesDesdeViewModel(private val vm: MantenimientoViewModel) : 
     override fun cerrarEditor() { vm.cerrarEditor() }
     override fun confirmarRepuesto() { vm.confirmarRepuesto() }
     override fun quitarRepuesto(id: String) { vm.quitarRepuesto(id) }
+    override fun proponerAceiteVehiculo() { vm.proponerAceiteVehiculo() }
     override fun guardar() { vm.guardar() }
     override fun reintentarMismaOperacion() { vm.reintentarMismaOperacion() }
     override fun consultarOperacion() { vm.consultarOperacion() }

@@ -29,6 +29,7 @@ fun DetalleVehiculoRoute(
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onActualizarKm: (() -> Unit)? = null,
+    recargaToken: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val vm: DetalleVehiculoViewModel = viewModel(
@@ -36,6 +37,7 @@ fun DetalleVehiculoRoute(
         factory = remember(repository, idVehiculo) { DetalleVehiculoViewModel.factory(idVehiculo, repository) }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
+    LaunchedEffect(recargaToken) { if (recargaToken > 0) vm.cargar() }
     DetalleVehiculoScreen(estado, vm::cargar, onVolver, onIniciarSesion, onActualizarKm, modifier)
 }
 
