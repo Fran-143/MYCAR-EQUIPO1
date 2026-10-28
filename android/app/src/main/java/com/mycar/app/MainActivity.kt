@@ -13,7 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.mycar.app.features.mantenimiento.ui.EntradaRegistroMantenimiento
+import com.mycar.app.features.historial.ui.FlujoHistorialMantenimiento
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.mycar.app.ui.theme.MyCarTheme
@@ -25,17 +25,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyCarTheme {
-                var mostrarRegistro by rememberSaveable { mutableStateOf(false) }
+                var mostrarHistorial by rememberSaveable { mutableStateOf(false) }
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    if (mostrarRegistro) {
-                        EntradaRegistroMantenimiento(
-                            onCerrar = { mostrarRegistro = false },
+                    if (mostrarHistorial) {
+                        FlujoHistorialMantenimiento(
+                            onVolverInicio = { mostrarHistorial = false },
                             modifier = Modifier.padding(innerPadding)
                         )
                     } else {
                         HomeScreen(
                             modifier = Modifier.padding(innerPadding),
-                            onRegistrarMantenimiento = { mostrarRegistro = true }
+                            onVerHistorial = { mostrarHistorial = true }
                         )
                     }
                 }
