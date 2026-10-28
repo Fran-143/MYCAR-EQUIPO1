@@ -7,6 +7,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.*
 import org.junit.Test
@@ -22,7 +23,11 @@ class LogoutTest {
     private inner class Store : CredentialStore {
         var value = CredentialVault(uuid, tokens())
         var clearFailure = false
-        override fun load() = value
+        var loadFailure = false
+        override fun load(): CredentialVault {
+            if (loadFailure) throw IOException("fixture")
+            return value
+        }
         override fun save(vault: CredentialVault) {
             if (clearFailure && vault.tokens == null) throw IOException("fixture")
             value = vault
@@ -33,6 +38,7 @@ class LogoutTest {
         var logoutFailure = false
         var expireAccess = false
         var validationCode = 200
+        var validationFailure = false
         var logouts = 0
         var renewals = 0
         var lastBearer: String? = null
@@ -43,7 +49,7 @@ class LogoutTest {
         val logoutStarted = CompletableDeferred<Unit>()
         val secondLogoutStarted = CompletableDeferred<Unit>()
         val renewalStarted = CompletableDeferred<Unit>()
-        val validationStarted = CompletableDeferred<Unit>()
+        var validationStarted = CompletableDeferred<Unit>()
         val loginStarted = CompletableDeferred<Unit>()
         override suspend fun register(request: RegistrationRequest): Response<RegistrationResponse> = error("No registration")
         override suspend fun login(request: LoginRequest): Response<TokenResponse> {
@@ -60,6 +66,7 @@ class LogoutTest {
         override suspend fun session(bearer: String): Response<SessionResponse> {
             validationStarted.complete(Unit)
             validationGate?.await()
+            if (validationFailure) throw IOException()
             return if (expireAccess || validationCode != 200) Response.error(
                 if (expireAccess) 401 else validationCode, "{}".toResponseBody())
             else Response.success(SessionResponse(true, if (bearer == "Bearer fixture-new") 8 else 7, end))
@@ -269,5 +276,93 @@ class LogoutTest {
         assertEquals(SessionPhase.SIGNED_OUT, repo.session.value.phase)
         assertEquals("Sesión cerrada en este dispositivo.", repo.session.value.message)
         assertNull(store.value.tokens)
+    }
+
+    private suspend fun assertLogoutFromRetry(networkFailure: Boolean) {
+        val api = Api().apply {
+            validationFailure = networkFailure
+            validationCode = 503
+            logoutFailure = networkFailure
+            logoutCode = 503
+        }
+        val store = Store()
+        val repo = repo(api, store)
+        repo.validateSession()
+        assertEquals(SessionPhase.RETRY, repo.session.value.phase)
+        assertTrue(repo.session.value.hasLocalSession)
+        assertTrue(repo.session.value.canRequestLogout)
+        val vm = AuthViewModel(repo, Dispatchers.Unconfined)
+        vm.requestLogout()
+        assertTrue(vm.logout.value.confirmation)
+        vm.confirmedLogout()
+        vm.logout.first { !it.busy }
+        assertNull(store.value.tokens)
+        assertEquals(uuid, store.value.installation)
+        assertEquals(SessionPhase.SIGNED_OUT, repo.session.value.phase)
+        assertFalse(repo.session.value.canRequestLogout)
+        assertEquals("Sesión cerrada en este dispositivo.", repo.session.value.message)
+        assertEquals(1, api.logouts)
+        assertEquals(0, api.renewals)
+    }
+
+    @Test fun networkFailureInRetryAllowsConfirmedLocalLogout() = runBlocking<Unit> {
+        assertLogoutFromRetry(networkFailure = true)
+    }
+
+    @Test fun http503InRetryAllowsConfirmedLocalLogout() = runBlocking<Unit> {
+        assertLogoutFromRetry(networkFailure = false)
+    }
+
+    @Test fun cancellingLogoutInRetryPreservesLocalCredentials() = runBlocking<Unit> {
+        val api = Api().apply { validationCode = 503 }
+        val store = Store()
+        val repo = repo(api, store)
+        repo.validateSession()
+        val original = store.value
+        val vm = AuthViewModel(repo, Dispatchers.Unconfined)
+        vm.requestLogout()
+        assertTrue(vm.logout.value.confirmation)
+        vm.cancelLogout()
+        assertSame(original, store.value)
+        assertEquals(SessionPhase.RETRY, repo.session.value.phase)
+        assertEquals(0, api.logouts)
+    }
+
+    @Test fun retryWithoutKnownLocalSessionDoesNotOfferLogout() = runBlocking<Unit> {
+        val api = Api()
+        val store = Store().apply { loadFailure = true }
+        val repo = repo(api, store)
+        repo.validateSession()
+        assertEquals(SessionPhase.RETRY, repo.session.value.phase)
+        assertFalse(repo.session.value.hasLocalSession)
+        assertFalse(repo.session.value.canRequestLogout)
+        val vm = AuthViewModel(repo, Dispatchers.Unconfined)
+        vm.requestLogout()
+        assertFalse(vm.logout.value.confirmation)
+        vm.confirmedLogout()
+        assertEquals(0, api.logouts)
+    }
+
+    @Test fun pendingValidationInRetryCannotRestoreLocallyClosedSession() = runBlocking<Unit> {
+        val api = Api().apply { validationCode = 503; logoutFailure = true }
+        val store = Store()
+        val repo = repo(api, store)
+        repo.validateSession()
+        assertEquals(SessionPhase.RETRY, repo.session.value.phase)
+        api.validationCode = 200
+        api.validationStarted = CompletableDeferred()
+        api.validationGate = CompletableDeferred()
+        val validating = async { repo.validateSession() }
+        api.validationStarted.await()
+        val vm = AuthViewModel(repo, Dispatchers.Unconfined)
+        vm.requestLogout()
+        vm.confirmedLogout()
+        vm.logout.first { !it.busy }
+        assertNull(store.value.tokens)
+        api.validationGate!!.complete(Unit)
+        validating.await()
+        assertNull(store.value.tokens)
+        assertEquals(SessionPhase.SIGNED_OUT, repo.session.value.phase)
+        assertEquals("Sesión cerrada en este dispositivo.", repo.session.value.message)
     }
 }

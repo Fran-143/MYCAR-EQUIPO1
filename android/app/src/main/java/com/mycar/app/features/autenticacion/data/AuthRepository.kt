@@ -20,7 +20,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 enum class SessionPhase { CHECKING, SIGNED_OUT, AUTHENTICATED, RETRY, CLEAR_FAILED }
-data class SessionState(val phase: SessionPhase, val message: String? = null, val contextVersion: Long = 0)
+data class SessionState(
+    val phase: SessionPhase, val message: String? = null, val contextVersion: Long = 0,
+    val hasLocalSession: Boolean = false
+) {
+    // RETRY no implica revocación: permite limpiar credenciales existentes aun sin conexión.
+    val canRequestLogout: Boolean get() = phase == SessionPhase.AUTHENTICATED ||
+        phase == SessionPhase.CLEAR_FAILED || (phase == SessionPhase.RETRY && hasLocalSession)
+}
 
 class AuthProblem(message: String) : Exception(message)
 
@@ -193,7 +200,8 @@ class AuthRepository(
     private fun retry(expected: Long) = synchronized(localLock) {
         if (expected == generation && !cleanupBlocked)
             publish(expected, SessionState(SessionPhase.RETRY,
-                "No se pudo validar la sesión. Revisa la conexión y vuelve a intentarlo."))
+                "No se pudo validar la sesión. Revisa la conexión y vuelve a intentarlo.",
+                hasLocalSession = vault?.tokens != null))
     }
 
     /**
