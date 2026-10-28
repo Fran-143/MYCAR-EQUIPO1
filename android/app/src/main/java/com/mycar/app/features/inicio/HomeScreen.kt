@@ -23,6 +23,7 @@ import com.mycar.app.features.inicio.viewmodel.HomeViewModel
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onRegistrarMantenimiento: (() -> Unit)? = null,
+    onAbrirVehiculos: (() -> Unit)? = null,
     homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModel.Factory
     )
@@ -51,6 +52,11 @@ fun HomeScreen(
         )
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        onAbrirVehiculos?.let { abrir ->
+            Button(onClick = abrir) { Text("Mis vehículos · iniciar sesión") }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         onRegistrarMantenimiento?.let { abrir ->
             Button(onClick = abrir) { Text("Registrar mantenimiento") }

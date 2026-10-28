@@ -35,6 +35,15 @@ public class VehiculosController {
         this.consultas = consultas;
     }
 
+    public record IdentidadCuenta(long idUsuario) { }
+
+    /** Identidad local confirmada por el servidor; no es una credencial ni acepta un id libre. */
+    @GetMapping("/identidad")
+    public org.springframework.http.ResponseEntity<IdentidadCuenta> identidad(Authentication autenticacion) {
+        return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(new IdentidadCuenta(usuario(autenticacion)));
+    }
+
     @GetMapping
     public DatosListadoVehiculos listar(
             Authentication autenticacion,

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prueba BD, servicio, consultas y contrato MVC RF08 en PostgreSQL 17 desechable. No utiliza .env ni Compose local."""
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -25,6 +26,7 @@ def main():
     parser.add_argument("--maven-settings", help="settings.xml externo, si la red requiere proxy")
     parser.add_argument("--maven-repo", help="caché Maven opcional")
     parser.add_argument("--incluir-rf09", action="store_true", help="Añade el listado y las pruebas RF09")
+    parser.add_argument("--incluir-sesion", action="store_true", help="Prueba login real, identidad, aislamiento, renovación y revocación RF02–vehículos")
     args = parser.parse_args()
     container = "mycar-mvp-test-" + uuid.uuid4().hex[:12]
     db_name = "mycar_mvp_test_" + uuid.uuid4().hex[:12]
@@ -73,7 +75,10 @@ def main():
         pruebas = "Validador*Test,Validacion*Test,RegistroVehiculoServicePostgresTest,VehiculosControllerTest,ConsultaRegistroVehiculoPostgresTest"
         if args.incluir_rf09:
             pruebas += ",ListadoVehiculosPostgresTest,ListadoVehiculosControllerTest"
-        run(command + ["-Dtest=" + pruebas,
+        if args.incluir_sesion:
+            env["MYCAR_SESION_TEST_SIGNING_KEY"] = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+            pruebas += ",IdentidadSesionVehiculosTest,SesionVehiculosIntegrationTest"
+        run(command + ["-Dtest=" + pruebas, "-Dmycar.sesion.vehiculos.tests=" + str(args.incluir_sesion).lower(),
                        "-Dmycar.rf08.tests=true", "test"], cwd=ROOT / "backend", env=env)
         print("Servicio RF08" + ("/RF09" if args.incluir_rf09 else "") + ", consultas, contrato MVC y validaciones: PASÓ", flush=True)
 
