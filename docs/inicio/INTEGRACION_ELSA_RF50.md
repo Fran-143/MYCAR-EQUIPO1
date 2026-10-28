@@ -47,12 +47,10 @@ Para probar también el registro RF01 con el documento académico local incluido
 ```powershell
 Set-Location 'C:\Proyectos\MyCarEquipo1'
 docker compose up -d --wait postgres
-powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\iniciar_backend_integracion_local.ps1' -VersionPrivacidad '1.0'
+powershell -NoProfile -ExecutionPolicy Bypass -File '.\scripts\iniciar_backend_integracion_local.ps1'
 ```
 
-La versión 1.0 corresponde al documento local DEBUG del PR #11. No configura ni acredita una política
-pública de Release; éste exige su documento/versionado externo. No se modifica .env ni se imprime la clave JWT.
-Para cuentas existentes también se puede iniciar el auxiliar sin VersionPrivacidad.
+El script ya usa **1.0** por defecto (alineado con Debug). La versión 1.0 corresponde al documento local DEBUG del PR #11. No configura ni acredita una política pública de Release; éste exige su documento/versionado externo. No se modifica .env ni se imprime la clave JWT. Solo login con cuentas existentes: `-VersionPrivacidad ''`.
 
 Android Studio: abrir android, seleccionar app y un emulador completamente iniciado, Run app.
 Debe abrir Bienvenida de Elsa; al autenticar debe abrir RF50, sin un segundo login para módulos.
