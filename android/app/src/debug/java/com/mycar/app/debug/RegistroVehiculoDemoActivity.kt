@@ -33,7 +33,7 @@ class RegistroVehiculoDemoActivity : ComponentActivity() {
 @Composable
 private fun NavegacionPrueba() {
     val context = LocalContext.current
-    var pantalla by rememberSaveable { mutableStateOf("registro") }
+    var pantalla by rememberSaveable { mutableStateOf("inicio") }
     BackHandler(enabled = pantalla != "inicio") { pantalla = if (pantalla == "registro") "autos" else "inicio" }
     when (pantalla) {
         "registro" -> RegistroVehiculoDemo(onVolver = { pantalla = "autos" })
@@ -66,7 +66,7 @@ private fun NavegacionPrueba() {
                 }
                 OutlinedButton(onClick = { context.startActivity(Intent(context, MainActivity::class.java)) },
                     modifier = Modifier.fillMaxWidth()) {
-                    Text("Inicio y mantenimientos")
+                    Text("Inicio principal")
                 }
                 OutlinedButton(onClick = { pantalla = "conexion" }, modifier = Modifier.fillMaxWidth()) {
                     Text("Comprobar conexión")

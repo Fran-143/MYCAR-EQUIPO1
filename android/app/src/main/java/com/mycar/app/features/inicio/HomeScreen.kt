@@ -1,5 +1,7 @@
 package com.mycar.app.features.inicio.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -23,7 +25,9 @@ import com.mycar.app.features.inicio.viewmodel.HomeViewModel
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onRegistrarMantenimiento: (() -> Unit)? = null,
+    onVerHistorial: (() -> Unit)? = null,
     onAbrirVehiculos: (() -> Unit)? = null,
+    onAbrirPruebas: (() -> Unit)? = null,
     homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModel.Factory
     )
@@ -33,6 +37,7 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -58,8 +63,18 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
+        onVerHistorial?.let { abrir ->
+            Button(onClick = abrir) { Text("Historial de mantenimientos") }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         onRegistrarMantenimiento?.let { abrir ->
             Button(onClick = abrir) { Text("Registrar mantenimiento") }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        onAbrirPruebas?.let { abrir ->
+            Button(onClick = abrir) { Text("Pruebas visuales · sin guardar datos") }
             Spacer(modifier = Modifier.height(12.dp))
         }
 
