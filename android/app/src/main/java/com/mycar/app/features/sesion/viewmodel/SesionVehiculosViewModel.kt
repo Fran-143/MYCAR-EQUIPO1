@@ -69,20 +69,22 @@ class SesionVehiculosViewModel(application: Application) : AndroidViewModel(appl
                     val archivo = ArchivoSolicitudRegistroPendiente(getApplication(), BuildConfig.API_BASE_URL, usuario)
                     val archivoMantenimiento = com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente(
                         getApplication(), "${BuildConfig.API_BASE_URL}|$usuario")
-                    CuentaVehiculos(usuario, ciclo,
+                    val creada = CuentaVehiculos(usuario, ciclo,
                         ClienteVehiculosAutenticado(BuildConfig.API_BASE_URL,
                             autorizacion = { runBlocking { auth.authorization(actual) } },
                             alCaducar = { viewModelScope.launch { sesionRequerida(ciclo) } }),
                         PendientesSesionVehiculos(archivo, archivo::borrarAlCerrarSesion),
                         archivoMantenimiento = archivoMantenimiento)
+                    // Migrar solo con el cierre ya registrado y sin soltar el bloqueo de la limpieza.
+                    DatosPrivadosSesion.registrar(ciclo, { borrar ->
+                        creada.cliente.cancelar()
+                        val vehiculos = runCatching { creada.pendientes.cerrar(borrar) }
+                        val mantenimiento = runCatching { creada.archivoMantenimiento?.cerrar(borrar) }
+                        vehiculos.getOrThrow(); mantenimiento.getOrThrow()
+                    }, alRegistrar = { archivoMantenimiento.preparar() })
+                    creada
                 }
                 construida = cuenta
-                DatosPrivadosSesion.registrar(ciclo) { borrar ->
-                    cuenta.cliente.cancelar()
-                    val vehiculos = runCatching { cuenta.pendientes.cerrar(borrar) }
-                    val mantenimiento = runCatching { cuenta.archivoMantenimiento?.cerrar(borrar) }
-                    vehiculos.getOrThrow(); mantenimiento.getOrThrow()
-                }
                 if (revision == intento && auth.authenticatedContext() == actual) {
                     _estado.value = EstadoAcceso(cuenta = cuenta)
                     construida = null
