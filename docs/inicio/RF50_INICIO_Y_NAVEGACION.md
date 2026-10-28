@@ -1,3 +1,6 @@
+> Actualización: la integración vigente con el login de Elsa (PR #11) se describe en
+> [INTEGRACION_ELSA_RF50.md](../inicio/INTEGRACION_ELSA_RF50.md). Las referencias al login temporal de esta guía son históricas.
+
 # RF50: Inicio y navegación común de MyCar
 
 Entrega local de Francesca; base main RF18 6fc5ad4 y bloque de sesión RF08/RF09 previamente integrado.
