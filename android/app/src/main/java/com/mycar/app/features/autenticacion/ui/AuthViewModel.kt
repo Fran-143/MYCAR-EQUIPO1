@@ -28,9 +28,7 @@ class AuthViewModel(
     private var logoutAttempt = 0L
 
     fun requestLogout() {
-        if (!mutableLogout.value.busy &&
-            session.value.phase in setOf(com.mycar.app.features.autenticacion.data.SessionPhase.AUTHENTICATED,
-                com.mycar.app.features.autenticacion.data.SessionPhase.CLEAR_FAILED))
+        if (!mutableLogout.value.busy && session.value.canRequestLogout)
             mutableLogout.value = LogoutUiState(confirmation = true)
     }
     fun cancelLogout() {

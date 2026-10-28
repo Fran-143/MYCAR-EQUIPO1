@@ -94,6 +94,11 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
                     Text(session.message.orEmpty(), textAlign = TextAlign.Center)
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = vm::retry) { Text("Volver a intentar") }
+                    if (session.canRequestLogout) {
+                        TextButton(onClick = vm::requestLogout, enabled = !logout.busy) {
+                            Text("Cerrar sesión")
+                        }
+                    }
                 }
             }
         }
