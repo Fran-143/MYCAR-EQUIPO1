@@ -152,6 +152,19 @@ class ListadoVehiculosPostgresTest {
         assertNull(consultas.listarVehiculos(usuario, null, null).vehiculos().getFirst().kilometrajeActual());
     }
 
+    @Test void detalleSoloPropietarioIncluyeIdentificadoresYLectura() {
+        long uno = cuenta(true), dos = cuenta(true);
+        var propio = registro.registrar(uno, datos());
+        var ajeno = registro.registrar(dos, datos());
+        var detalle = consultas.consultarDetalle(uno, propio.idVehiculo());
+        assertEquals("SERIE123", detalle.numeroSerie());
+        assertEquals("MOTOR123", detalle.numeroMotor());
+        assertEquals(50000, detalle.kilometrajeActual());
+        assertNotNull(detalle.fechaUltimaLecturaKm());
+        assertCodigo("VEHICULO_NO_ENCONTRADO", () -> consultas.consultarDetalle(dos, propio.idVehiculo()));
+        assertCodigo("VEHICULO_NO_ENCONTRADO", () -> consultas.consultarDetalle(uno, ajeno.idVehiculo()));
+    }
+
     private long cuenta(boolean free) {
         assertTrue(jdbc.queryForObject("SHOW server_version", String.class).startsWith("17."));
         return new TransactionTemplate(transacciones).execute(s -> {
