@@ -1,0 +1,1871 @@
+{
+  "baseGitHub": "b7116ad7284e2a1e34922c71475797c90694fe12",
+  "mainGitHub": "91eb169b7ed36bf57a77d72995f9446016f4725e",
+  "arbolAnterior": "7e82cc36fd4dcb3a8b60090c51472f76a85fdb18",
+  "arbolFinal": "7c629205db8cc1e0c8a1575b814417ec594af54a",
+  "checksumV6Anterior": 790664128,
+  "checksumV6GitHub": -665165790,
+  "archivos": [
+    {
+      "ruta": ".env.example",
+      "sha256": "832912adf99d66d55077f181e46f578e71f8e40718977f280a8dc4f07ff03401"
+    },
+    {
+      "ruta": ".gitignore",
+      "sha256": "99c5d403a0ea558b7339e42a8bc9152a676cc8ba936f41309747f1876c2f8015"
+    },
+    {
+      "ruta": "README.md",
+      "sha256": "9a4cecd049bf686bf7b9e5b7ce6aaac7f3770baaf35fa97ee5e591cf754b9533"
+    },
+    {
+      "ruta": "android/.gitignore",
+      "sha256": "703238443066325af08e3868d1e4b571a633baf68fcc93e323f0066999a97e1b"
+    },
+    {
+      "ruta": "android/app/.gitignore",
+      "sha256": "5c3174b74edc6f2b9e0743594b8bd3c7f31e4f4405758cc9872b3fe1de1d28b4"
+    },
+    {
+      "ruta": "android/app/build.gradle.kts",
+      "sha256": "43bfb443726da116bfff5eb87aebc91133ff2a6915fb6902789b5fbee2537137"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/ExampleInstrumentedTest.kt",
+      "sha256": "1c3f26f8854165d0f8193cbeba8b5343e4e6e68ed1478423424d08fc5ec08236"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/autenticacion/ui/LocalPrivacyNavigationTest.kt",
+      "sha256": "c9779438d6aa4263acbe16e3e2284558ac92a30db1a0ebcb292cd6f7a4da6f76"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/historial/ui/HistorialMantenimientoPantallasTest.kt",
+      "sha256": "65c51e941b633767b4703ee522951659acfcbe15edbc1d1f54f6e38bf67b3bca"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/inicio/AlmacenamientoMantenimientoSesionTest.kt",
+      "sha256": "2928228a11e3320c98474317b547f76108855d7f73dc765ddbd1e64cd1acc5c9"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/inicio/InicioNavegacionTest.kt",
+      "sha256": "68081449b2d2260551bba67015f8cb4a24a4988c9d7c89cf7aead41a4b58cea5"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/mantenimiento/MigracionPendienteLogoutTest.kt",
+      "sha256": "ae29cac98a79d7615c026c8595879cb846c64e65cf3022c91391337d15f6135b"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/mantenimiento/ui/RegistroMantenimientoPantallasTest.kt",
+      "sha256": "badbb04318081027f37ecb24db63e9f94b3f81ef4145457b11d28627f3ef17d1"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/sesion/AlmacenamientoSesionVehiculosTest.kt",
+      "sha256": "c3f632f4525ecd05bc431a94142a352ee7e6ae83e9df33c745c701b45015dc9a"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/vehiculos/DetalleVehiculoScreenTest.kt",
+      "sha256": "b5f0fcf569020b23a946620429aed5555d9245ca5c4814eb64a5b44c4f9d78db"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/vehiculos/RegistroVehiculoScreenTest.kt",
+      "sha256": "436586f94f76ac6377e057417a56ff19eedff90beaf47483718b7db6a725a84a"
+    },
+    {
+      "ruta": "android/app/src/debug/AndroidManifest.xml",
+      "sha256": "f91ecc39742a6fbf5b6740b13c18482bb0c6ff61e8f74dac87918640ceaa7243"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/debug/RegistroVehiculoDemoActivity.kt",
+      "sha256": "91cc79049d7caf161c851924a504f5ef4339ab39bbdb96f96e6e7385a86492dc"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/historial/ui/HistorialMantenimientoPreview.kt",
+      "sha256": "b4b139c2fc3e6d2407649498307b5cc38bb3ac92564871f52343a85356963861"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/historial/ui/HistorialPreviewActivity.kt",
+      "sha256": "f899c1a304ac498137aaa4e83577f1477533dcde6ea3a9916f600cfd39540f40"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/inicio/ui/InicioPreview.kt",
+      "sha256": "ddc36a89c5dc9ac4a4d4fd05266da705c32b23ed88c800dea6ccd8f89357288f"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/mantenimiento/ui/RegistrarMantenimientoPreview.kt",
+      "sha256": "6c347aa9c3931303030d073d43d22a6bf7db48b1da5c329ad88af137c4520b93"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/vehiculos/ui/ListadoVehiculosDemo.kt",
+      "sha256": "6fa97f81ad9892bc081e11120f9700533d428f6d0cef8d1d31908d430397fa3a"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/vehiculos/ui/RegistroVehiculoDemo.kt",
+      "sha256": "e15b4439817b4aa2b8dfae9e2dbdeb8786da5143383d320a48538eb1e76e4502"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/vehiculos/ui/RegistroVehiculoPreview.kt",
+      "sha256": "1055b08e810f8b091ec5b0136cbb83e17005db8036aa8afce24bf37e28bd3985"
+    },
+    {
+      "ruta": "android/app/src/debug/res/xml/debug_network_security_config.xml",
+      "sha256": "3c1297540a0008d334a3eb5c5e760e90c3568453455e88e55a4bc3710a244791"
+    },
+    {
+      "ruta": "android/app/src/main/AndroidManifest.xml",
+      "sha256": "d840ed55cf1a7c0ce1fca2721c2df957582c43a8e5d56d4323ef16cbaf6d493c"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/MainActivity.kt",
+      "sha256": "981547c1f9376a84ead3b9075406adbb2a79b4afe6937891bc54a03b58c833e3"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/core/network/ApiClient.kt",
+      "sha256": "bc09e10b272d9fd8fcadb6b40f574eac4c7798118fbc65520d092ff872f00f9d"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/core/network/HealthApi.kt",
+      "sha256": "1c9bfbd3b208d7182478a757d128a789b39e8f1d456d037946c31a47c1f7b7c8"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/core/network/HealthResponse.kt",
+      "sha256": "93f8c552d65d8deb9a80387709307b356476b76b3cf8e0ed5d3a852dcea1824c"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/data/AlertasApi.kt",
+      "sha256": "2910991220041c15233aa99fb65de4c018769c8bb93b51618444d95b2519be05"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/data/RemoteAlertasRepository.kt",
+      "sha256": "cab870d64afa06fca77795fccc414615ce242430cb417c1891504b841730af40"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/domain/AlertasModels.kt",
+      "sha256": "60598912a6837b1bc70827b5a0234ace2c9868180aa0623ab80c8b96248dd598"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/domain/CriterioAlerta.kt",
+      "sha256": "5a15db281471947c33c51aa37450a95c911269e62cde6072cae1c2e63563b22c"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/ui/AlertasScreen.kt",
+      "sha256": "db8c9da579d306f5fc755678a3320b82819ef5875cc6d8207291eaadfbc55349"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/ui/ProgramarAlertaScreen.kt",
+      "sha256": "588ad0d09291eef95991341bcd9c84995c88507034c994d8a37c3c0e1d88d96a"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/viewmodel/AlertasViewModel.kt",
+      "sha256": "e747e4c882c2eb84afe817d5d9f95cf53cfedda44708614f22b206e1e7c56075"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/viewmodel/ProgramarAlertaViewModel.kt",
+      "sha256": "63c256e335a3bd63d0eb47708bf5767dcb41671b40c1a7b3614cb93778681191"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthApi.kt",
+      "sha256": "05279d5388f7e1babc21eb6e097631441f832a2d9e38e8b2ae9d93e637876380"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthGraph.kt",
+      "sha256": "5a966a3e44541f3cdafdd238ea0c418d558a25391fa97ae23ac914a9bf971a77"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthRepository.kt",
+      "sha256": "87c6f6a36ec3ce39afca9a36deb320bd062cbaf4f0b639e1873fbe4eba762894"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/CredentialStore.kt",
+      "sha256": "9428b4a4f3153169da7b922d6cd2d664eca8c3524a9de14d2b0b84e8a2c1c7a5"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/KeystoreCredentialStore.kt",
+      "sha256": "ade81492e84d977dd8141f859d1810a2773ecddad74ed56897dbd84c75f530c6"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/RegistrationContract.kt",
+      "sha256": "10b3848f17fa3f35c27aa261168ffd9a4058aae9286ffd4574a40b3fbce24fa3"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/domain/RegistrationValidator.kt",
+      "sha256": "70dd048fe0c11101aaa31a7787b9de6143f2b679edab6baa8a0ffdd0b1d17069"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/ui/AuthGate.kt",
+      "sha256": "4e12e4e43c02c6bb545d6536eb39865a4e8b231c9368609e834020339704e012"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/ui/AuthViewModel.kt",
+      "sha256": "ddc00b1a23ad6611e514b29a1a164ddc909b375aff5104d9edd3d37ecb3a32ee"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/ui/LocalPrivacyPolicyScreen.kt",
+      "sha256": "5001b42d059f8237760feeae1e38bd4da97fc8ebb5ff5c290deb54185ec3138e"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/ui/RegistrationScreen.kt",
+      "sha256": "a35255b07054ee6a8d00eacc4485aa6c74eea02cfef5cab214b3dc42ad27ea40"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/ui/RegistrationViewModel.kt",
+      "sha256": "d4afb65c44ad7a9e5e9a82bbb15b729dadd7eefbdc5a6a06d0c1800b2e42da2c"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/data/HistorialApi.kt",
+      "sha256": "a3b215e3c606e3812b753ceebec7b2e48d42ddede9bab902241ff080e41c37eb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/data/RemoteHistorialRepository.kt",
+      "sha256": "a1f62a5d7be3fcb95ded5c82932853a19fd6972b5ca826a7e379108a3d4ebbbe"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/domain/CoordinadorHistorial.kt",
+      "sha256": "7b1144e9b42a865fbf93361e89a75b0a1a943a1971fdfae0151537cfd12b88c7"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/domain/HistorialModels.kt",
+      "sha256": "e53eb8439b393fddaa168e9da1e03a2503e6fede8ad21511a2decaf5910f1489"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/ui/EntradaHistorialMantenimiento.kt",
+      "sha256": "f91f24a25c902ffd5868b81b5aa5650d5984c4ec15489fa324adcc25d5b14cc7"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/ui/HistorialMantenimientoScreen.kt",
+      "sha256": "fe33ea737364621bbcc1eb0d4988d28617ddbb39f7415dda25d3eaea3ab82bb5"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/historial/viewmodel/HistorialViewModel.kt",
+      "sha256": "8eafbdcd685136475150a02a34eb93147066432a35af6b45f018c1ee0a80af7e"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/HomeScreen.kt",
+      "sha256": "267eb22c864e70fcd19c96dcb48af84e286bfab2c3e51772a99f9b849a8518c6"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/data/RemoteHealthRepository.kt",
+      "sha256": "142786d2d7bdcf4f68afe2339b9db08fd9c8ef441dd57958da305e87a90656c6"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/data/RemoteResumenInicioRepository.kt",
+      "sha256": "d2ce66f861b8760a3b581664f715c5c5977ca7117f4bc61cbf11ab63f4c22df0"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/domain/CoordinadorInicio.kt",
+      "sha256": "c93e4585cdb2416c238bef076dbfaca5236be09964a68abd8eea0ec0a9c0ec4a"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/domain/HealthRepository.kt",
+      "sha256": "07a1c2cf26e4e1acb61b094511620b135f30ccb189064fe9c2f7c9ac4fb7d96d"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/domain/NavegacionInicio.kt",
+      "sha256": "4ece6fceeee1082a3dcd057ce3f48af4569a84ca5d2b5f5ac5abd440cbc7511a"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/domain/ResumenInicio.kt",
+      "sha256": "39e8a29d1b923bc4f4f769937f004b03110f48d28d6430b18fce7ec28a881f60"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/ui/ConexionServidorScreen.kt",
+      "sha256": "6904ff15a4d76ea48eae62dce49de3ae3002cf83c01d037e6ac21eada9f8f887"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/ui/MyCarNavigation.kt",
+      "sha256": "248467f37d66a2a29a54fee051fdc0fda3ae57c5ad886638900b8617fa31fe98"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/viewmodel/HomeViewModel.kt",
+      "sha256": "d65c3a3b60adc3a4f02489af3b0f93d975affb196d397370900a915756c06cab"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/viewmodel/ResumenInicioViewModel.kt",
+      "sha256": "4e3840e4b7411ae63981ad6631ca1d0a4ac59a8c03ecb7a67be5a27128da66e1"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/ArchivoRegistroPendiente.kt",
+      "sha256": "7c91f4ae84bfa15ac448349ae3231b1001834852f6b2ece02ac0c9540057174e"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/MantenimientoApi.kt",
+      "sha256": "817921fa8e1b22885f3b63e3c8561ec1595eccbab14ead07f2f669d29271953b"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/MantenimientoApiAdapter.kt",
+      "sha256": "03f6999b37f8af7d3bf42f8eb0814bbf3b5f3ebd35797f5d3570b28df30d2568"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/data/RemoteMantenimientoRepository.kt",
+      "sha256": "0dd4a0b3d6dc6b476bc95a664ccd00f5806abbcbfe64cc62dd75f6bc9fb265fb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/domain/BorradorMantenimiento.kt",
+      "sha256": "f1afd173dab84290256c16ca57059362bae06ceacc3145aefd083612fe42a40b"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/domain/MantenimientoRepository.kt",
+      "sha256": "2d5120193b9b41e12ef18fff35dc105927b168f05bfc89165f847408c611a72e"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/AccionesMantenimiento.kt",
+      "sha256": "ad36fd81e5544005b74278efffbbb5912d8dac29e01375856e16893c4a11210b"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/ComponentesMantenimiento.kt",
+      "sha256": "9bae190fa31767adcb4445996a46b1134b6e70c99a811aa82b5040a010275055"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/EntradaRegistroMantenimiento.kt",
+      "sha256": "bb0eb831d9a4849f3bf74f5cc126f312b9676fe7331e296b6e569af2518605fc"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/RegistrarMantenimientoRoute.kt",
+      "sha256": "ccc2a4d592f57aa802f3769d52f55441777f6bff4aa1c47ac6993b62395c2dfc"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/RegistrarMantenimientoScreen.kt",
+      "sha256": "1618914916b3085e5305b5fa62ee9c5b0244d92c695992a3f6fd26d141bc1f08"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/RepuestoMantenimientoDialog.kt",
+      "sha256": "bb844e2aa16c8a632f37ac6428eba0b4102f91787153b28483b6aa93e95d1125"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/ui/ResultadoMantenimientoScreen.kt",
+      "sha256": "a6324a72fb6b93c9508c22c8fed211c6c6dfc2c1c0fcbc4d40fb0a6cbf82d82d"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/mantenimiento/viewmodel/MantenimientoViewModel.kt",
+      "sha256": "0491bf9bfe1b876662fc62ef3cfcb280f28d21b75c108538df80ed7fc56ead11"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/data/ClienteVehiculosAutenticado.kt",
+      "sha256": "69afe43143d683dbb0712ee71a25f27d92b4d76688c454f17bfa596d4f096701"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/data/DatosPrivadosSesion.kt",
+      "sha256": "50876024a855a07a9f3499bc28f6355aa26100c78787cfe993c2796b79e34dd3"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/data/InstalacionMyCar.kt",
+      "sha256": "0229e3c8390dbd983bab2173411f3b05a2adbb42c02d51f00aa17c53f2fcd8aa"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/data/SesionApi.kt",
+      "sha256": "2decd35aedf4546c7e9e60565275c45012a1c75b39643687d9d353dcffe669e3"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/domain/CredencialesSesion.kt",
+      "sha256": "67975af864baec626bfd45686ee1d58926c1642810769d11837b16b5899ca6ee"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/domain/PoliticaRedLocal.kt",
+      "sha256": "d69aea5a8f4d8aee22250ba21f42db0e2411e57f5c814680b144f5e29742b281"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/ui/SesionVehiculosActivity.kt",
+      "sha256": "cbe876c9063c7ee02ff996c9efe0ffc3b338784c5a9e363e403dac91ccdc8639"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/sesion/viewmodel/SesionVehiculosViewModel.kt",
+      "sha256": "97788c694f2c87459aa55a2c738e72132d61aef3ad53d11a2750c5e4f5a95d45"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/ArchivoSolicitudRegistroPendiente.kt",
+      "sha256": "c074a29fb37d4b5dd36bd404d8adfab9900ab22ca86cee469aecc1377b13fd13"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/DetalleVehiculoApi.kt",
+      "sha256": "ba9779151a0ce0fc03f77a32bfe7d5c264470464b959bdf34881fc26d2430920"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/KilometrajeApi.kt",
+      "sha256": "3553451953e7647e65e4adca108266d6dba4960241171179c08cd4f5886fa89f"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/ListadoVehiculosApi.kt",
+      "sha256": "8d4286f531e92ca757940afe1db8009d7e0dbd4034494ed99fe2452bcf608b46"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/PendientesSesionVehiculos.kt",
+      "sha256": "44e3247548c3ff65c557de0e81957b9f3335d27c150a9b6c1f27a8cd074d484d"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/RegistroVehiculoApi.kt",
+      "sha256": "8958f208685894802cd79539d16a11d3c571e2f95678aa342de6080f4714faf8"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/RegistroVehiculoDtos.kt",
+      "sha256": "1ba935c74ab482ef099147c0a2b753c54045bbd9db3d8c6c17327a983b949030"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/RemoteActualizarKilometrajeRepository.kt",
+      "sha256": "305196aea929e272d54d70e87a7d1e391b70237c8c52bafe6ae0239040a9d0b5"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/RemoteDetalleVehiculosRepository.kt",
+      "sha256": "403bb83d3abc5f31902785eb4cd6f369483ff389ba640dd070a163343b4321c9"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/RemoteListadoVehiculosRepository.kt",
+      "sha256": "af89bb51b608de3d36412f84a098ef25386257b481b005ab9779e5afdf67d8f7"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/data/RemoteRegistroVehiculoRepository.kt",
+      "sha256": "7c852991a637986c6bc4c6f2ad533c27aa2ff942d18f7500df21df4667350405"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/domain/ActualizarKilometrajeRepository.kt",
+      "sha256": "757582dd6ab174fa2ad73722d31f4e53a522fd2204493a5feba73915859b34a6"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/domain/CoordinadorRegistroVehiculo.kt",
+      "sha256": "31d684da49685d3450e6b2a65e11d998f6a6fc3b6ea1dde86039d69b3cd9ddfb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/domain/DetalleVehiculosRepository.kt",
+      "sha256": "64ee84f78fec53db6fced665cd558f1baebf8e30935070b7f3520b486cbe866c"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/domain/FormularioRegistroVehiculo.kt",
+      "sha256": "6025886eee9fc535601b0c808233b1be0c6cbfeb58045e23616f35ac5e18e1c5"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/domain/ListadoVehiculosRepository.kt",
+      "sha256": "5b7f37df314c2c90aa98ca57b716a0aa48fa327fb57b03cc3ea7e8f53bc30fcb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/domain/RegistroVehiculoRepository.kt",
+      "sha256": "1c67981bd1b1ee5924bf0bd93690744b48d397b918d8b9ed4651a17cf36c3a86"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/domain/ValidadorFormularioRegistro.kt",
+      "sha256": "38197110541d7e865571298c3f283b2c59fa894c178cd26c45c97d95c2df0854"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/ui/ActualizarKilometrajeScreen.kt",
+      "sha256": "330debe17198af88006381969529cd3bd2c16a7c17bb2a83ae46859b0cb5b130"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/ui/DetalleVehiculoScreen.kt",
+      "sha256": "4e0fcb8f88b7de7486b2c2bd498fe2197ec4c222ca6665b8fc05425008f58746"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/ui/ListadoVehiculosScreen.kt",
+      "sha256": "5ebd4c93fbaedb4af509f9468ae96d05d8739bd6807c15efd51db537163755cb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/ui/RegistroVehiculoScreen.kt",
+      "sha256": "d86f9a4ef557969e2ecdf6c0c277a85917676d7f37bc85f6c52779cd4c4cb2aa"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/ui/VehiculosRoute.kt",
+      "sha256": "a05d21df82247cec91bc64a6f803a7e417ccd29533972ba2dc8d5afe55920a3b"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/viewmodel/ActualizarKilometrajeViewModel.kt",
+      "sha256": "0bb5c386569fdcd9309be83eadc06422dd8051567409a8b4530016a1cf6f87b5"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/viewmodel/DetalleVehiculoViewModel.kt",
+      "sha256": "a4bdf502c7b3e5b85a014037161fad11b0a851241c3c8baf55819689044a4600"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/viewmodel/ListadoVehiculosViewModel.kt",
+      "sha256": "88b0c7fc57426bbce9a854acf2f1d18ac88f28d21b0741070637e7fac3a71084"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/vehiculos/viewmodel/RegistroVehiculoViewModel.kt",
+      "sha256": "e94d601f030ca69fcc41f53508ab457f9489905d4c477ddfd32bf867809f29f9"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/ui/theme/Color.kt",
+      "sha256": "4e3fbb64005322001a41d7b48495137ff9cf865a0c89c4e06d6bd375a0990ca9"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/ui/theme/Theme.kt",
+      "sha256": "c45ad290cd475838eee1f3677517533e8e787306c85dd095e6fa237205106b57"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/ui/theme/Type.kt",
+      "sha256": "09a8a2402b258a6ac5649960f3a1634a3c83183a628da4e49cf591c8f31f2017"
+    },
+    {
+      "ruta": "android/app/src/main/keepRules/rules.keep",
+      "sha256": "cd9f36ade2d8604e1b7cf24eff5b171f9c0816c0aa013ba7eb55be4fe2e1dac7"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_auth_back.xml",
+      "sha256": "57ef01c51813f3d39df19b9740415bd44078e87c0f5b4fbcfaaab73bd15fed4a"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_auth_car.xml",
+      "sha256": "b4204685c3f6a089b2c0d77f3c914e8ac4a3e0c79f0c244c532ca8f3465e73cc"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_inicio_abajo.xml",
+      "sha256": "71627f5adc47f6be7c55cca8c86dda052e3902058bfca3ceccf49543571d2b3f"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_inicio_campana.xml",
+      "sha256": "602be3fbe2ab24f63b7111c56171f7e3a1a89a86070c707b9dd0f98bf5a5b965"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_inicio_inicio.xml",
+      "sha256": "44102458ff4f6be2834a2192f5ee72edc5fecd4df14f5fbb624072d4b6b9d045"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_inicio_llave.xml",
+      "sha256": "2e398e2f4208b22b97f7c3adb4d96efa4a01e8723f668d484da4f55102ba5868"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_inicio_perfil.xml",
+      "sha256": "f80cf1d71c76607ba719cdaae88adefc42d02ea9a213d3a4967b9230f6fc5a83"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_inicio_reloj.xml",
+      "sha256": "6822dd0538ef767a72c5d6cfe7234355f12ee5648aefca83ad78cddd9242fdfb"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_launcher_background.xml",
+      "sha256": "ed423c73a6f40a4d2909f0901e60527b3a807cd59e1b5593bcaae1808b1c6321"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_launcher_foreground.xml",
+      "sha256": "01d1a6a6c1234eb7fe270d097eb283d72b9c95ae5118886f1b6573aad280f1f7"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_rf08_abajo.xml",
+      "sha256": "3be83467cbfdffce0025a8c09ecc592d4b039e6547fd02d46e296b11e52feb36"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_rf08_arriba.xml",
+      "sha256": "54144895d227a1b2212ee65dea637a569b390f3f0983c2b2e152f66545e42f4d"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_rf08_identificacion.xml",
+      "sha256": "28afa22e2649b5a70d5730c631a40933290f6301069df639aa1d818d94a6387d"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_rf08_informacion.xml",
+      "sha256": "68bd389650199a49128b608100bd8afd00b59b2b55faa5c19d921525555333b0"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_rf08_motor.xml",
+      "sha256": "eef1a000e745695321063c2735ccd49f40e44cac4a5da3d65b2d646926b3ddf8"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_rf08_volver.xml",
+      "sha256": "7624182dfdc7a02191429c2bf8d2710ed1979eb447d376883b42c038f4d4709d"
+    },
+    {
+      "ruta": "android/app/src/main/res/drawable/ic_vehiculo_predeterminado_rf08.xml",
+      "sha256": "c39f1d2ab85d4f0e4624cfa3292df8232dbb5f7c3b483c308a66e3d361ba7fc2"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-anydpi/ic_launcher.xml",
+      "sha256": "88f7653499ef524126ea5018a99baf9cc3269e7e584d6205dfdd76db39f39cc0"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml",
+      "sha256": "88f7653499ef524126ea5018a99baf9cc3269e7e584d6205dfdd76db39f39cc0"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-hdpi/ic_launcher.webp",
+      "sha256": "dd00996198640ed28fbc09cdcd7a3807cf8707f3eb255b659634da3ca6a6ff01"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.webp",
+      "sha256": "1ed73f5341a69d3b41c7e02e126803f50cc8c3284adf4bbb737f0c93577aef07"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-mdpi/ic_launcher.webp",
+      "sha256": "846219e6f72fe9a6c104ca8919cbee36a101e7d2ff8da9da67b689a5888f060d"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.webp",
+      "sha256": "4e2c58b91de01130e6479e00cbbaaf6e77cd961dd2c8e303cf13cd077fa92632"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-xhdpi/ic_launcher.webp",
+      "sha256": "398340dad816fc9a6338cb151a8cf1e45b926f9bfb70628b24c4bd2523cc94d4"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp",
+      "sha256": "91b490aef86574901137f0a252272e1f1add99c1ad709e0696ed68929b88d261"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.webp",
+      "sha256": "58ae87fa0c5b5d1562d27fd648d2c061553fe20e3ed570bde588162d01ea7a27"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp",
+      "sha256": "3009fad079f5772f30ecd767f98924367fbe0f81c30048d672d4fda2d5ca7d12"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp",
+      "sha256": "f98fef5bc3bfe5b65692c40ad1cbae2bec4faf9f1b249c397626740db71b62d8"
+    },
+    {
+      "ruta": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp",
+      "sha256": "5faf033745c8c882c43bb1b372d4e4a5890caec63d9892a2e756c954108b85dc"
+    },
+    {
+      "ruta": "android/app/src/main/res/raw/mycar_privacy_1_0.txt",
+      "sha256": "c85fb340c7bd4e6e22fd30bc4db9dc932260d0767fce4fbd8a3daf679cfb7713"
+    },
+    {
+      "ruta": "android/app/src/main/res/values/colors.xml",
+      "sha256": "b5626527d503417f0d8e5b1e08f338de7b31173bf0e122815f03e64932adbd88"
+    },
+    {
+      "ruta": "android/app/src/main/res/values/strings.xml",
+      "sha256": "94fd335f913c32a889ce9000e209961ecc2c0bf5a9574d46dee6910e43731acb"
+    },
+    {
+      "ruta": "android/app/src/main/res/values/themes.xml",
+      "sha256": "6ac8e9f1d855ecf361ea13518fa5c5bcb9f26a71be88b520d5b1b8d8812cc422"
+    },
+    {
+      "ruta": "android/app/src/main/res/xml/backup_rules.xml",
+      "sha256": "6cf1a27e6807b1d24e41d3fbe7ddc1bfe1f42226027964f6eaf477d71b43b283"
+    },
+    {
+      "ruta": "android/app/src/main/res/xml/data_extraction_rules.xml",
+      "sha256": "cb1fc47ab4a984530ed60e0e6ee638929c3038290e7e7e0b4b03a3a30fbe7381"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/ExampleUnitTest.kt",
+      "sha256": "5544da433bb7f80f9b042e6d76af41ccaa7e418fe4930b49cc18f4968ed1c3ac"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/alertas/AlertasFiltroTest.kt",
+      "sha256": "f5173556794813b7feda18b50d2fb01fa46d47e5d75562f579621988ded50239"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/alertas/ProgramarAlertaViewModelTest.kt",
+      "sha256": "9f260e2f4e012ca1523c01109235d6c32d6c80638157949be4d2c297897f66be"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/autenticacion/AuthRepositoryTest.kt",
+      "sha256": "5001a14296ac8d2d08dfa22d8c4f0e2a0bc6772be6ca045e5ff8e84cd4d37f99"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/autenticacion/LocalPrivacyPolicyTest.kt",
+      "sha256": "cc0d6f5a8882c1b1ecb4ad55042f28ac6cb4687f03f7fba525c3540b992ec392"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/autenticacion/LogoutTest.kt",
+      "sha256": "60a74ddc7e0273dcbe6e07da7a0046f1ed550d97b91f304fbca9d7e6dd0e9aeb"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/autenticacion/RegistrationFlowTest.kt",
+      "sha256": "9cde7bdd8b6168c55aadc46d334ab3b2b1858631d16c859974e5023129b07a5b"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/autenticacion/RegistrationValidatorTest.kt",
+      "sha256": "e48322226141676d95fd35aea37e4f6c268f984e29a6f8ed1752b4542e6002c5"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/autenticacion/SessionModulesIntegrationTest.kt",
+      "sha256": "bbc1fbfb3c8c9d44cb9aa58939a1dc1a4bfba496cf6f37b7c9dcd68e209b2c86"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/historial/CoordinadorHistorialTest.kt",
+      "sha256": "fe5c998348043c2747df5ab1ff83fc72492eaeb4aec11733371522fcacdc35f6"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/historial/RemoteHistorialRepositoryTest.kt",
+      "sha256": "7eda5002cee5989031d23a522d7342421267d4df5f481a9ff34510abbfa2f488"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/inicio/CoordinadorInicioTest.kt",
+      "sha256": "98ecea413c5e9a1ac2ac69118b506c809acd0220fedbe905c6f7ffe4f74219bf"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/inicio/LimpiezaSesionCompartidaTest.kt",
+      "sha256": "f721634c4c6707fdb47026171e6f1402b2bc7806f9c015c18588c008cf48e723"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/inicio/ReglasResumenInicioTest.kt",
+      "sha256": "437f9010a65f1ab65e2cba1c112690fd2dc4b773eec9a0dda1f8934c7bde7f22"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/inicio/RemoteResumenInicioRepositoryTest.kt",
+      "sha256": "a218574c2db403c666fb07056b3fb00ece315b611c18f03ab8486907cd9ee0e1"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/mantenimiento/MantenimientoAceiteVehiculoTest.kt",
+      "sha256": "c0e98f9102fdc58be2767eb931182100489729479db3df003d16aa5655215c1f"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/sesion/ClienteSesionCompartidaTest.kt",
+      "sha256": "5de36734453876a30b6035de6286c7c87da231ac44fd9e5faf7e523a72448e89"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/sesion/CredencialesSesionTest.kt",
+      "sha256": "cf2b2d90147183a4548a4fca3c1b312aa6f9d65aad6b564ef15cfdf8dc603592"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/sesion/PendientesSesionVehiculosTest.kt",
+      "sha256": "7dd6237d420c93bdd25eface2ac8c9ccf713cf69e331b0ef31b26d2fa6ec1798"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/sesion/PoliticaRedLocalTest.kt",
+      "sha256": "84ba1a5dbe1abbc05320a40e62e6e88bfb548890570d97989202b53221a64a37"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/ActualizarKilometrajeReaperturaTest.kt",
+      "sha256": "f6243511664e133554fd334c7132ee6884889f1f5df30a16977f5653df53c574"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/CoordinadorRegistroVehiculoTest.kt",
+      "sha256": "8a7352e0e1a30753e52067b640d30e922214d99162040b47456fb0cbb5c9258f"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/DatosPruebaRf08.kt",
+      "sha256": "47f453616004cfff33bd79593559ffb8f90dba7511ac2b9288f79069c63a86a4"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/RemoteActualizarKilometrajeRepositoryTest.kt",
+      "sha256": "05fcce9519c9cb309e252b4235bcb3143957ead7b38de3172994578c6bdb5a98"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/RemoteDetalleVehiculosRepositoryTest.kt",
+      "sha256": "7ffa372740fbf3d80d906e4d72162379bd490ed01f727b7cd7fb2eebdbe519e6"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/RemoteListadoVehiculosRepositoryTest.kt",
+      "sha256": "987ada745faf41e1622db121dddb79ff69d543ae3735b4f1c14519fbb3395b33"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/RemoteRegistroVehiculoRepositoryTest.kt",
+      "sha256": "acbb619daf90e92f6e9f1b29a1ebdc4a58daf8c1477335b26c1b5c3355294c19"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/vehiculos/ValidadorFormularioRegistroTest.kt",
+      "sha256": "046f8271da33b90f6cf9b492b2a6ccce81092a1bf8d18fa16e300011100e509c"
+    },
+    {
+      "ruta": "android/build.gradle.kts",
+      "sha256": "be7dbfa1841b18b020f744e203b995d3dac5709c2a6b8e310fbcfaed0364919a"
+    },
+    {
+      "ruta": "android/gradle/gradle-daemon-jvm.properties",
+      "sha256": "6c13aa5ba36690ccfbbb25a8807d01d98c15833e446d7ae82ddc726472cb8ef7"
+    },
+    {
+      "ruta": "android/gradle/libs.versions.toml",
+      "sha256": "981e4ee416a756ab3654abf4ee42b49bf9d8791e8303eb8562f22d44813ab80f"
+    },
+    {
+      "ruta": "android/gradle/wrapper/gradle-wrapper.jar",
+      "sha256": "76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3"
+    },
+    {
+      "ruta": "android/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "24204af8643f55657833bb936498a5fa9a335c0755ab0341a4e172ce662f853c"
+    },
+    {
+      "ruta": "android/gradle.properties",
+      "sha256": "cf774135f23cd1e6c054168ce772e24140800347f95b29819744c96f97e4ef26"
+    },
+    {
+      "ruta": "android/gradlew",
+      "sha256": "3238afb2aed5cb16eb7d6718077e7138059108f007b54179e9cc157c5a6e0e89"
+    },
+    {
+      "ruta": "android/gradlew.bat",
+      "sha256": "94102713eb8fb22d032397924c0f38ab2da783ba60d07054339f1190a0c4e2cd"
+    },
+    {
+      "ruta": "android/settings.gradle.kts",
+      "sha256": "619b0dcda2e3b3cad6e002bdc50070cba5afe36244834a5b2f9fcf750a54e28e"
+    },
+    {
+      "ruta": "backend/.gitattributes",
+      "sha256": "5775a77ad2f6d12dde053a3fb0cca4309189163f0888f4e7e984cd0ab327028b"
+    },
+    {
+      "ruta": "backend/.gitignore",
+      "sha256": "089382e4d7944ab6cb6900a1269678ebff93c00d441ada788cd05a8da182b22b"
+    },
+    {
+      "ruta": "backend/.mvn/wrapper/maven-wrapper.properties",
+      "sha256": "e475c49e0cb54793fef372f979672f56bfe7d272b981ad6f5ebd5e50e08ee1dd"
+    },
+    {
+      "ruta": "backend/EC-RF02-01.md",
+      "sha256": "40f354668ced4be3c2a92a245bdc94119899017287b69a23613287fbdf0af5a5"
+    },
+    {
+      "ruta": "backend/GUIA_INTEGRACION_RF01_RF02_RF06.md",
+      "sha256": "58e4861c671a219d2f8d68ebc7683dd6a147fb045b4763b59d07aabce65ddc84"
+    },
+    {
+      "ruta": "backend/RF01.md",
+      "sha256": "d8b8b7d5da63bb7c53f28368fd906025677437135fb6f226d81d262a0c5701e3"
+    },
+    {
+      "ruta": "backend/RF02.md",
+      "sha256": "4809ed02da02c715c7873c266b0a28de061e580b7360c110063160f1ec3a69fa"
+    },
+    {
+      "ruta": "backend/RF06.md",
+      "sha256": "28b148ff3fed586a8665cc8721b9856d903a057042983f8725eeb2070593a67d"
+    },
+    {
+      "ruta": "backend/mvnw",
+      "sha256": "cae96cef89ebea3531221f4ae17c23cf8edf67d00eae8306d4186ae1bbed4d02"
+    },
+    {
+      "ruta": "backend/mvnw.cmd",
+      "sha256": "46eedb8419bd14fe70d5bb2916d7b6f51806e51b39d5b76a42610384ca929c1c"
+    },
+    {
+      "ruta": "backend/pom.xml",
+      "sha256": "f577dd195fc41c581985e2a2b003dc5bec2a6c3beca73db5516790497afa6548"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/BackendApplication.java",
+      "sha256": "6b46cbe7586ac38d18448d6bd1058152fb158eabbff992e8fd456114997e5061"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/api/AlertasController.java",
+      "sha256": "786125d2895e86a928a58a82ff74140c4d1180fa962a92cc7254dca36bf9faeb"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/api/ErroresAlertasController.java",
+      "sha256": "dc208bbfdf8761fb05702a69238c8a36b28ec32005c2ab4d1da0c2d289499176"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/api/IntegracionAlertasPendienteException.java",
+      "sha256": "8fdfdbd83f400a0b29509e5ee9c55e0004dcd480d985a2d705a5f55ebb67d2f4"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/api/SesionAlertasNoValidada.java",
+      "sha256": "834e2f31a7d9a89008a3cdd954b4a9f370218e09883a0d9f14a0849bee4ffbfc"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/api/dto/ContratoRf22.java",
+      "sha256": "2fc989a769e1c7b44d253012591a1bfc9dd6da547c14ccc5d1aa26122b030486"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/dao/AlertasJdbcDao.java",
+      "sha256": "4fb854637ca273c52341a1d32c2c5c09c1a1e11a76e72c99ebdeebb589964b76"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/dao/OperacionAlertaJdbcDao.java",
+      "sha256": "e8ffffef038c27d73934ebc45247bcf8d9a0681e3d8b878a4d33380717578956"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/model/ErrorAlertas.java",
+      "sha256": "6f08d09a60f3f34e16aea4748daa3a239770e7678b44e703023df3f1d6cede7b"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/seguridad/IdentidadAlertas.java",
+      "sha256": "5207a18bec025f4adede1292645f0edc2c6627fad8b0316f1ef4d79915074cbe"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/seguridad/IntegracionSesionAlertas.java",
+      "sha256": "f38a4ba90eb45d071ed924ac7ad6d98d45522859f4efbe590b58e6dfb78597c8"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/service/CriterioAlerta.java",
+      "sha256": "d24be232afe1d582176e25f33809d94f8d9dff5b47e116e703a1b8f42e1bc21f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/service/FirmaEquivalenciaAlerta.java",
+      "sha256": "1a7a3aa0b6c05dd08214cd25c048cd986eb78d326aa71e34fed442ed7dfd3155"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/service/HuellaProgramarAlerta.java",
+      "sha256": "8088084e9f767ec3fb3c68ae759167d534b558469f87e08348f6924b24062406"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/service/ProgramarAlertaService.java",
+      "sha256": "e67ebd12894a1465fc77061290002f2cc6f8db35b0f4e94aa95484ecf33e7dcf"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/service/SincronizarAlertasService.java",
+      "sha256": "778506fc28cbf43335b58b9fac1885ab081bb917b8613f5ae82879e29a0f9351"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/AuthenticationFailure.java",
+      "sha256": "fef859af422c305f43bce94b14608111adb47e97e1bfb03b5f42507f0aad09ff"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/AuthenticationStore.java",
+      "sha256": "90c383498bbe9e2708eb129307a598e18c09ca21f187774b9254ec1115f1232b"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/LoginCommand.java",
+      "sha256": "c505fbbfcbae43f54df3cb5cd0c2d0d5363c9145ea6b6049ba3dc1c25c5dc899"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/LoginValidator.java",
+      "sha256": "b06d8029be4f2896ee47cccac4cf6efe845947e7183acd95bb658bd7e40c2265"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/SessionAuthentication.java",
+      "sha256": "40874d087cc0773594c651d7f2af200d5724d14afbc2c3ae5342393b757c8a92"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/SessionCredentials.java",
+      "sha256": "eba49d055cac86d22074db1c6b452b63c0c65d25ed6f66ad4c71ebbe0c56bee6"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/persistence/JdbcAuthenticationStore.java",
+      "sha256": "96b56d285f8940c4ff4387559679c3abcfbd08bf84178b3fd88f98e730584c33"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/web/AuthenticationController.java",
+      "sha256": "1cc3aef50185355a9b6603cea6308cd10b22f2ffa7ec259d21f57207850ac269"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/web/AuthenticationErrorHandler.java",
+      "sha256": "57004d7ca39d60ec8abe7f2307002ecadc025c4dd5cb3d45acc7f5ff26260415"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/web/AuthenticationErrors.java",
+      "sha256": "7da53d38c7221e4b663486d6618ec5ac65fc734f29eea09e14cc3e79c6abd80e"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/web/LoginSecurityConfiguration.java",
+      "sha256": "0f0ecd00d88951f68cdd682ca4b04acf28067e02be9c015401ef8a5b4ac76312"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/autenticacion/web/SessionBearerFilter.java",
+      "sha256": "38dd9124df6883df2566c23c02fb4e1d430a58894c3256876716b021b21f5dcb"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/cierresesion/CloseSession.java",
+      "sha256": "45c011838d2c57d2eaaa04b309fc41e9a86b75b97b98c942b52aba8b624bd609"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/cierresesion/SessionRevocationStore.java",
+      "sha256": "ecb8fdbfc94c46be70aad6480d7c5da4e806bf0dd03910f86bbaffe44220e95c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/cierresesion/persistence/JdbcSessionRevocationStore.java",
+      "sha256": "a335120004276599848ad09c963c821c0ddfdc860c4ca64086e789ee9efc68e8"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/cierresesion/web/LogoutController.java",
+      "sha256": "c4ef3c3fb7353fbcf2d1c25a05ada391fb5df055fc722a0a046e81d8df6bd6cb"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/cierresesion/web/LogoutErrorHandler.java",
+      "sha256": "f8bb7ad059c846c2bc308652582383c1e0e08e795c50a6bee120470434a9f06d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/cierresesion/web/LogoutSecurityConfiguration.java",
+      "sha256": "ca75d863b2f4c0a9bb5d262f44833b00c0850e8169a6c8e1cfd259c961ff6a8c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/api/ErroresHistorialController.java",
+      "sha256": "e9df212d00f8c1da515a9750d8b37302219aa7274fbd0d91ec19b38e893446a1"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/api/HistorialMantenimientoController.java",
+      "sha256": "d4b50486a37b83540d3f70c78b154c956f583f0786be9a3c0872a3179a103fb3"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/dao/HistorialMantenimientoDao.java",
+      "sha256": "2b984633ca93e6833101e0c1a79de1349caa2790545ef01b20d9ed8f65ca94a5"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/dao/HistorialMantenimientoJdbcDao.java",
+      "sha256": "6b2acf0e137371928764b02bd9048b9a8bda4f5ebb1899c40bbbf146383de72f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/model/DatosHistorial.java",
+      "sha256": "dbbc12ad7924c875f4542a25abe722a7396084b13bb7e34c8890ab81c876341d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/model/HistorialInconsistente.java",
+      "sha256": "9d003e792166275085f55979ded6edd09e08296cdcdc1b55bbe1865f680520a6"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/model/HistorialNoDisponible.java",
+      "sha256": "1ce8bdfa82d8bc68afd2adea99bfcdd606087096bf5267f6306b1c28ab00e1ed"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/seguridad/HistorialSecurityConfiguration.java",
+      "sha256": "d77bb5e5ce8beadbbef4bb10b8377ca44646f8a498d0cf963f8f12e294b5b24c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/historial/service/HistorialMantenimientoService.java",
+      "sha256": "5a029f31b8ced02f989cad6f92a96837626f7b1dcb4f3004a354bb623a74ccb0"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/api/ErroresMantenimientoController.java",
+      "sha256": "8d33503cca046a1499ea27e8aaadd66eab302528d7752c8c39608b8745ec9e0a"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/api/IntegracionRf17PendienteException.java",
+      "sha256": "5a358ec28c53aeaa93e2d8ec0f5fbad85d31fbbd746323b39c99ee2319d33644"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/api/MantenimientoController.java",
+      "sha256": "9eb5743c9177e138088bfa23b4ca47f3eeeafbd385301f86c2d8ecbbed24abea"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/api/dto/ContratoRf17.java",
+      "sha256": "09eff5bfa6019ec0bdfcdba5d73bf3aa43a06b31ae00924740aad9557a32a7e5"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/config/MantenimientoConfiguracion.java",
+      "sha256": "347096f65e3283b97219b768c6f4758006550d101dfdcd4c6e1c2fe3b043dc67"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/ContextoMantenimientoJdbcDao.java",
+      "sha256": "104da657f0d6ad3190756fd1cd89679139e4b58cd65207070d042756439001bf"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/LecturaKmMantenimientoDao.java",
+      "sha256": "13d74ba5811086308baafc658dc3541a8e7a7035a622e268f77e9e12ca6b90d0"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/LecturaKmMantenimientoJdbcDao.java",
+      "sha256": "238170d72a6b8b11cab9b2fc5c1bc5d19d1288d8ea9bc0e7bbb3549bb7c6a427"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/OperacionMantenimientoDao.java",
+      "sha256": "6723a8da5e29c80bea0a6971d16ada3d97edf73b25b763e24f222f9de8ff343a"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/OperacionMantenimientoJdbcDao.java",
+      "sha256": "622beb40a56fb2195cc534e143e6e58cb01add01939217c379f00a2a0b54a45f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/RegistroMantenimientoDao.java",
+      "sha256": "85c0e36f4e19111354a057a94da4bfc109ef1987f1c754d9ac2beab07e1ef08b"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/RegistroMantenimientoJdbcDao.java",
+      "sha256": "b04f0872721fe9a3845b8a87326c644bb103120614fc5c294d54424bce99f11d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/TipoMantenimientoDao.java",
+      "sha256": "3e824a6fb0bf75deb1a4334e37d664a3111c3f5d93da1aeb3be45fa717614174"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/TipoMantenimientoJdbcDao.java",
+      "sha256": "8718e86df4b828f7381e7c68ef7178c62c415a00b1df811f6f7d4ec9989f151e"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/VehiculoMantenimientoDao.java",
+      "sha256": "b785f658573fa76398e3d52920b6b3c684806628ae17f8875a64fdf2237a54c9"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/dao/VehiculoMantenimientoJdbcDao.java",
+      "sha256": "843345cc8d81522f20cf2bf7fbe6a952e2ad97b8bfa0356249047832fd19ff84"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/integracion/JsonOperacionMantenimiento.java",
+      "sha256": "8055e3d73e4ca9a6ef49581d7e0b00b66b9e05c6e3df59082e299131504c4ba9"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimiento.java",
+      "sha256": "5b5e014ab80abe0fe16b61095aa14e547fce186d6c1e7611e0291f7e0ae344ab"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/integracion/RegistroIdempotenteMantenimientoService.java",
+      "sha256": "f155b2d7b9051433838df1bdf9b3fe85d4e3b4f1ed4e1b8ccb39f6a065ce6079"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/ConflictoOperacionMantenimientoException.java",
+      "sha256": "21719f2288962eb914b087aa2dfc0c39da7bb094eb3d6a078ba2fb94d61b78a2"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/DatosRegistroMantenimiento.java",
+      "sha256": "0ce1174241ebfad2a631588620b0db942137790cb0754c9f4b7ffed672f7912d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/DatosRepuesto.java",
+      "sha256": "03cc4591e0859917025cb83fa7b581ad70f500c183e1eb0dff3d92c294ee861f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/EstadoOperacionRegistro.java",
+      "sha256": "6142a68e216726b908d92f853f3a92d993faf57deba2beb0530fbf16b7164e4c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/LecturaKmReferencia.java",
+      "sha256": "8703d79eb96aacc357410d61e68c4541d4f3d01073e2d83b3bd6cf5d7d04fdb8"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/MantenimientoNoDisponibleException.java",
+      "sha256": "fa737fb3c9335deea63acc01aa9e4a563bd019a6b99d546d4d960fe4c47d8feb"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/OperacionMantenimiento.java",
+      "sha256": "29fc1ee71138ed6790fbf0042d0f109c653751bcef4f601a3c8181af007e3fff"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/ResultadoRegistroMantenimiento.java",
+      "sha256": "704f6e3cd6ba05c3aa8a58470e0b5efa58dc9a3b0c69379255b613ba622f4bac"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/SolicitudRegistroMantenimiento.java",
+      "sha256": "1b5ca7a4199f91087b8948f51c826eefafeab152d7e59ba28df1ebf58c475565"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/TipoMantenimiento.java",
+      "sha256": "6e8792ee8d27283d9a985c1b71a707679f34128d55e97a499345f88be30d878d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/model/VehiculoMantenimiento.java",
+      "sha256": "d5dd3481357227fc5af9ab143b4dfa3b9b1551f8ee07dee4d8eeea1e7065468c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/seguridad/IdentidadMantenimiento.java",
+      "sha256": "db2cdc4844d3c425d944c9265a75dfde711f1fb7b4b473da332a5d7d33cb3495"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/seguridad/IntegracionSesionMantenimiento.java",
+      "sha256": "8ef23c2705b358c462cd4cc045281d84426c1cfd2768a42031cacb960094376c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/seguridad/SesionMantenimientoNoValidada.java",
+      "sha256": "a2d5c2cde415c6d28a1e4d268b0ba0e9b328c33da3b132bf0d719d38c2c2a5b2"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/LecturaKmMantenimientoService.java",
+      "sha256": "9478d9db8e138b041077c0a04313938f56cba3a8658ecfb4f1d9ab19b21c46c1"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/LimitesAlmacenamiento.java",
+      "sha256": "de8deb1e0c856d07dcd322b36eece8a4b6f8cb568779375369c7e6f338f218e8"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/MantenimientoHttpService.java",
+      "sha256": "6f63ae098d80745cb3860f3410db6e451b12a2d3f1b530c4d14bb20f44707cdc"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/RegistroMantenimientoService.java",
+      "sha256": "746ec4a4bc510178f300e0facb8d9af5b263b471702a48c63166caa919501563"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/TipoMantenimientoService.java",
+      "sha256": "a101c00b3aff8b9089534912aff03c2a92a81dea11caa850b3fd9bd834498cfb"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/ValidadorRegistroMantenimiento.java",
+      "sha256": "00a7e03412c4f8ad85a02d1b153382f9bb4c4a4d0254b6402ff8755c77e3c996"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/ValidadorRepuesto.java",
+      "sha256": "725ecd753056da3ec5b93c13f60bf3a94a5e91e28937dc5e9aa642b423700093"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/mantenimiento/service/VehiculoMantenimientoService.java",
+      "sha256": "b41e3e26e14106bfea0b9b8deb2a210271d07c48c6cf27df1088592668408574"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegisterAccount.java",
+      "sha256": "6aa28616f58aa3239d8fb71bf2fe945df058c425b9ec19830a15843e719c421d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegistrationCommand.java",
+      "sha256": "8b861b40a25421a35d1a921df62436955a5015010fe6b0000bcabcbdfe510e83"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegistrationConfiguration.java",
+      "sha256": "e4b8ae6f485b715a9d648e93d04e6354f213e0cfe00fa87ac23df993733754c5"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegistrationData.java",
+      "sha256": "db17f4e0dbfa3dd35e327d96452d463cc16ab27f890e6920efe919384e7add78"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegistrationException.java",
+      "sha256": "e22b0cf0e4f3591ba79daa41b8df7728ed72e24b75a4e605396ed0f3099ef9f8"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegistrationPrivacyPolicy.java",
+      "sha256": "8695041a66fb7574983d3f5f4c7eb7b4647f77c0f78d6c4efde804a76c84c112"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegistrationStore.java",
+      "sha256": "f0255ea5006438c584b6dcac9ac809691d895126fb4f053b8b26f2e9d0b533e7"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/RegistrationValidator.java",
+      "sha256": "ded97340e87e9634477640ff399d58724b224c2478ca1e39ac77793663fc21fc"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/persistence/JdbcRegistrationStore.java",
+      "sha256": "8d1e7d3db32a374f1d1fc47a9f9be58276165600c80474c0672b93d5dbadc010"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/web/RegistrationController.java",
+      "sha256": "b49a00763fe7c34736f44c6004f78b42ca3d174d8d082c696c6ea14b38b3db46"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/web/RegistrationErrorHandler.java",
+      "sha256": "a54f1272528fa71bd55a60ec4a4c81481afb7b3fff0d40f4925289036bcd1b27"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/web/RegistrationRequest.java",
+      "sha256": "b1510a85dcb9b67687c4dcd2f529ce133d11edc5f10391fa79a32ee5cd1447ea"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/registro/web/RegistrationSecurityConfiguration.java",
+      "sha256": "d7743ddc8ffc4c33e138fa90f80bfe35e07424ec8b57b7879922420e07ca5d62"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/controller/ErroresVehiculosController.java",
+      "sha256": "86550161c7616927dc96ca5e14f0f7c40b01c298b1e601d23c938c22de2bc06a"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/controller/KilometrajeVehiculoController.java",
+      "sha256": "e3aedfd77a18e668716cc848c18a0d50ae666ac289dbe28794ee3bb9597ddfce"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/controller/VehiculosController.java",
+      "sha256": "3222e561e78327c84ebd7dfca4a9576d5a683937ffabd4f072e66dfc47c1a138"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dao/CatalogosVehiculoDao.java",
+      "sha256": "a372c16201697336a5f74e579732155c0b08994c879667aa8595cf2b94b70c54"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dao/CondicionesRegistroVehiculoDao.java",
+      "sha256": "eb2e8339e65d2885d443de278257fef18faa23fe87289a2b3469158687cc1f13"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dao/ConsultaRegistroVehiculoDao.java",
+      "sha256": "7ec90218d743a72be84a6818cd288f622c982db4f9d0f5cb26008808d538aa47"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dao/KilometrajeVehiculoDao.java",
+      "sha256": "336725517f8b171d6bae5eec51fc87407568b5f0722cbca2908809d7f8980e67"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dao/OperacionVehiculoDao.java",
+      "sha256": "dd66197ea6d5e548962f49374533489bad38f375198100c1f647a40bb8956f9d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dao/RegistroInicialVehiculoDao.java",
+      "sha256": "d0d6cacde0aa19ed0631782210756e77acf5eeeb41da7c6dfaef4547acb7b546"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dao/VehiculoDao.java",
+      "sha256": "e787b9673119f5bb33007cb943eaa0325b08f9172345fc03bce2050cbeca8af8"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/domain/ErrorRegistroVehiculo.java",
+      "sha256": "7ce4c0b32385a631ae9123308dc9353a89894436ca8ace0390ffd38da23639e2"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/domain/ValidadorIdentificacionVehiculo.java",
+      "sha256": "a4e392c2c7351d5b0f2effaf7382e793154808beb258ab7fd2f86cfa808ab484"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/domain/ValidadorPlaca.java",
+      "sha256": "3f5fac26154177fa29a34a5ed4fd3693d9006f6b04ab81977b557609805c500f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/domain/ValidadorVehiculo.java",
+      "sha256": "21abc63ecb1b9bce2039ce29c8c88cad69212eb344320b93519e63e68d09f2ae"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/ContextoKilometrajeActual.java",
+      "sha256": "75b88ddb760fd478ce71143f0587e974a9ebe642d17e7a409a90749d239eee7d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosActualizarKilometraje.java",
+      "sha256": "5df9d0dd6d5c01c60d2116d8c475118a135c366c3acb1fc9d6bdaba763c25866"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosCatalogosVehiculo.java",
+      "sha256": "16facee073bb76067493f14e7a2d9e5b85e6d6fb242f3aacc9a675f9eb571fd9"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosCupoRegistro.java",
+      "sha256": "67762e8eb60fdd058614a482d6e2614797de2b56807deb0a61db6083de434a71"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosDetalleVehiculo.java",
+      "sha256": "3ee292fbd80320904138bec73dacb9ac0acd8584c6f5d535ee4f3e09ba2c1cd6"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosEstadoOperacionKilometraje.java",
+      "sha256": "7fe4c61ed1a171ac72fee6bc657cae7818e1ed00ce923c72e2dbe3f834cf9fbe"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosEstadoOperacionVehiculo.java",
+      "sha256": "e73d607cf9df6f51d719ef86263f4e9265969e0e1b771f16cc5f9c3ff272e73f"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosListadoVehiculos.java",
+      "sha256": "8ba70ae8c5cb7184fca886397cc6c3ff456383b4093c01f1df53c2e8820f4359"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/DatosRegistroVehiculo.java",
+      "sha256": "c4ec1aa4428b32c8aa3622ffb05745e5b5ea440ded85365fd73fea44ac0cbc14"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/NumerosEnterosRegistroJson.java",
+      "sha256": "9822fc9342f1c1b93ef86dcbf2d07218a9b649dbbf975b91edf5b242ebeff54b"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/ResultadoActualizarKilometraje.java",
+      "sha256": "cefab8a184afdbd0c25dd9fb502600f2c7df9ec4b6922b5cedf7bd4f7bbe333d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/dto/ResultadoRegistroVehiculo.java",
+      "sha256": "ecd91c4ad2fafbd7cb40ea56b5760b28ba343ef91a0c241541e97d69fa0f9e89"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/seguridad/IdentidadSesionVehiculos.java",
+      "sha256": "683fac6b38a034b009076420ada5c554b70edc5c01f504f2d26ccaa62ccf2944"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/seguridad/IdentidadVehiculos.java",
+      "sha256": "dd6dea0283148010c1e4f46d41ae14fa0b317d4f1e5b539a6cdf7c3666bd95d2"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/seguridad/SeguridadSesionVehiculos.java",
+      "sha256": "6cb8c1e32689c429243adc84ca82fdb017657a228e71aae35e446e875d2929c9"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/seguridad/SesionVehiculosNoValidada.java",
+      "sha256": "7389f0310be0eece39a6861c11b033d5c0dc9827fd8396ffe3aac7aae333b46d"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/service/ActualizarKilometrajeService.java",
+      "sha256": "e7674308360852a0e82966199c3dbd8ef5c9e803d6dab42bc08b2dbb38a3ad0a"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/service/ConsultaRegistroVehiculoService.java",
+      "sha256": "2ef091ca3829b26ba37ed2e4733b04b0a9d4b67f522a64c813d9b85afcdda2bb"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/service/HuellaActualizarKilometraje.java",
+      "sha256": "0fab0a318a62c0916dda262ba27a523a66a5504866d2853ced831524adc95d8e"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/service/HuellaRegistroVehiculo.java",
+      "sha256": "edb9fbeb41f92b3ab8528fab1ee2039ee677f764e8bbd29cc644d6fa919d1a34"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/service/RegistroVehiculoService.java",
+      "sha256": "326ad26de9a70ca2d7fefae9f0c0adc8fd7e2d20a40399409d5ebcf4f80568da"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/vehiculos/service/ValidacionRegistroVehiculoService.java",
+      "sha256": "12d7bf0d7850fdcaa049db230a5a4a5fe60d3cb88b3dfb483eeadc29b0181472"
+    },
+    {
+      "ruta": "backend/src/main/resources/application.properties",
+      "sha256": "35b562e5a8137bf621fd2c23ebd006385fa18cc04847bdaeb7abe7ce17308d80"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V1__esquema_mvp.sql",
+      "sha256": "65e5a7bef83ce744310d3540fb4055b382819c8e3ae70ce8ec6b5535142e319b"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V2__tablas_mvp.sql",
+      "sha256": "f9ba558cb207f3ed56a62668eea17f1b5fbe1486b4118347f15a4f76fa012e87"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V3__catalogos_mvp.sql",
+      "sha256": "f8c976de162090edc24c7848720e52662aea1678680d4e8acaaf60a065172fd8"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V4__funciones_y_triggers_mvp.sql",
+      "sha256": "e2174746f86cbef80102402b01a7f961b3422cce4fa59c86d9815d37b758eff8"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V5__validacion_identificadores_vehiculo.sql",
+      "sha256": "ab5669d0e5e2881d14ca580f735ca69436593b3feba525cac63ccf8bb53a7d66"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V6__rf22_tiempo_sin_lectura.sql",
+      "sha256": "d3bda6d749fd08f2da6cf56dcbb4434fdaa500d684b6fb64fb517bedfa0df568"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/BackendApplicationTests.java",
+      "sha256": "5cb8c21872bb09f9418bbf58555bc76ef2700fe349f8a223d4de9295a5b328e6"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/api/AlertasControllerTest.java",
+      "sha256": "9176c3360aa0b930455ec2433c5f66eb2bd3579b9a858f08137d6f785ec84f8f"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/service/HuellaProgramarAlertaTest.java",
+      "sha256": "29953c8769cc31285d397fd5c3036532063246df3922e803d3b5ae83008632d4"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/service/ProgramarAlertaServiceReglasTest.java",
+      "sha256": "b2bfc36a24ef4a37036cd2fbf93554837e17009dc10a459efdbf31d1301fe59d"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/autenticacion/AuthenticationIntegrationTest.java",
+      "sha256": "aae9b6989fe65483dbbf42470199a01bafcd5f9cf95836a3f2237f5312900b57"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/autenticacion/LoginFlowTest.java",
+      "sha256": "ff0a42cb596b4ee15b98b82ca64b987194fe2b904a6d72f19af89c33a7b6568e"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/autenticacion/LoginValidatorTest.java",
+      "sha256": "34d4f84d3580eac38139439210f79bf0e89fd4f49191fef4bcaa07756dc7c686"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/autenticacion/SessionCredentialsTest.java",
+      "sha256": "4ae9a3eb99bc8ff8b6c03ad908781720e638df87ac35be868022fdeffbb070e2"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/cierresesion/CloseSessionTest.java",
+      "sha256": "c7ceda3f84d9b9dfef2e9c52c94c98ac845e7389ab959c98a776976e7b79b85e"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/cierresesion/LogoutIntegrationTest.java",
+      "sha256": "47668ba194a23270ed961295e7b4b018ca9b91a0a6ffd3691492cf25b6243169"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/cierresesion/LogoutWebTest.java",
+      "sha256": "0bf0182005cc734231bce9f7d2dc4f59a986d4f7123ad602c2306a3a54882e8d"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/db/MvpDatabaseTest.java",
+      "sha256": "043445e44064b52c2a34af66f9bb2070d152246c675f00130bc55d2ae85d7e81"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/api/HistorialAutenticadoPostgresTest.java",
+      "sha256": "7bf0a4a12c51cb5eae2f0b15ea5c681708ff15c3f4c49b237142ca007bbbac1c"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/api/HistorialMantenimientoControllerTest.java",
+      "sha256": "e4b94744109404da50264e379726a2ff3a5490722c9b8648c416f773f4d06d59"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/dao/HistorialMantenimientoPostgresTest.java",
+      "sha256": "55573c4d743fca014511acd3cb6802cf615e8c51cf6e15ab205cd261e85121f9"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/historial/service/HistorialMantenimientoServiceTest.java",
+      "sha256": "eca4fa7384341110692ff771db595033d05ef93cf9e515fc9c0b3d54eb74bd00"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/dao/LecturaKmMantenimientoJdbcDaoTest.java",
+      "sha256": "a0e52affcd42cb71f89b56ff156f0e0062b5d1d51c802c69e533ccfdb2186889"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/dao/RegistroMantenimientoJdbcDaoTest.java",
+      "sha256": "79ed5e6e3e090e8248c33f1c17619dfe3b1b5198046904793a361c275a8e98f7"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/dao/TipoMantenimientoJdbcDaoTest.java",
+      "sha256": "0cfa21d27aff05b15dbc5e910e144fb2a3e424d3eb6c2f8cb3ad4a6e2aa0f649"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/dao/VehiculoMantenimientoJdbcDaoTest.java",
+      "sha256": "f1591f2f0d06ab168ec2eee06ec2cd1c48d850f556872b65e59c6648ca9079c3"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/LecturaKmMantenimientoServiceTest.java",
+      "sha256": "a0a2581a07fa348f775d4f6f04a4941a027a4663d55df8970c5c1d0bcb8478de"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoConcurrenciaTest.java",
+      "sha256": "0ee25fa6c559df3b773b81bdb94bfd6b4b8bce1af21bae109ec964fde3393413"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/RegistroMantenimientoServiceTest.java",
+      "sha256": "f0bcb751ba0a5439e3c8ff84879a7542040745717c03ccea6b518023e71200d8"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/TipoMantenimientoServiceTest.java",
+      "sha256": "ebf0bbdf778cadae7b355616c49c1c2d796da430a4fa2941e1a9a1b01e9227fa"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/ValidadorRegistroMantenimientoTest.java",
+      "sha256": "498d84ae7f66145f20282b675d7d45bd53b8b114c6261258af306ecfbc94fa16"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/ValidadorRepuestoTest.java",
+      "sha256": "b8ef09dc4958ba2c9a9add079772f4f9d8d67729739bda5b77ccbbb3c5acf016"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/mantenimiento/service/VehiculoMantenimientoServiceTest.java",
+      "sha256": "32843b3423600bb8261100e9c36e21a507cb4ff12abf9b73f3538ffaa27e3e0a"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/registro/RegisterAccountTest.java",
+      "sha256": "b7a2ffb222401dc4848ec534418b328904a0103790fe2fa367a6a6888f674dc2"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/registro/RegistrationIntegrationTest.java",
+      "sha256": "c828b299d776140ad10f47cb7329b4993e20f3b58fba4304edb062a3ca7c9f65"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/registro/RegistrationPrivacyUnavailableIntegrationTest.java",
+      "sha256": "711131dc09a4b25d1761fc79938ab53ca0c589af096425c6173ed5fa67f55213"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/registro/RegistrationValidatorTest.java",
+      "sha256": "c678116a246ccb3c5d4a6c6855f28ca00dfb1303a79fdca55cd898881dd401eb"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/registro/RegistrationWebTest.java",
+      "sha256": "8916677bede5c49b41fcd8915423e5d0fb569ad46476ad273a1052515288146e"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/controller/ActualizarKilometrajeControllerTest.java",
+      "sha256": "e63933e9d3156a0109bb00dbfb897ff3f1236cbbba8dd1e8b0e72480f21000a8"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/controller/ListadoVehiculosControllerTest.java",
+      "sha256": "bf9e558d8b4c5e242681448a4ca784e265e7a0035b101ca91384f48c9e3a6919"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/controller/VehiculosControllerTest.java",
+      "sha256": "f3491df95666436afa435f533397a4e9f4c80141831a44f0ecc5ee510c42df2c"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/dao/CatalogosVehiculoDaoTest.java",
+      "sha256": "d388ee9f83c92fba4719246ff06ec90f61ba6036bad3ae00230758bd717cfb39"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/domain/ValidacionDatosRegistroVehiculoTest.java",
+      "sha256": "11ca966005a0146113073bf98364346f4dd3e908405b3a6e51635ed38d457dee"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/domain/ValidacionMotorVehiculoTest.java",
+      "sha256": "2e0b4c778dacf2ca12f1e1bd012e578e3708ffa422119ede887014b716072136"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/domain/ValidadorIdentificacionVehiculoTest.java",
+      "sha256": "a1109fc8b2f131f2ec73554c35b0d753cce91bd410782e16a84850feaa6d1fad"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/domain/ValidadorPlacaTest.java",
+      "sha256": "734f62003726e148bd960cd3ce292d5875cebe0cfdf4490a36a21cc829803cd8"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/domain/ValidadorVehiculoTest.java",
+      "sha256": "d75d46f59b6d2137bfa4583b8392a1302bad88846036f87a9348adb8fddebb2e"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/seguridad/IdentidadSesionVehiculosTest.java",
+      "sha256": "f4f2c10422d283796b242946cd14120b7de86fb9e08c8f9f1120991a503f76cf"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/seguridad/SesionVehiculosIntegrationTest.java",
+      "sha256": "61b7bed113537420994ee1045bd123552589e64a486d21c6adbce76af01fcfd7"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/service/ActualizarKilometrajePostgresTest.java",
+      "sha256": "b881258f12933ffc2dc1d65805202f6c1a121b8ac270b502b84f3c9736ddb209"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/service/ConsultaRegistroVehiculoPostgresTest.java",
+      "sha256": "a2819d070132bf366b0c42d05067050b857ccd2782a8e26013f1ce5f43b2b488"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/service/ListadoVehiculosPostgresTest.java",
+      "sha256": "feb164386de9a9f64d11fd86f792eb5f95cfa5fa5e4796f2b4c4ecf200212e5e"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/service/RegistroVehiculoServicePostgresTest.java",
+      "sha256": "b80d5d9e9ae30da41ac42727707e445a80da0a164a66680f4039cf513170dc8c"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/service/ValidacionIdentificacionRegistroServiceTest.java",
+      "sha256": "3a4534a80cbb9d73be1a2da51a111a4b003654ada68b50cac9640c8c44bf68f8"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/vehiculos/service/ValidacionRegistroVehiculoServiceTest.java",
+      "sha256": "b17c9527473c75f23e074a0e42b231110ce4e8b7186f95b551d779c3fd291f43"
+    },
+    {
+      "ruta": "backend/src/test/resources/db/mvp/dictionary_columns.json",
+      "sha256": "1078a47db8a0d32ef48befd9d4423ebee2a14b50b38525d7e27c81557ccb807e"
+    },
+    {
+      "ruta": "backend/src/test/resources/db/mvp/smoke_rollback.sql",
+      "sha256": "d44349437772696111197d812e6f22a4ca5399531c1b58984b41e7ba0d18845f"
+    },
+    {
+      "ruta": "compose.yml",
+      "sha256": "46d12fcb5fca496c5269e39eb2ee1903590d6702498183cc75f2500901a9cfe3"
+    },
+    {
+      "ruta": "docs/db/mvp/CORRECCIONES.md",
+      "sha256": "216048f1dde0b90f24c8f716f37d58988e3ce5879d6993318960332f01af9771"
+    },
+    {
+      "ruta": "docs/db/mvp/DICCIONARIO_MVP_APROBADO.xlsx",
+      "sha256": "f78bd9d6b3f7424fd5cf45b82782daf4061bb4f0f893660a6806fea21a1cc9a4"
+    },
+    {
+      "ruta": "docs/db/mvp/README.md",
+      "sha256": "793cea38c41d42092be47856cfaccc4d13739903b8a74687841e21f8465fd787"
+    },
+    {
+      "ruta": "docs/db/mvp/RESULTADOS_PRUEBAS.md",
+      "sha256": "d7d9c7c0e6ababaf869f64ffcabec2895953d8d2b08da8b1b880a763f795a2a4"
+    },
+    {
+      "ruta": "docs/db/mvp/diccionario_columnas.csv",
+      "sha256": "d61ae295a16ebb67cf4945474473de6f3cf62b9063429a79522d1a26004376bb"
+    },
+    {
+      "ruta": "docs/db/mvp/evidencia_pruebas.txt",
+      "sha256": "a255db93e8f9c40a1e7205e92d79774dacc605c65df2328556b8585e6da68cba"
+    },
+    {
+      "ruta": "docs/db/mvp/fuentes_sha256.json",
+      "sha256": "40208c065fef4c2deec443fd9c2667eebe01d43daa5d8e4b45696685ed45680f"
+    },
+    {
+      "ruta": "docs/db/mvp/modelo_logico.mmd",
+      "sha256": "88ded8417a7063ad744e3802ab42c6db00aee0eabb58cceb8a3db413bd400d54"
+    },
+    {
+      "ruta": "docs/inicio/INTEGRACION_ELSA_RF50.md",
+      "sha256": "b1139d1ddb8e8cd346a458f237646d7985c2d2a5f031a823bf1285d912ffe6bc"
+    },
+    {
+      "ruta": "docs/inicio/PERMISO_RED_LOCAL_DEBUG.md",
+      "sha256": "ab076c667176d1ecaf03280fcdb0b6451571889842019b568b8211f603e54edc"
+    },
+    {
+      "ruta": "docs/inicio/RF50_INICIO_Y_NAVEGACION.md",
+      "sha256": "7f283f542fb3c69f98e7f74f6e381affa91c4f0d2df5597b82e67ec079817a50"
+    },
+    {
+      "ruta": "docs/requisitos/00_CREAR_BASE_OPCIONAL.sql",
+      "sha256": "f3321ee159e7730912c97d913bf77b90ed4d679ff91294e837a6321eac183837"
+    },
+    {
+      "ruta": "docs/requisitos/00_DICCIONARIO_DE_ORIGEN.xlsx",
+      "sha256": "f78bd9d6b3f7424fd5cf45b82782daf4061bb4f0f893660a6806fea21a1cc9a4"
+    },
+    {
+      "ruta": "docs/requisitos/01_Diagramas_Exitosos_Francesca_4RF_CORREGIDOS.xlsx",
+      "sha256": "e5ec2c0212f30c78040547df815037243859cbcca15f3169c3ca3d457e013f06"
+    },
+    {
+      "ruta": "docs/requisitos/01_ESQUEMA_MYCAR.sql",
+      "sha256": "21eddae4ea026281d00f007c91b68a6b90da6110d9481be8bc17b9d75c326973"
+    },
+    {
+      "ruta": "docs/requisitos/02_24_Alternativos_Francesca_MVP_CORREGIDOS.xlsx",
+      "sha256": "6441960ef006935c6547e44cc0dd11441ae2066354dba36a4b7e1098f2ea3988"
+    },
+    {
+      "ruta": "docs/requisitos/02_29_Alternativos_Nayu_MVP_Conciliados.xlsx",
+      "sha256": "544b50abf84c8edd2f8689c08a78f4e90fc3a7313a6a2d63bb7f3f01fe72d581"
+    },
+    {
+      "ruta": "docs/requisitos/02_CATALOGOS_INICIALES.sql",
+      "sha256": "02c6c1118e8a7b8efa2fb1060cb1214b47be1b17b87322b2c217514517619065"
+    },
+    {
+      "ruta": "docs/requisitos/02_Elsa_12_EA_FINAL.xlsx",
+      "sha256": "be05b6b20c559ae2a4cebe8d33d8c0a8f0939696b3534eb67c6da354196d895b"
+    },
+    {
+      "ruta": "docs/requisitos/03_Ficha_MVP_Elsa_RF01_RF02_RF06_FINAL.docx",
+      "sha256": "8f1ecfadb04270b8f1c978eb982db1655a8476db2724cd8fe5b3d1b14da87c3d"
+    },
+    {
+      "ruta": "docs/requisitos/03_Ficha_MVP_Francesca_CORREGIDA.docx",
+      "sha256": "df716143653259b6482e4d8e8da2d2a2a9224925b3f8036bd5d245680a2e4313"
+    },
+    {
+      "ruta": "docs/requisitos/03_Ficha_MVP_Nayu_Actualizada_Acuerdos_Finales.docx",
+      "sha256": "449ea64b41fc26b564e3f30e077e722e35238505c17734ab6f765e71cab2999d"
+    },
+    {
+      "ruta": "docs/requisitos/03_LOGICA_BD.sql",
+      "sha256": "808c373b589d78bc860558abd122f43237d02691ee88709e1adfbd7ebd5d0889"
+    },
+    {
+      "ruta": "docs/requisitos/04_PRUEBAS_SMOKE_ROLLBACK.sql",
+      "sha256": "3ebfb89808cf52625b6d2e4e503ad594790b77679a64b973e9fee77b4fa41af3"
+    },
+    {
+      "ruta": "docs/requisitos/04_Reglas_Negocio_Elsa_RF01_RF02_RF06_FINAL.docx",
+      "sha256": "3909abe113f500322e74a8eaede96aa484233c00b0fb49d54e1f65f541bda24b"
+    },
+    {
+      "ruta": "docs/requisitos/04_Reglas_Negocio_Francesca_CORREGIDAS.docx",
+      "sha256": "ae72ebce2fb6aacfe65208d3671ef16a88dcedf37f44b7ff1b96745b00b7d793"
+    },
+    {
+      "ruta": "docs/requisitos/04_Reglas_Negocio_Nayu_Conciliadas.docx",
+      "sha256": "87c7964a7ef25183cb2b2ab8d6d37fe4f1375aee36e2f7466448a079632645d6"
+    },
+    {
+      "ruta": "docs/requisitos/05_Diccionario_Logico_MyCar_Compartido_Conciliado_Elsa.xlsx",
+      "sha256": "9fe5d321498f8ed5edd637bdf1b25107872f897c817189e54cf62c177755b5ca"
+    },
+    {
+      "ruta": "docs/requisitos/05_Diccionario_Logico_Referencia_ACTUALIZADO.xlsx",
+      "sha256": "55fb9f4e116f6646fc790c4ed8c60200b0b222d8cc1529e151ca28b1b5a1cbac"
+    },
+    {
+      "ruta": "docs/requisitos/05_MODELO_LOGICO.md",
+      "sha256": "330e66cf01c0aecb5fba68858a555ce8fb210b81b37ca881f1616e6f50eb397b"
+    },
+    {
+      "ruta": "docs/requisitos/06_Contratos_REST_Elsa_RF01_RF02_RF06_PROPUESTOS.docx",
+      "sha256": "a09f7751dfb4737ae8f4272b88d93c2f020e053326b638e7e20b54a7a3314623"
+    },
+    {
+      "ruta": "docs/requisitos/06_Contratos_REST_Francesca_PROPUESTOS_CORREGIDOS.docx",
+      "sha256": "25b7c762a40f2e36f2cdf4f9d139006877d4670a13f4d1d8c350f738131ffa49"
+    },
+    {
+      "ruta": "docs/requisitos/06_Contratos_REST_Nayu_Actualizados_Propuestos.docx",
+      "sha256": "b29924637e8143256d47f19f74eff4d911c28c2fd5d1799160dffbf7ceff3141"
+    },
+    {
+      "ruta": "docs/requisitos/06_TRANSACCIONES_SPRING_BOOT.md",
+      "sha256": "4e1ca8d810af6b3e34913922019ff4bf433f27a46c092a1e3028e01ecfb5ef5e"
+    },
+    {
+      "ruta": "docs/requisitos/07_DIAGRAMA_LOGICO.mmd",
+      "sha256": "88ded8417a7063ad744e3802ab42c6db00aee0eabb58cceb8a3db413bd400d54"
+    },
+    {
+      "ruta": "docs/requisitos/08_DIAGRAMA_COMPLETO.dot",
+      "sha256": "ac7a6c22f322e16e625dcc7c0b1d37ec0ef9872b85e0a9889fb090ee1eb79a3e"
+    },
+    {
+      "ruta": "docs/requisitos/08_DIAGRAMA_COMPLETO.svg",
+      "sha256": "cd52a902a47fae0299deaad17c3519e37baa49345c096eac8d606f3577f80012"
+    },
+    {
+      "ruta": "docs/requisitos/09_INSTALACION_TODO_EN_UNO.sql",
+      "sha256": "4cb165c39bcb732e69fcf067830f011ed90da36f750586d9833d65c46598ecf9"
+    },
+    {
+      "ruta": "docs/requisitos/10_COMPROBACION_ESTATICA.json",
+      "sha256": "4cb37e164a93316b02eea4dafc5b64f92612afb7f0107567f6f3f4992c48fc9a"
+    },
+    {
+      "ruta": "docs/requisitos/CC-RF01-01_REGISTRO_CAMBIO.txt",
+      "sha256": "03bb87eab1cc9af4a94cd7e7072c7edc7cb970ec86d8c70c41857c65738d943e"
+    },
+    {
+      "ruta": "docs/requisitos/LEER_PRIMERO.md",
+      "sha256": "c8ac3e1884908a5fcec35d5bc7912bb3b5026d8a1cbccdf7fefaa7e314d2594b"
+    },
+    {
+      "ruta": "docs/requisitos/MyCar_RF01_RF65_CONSOLIDADO_AUDITADO_20261028_PLMERU.xlsx",
+      "sha256": "4c786e5ce9e5548421feb981284a3d081df0f8db2505393445f0ff4af21f7fdd"
+    },
+    {
+      "ruta": "docs/vehiculos/ACTUALIZACION_MAIN_RF18.md",
+      "sha256": "5e381e8e1ee04b7fe187c9ad665bb0074b16186f98e6aff7cdd497e59cf82810"
+    },
+    {
+      "ruta": "docs/vehiculos/ANDROID_RF08_20261027.md",
+      "sha256": "0937f19045103db2ef71f08bee6d7002a23d952af8a0bedb1c8a8a57c8ee660e"
+    },
+    {
+      "ruta": "docs/vehiculos/API_RF08_PROPUESTA_20261027.md",
+      "sha256": "149c97b4f8ceb44786a75a355ae3d553457072351e60aca8116cdfad1c40ffd1"
+    },
+    {
+      "ruta": "docs/vehiculos/API_RF09_PROPUESTA.md",
+      "sha256": "2f9b76333a5043bcafc7d595471167bb117cda07c93718c275669d1c9b886c0e"
+    },
+    {
+      "ruta": "docs/vehiculos/API_RF10.md",
+      "sha256": "0048873f2bd4b852f27399f8fd445f7584a9f02ce35e97344d7e0a01728ec82d"
+    },
+    {
+      "ruta": "docs/vehiculos/BLOQUE_RF08_RF09.md",
+      "sha256": "3cc53515922ab00e0d65f99baa2dcbc2c9b5c05e519199d35b648a823d0ea31a"
+    },
+    {
+      "ruta": "docs/vehiculos/BLOQUE_RF10.md",
+      "sha256": "aeed917b6e13f118026e65234691e1a56665fab6f10e8595eab3bd9ebf58e800"
+    },
+    {
+      "ruta": "docs/vehiculos/BLOQUE_RF14.md",
+      "sha256": "cf6a3f891b83aa4381456a6924226bb7054239b3bb8dc23c6cf6568d8d3430ee"
+    },
+    {
+      "ruta": "docs/vehiculos/BLOQUE_RF22_RF23.md",
+      "sha256": "fdac140c7add2b94aff4d8d200cc333cd60e199e59f60ab354be4aec444da92a"
+    },
+    {
+      "ruta": "docs/vehiculos/CORRECCION_RF22_RF14_REAPERTURA.md",
+      "sha256": "f6a3d5900c9b5ae11f284fa5dbf3f5e1d2b00c0fc6d89aa10760f20348806911"
+    },
+    {
+      "ruta": "docs/vehiculos/FRONTEND_RF08.md",
+      "sha256": "f99714f7cf1b847f14d2465f9b7396ab8ad73471ea086b6e567af58b2230af34"
+    },
+    {
+      "ruta": "docs/vehiculos/GUIA_RF14.md",
+      "sha256": "cd0046e249cedb68c5dbf31e5a1bc095e4695c9ce9b7a9ccc31259a6bd0973d1"
+    },
+    {
+      "ruta": "docs/vehiculos/GUIA_RF22_RF23.md",
+      "sha256": "94d5d0f291399615435fd6f6a89086b41c7c31d85f8d0b7dbd934312ec4cbbf2"
+    },
+    {
+      "ruta": "docs/vehiculos/INTEGRACION_RF08_PROPUESTA_20261027.md",
+      "sha256": "f1be683a9ec12fe7652cf9d5ffff38c15340b00c0e0c700bc86990dce9eddc62"
+    },
+    {
+      "ruta": "docs/vehiculos/INTEGRACION_SESION_VEHICULOS.md",
+      "sha256": "26fcdef7f0aa9fea4ce1e5ad9ddedb6c9a8c2c9eb2511a86e628c5e43f958f97"
+    },
+    {
+      "ruta": "docs/vehiculos/PROBAR_RF08_EN_APP.md",
+      "sha256": "1399bd0c21e814a02c90e5de74af92381755a68946b3686b2845dc82aee6ba80"
+    },
+    {
+      "ruta": "docs/vehiculos/VALIDACION_IDENTIFICADORES.md",
+      "sha256": "0724c7e4823241efc9e0ab87324f42574188166226b1c193637f0c261116d8e7"
+    },
+    {
+      "ruta": "scripts/crear_cuenta_integracion_local.ps1",
+      "sha256": "95548b604a7f244ae4b0808042f3cc48855867271c530afdc9fcf2c62f1a31fb"
+    },
+    {
+      "ruta": "scripts/iniciar_backend_integracion_local.ps1",
+      "sha256": "911a8d08e5f38a7288f894fb2fc05455be837f15a8f0989f2e0de810d7015aec"
+    },
+    {
+      "ruta": "scripts/test_mvp_db.py",
+      "sha256": "31ade8ea22a8f738da7ad0f22a15a091d6008f061c19c58ed30c3001caafe96d"
+    },
+    {
+      "ruta": "scripts/test_rf01.py",
+      "sha256": "22e4c082138e1fea6f2fe08a2cd150b13c7694126aaee8be47870146387a0a35"
+    },
+    {
+      "ruta": "scripts/test_rf02.py",
+      "sha256": "414ed296443108a9126f6b12c606b7d30f584f97c25cc694eedf6f232920545f"
+    },
+    {
+      "ruta": "scripts/test_rf06.py",
+      "sha256": "b9fd7be392f46c8f34fb8d365d41f26143b0f72f65cf7ccd27ac4dee3f26fbcd"
+    },
+    {
+      "ruta": "scripts/test_rf08_api.py",
+      "sha256": "0e8b85d3f6d392b831710a29528cf9592077d4b3d9b189824e2ba232681627ee"
+    },
+    {
+      "ruta": "scripts/test_rf08_backend.py",
+      "sha256": "ab18f99c5ba534b7e069cd79d1a9d25677c1a3d0b3bae87f747012fcfb04b328"
+    }
+  ],
+  "shaAuxiliar": "6b5d72ccf3c74404930171be46b8a80361f3942da4b093fd900cfb1ba35c02a9",
+  "arbolesAnteriores": [
+    "7e82cc36fd4dcb3a8b60090c51472f76a85fdb18",
+    "8895edfdd9dee3be2d21e090696f52309f19ac91"
+  ]
+}

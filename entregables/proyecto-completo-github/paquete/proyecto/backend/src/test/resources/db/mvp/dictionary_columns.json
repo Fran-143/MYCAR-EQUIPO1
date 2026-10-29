@@ -1,0 +1,193 @@
+{
+  "alerta": [
+    "cantidad_tiempo",
+    "categoria",
+    "creada_utc",
+    "criterio",
+    "estado",
+    "fecha_base",
+    "fecha_estado_utc",
+    "fecha_objetivo",
+    "fecha_vencida_verificable",
+    "firma_equivalencia",
+    "id_alerta",
+    "id_lectura_vencida_evidencia",
+    "id_mantenimiento_referencia",
+    "id_tipo_mantenimiento",
+    "id_vehiculo",
+    "intervalo_km",
+    "km_base",
+    "km_objetivo",
+    "origen",
+    "servicio_otro",
+    "unidad_tiempo",
+    "version_fila"
+  ],
+  "combustible": [
+    "codigo",
+    "id_combustible",
+    "nombre"
+  ],
+  "config_recordatorio_km": [
+    "estado",
+    "fecha_base_utc",
+    "frecuencia",
+    "id_vehiculo",
+    "proximo_envio_utc",
+    "ultimo_envio_utc"
+  ],
+  "config_recordatorio_km_usuario": [
+    "estado_recordatorios",
+    "id_usuario"
+  ],
+  "historial_alerta": [
+    "estado_anterior",
+    "estado_nuevo",
+    "fecha_cambio_utc",
+    "id_alerta",
+    "id_historial_alerta",
+    "id_lectura_evidencia",
+    "motivo",
+    "version_destino"
+  ],
+  "intento_login_fallido": [
+    "id_intento",
+    "id_usuario",
+    "ocurrido_utc"
+  ],
+  "lectura_kilometraje": [
+    "fecha_lectura_utc",
+    "id_lectura_km",
+    "id_operacion",
+    "id_vehiculo",
+    "origen",
+    "valor_km"
+  ],
+  "mantenimiento": [
+    "costo_total",
+    "descripcion",
+    "estado",
+    "fecha_servicio",
+    "id_lectura_km_referencia",
+    "id_mantenimiento",
+    "id_tipo_mantenimiento",
+    "id_vehiculo",
+    "km_servicio",
+    "origen_km_servicio",
+    "proxima_fecha_sugerida",
+    "proximo_km_sugerido",
+    "servicio_otro"
+  ],
+  "mantenimiento_repuesto": [
+    "cantidad",
+    "id_mantenimiento",
+    "id_repuesto",
+    "nombre_snapshot",
+    "precio_unitario"
+  ],
+  "operacion_idempotente": [
+    "creado_utc",
+    "estado",
+    "hash_solicitud",
+    "id_operacion",
+    "id_usuario",
+    "respuesta_json",
+    "tipo_operacion"
+  ],
+  "plan": [
+    "activo",
+    "codigo",
+    "id_plan",
+    "max_vehiculos_registrados",
+    "nombre"
+  ],
+  "preferencia_notificacion": [
+    "id_usuario",
+    "kilometraje_on",
+    "mantenimiento_on",
+    "permiso_dispositivo",
+    "soat_on"
+  ],
+  "repuesto": [
+    "id_repuesto",
+    "id_usuario",
+    "marca",
+    "nombre"
+  ],
+  "sesion": [
+    "estado_sesion",
+    "expira_utc",
+    "id_instalacion",
+    "id_sesion",
+    "id_usuario",
+    "refresh_token_hash",
+    "revocada_utc",
+    "ultimo_acceso_utc"
+  ],
+  "suscripcion": [
+    "estado",
+    "fin_utc",
+    "id_plan",
+    "id_suscripcion",
+    "id_usuario",
+    "inicio_utc"
+  ],
+  "tipo_aceite": [
+    "codigo",
+    "id_tipo_aceite",
+    "nombre"
+  ],
+  "tipo_mantenimiento": [
+    "activo",
+    "codigo",
+    "id_tipo_mantenimiento",
+    "nombre"
+  ],
+  "tipo_motor": [
+    "codigo",
+    "es_electrico",
+    "id_tipo_motor",
+    "nombre"
+  ],
+  "uso_vehiculo": [
+    "codigo",
+    "nombre"
+  ],
+  "usuario": [
+    "apellido",
+    "codigo_rol",
+    "consentimiento_privacidad_fecha_utc",
+    "consentimiento_privacidad_version",
+    "correo",
+    "estado_cuenta",
+    "fecha_nacimiento",
+    "fecha_registro_utc",
+    "id_usuario",
+    "login_bloqueo_hasta_utc",
+    "nombre",
+    "password_hash"
+  ],
+  "vehiculo": [
+    "anio_fabricacion",
+    "color",
+    "combustible_otro",
+    "creado_utc",
+    "es_principal",
+    "estado_vehiculo",
+    "id_combustible",
+    "id_tipo_aceite",
+    "id_tipo_motor",
+    "id_usuario",
+    "id_vehiculo",
+    "marca",
+    "modelo",
+    "numero_motor",
+    "numero_serie",
+    "numero_vin",
+    "placa",
+    "tipo_aceite_otro",
+    "tipo_motor_otro",
+    "uso_vehiculo_codigo",
+    "version_km"
+  ]
+}

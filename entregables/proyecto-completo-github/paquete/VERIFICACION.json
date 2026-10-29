@@ -1,0 +1,47 @@
+{
+  "mainGitHub": "91eb169b7ed36bf57a77d72995f9446016f4725e",
+  "ramaEquipoGitHub": "b7116ad7284e2a1e34922c71475797c90694fe12",
+  "arbolProyecto": "7c629205db8cc1e0c8a1575b814417ec594af54a",
+  "archivosVerificados": 464,
+  "sinCambiosEnCodigoPublicado": true,
+  "normalizacion": "Finales CRLF/LF de .cmd según atributos de Git",
+  "migraciones": [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+  ],
+  "v7Incluida": false,
+  "android": {
+    "tests": 237,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "backend": {
+    "tests": 525,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 184
+  },
+  "httpReal": {
+    "proyectoSinCambios": "b7116ad + README de main91eb169",
+    "v6Anterior": 790664128,
+    "v6GitHub": -665165790,
+    "v7Creada": false,
+    "cuentaYVehiculoConservados": true,
+    "rf14ActualizaYRepiteSinDuplicado": true,
+    "rf22ProgramaYRepiteSinDuplicado": true,
+    "rf23ListaAlertasReales": true,
+    "rf17Rf18Disponibles": true,
+    "soloBaseTemporal": true
+  },
+  "lintErrores": 0,
+  "launchers": [
+    "com.mycar.app.MainActivity"
+  ],
+  "powershell": "7.4.6 Linux: actualizador ejercitado con Git/PostgreSQL/backup reales; preparacion Maven simulada; Windows pendiente",
+  "instrumentacion": "No ejecutada; APK de pruebas tiene el fallo de la rama publicada descrito en LEEME"
+}
