@@ -1,29 +1,63 @@
-# RF22 / RF23 — Guía local (Windows)
+# RF22 / RF23 — Guía para el equipo (ejecutar en local)
 
-Rama de trabajo: **`feat/mantenimientos-rf22-rf23`** (solo local hasta revisión).
+Rama: **`feat/mantenimientos-rf22-rf23`**
 
-## Dependencias de ramas
+Esta guía sirve para que cualquiera del equipo pueda clonar/actualizar la rama, levantar backend + Postgres y probar **programar alertas (RF22)** y **Mis alertas (RF23)** en el emulador.
 
-| Rama | Contenido necesario |
-|------|---------------------|
-| `feat/integracion-sesion-vehiculos` | Sesión compartida Elsa + RF06 |
-| `feat/detalle-vehiculo-rf10` | Detalle vehículo |
-| `feat/actualizar-kilometraje-rf14` | RF14 real |
-| **Esta rama** | RF22 programar alerta, RF23 Mis alertas, RF14 desde mantenimiento/detalle |
+## Qué incluye esta rama
 
-## 1. Entorno
+| Pieza | Qué hace |
+|-------|----------|
+| **RF22** | Programar alerta por tiempo, kilometraje o **ambos** (una sola alerta) |
+| **RF23** | Listar Mis alertas con 6 filtros (sin chip Anuladas) y sincronizar estados |
+| **RF14** | Actualizar km desde detalle o mantenimiento (sin botón de km dentro de RF22) |
+| **V6 Flyway** | POR_TIEMPO puede guardarse sin lectura de km; sync RF23 solo exige km si hay alertas KM/AMBOS |
+| **G89** | Si cambian fecha o km entre revisión y guardar → reconfirmación (no guardado silencioso) |
+| **Idempotencia** | Mismo `idOperacion` en reintento; cliente recupera operación si la respuesta se pierde |
 
-- Docker + PostgreSQL (`docker compose up -d --wait postgres`)
-- Backend puerto **8081** con RF17, RF18 y **RF22** habilitados:
+Regla de negocio clave (Excel consolidado RF22!G61):  
+`fecha_objetivo = fecha_actual + intervalo` · `km_objetivo = último_km_RF08/RF14 + intervalo_km` · el último mantenimiento **no** es base de cálculo · Ambos = **una** alerta y manda lo que ocurra primero.
+
+## 1. Traer la rama
 
 ```powershell
 cd C:\Proyectos\MyCarEquipo1
+git fetch origin
+git checkout feat/mantenimientos-rf22-rf23
+git pull origin feat/mantenimientos-rf22-rf23
+```
+
+Si aún no existe localmente:
+
+```powershell
+git fetch origin
+git checkout -b feat/mantenimientos-rf22-rf23 origin/feat/mantenimientos-rf22-rf23
+```
+
+## 2. Requisitos
+
+- Docker Desktop encendido  
+- JDK / Android Studio (JBR)  
+- Emulador Android (recomendado API 37, p. ej. PHONEBETA)  
+- Archivo `.env` en la raíz del repo (no se sube a Git; pedirlo al equipo si no lo tienes)
+
+## 3. Base de datos + backend
+
+```powershell
+cd C:\Proyectos\MyCarEquipo1
+docker compose up -d --wait postgres
 .\scripts\iniciar_backend_integracion_local.ps1
 ```
 
-Reinicia el backend (Ctrl+C y volver a ejecutar el script) tras cambios Java.
+- El script arranca el backend en el puerto **8081** con JWT local y RF17/RF18/**RF22** activos.  
+- Flyway aplicará migraciones hasta **V6** (`V6__rf22_tiempo_sin_lectura.sql`).  
+- Health: `http://localhost:8081/actuator/health` → `{"status":"UP"}`.
 
-## 2. Android
+Tras cambios Java: Ctrl+C y vuelve a ejecutar el script.
+
+> La app Android en **debug** usa por defecto `http://10.0.2.2:8081/` (emulador → PC). No confundir con Postgres (5432) ni con un backend arrancado a mano en 8080 sin el script.
+
+## 4. Android
 
 ```powershell
 $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
@@ -31,58 +65,80 @@ cd C:\Proyectos\MyCarEquipo1\android
 .\gradlew.bat :app:installDebug
 ```
 
-Emulador API 37:
+O abre el módulo `android` en Android Studio, elige el emulador y pulsa **Run**.
+
+Permiso de red local (API 37):
 
 ```powershell
 & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell pm grant com.mycar.app android.permission.ACCESS_LOCAL_NETWORK
 ```
 
-## 3. Dónde probar
+## 5. Dónde probar en la app
 
-| RF | Pantalla |
-|----|----------|
-| **RF23** | Barra inferior → **Alertas** (sincroniza y lista) |
+| Qué | Dónde |
+|-----|--------|
+| **RF23** | Barra inferior → **Alertas** |
 | **RF22** | Alertas → **Programar alerta** |
-| **RF14 desde RF10** | Detalle vehículo → **Actualizar kilometraje** (formulario real) |
-| **RF14 desde RF17** | Mantenimientos → registrar → **Actualizar kilometraje vigente** (conserva borrador) |
+| **RF14 (detalle)** | Vehículo → detalle → **Actualizar kilometraje** |
+| **RF14 (mantenimiento)** | Mantenimientos → al registrar → actualizar km (conserva borrador) |
 
-## 4. Comprobaciones manuales
+### Checklist manual corto
 
-1. **Detalle → RF14**: abrir no envía nada; cancelar vuelve al detalle; guardar actualiza km en detalle.
-2. **Mantenimiento → RF14**: borrador intacto al cancelar; lecturas/km vigente se refrescan al confirmar.
-3. **Cambio de aceite**: con aceite en vehículo, botón **Usar aceite registrado** propone repuesto (editable).
-4. **RF22**: programar alerta por km; segunda equivalente → conflicto.
-5. **RF23**: entrar a Alertas ejecuta sincronización (contador `alertasSincronizadas`).
+1. **Por tiempo:** 6 meses → fecha objetivo = hoy (Lima) + 6 meses; **no** exige km.  
+2. **Por km:** intervalo 5000 desde el **último km registrado** (no desde el km del último mantenimiento).  
+3. **Ambos:** aparecen tiempo + km; se crea **una** alerta; atención con el primer criterio.  
+4. Pantalla de **revisión/resumen** antes de confirmar (exigida por RF22 G68–G71).  
+5. Si cambias km (RF14) entre revisar y confirmar → debe pedir **reconfirmación** (G89).  
+6. Segunda alerta equivalente activa → conflicto; tras REALIZADA/ANULADA se puede programar otro ciclo.  
+7. Abrir RF14 no guarda solo; cancelar no escribe lectura.
 
-## 5. SQL solo lectura
+## 6. Pruebas automáticas
+
+```powershell
+cd C:\Proyectos\MyCarEquipo1\backend
+.\mvnw.cmd test "-Dtest=ProgramarAlertaServiceReglasTest,HuellaProgramarAlertaTest,AlertasControllerTest"
+
+cd C:\Proyectos\MyCarEquipo1\android
+.\gradlew.bat :app:testDebugUnitTest --tests "com.mycar.app.features.alertas.*" --tests "com.mycar.app.features.vehiculos.ActualizarKilometrajeReaperturaTest"
+```
+
+Pruebas de BD desechables (opcional, no usar la BD personal compartida):
+
+```powershell
+# Solo si el equipo tiene configurado mycar.db.tests + JDBC mycar_mvp_test_*
+.\mvnw.cmd test "-Dtest=MvpDatabaseTest" "-Dmycar.db.tests=true"
+```
+
+## 7. SQL de solo lectura (comprobar alertas)
 
 ```sql
-SELECT a.id_alerta, tm.codigo, a.estado, a.km_objetivo, a.fecha_objetivo, a.firma_equivalencia
+SELECT a.id_alerta, tm.codigo, a.criterio, a.estado,
+       a.fecha_base, a.fecha_objetivo, a.km_base, a.intervalo_km, a.km_objetivo
 FROM mycar.alerta a
 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
 WHERE a.id_vehiculo = :idVehiculo
 ORDER BY a.creada_utc DESC;
 ```
 
-## 6. Pruebas automáticas
+## 8. Documentación de requisitos
 
-```powershell
-cd C:\Proyectos\MyCarEquipo1\backend
-.\mvnw.cmd test "-Dtest=AlertasControllerTest"
+| Recurso | Uso |
+|---------|-----|
+| `docs/requisitos/MyCar_RF01_RF65_CONSOLIDADO_AUDITADO_20261028_PLMERU.xlsx` | Hojas **RF22**, **RF23**, **RF24** (reglas G…) |
+| `docs/requisitos/02_29_Alternativos_Nayu_MVP_Conciliados.xlsx` | Escenarios alternativos |
+| `docs/db/mvp/diccionario_columnas.csv` | Meses calendario, umbrales de estado |
+| `docs/vehiculos/CORRECCION_RF22_RF14_REAPERTURA.md` | Notas de reapertura formulario / RF14 |
 
-cd C:\Proyectos\MyCarEquipo1\android
-.\gradlew.bat :app:testDebugUnitTest :app:lintDebug
-```
+## Problemas frecuentes
 
-## Fuentes de reglas (Excel / docs)
+| Síntoma | Qué revisar |
+|---------|-------------|
+| «Autenticación no disponible» / login 503 | Backend sin script de integración (falta JWT). Usa `iniciar_backend_integracion_local.ps1`. |
+| App no conecta | Puerto **8081** + `10.0.2.2` + permiso `ACCESS_LOCAL_NETWORK`. |
+| «No se pudo validar la sesión» | Docker/Postgres y Spring Boot UP. |
+| Alertas vacías / sin vehículos | Entrar antes a Inicio o Mantenimientos para cargar contexto; vehículo **ACTIVO**. |
+| Flyway / V6 | Reiniciar backend tras pull para aplicar la migración. |
 
-| RF | Nombre (docs Nayu) | Fuentes leídas |
-|----|-------------------|----------------|
-| **RF22** | Programar alerta manual (11 EA) | `docs/requisitos/06_TRANSACCIONES_SPRING_BOOT.md`, `05_MODELO_LOGICO.md`, `docs/db/mvp/diccionario_columnas.csv`, `04_Reglas_Negocio_Nayu_Conciliadas.docx` (síntesis), triggers V4 |
-| **RF23** | Sincronizar Mis Alertas (6 EA) | Misma carpeta + función `mycar.sincronizar_alertas_vehiculo` |
+## Autoría
 
-Hojas Excel `.xlsx`: no se pudo ejecutar Python en este equipo; los escenarios EA se tomaron de la síntesis Nayu y SQL de referencia en `docs/requisitos/`.
-
-## IA y autoría
-
-Implementación asistida por IA en Cursor; reutiliza backend Nayu/Fran (RF17, BD RF22/RF23 en Flyway) y RF14/RF10 del equipo. Revisión humana pendiente antes de publicar.
+Implementación asistida en Cursor sobre el trabajo del equipo (sesión, RF10, RF14, BD MVP). Revisión humana del PR recomendada antes de merge a `main`.

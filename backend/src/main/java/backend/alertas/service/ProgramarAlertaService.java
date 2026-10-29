@@ -34,12 +34,12 @@ public class ProgramarAlertaService {
             throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible.");
         }
         var lectura = alertas.ultimaLectura(vehiculo);
-        if (lectura == null) {
-            throw new ErrorAlertas("KILOMETRAJE_NO_DISPONIBLE", "No hay lectura base del vehículo.");
-        }
+        // POR_TIEMPO puede abrirse sin km; KM/AMBOS se validan al configurar/guardar (G59).
+        boolean hayKm = lectura != null;
         return new ContratoRf22.ContextoResponse(
                 alertas.hoyLima(), "America/Lima",
-                lectura.valorKm(), lectura.idLecturaKm(),
+                hayKm ? lectura.valorKm() : null,
+                hayKm ? lectura.idLecturaKm() : null,
                 alertas.tiposActivos(), alertas.referenciasRealizadas(vehiculo), true);
     }
 
@@ -61,11 +61,17 @@ public class ProgramarAlertaService {
         }
 
         alertas.exigirVehiculoPropioActivo(usuario, vehiculo);
+        LocalDate hoy = alertas.hoyLima();
         var lectura = alertas.ultimaLectura(vehiculo);
-        if (lectura == null) throw new ErrorAlertas("KILOMETRAJE_NO_DISPONIBLE", "No hay lectura base del vehículo.");
+        revalidarBasesConfirmadas(req, hoy, lectura);
+
+        if (CriterioAlerta.usaKm(req.criterio()) && lectura == null) {
+            throw new ErrorAlertas("KILOMETRAJE_NO_DISPONIBLE",
+                    "Se necesita kilometraje vigente para programar por kilometraje o ambos.");
+        }
 
         long idTipo = alertas.idTipoPorCodigo(req.codigoTipoMantenimiento());
-        LocalDate fechaBase = alertas.hoyLima();
+        LocalDate fechaBase = null;
         LocalDate fechaObjetivo = null;
         Integer intervaloKm = null;
         Integer kmObjetivo = null;
@@ -76,41 +82,79 @@ public class ProgramarAlertaService {
             throw new ErrorAlertas("DATOS_INVALIDOS", "Describe el servicio OTRO.", Set.of("servicioOtro"));
         }
 
-        if (req.criterio().contains("TIEMPO")) {
+        if (CriterioAlerta.usaTiempo(req.criterio())) {
             unidad = req.unidadTiempo();
             cantidad = req.cantidadTiempo();
             if (unidad == null || cantidad == null) {
                 throw new ErrorAlertas("DATOS_INVALIDOS", "Completa tiempo.", Set.of("unidadTiempo", "cantidadTiempo"));
             }
+            fechaBase = hoy;
             fechaObjetivo = alertas.calcularFechaObjetivo(fechaBase, unidad, cantidad);
             if (!fechaObjetivo.isAfter(fechaBase)) {
                 throw new ErrorAlertas("OBJETIVO_NO_FUTURO", "La fecha objetivo debe ser futura.", Set.of("cantidadTiempo"));
             }
         }
-        if (req.criterio().contains("KILOMETRAJE")) {
+        if (CriterioAlerta.usaKm(req.criterio())) {
             intervaloKm = req.intervaloKm();
             if (intervaloKm == null || intervaloKm <= 0) {
                 throw new ErrorAlertas("DATOS_INVALIDOS", "Intervalo inválido.", Set.of("intervaloKm"));
             }
-            kmObjetivo = lectura.valorKm() + intervaloKm;
+            long suma = (long) lectura.valorKm() + (long) intervaloKm;
+            if (suma > Integer.MAX_VALUE) {
+                throw new ErrorAlertas("DATOS_INVALIDOS",
+                        "El kilometraje objetivo supera el máximo permitido.", Set.of("intervaloKm"));
+            }
+            kmObjetivo = (int) suma;
         }
 
         String servicioNorm = alertas.normalizarServicioOtro(servicio == null ? "" : servicio);
         String firma = FirmaEquivalenciaAlerta.calcular(idTipo, req.criterio(), fechaObjetivo, kmObjetivo, servicioNorm);
+        int kmParaEstado = lectura == null ? 0 : lectura.valorKm();
         String estado = alertas.calcularEstadoInicial(
-                req.criterio(), fechaObjetivo, fechaBase, kmObjetivo, intervaloKm, lectura.valorKm());
+                req.criterio(), fechaObjetivo, hoy, kmObjetivo, intervaloKm, kmParaEstado);
 
         try {
             long idAlerta = alertas.insertarAlerta(new AlertasJdbcDao.DatosInsercion(
                     vehiculo, idTipo, req.criterio(), servicio,
                     unidad, cantidad, fechaBase, fechaObjetivo,
-                    req.criterio().contains("KILOMETRAJE") ? lectura.valorKm() : null,
+                    CriterioAlerta.usaKm(req.criterio()) ? lectura.valorKm() : null,
                     intervaloKm, kmObjetivo, estado, firma, req.idMantenimientoReferencia()));
             alertas.historialInicial(idAlerta, estado);
             operaciones.confirmar(req.idOperacion(), usuario, idAlerta, estado);
             return new ContratoRf22.ProgramarResponse(req.idOperacion(), idAlerta, estado);
         } catch (DataIntegrityViolationException ex) {
-            throw new ErrorAlertas("ALERTA_EQUIVALENTE", "Ya existe una alerta equivalente activa.");
+            String detalle = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+            if (detalle != null && detalle.contains("uq_alerta_equivalente_activa")) {
+                throw new ErrorAlertas("ALERTA_EQUIVALENTE", "Ya existe una alerta equivalente activa.");
+            }
+            throw new ErrorAlertas("DATOS_INVALIDOS",
+                    "No se pudo guardar la alerta. Revisa el criterio y los intervalos.");
+        }
+    }
+
+    /**
+     * G89: si el resumen se basó en fecha/km distintos a los vigentes, no guardar;
+     * el cliente debe actualizar el resumen y pedir reconfirmación.
+     */
+    private void revalidarBasesConfirmadas(
+            ContratoRf22.ProgramarRequest req, LocalDate hoy, AlertasJdbcDao.LecturaActual lectura) {
+        if (CriterioAlerta.usaTiempo(req.criterio())) {
+            if (req.fechaBaseConfirmada() == null || !req.fechaBaseConfirmada().equals(hoy)) {
+                throw new ErrorAlertas("BASES_CAMBIARON",
+                        "La fecha actual cambió. Revisa el resumen y confirma de nuevo.");
+            }
+        }
+        if (CriterioAlerta.usaKm(req.criterio())) {
+            if (lectura == null) {
+                throw new ErrorAlertas("KILOMETRAJE_NO_DISPONIBLE",
+                        "Se necesita kilometraje vigente para programar por kilometraje o ambos.");
+            }
+            if (req.kmBaseConfirmado() == null || req.idLecturaConfirmada() == null
+                    || !Objects.equals(req.kmBaseConfirmado(), lectura.valorKm())
+                    || !Objects.equals(req.idLecturaConfirmada(), lectura.idLecturaKm())) {
+                throw new ErrorAlertas("BASES_CAMBIARON",
+                        "El kilometraje vigente cambió. Revisa el resumen y confirma de nuevo.");
+            }
         }
     }
 

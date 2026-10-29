@@ -62,6 +62,9 @@ class MantenimientoViewModel(
         val nuevo = cambio(actual.borrador).copy(idOperacion = UUID.randomUUID().toString(), envioPendiente = false)
         recordar(nuevo)
         mutable.value = actual.copy(borrador = nuevo, errores = emptyMap(), mensaje = null)
+        if (nuevo.codigoTipo == "CAMBIO_ACEITE" && actual.borrador.codigoTipo != "CAMBIO_ACEITE") {
+            proponerAceiteVehiculo()
+        }
     }
     fun recargar() { viewModelScope.launch { cargarContexto() } }
     private suspend fun cargarContexto() {

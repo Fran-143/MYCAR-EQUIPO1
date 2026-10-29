@@ -37,6 +37,7 @@ public class RegistrationSecurityConfiguration {
         // accidentally expose unmatched routes. Future RFs must provide their own policy.
         return http.authorizeHttpRequests(auth -> auth.requestMatchers(EndpointRequest.to(HealthEndpoint.class))
                         .permitAll().anyRequest().denyAll())
+                .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .httpBasic(AbstractHttpConfigurer::disable)

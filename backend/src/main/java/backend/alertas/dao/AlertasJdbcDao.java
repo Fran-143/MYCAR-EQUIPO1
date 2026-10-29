@@ -115,7 +115,7 @@ public class AlertasJdbcDao {
                        a.servicio_otro, a.version_fila
                 FROM mycar.alerta a
                 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
-                WHERE a.id_vehiculo = ?
+                WHERE a.id_vehiculo = ? AND a.estado <> 'ANULADA'
                 ORDER BY a.creada_utc DESC, a.id_alerta DESC
                 """, (rs, n) -> new ContratoRf22.AlertaDto(
                 rs.getLong("id_alerta"),

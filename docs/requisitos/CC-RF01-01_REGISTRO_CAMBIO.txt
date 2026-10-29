@@ -1,0 +1,128 @@
+﻿CC-RF01-01 — REGISTRO DE CAMBIO
+Fecha: 2026-10-27
+Estado: pendiente de revisión y ratificación del equipo.
+
+Motivo: eliminar exclusivamente la validación por catálogo de palabras restringidas, ofensivas o consideradas sin sentido en el nombre durante RF01.
+Decisión autorizada: retiro de RF001-E1/P17 y RF001-A04/P13, sin método sustituto; conservación de obligatoriedad, longitud, formato, caracteres, separadores, normalización y revalidación backend.
+Los contratos REST siguen siendo PROPUESTAS. Este paquete no aprueba rutas, DTO, códigos HTTP, mecanismos de seguridad ni otras decisiones técnicas pendientes.
+
+MENSAJES BCE RETIRADOS (REFERENCIA HISTÓRICA):
+RF001-E1/P17: validarPalabrasRestringidas(nombre). Antes 44 mensajes; ahora 43 vigentes. Ocho bloques conservados.
+RF001-A04/P13: validarPalabrasRestringidas(nombre). Antes 25 mensajes; ahora 24 vigentes. Cinco bloques conservados.
+Identificadores originales conservados, sin desplazar filas ni renumerar mensajes.
+D23/D19: se elimina la flecha de llamada. F23/F19: RETIRADO — CC-RF01-01. G23/G19: anotación histórica sin llamada ejecutable.
+Se conservan las celdas de participantes y sus fórmulas compartidas para no alterar las interacciones restantes. Esas filas no representan llamadas ejecutables.
+
+UBICACIONES Y FRAGMENTOS EXACTOS:
+
+01_Elsa_3_EF_FINAL.xlsx — RF001-E1!A2
+ANTES: Patrón: Actor → Interfaz → Control → Entidad → Control → Interfaz → Actor  |  44 pasos  |  8 bloques
+DESPUÉS: Patrón: Actor → Interfaz → Control → Entidad → Control → Interfaz → Actor | 43 mensajes vigentes | 8 bloques | P17 retirado (CC-RF01-01)
+
+01_Elsa_3_EF_FINAL.xlsx — RF001-E1!A18
+ANTES: BLOQUE 3 · Validación de información ingresada (Pasos 13–24)
+DESPUÉS: BLOQUE 3 · Validación de información ingresada (identificadores históricos 13–24; P17 retirado por CC-RF01-01)
+
+01_Elsa_3_EF_FINAL.xlsx — RF001-E1!D23
+ANTES: ↩  (auto-msg)
+DESPUÉS: [celda de flecha vacía]
+
+01_Elsa_3_EF_FINAL.xlsx — RF001-E1!F23
+ANTES: validarPalabrasRestringidas(nombre)
+DESPUÉS: RETIRADO — CC-RF01-01
+
+01_Elsa_3_EF_FINAL.xlsx — RF001-E1!G23
+ANTES: Conserva la validación heredada de palabras restringidas solo para nombre; el catálogo concreto queda pendiente de definición técnica, sin ampliar al apellido.
+DESPUÉS: Referencia histórica P17 retirada; sin llamada BCE ejecutable.
+
+02_Elsa_12_EA_FINAL.xlsx — RF001-A04!A2
+ANTES: Patrón: Actor → Interfaz → Control → Entidad | 25 mensajes | 5 bloques | Rechazo genérico
+DESPUÉS: Patrón: Actor → Interfaz → Control → Entidad | 24 mensajes vigentes | 5 bloques | Rechazo genérico | P13 retirado (CC-RF01-01)
+
+02_Elsa_12_EA_FINAL.xlsx — RF001-A04!A14
+ANTES: BLOQUE 3 · Validación de datos (Pasos 9–20)
+DESPUÉS: BLOQUE 3 · Validación de datos (identificadores históricos 9–20; P13 retirado por CC-RF01-01)
+
+02_Elsa_12_EA_FINAL.xlsx — RF001-A04!D19
+ANTES: ↩  (auto-msg)
+DESPUÉS: [celda de flecha vacía]
+
+02_Elsa_12_EA_FINAL.xlsx — RF001-A04!F19
+ANTES: validarPalabrasRestringidas(nombre)
+DESPUÉS: RETIRADO — CC-RF01-01
+
+02_Elsa_12_EA_FINAL.xlsx — RF001-A04!G19
+ANTES: Conserva la validación heredada de palabras restringidas solo para nombre; el catálogo concreto queda pendiente de definición técnica, sin ampliar al apellido.
+DESPUÉS: Referencia histórica P13 retirada; sin llamada BCE ejecutable.
+
+02_Elsa_12_EA_FINAL.xlsx — RF001-A01!G15
+ANTES: El usuario ve el estado elegido; si continúa con el registro se aplica íntegramente RF001-E1 (44 mensajes, reglas aprobadas).
+DESPUÉS: El usuario ve el estado elegido; si continúa con el registro se aplica RF001-E1 actualizado: 43 mensajes vigentes; P17 retirado por CC-RF01-01.
+
+04_Reglas_Negocio_Elsa_RF01_RF02_RF06_FINAL.docx — word/document.xml / párrafo 40 / RF01, RN01-02, tabla 2 fila 3, celda 2
+ANTES: Nombre y apellido en campos separados, cada uno 2–100 caracteres tras normalizar espacios; letras y tildes/ñ; guion y apóstrofo solo entre letras. Se conserva la validación heredada de palabras restringidas para el nombre (EF P17); el catálogo aplicable permanece pendiente de definición técnica.
+DESPUÉS: Nombre y apellido en campos separados, cada uno 2–100 caracteres tras normalizar espacios; letras y tildes/ñ; guion y apóstrofo solo entre letras.
+
+04_Reglas_Negocio_Elsa_RF01_RF02_RF06_FINAL.docx — word/document.xml / párrafo 41 / RF01, RN01-02, tabla 2 fila 3, celda 3
+ANTES: EF P14–P17
+DESPUÉS: EF P14–P16
+
+04_Reglas_Negocio_Elsa_RF01_RF02_RF06_FINAL.docx — word/document.xml / párrafo 17 / Resumen de cobertura, tabla 1 fila 2 celda 3
+ANTES: 44 mensajes EF + 4 alternativos
+DESPUÉS: 43 mensajes EF vigentes + 4 alternativos; identificadores históricos conservados y P17 retirado por CC-RF01-01
+
+06_Contratos_REST_Elsa_RF01_RF02_RF06_PROPUESTOS.docx — word/document.xml / párrafo 69 / Contrato de registro, 4. REGLAS
+ANTES: Validar campos, nombre y apellido 2–100, edad 18–85 calculada en servidor, contraseña 8–64 con cuatro clases sin espacios y coincidencia exacta; normalizar correo trim/lowercase sin alias Gmail; consentimiento expreso inicialmente desmarcado con versión/fecha. Mantener validación heredada de palabras restringidas SOLO nombre (catálogo pendiente). Único por correo para cuentas ACTIVA/SUSPENDIDA/PENDIENTE_ELIMINACION. Backend asigna plan FREE una sola vez (sin trigger adicional). Todo se confirma o se revierte: no éxito parcial.
+DESPUÉS: Validar campos, nombre y apellido 2–100, edad 18–85 calculada en servidor, contraseña 8–64 con cuatro clases sin espacios y coincidencia exacta; normalizar correo trim/lowercase sin alias Gmail; consentimiento expreso inicialmente desmarcado con versión/fecha. Único por correo para cuentas ACTIVA/SUSPENDIDA/PENDIENTE_ELIMINACION. Backend asigna plan FREE una sola vez (sin trigger adicional). Todo se confirma o se revierte: no éxito parcial.
+
+06_Contratos_REST_Elsa_RF01_RF02_RF06_PROPUESTOS.docx — word/document.xml / párrafo 5 / Alcance y fuentes de verdad
+ANTES: 01_Elsa_3_EF_FINAL.xlsx: RF001-E1 (44 mensajes), RF002-E1 (38 mensajes), RF006-E1 (21 mensajes), observaciones y concordancia.
+DESPUÉS: 01_Elsa_3_EF_FINAL.xlsx: RF001-E1 (43 mensajes vigentes; P17 histórico retirado por CC-RF01-01), RF002-E1 (38 mensajes), RF006-E1 (21 mensajes), observaciones y concordancia.
+
+06_Contratos_REST_Elsa_RF01_RF02_RF06_PROPUESTOS.docx — word/document.xml / párrafo 78 / Contrato de registro, Trazabilidad documental
+ANTES: Trazabilidad documental: RF001-E1 P11–P44; RF001-A01/A02/A03/A04; Documento 04 RN01-01 a RN01-08.
+DESPUÉS: Trazabilidad documental: RF001-E1 P11–P44, con identificadores históricos conservados y P17 retirado por CC-RF01-01; RF001-A01/A02/A03/A04; Documento 04 RN01-01 a RN01-08.
+
+ELEMENTOS INTACTOS:
+00_LEER_PRIMERO_ELSA.txt, 03_Ficha_MVP_Elsa_RF01_RF02_RF06_FINAL.docx y 05_Diccionario_Logico_MyCar_Compartido_Conciliado_Elsa.xlsx: copias idénticas byte a byte.
+RF02 y RF06: sin cambios de contenido. Se conservan las ocho reglas de RF01 y sus cuatro escenarios alternativos.
+Correo, contraseña, edad, privacidad, FREE, atomicidad y demás reglas: sin cambios funcionales.
+Excel: mismas hojas, fórmulas, estilos, bordes, dimensiones, combinaciones, comentarios y configuración de impresión; cambios de valor limitados a las once celdas registradas.
+Word: mismas tablas, encabezados, pies, secciones, estilos y estructura de runs; cambios limitados a seis párrafos registrados.
+Repositorio, Java, Kotlin, PostgreSQL, Flyway y migraciones: no intervenidos.
+
+VERIFICACIONES:
+Apertura nativa en Microsoft Word y Excel, en modo de solo lectura; exportación de vistas de control sin guardar desde Office.
+Word 04: 6 páginas, 10 tablas, 1 sección, tanto original como corregido. Word 06: 8 páginas, 10 tablas, 1 sección.
+Excel 01: 5 hojas; Excel 02: 13 hojas. Fórmulas conservadas y recuentos activos 43/24 comprobados.
+Partes OOXML no afectadas idénticas byte a byte; XML bien formado y paquetes sin errores CRC.
+Revisión visual de vistas de control; contratos REST permanecen expresamente propuestos.
+
+DIFERENCIAS DE PRESENTACIÓN HEREDADAS:
+La configuración original de impresión de Excel divide las tablas entre páginas horizontales y verticales. Se conserva sin correcciones editoriales ni ajustes de anchos, alturas o impresión.
+No se incluyen PDF ni imágenes de control dentro del ZIP; solo los siete documentos y este registro.
+Las anotaciones de retiro y referencias actualizadas son cambios documentales autorizados; no son nuevas reglas.
+
+INTEGRIDAD SHA-256:
+ZIP original: dfea0ebf61aab109b2263c472236e64964cc3f289f2423c53e9d65400a660ed3
+00_LEER_PRIMERO_ELSA.txt
+  original: 428f47d7ca24d90f6a55a8bb175f00ac15c31b07e1f88f078d3a09248919e233
+  corregido: 428f47d7ca24d90f6a55a8bb175f00ac15c31b07e1f88f078d3a09248919e233
+01_Elsa_3_EF_FINAL.xlsx
+  original: 8b15c302898bc70caef6d54cf055ae78180ae5da21eb6c6d5e9c4f0f44e74409
+  corregido: 5448a050c0d12c67e4b4bf4b29ad6da388fcd68d69c306e0684c5312c10c624a
+02_Elsa_12_EA_FINAL.xlsx
+  original: 9a298223bd405d4b3c51d91adae69aa7c0d1b77b20edaad327b68306c6aad89f
+  corregido: be05b6b20c559ae2a4cebe8d33d8c0a8f0939696b3534eb67c6da354196d895b
+03_Ficha_MVP_Elsa_RF01_RF02_RF06_FINAL.docx
+  original: 8f1ecfadb04270b8f1c978eb982db1655a8476db2724cd8fe5b3d1b14da87c3d
+  corregido: 8f1ecfadb04270b8f1c978eb982db1655a8476db2724cd8fe5b3d1b14da87c3d
+04_Reglas_Negocio_Elsa_RF01_RF02_RF06_FINAL.docx
+  original: c4de015b6023e6df5736c206865a7c2ee89ea9683afc4cbbaa63d8f9dc5c5aec
+  corregido: 3909abe113f500322e74a8eaede96aa484233c00b0fb49d54e1f65f541bda24b
+05_Diccionario_Logico_MyCar_Compartido_Conciliado_Elsa.xlsx
+  original: 9fe5d321498f8ed5edd637bdf1b25107872f897c817189e54cf62c177755b5ca
+  corregido: 9fe5d321498f8ed5edd637bdf1b25107872f897c817189e54cf62c177755b5ca
+06_Contratos_REST_Elsa_RF01_RF02_RF06_PROPUESTOS.docx
+  original: 225afbd345a5a2455b77bf9d2f014ab3574ab0f81c829228c3b512f46d7b2c3b
+  corregido: a09f7751dfb4737ae8f4272b88d93c2f020e053326b638e7e20b54a7a3314623

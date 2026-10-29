@@ -1,9 +1,7 @@
 package com.mycar.app.features.vehiculos.viewmodel
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mycar.app.features.vehiculos.data.ContextoKilometrajeDto
@@ -28,18 +26,12 @@ data class EstadoActualizarKm(
     val kmConfirmado: Int? = null
 )
 
+/** Sin SavedStateHandle: el host de cuenta no es SavedStateRegistryOwner y createSavedStateHandle cerraba la app. */
 class ActualizarKilometrajeViewModel(
     private val idVehiculo: Long,
-    private val repository: ActualizarKilometrajeRepository,
-    private val saved: SavedStateHandle
+    private val repository: ActualizarKilometrajeRepository
 ) : ViewModel() {
-    private val _estado = MutableStateFlow(
-        EstadoActualizarKm(
-            idVehiculo,
-            kmNuevoTexto = saved["rf14.km"] ?: "",
-            idOperacion = saved.get<String>("rf14.op")?.let(UUID::fromString)
-        )
-    )
+    private val _estado = MutableStateFlow(EstadoActualizarKm(idVehiculo))
     val estado = _estado.asStateFlow()
 
     init { cargarContexto() }
@@ -61,8 +53,60 @@ class ActualizarKilometrajeViewModel(
     }
 
     fun cambiarKm(texto: String) {
-        saved["rf14.km"] = texto
-        _estado.value = _estado.value.copy(kmNuevoTexto = texto, errores = emptyMap())
+        val actual = _estado.value
+        if (texto == actual.kmNuevoTexto) return
+        val pendiente = actual.idOperacion
+        if (pendiente == null) {
+            _estado.value = actual.copy(kmNuevoTexto = texto, errores = emptyMap())
+            return
+        }
+        // Resultado incierto: no descartar idOperacion en silencio; reconciliar primero.
+        viewModelScope.launch {
+            reconciliarAntesDeCambiarKm(pendiente, texto)
+        }
+    }
+
+    private suspend fun reconciliarAntesDeCambiarKm(op: UUID, textoNuevo: String) {
+        try {
+            val estadoOp = repository.operacion(op)
+            when (estadoOp.estado) {
+                "CONFIRMADA" -> {
+                    val km = estadoOp.resultado?.kmActual
+                    _estado.value = _estado.value.copy(
+                        paso = PasoKm.EXITO,
+                        kmConfirmado = km,
+                        idOperacion = null,
+                        mensaje = null,
+                        errores = emptyMap()
+                    )
+                }
+                "EN_PROCESO" -> {
+                    _estado.value = _estado.value.copy(
+                        paso = PasoKm.ERROR,
+                        mensaje = "La operación sigue en proceso. Inténtalo de nuevo en unos segundos.",
+                        errores = emptyMap()
+                    )
+                }
+                else -> {
+                    // Operación no reutilizable: permitir nuevo texto; nueva identidad solo al confirmar.
+                    _estado.value = _estado.value.copy(
+                        kmNuevoTexto = textoNuevo,
+                        idOperacion = null,
+                        errores = emptyMap(),
+                        mensaje = null,
+                        paso = PasoKm.EDICION
+                    )
+                }
+            }
+        } catch (cancelada: CancellationException) {
+            throw cancelada
+        } catch (_: Exception) {
+            // Sin certeza del servidor: conservar identidad y no aplicar el cambio de km.
+            _estado.value = _estado.value.copy(
+                paso = PasoKm.ERROR,
+                mensaje = "No se pudo confirmar el resultado. Conserva la misma operación antes de reintentar."
+            )
+        }
     }
 
     fun irVistaPrevia() {
@@ -83,8 +127,8 @@ class ActualizarKilometrajeViewModel(
     fun confirmar() {
         val ctx = _estado.value.contexto ?: return
         val km = _estado.value.kmNuevoTexto.trim().toIntOrNull() ?: return
+        // Conserva idOperacion en reintentos de la misma confirmación (sin duplicar identidad).
         val op = _estado.value.idOperacion ?: UUID.randomUUID().also {
-            saved["rf14.op"] = it.toString()
             _estado.value = _estado.value.copy(idOperacion = it)
         }
         _estado.value = _estado.value.copy(paso = PasoKm.ENVIANDO, mensaje = null)
@@ -94,8 +138,6 @@ class ActualizarKilometrajeViewModel(
                     idVehiculo,
                     SolicitudActualizarKmDto(op, km, ctx.idLectura, ctx.versionKm)
                 )
-                saved.remove<String>("rf14.op")
-                saved.remove<String>("rf14.km")
                 _estado.value = _estado.value.copy(
                     paso = PasoKm.EXITO, kmConfirmado = resultado.kmActual, idOperacion = null, kmNuevoTexto = ""
                 )
@@ -112,10 +154,9 @@ class ActualizarKilometrajeViewModel(
 
     private suspend fun recuperarOperacion(op: UUID) {
         try {
-            when (val estadoOp = repository.operacion(op).estado) {
+            when (repository.operacion(op).estado) {
                 "CONFIRMADA" -> {
                     val km = repository.operacion(op).resultado?.kmActual
-                    saved.remove<String>("rf14.op")
                     _estado.value = _estado.value.copy(paso = PasoKm.EXITO, kmConfirmado = km, idOperacion = null)
                 }
                 "EN_PROCESO" -> _estado.value = _estado.value.copy(
@@ -150,7 +191,7 @@ class ActualizarKilometrajeViewModel(
 
     companion object {
         fun factory(idVehiculo: Long, repository: ActualizarKilometrajeRepository) = viewModelFactory {
-            initializer { ActualizarKilometrajeViewModel(idVehiculo, repository, createSavedStateHandle()) }
+            initializer { ActualizarKilometrajeViewModel(idVehiculo, repository) }
         }
     }
 }
