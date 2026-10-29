@@ -1,5 +1,7 @@
 # RF22 — Backend y Android con frontend
 
+> **Actualización de main PR #12:** si ya instalaste RF22 sobre `529927a`, usa el [actualizador para incorporar main 8eaeef3 en tu rama RF22](actualizacion-main-8eaeef3/README.md). Conserva tu RF22, el inicio RF50 y la sesión compartida. Los ZIP originales de abajo corresponden a la base anterior; no los reapliques después de actualizar.
+
 Paquetes para incorporar **Programar alerta preventiva manual** al proyecto original. Base revisada: `main` `529927a`, incluido el acceso de Elsa (PR #11). Esta rama contiene descargas y fuentes de los paquetes: **no debe fusionarse con main**. Los instaladores preparan la rama de implementación `feat/programar-alerta-rf22` en tu PC para su revisión posterior.
 
 ## Descargar

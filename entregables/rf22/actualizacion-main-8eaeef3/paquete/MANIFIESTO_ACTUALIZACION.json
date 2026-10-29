@@ -1,0 +1,230 @@
+{
+  "baseOriginal": "529927ac0398d09f71c6a40d0c6dbf67a8b3f621",
+  "mainRevisado": "8eaeef33b5c05e680f433f8e54f67c39f998065d",
+  "arbolRf22Original": "e3c62a60de8fc7e4529d817999bf32e1fd4e5a03",
+  "arbolFinal": "7e82cc36fd4dcb3a8b60090c51472f76a85fdb18",
+  "conflictos": [
+    "android/app/src/debug/AndroidManifest.xml",
+    "android/app/src/main/AndroidManifest.xml",
+    "android/app/src/main/java/com/mycar/app/MainActivity.kt",
+    "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthGraph.kt",
+    "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthRepository.kt",
+    "android/app/src/main/java/com/mycar/app/features/inicio/HomeScreen.kt"
+  ],
+  "entrada": [
+    {
+      "ruta": "android/app/build.gradle.kts",
+      "sha256": "ba54ff0234316f3b053367933fbed838d2b0522a2dfb73c1040913b0e0f6854e"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/alertas/programacion/ArchivoProgramacionTest.kt",
+      "sha256": "3464420b715e182351d3244013218667c08822d3c7dcbc519db1632eadbc03ec"
+    },
+    {
+      "ruta": "android/app/src/androidTest/java/com/mycar/app/features/alertas/programacion/ProgramacionPantallasTest.kt",
+      "sha256": "9027350d6e2673bf0fa7800d9b5f897d1efda77bae05f49719718bc5d2c724be"
+    },
+    {
+      "ruta": "android/app/src/debug/AndroidManifest.xml",
+      "sha256": "f79fd66e1ecc0349f091f384655e68a09cdd29ad9dfbe1856ce60950f2cb7e86"
+    },
+    {
+      "ruta": "android/app/src/debug/java/com/mycar/app/features/alertas/programacion/ui/ProgramacionPreviewActivity.kt",
+      "sha256": "f64271f7a27b3243591678aad116c108f1b0c2c9a74f4294f54eeb8766baa6f8"
+    },
+    {
+      "ruta": "android/app/src/main/AndroidManifest.xml",
+      "sha256": "4b2de7bb44e775cd530564e881abb7f33430bfdd56a7a16d727d5a9f20f3d016"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/MainActivity.kt",
+      "sha256": "c35cad795a8011d0f733b78133fb11a0593ada2ccacec1c39f6bfcd3d714c391"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/data/ArchivoProgramacionPendiente.kt",
+      "sha256": "cdd70cfd0acfad2496756f023c98a0ba5252814f8a850546616e4372f8151d71"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/data/ProgramacionApi.kt",
+      "sha256": "c9cefde2a7f97db39f717cad8685bbc8ad9ac274f653cef812286bdd561232fc"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/data/RemoteProgramacionRepository.kt",
+      "sha256": "606cbe6dc0808812c594cb27872f1058eb78dfb814c3ebcc8c9a1085ce33bcf1"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/domain/CoordinadorProgramacion.kt",
+      "sha256": "941354e1430eb2b67854e3e5890a53b4a5afda67121f6d11ebc9094ece9e9ff0"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/domain/ProgramacionModels.kt",
+      "sha256": "dfcf9cad41c136f4cbafeb1b91b5aeb52763daec7da3e084bfa5a7da7eaf3c55"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/ui/ProgramarAlertaActivity.kt",
+      "sha256": "19907686031e0aeec5bc248d38406dfc175d39ba4eb38f0fd809b018612ea474"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/ui/ProgramarAlertaScreen.kt",
+      "sha256": "2d1d9c01856202c1bb5ebfdf2e60bf5ee5bc721db39c560d8afe17cbdbcefa05"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/viewmodel/ProgramacionViewModel.kt",
+      "sha256": "5d79f315c65fe668c8c6f4d4cdbd5740a3d632759019ca208af274d2ec4261fb"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthGraph.kt",
+      "sha256": "9d14f7e2a819087de50e1278554d5c604a9ffa2e76a2fcac9cf16e151cc98ecc"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthRepository.kt",
+      "sha256": "681a57bd3400c5287d9459ca8976b2595bee710651e4fb74348ac5519846dca2"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/HomeScreen.kt",
+      "sha256": "7e3634821fc504f0e6e9547382fd9f50b489ccc47fcedaf8b8eebdb904b6cb7c"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/alertas/programacion/CoordinadorProgramacionTest.kt",
+      "sha256": "687d81cfe0cd2f1c0781a8a2761075a5998ed36aee49f162b92053de35d3c0c2"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/alertas/programacion/PeticionesSesionMyCarTest.kt",
+      "sha256": "ff855e6010240549a127b523e3a3f89d43d50125968b6419a234d01223a3dc2b"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/alertas/programacion/RemoteProgramacionRepositoryTest.kt",
+      "sha256": "f1c107386961bb260ed6a7f1b1968f5603ec01f209755c965314afbc369fd10c"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/api/ConfiguracionRf22.java",
+      "sha256": "2630440dbce5286627c681547ad6dfb53305ba57616564b4380dc684bd747af9"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/api/ErroresProgramacionController.java",
+      "sha256": "c7a88572073bf66ec2f17fe87fe14eed319a6aba15085589585949127224c9b0"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/api/ProgramacionAlertaController.java",
+      "sha256": "3b6c1f67122d00acbcac55943197934c1da19c6e2e66148ef474d79b3da4f97a"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/dao/ProgramacionAlertaDao.java",
+      "sha256": "c0522e2a3a34a97e310757d15e64ef4a76b1bffaf9043bc71ac6a592253b5979"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/dao/ProgramacionAlertaJdbcDao.java",
+      "sha256": "cfa01627843ba5a1b057640ed1030adb431a9ba7414a238fe04cfe4575f42332"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/model/EnterosRf22.java",
+      "sha256": "ee9e4481239e9e8dca88a2c8f137fb5b445ba0cd4155ff0e0030cddcd2a90342"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/model/ErrorProgramacion.java",
+      "sha256": "982e4abc40f000370dec1ad7f81a8c5cceb08441a44539422a9af8c3253197b5"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/model/ProgramacionAlerta.java",
+      "sha256": "35fcdce0ff927ce53875e181a00cfa803be83826a4270b04aaa8b2c141c53488"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/service/CalculadorProgramacion.java",
+      "sha256": "214d17229ef19df81ab2c8ced4917055dcc2e993f715e4c89d58ac9c9e45b4c2"
+    },
+    {
+      "ruta": "backend/src/main/java/backend/alertas/programacion/service/ProgramacionAlertaService.java",
+      "sha256": "f4d13bd1c5b602c0f30d6cd19198bf6cd61ac0223bd87b86e155184ceb4cfc60"
+    },
+    {
+      "ruta": "backend/src/main/resources/db/mvp/V6__rf22_tiempo_sin_lectura.sql",
+      "sha256": "a22a073bb2b60ce752cb8ade38249cb4b5950fd6beb64d503806f395fa971d07"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/programacion/CalculadorProgramacionTest.java",
+      "sha256": "34359480fbd63074cbe89e80224e8f837ef167fc8a976a74e858c156af5a1c6c"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/programacion/ProgramacionAlertaPostgresTest.java",
+      "sha256": "5ac71fdc5cf57059ea883b16afbf2de4b98386fbd90173dc49b8f62551d09636"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/programacion/ProgramacionAlertaServiceTest.java",
+      "sha256": "72faf2d822e871218233a8041887e5c4bd4b8c20f15ff356b9dff00a363fa778"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/db/MvpDatabaseTest.java",
+      "sha256": "ffff6ceb38ba6ff1c2c9b85a09c535bf16fba42ec122b095396652c3b30d6f49"
+    },
+    {
+      "ruta": "docs/rf22/CP_RF22.md",
+      "sha256": "6242a5bd1403897bf542e67f7fc0dd915ec00d2ad7a03f62b9ba7546f72ea8ba"
+    },
+    {
+      "ruta": "docs/rf22/LEEME_RF22.md",
+      "sha256": "11de312b8db8ced080d1c1141e6a11afd89d3f76835c9f8aa392c896dcce39cb"
+    },
+    {
+      "ruta": "scripts/iniciar_backend_rf22.ps1",
+      "sha256": "c4fbd8e8c65af32cfc4965dfbc45bdd71c88bf065c0e6c1663cc55e1c5c8433f"
+    },
+    {
+      "ruta": "scripts/probar_postgres_rf22.ps1",
+      "sha256": "52d21b4b9d5202ebca4af7d6c249406e74da457cac3c4d76a56f67295ac74e10"
+    }
+  ],
+  "resoluciones": [
+    {
+      "ruta": "android/app/src/debug/AndroidManifest.xml",
+      "sha256": "8116d4b555ceac5574490bca225ed0dc36208aac9cf124415501b477a02cf264"
+    },
+    {
+      "ruta": "android/app/src/main/AndroidManifest.xml",
+      "sha256": "c2d132e105e6990821a85baae0d0ee8df0a096f09b1efb273fcca1922e56b5f4"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/MainActivity.kt",
+      "sha256": "fb77dfef15cc969fe8ed3749e48797a219ec075d513a091deb231906890e5c94"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/alertas/programacion/ui/ProgramarAlertaActivity.kt",
+      "sha256": "0a10d477f9e0809363400e5c3246b156eb0611e320c3ae31bc45070f55a3d47e"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthGraph.kt",
+      "sha256": "86fb9baa811db99ee0c39b325c4d638005af02f24fd80e99347a9baee8dedf4a"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/autenticacion/data/AuthRepository.kt",
+      "sha256": "f289153f833effaa46b0e8eeb0e0251cd47e5b3ae2c7f942fbac90ce09043c9d"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/HomeScreen.kt",
+      "sha256": "267eb22c864e70fcd19c96dcb48af84e286bfab2c3e51772a99f9b849a8518c6"
+    },
+    {
+      "ruta": "android/app/src/main/java/com/mycar/app/features/inicio/ui/MyCarNavigation.kt",
+      "sha256": "23659b822abef2215f73c0b915a84208ed554069b549071463fd7e1b8b4411b0"
+    },
+    {
+      "ruta": "android/app/src/test/java/com/mycar/app/features/alertas/programacion/PeticionesSesionMyCarTest.kt",
+      "sha256": "e39be1d09ee010a3eebd5653519057b68c5efeef7e3a555685d123c8e5f950ba"
+    },
+    {
+      "ruta": "backend/src/test/java/backend/alertas/programacion/ProgramacionAlertaPostgresTest.java",
+      "sha256": "b12dfa36a06a694cbc34941df329f3e42f54c77609a79e6fbd5e84e285f59801"
+    },
+    {
+      "ruta": "docs/rf22/ACTUALIZACION_MAIN_PR12.md",
+      "sha256": "fb1f80ce9509c6a615fa3ce3808b6b4550aaf6ce1ac8b9719f07088bb7919ffc"
+    },
+    {
+      "ruta": "docs/rf22/LEEME_RF22.md",
+      "sha256": "8449ffeabb9ec25fce51a977db3de9905d6991494708b9e199e117d2b212f602"
+    },
+    {
+      "ruta": "scripts/iniciar_backend_rf22.ps1",
+      "sha256": "f7f4f2950ebe20bc7b99f3c801a0f873854e1a2e5944c820516605faad67e8b7"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <application android:networkSecurityConfig="@xml/debug_network_security_config">
+        <activity android:name=".features.alertas.programacion.ui.ProgramacionPreviewActivity"
+            android:exported="true" android:label="RF22 · Diseño con ejemplos" />
+        <activity-alias android:name=".features.alertas.programacion.ui.EntradaRf22"
+            android:targetActivity=".features.alertas.programacion.ui.ProgramarAlertaActivity"
+            android:exported="true" android:label="MyCar · Programar alerta real" />
+        <!-- DEBUG abre MainActivity, igual que RELEASE. Demostraciones solo por acceso explícito. -->
+        <activity
+            android:name=".debug.RegistroVehiculoDemoActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MyCar"
+            android:windowSoftInputMode="adjustResize" />
+        <!-- RF18: conserva sus accesos explícitos de diseño e historial. -->
+        <activity android:name=".features.historial.ui.HistorialPreviewActivity"
+            android:exported="true" android:label="RF18 · Diseño con ejemplos" />
+        <activity-alias android:name=".features.historial.ui.HistorialEntrada"
+            android:targetActivity=".MainActivity" android:exported="true"
+            android:label="MyCar · Historial" />
+    </application>
+</manifest>

@@ -1,0 +1,98 @@
+{
+  "fechaRevisionLima": "2026-10-28",
+  "mainRevisado": "8eaeef33b5c05e680f433f8e54f67c39f998065d",
+  "arbolResultado": "7e82cc36fd4dcb3a8b60090c51472f76a85fdb18",
+  "backend": {
+    "tests": 540,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 172,
+    "ejecutadas": 368
+  },
+  "backendRf22": {
+    "tests": 39,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "ejecutadas": 39
+  },
+  "sesionVehiculos": {
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "ejecutadas": 8
+  },
+  "android": {
+    "tests": 237,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "ejecutadas": 237
+  },
+  "androidRf22": {
+    "tests": 29,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "ejecutadas": 29
+  },
+  "http": {
+    "servidor": "Spring Boot HTTP real, PostgreSQL temporal",
+    "health": "UP",
+    "login": 200,
+    "confirmacion": 201,
+    "reintento": 201,
+    "mismaRespuesta": true,
+    "consultaConfirmada": true,
+    "historialInicialUnico": true,
+    "sinBaseDelEquipo": true,
+    "modulosSesionCompartida": {
+      "/api/v1/vehiculos/identidad": 200,
+      "/api/v1/rf17/contexto": 200,
+      "/api/v1/rf18/contexto": 200,
+      "/api/v1/rf22/contexto": 200
+    }
+  },
+  "lint": {
+    "Error": 0,
+    "Warning": 17
+  },
+  "debugLaunchers": [
+    "com.mycar.app.MainActivity"
+  ],
+  "releaseLaunchers": [
+    "com.mycar.app.MainActivity"
+  ],
+  "migracionesIntactas": {
+    "V1__esquema_mvp.sql": "65e5a7bef83ce744310d3540fb4055b382819c8e3ae70ce8ec6b5535142e319b",
+    "V2__tablas_mvp.sql": "f9ba558cb207f3ed56a62668eea17f1b5fbe1486b4118347f15a4f76fa012e87",
+    "V3__catalogos_mvp.sql": "f8c976de162090edc24c7848720e52662aea1678680d4e8acaaf60a065172fd8",
+    "V4__funciones_y_triggers_mvp.sql": "e2174746f86cbef80102402b01a7f961b3422cce4fa59c86d9815d37b758eff8",
+    "V5__validacion_identificadores_vehiculo.sql": "ab5669d0e5e2881d14ca580f735ca69436593b3feba525cac63ccf8bb53a7d66",
+    "V6__rf22_tiempo_sin_lectura.sql": "a22a073bb2b60ce752cb8ade38249cb4b5950fd6beb64d503806f395fa971d07"
+  },
+  "limites": [
+    "APK debug, APK de pruebas y Kotlin release compilados; instrumentacion no ejecutada en cloud",
+    "Actualizador se prueba con PowerShell 7.4.6 Linux; falta ejecutar en Windows",
+    "No se aplico nada al PC ni la BD del usuario; sin push de la rama funcional"
+  ],
+  "powershell": {
+    "version": "PowerShell 7.4.6 Linux",
+    "scriptsAnalizados": 3,
+    "integraOrigenExacto": true,
+    "conservaRamaMain": true,
+    "aceptaCRLF": true,
+    "conservaEnvSinIncluirloEnGit": true,
+    "rechazaCambiosRF22AntesDeCommit": true,
+    "rechazaArchivosAjenosAntesDeCommit": true,
+    "creaRespaldoYCopiaExterna": true,
+    "reejecucionSinCambios": true,
+    "WindowsPendiente": true
+  },
+  "auxiliarArranqueSimulado": {
+    "rf17Rf18Rf22Habilitadas": true,
+    "puerto": 8081,
+    "claveFueraDeGit": true
+  }
+}
