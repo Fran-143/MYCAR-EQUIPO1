@@ -14,7 +14,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.util.Set;
 
 /** Alcance exclusivo de este controlador; no altera los módulos de otros integrantes. */
-@RestControllerAdvice(assignableTypes = VehiculosController.class)
+@RestControllerAdvice(assignableTypes = {VehiculosController.class, KilometrajeVehiculoController.class})
 public class ErroresVehiculosController {
     @ExceptionHandler(SesionVehiculosNoValidada.class)
     public ResponseEntity<ErrorApiVehiculos> sesion(SesionVehiculosNoValidada error) {
@@ -29,7 +29,8 @@ public class ErroresVehiculosController {
             case "OPERACION_NO_ENCONTRADA", "VEHICULO_NO_ENCONTRADO" -> HttpStatus.NOT_FOUND;
             case "PLAN_FREE_NO_DISPONIBLE", "LIMITE_FREE", "PLACA_DUPLICADA",
                  "VIN_DUPLICADO", "CONFLICTO_REGISTRO", "CONFLICTO_IDEMPOTENCIA",
-                 "OPERACION_EN_PROCESO" -> HttpStatus.CONFLICT;
+                 "OPERACION_EN_PROCESO", "KM_OBSOLETO", "KM_NO_SUPERIOR" -> HttpStatus.CONFLICT;
+            case "VEHICULO_INACTIVO", "KILOMETRAJE_NO_DISPONIBLE" -> HttpStatus.FORBIDDEN;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
         String mensaje = switch (error.codigo()) {
@@ -38,6 +39,10 @@ public class ErroresVehiculosController {
             case "CUENTA_NO_AUTORIZADA" -> "Tu cuenta no tiene acceso a esta operación.";
             case "OPERACION_NO_ENCONTRADA" -> "No se encontró una operación disponible para tu cuenta.";
             case "VEHICULO_NO_ENCONTRADO" -> "No se encontró el vehículo en tu cuenta.";
+            case "VEHICULO_INACTIVO" -> "Solo puedes actualizar kilometraje de vehículos activos.";
+            case "KILOMETRAJE_NO_DISPONIBLE" -> "El kilometraje vigente no está disponible temporalmente.";
+            case "KM_OBSOLETO" -> "Los datos de lectura cambiaron. Vuelve a cargar el kilometraje actual.";
+            case "KM_NO_SUPERIOR" -> "El nuevo kilometraje debe ser mayor al vigente.";
             case "PLAN_FREE_NO_DISPONIBLE" -> "No hay un plan Free disponible para registrar el vehículo.";
             case "LIMITE_FREE" -> "El plan Free permite un vehículo registrado, incluyendo inactivos.";
             case "PLACA_DUPLICADA" -> "La placa ya está registrada.";
