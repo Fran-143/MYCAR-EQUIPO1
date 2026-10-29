@@ -9,7 +9,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -43,11 +42,7 @@ public class IntegracionSesionAlertas {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/api/v1/rf22/contexto",
-                                "/api/v1/rf22/vehiculos/*/alertas", "/api/v1/rf22/operaciones/*").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/rf22/vehiculos/*/alertas").authenticated()
-                        .anyRequest().denyAll())
+                .authorizeHttpRequests(a -> a.anyRequest().authenticated())
                 .addFilterBefore(new SessionBearerFilter(sesiones, json), AnonymousAuthenticationFilter.class)
                 .build();
     }

@@ -93,12 +93,20 @@ internal fun FormularioRegistroMantenimiento(
                 Text("Kilometraje vigente: ${vehiculo?.kmActual?.let { "$it km" } ?: "Sin lectura"}",
                     style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                 vehiculo?.fechaLecturaActual?.let { Text(fechaLecturaVisible(it), style = MaterialTheme.typography.bodySmall) }
-                Text("Aceite registrado: ${vehiculo?.aceiteRegistrado ?: "No informado"}", style = MaterialTheme.typography.bodySmall)
-                if (b.codigoTipo == "CAMBIO_ACEITE" && !vehiculo?.aceiteRegistrado.isNullOrBlank()) {
-                    OutlinedButton(onClick = vm::proponerAceiteVehiculo, enabled = enabled && b.codigoTipo == "CAMBIO_ACEITE") {
-                        Text("Usar aceite registrado del vehículo")
+                Text("Aceite registrado del vehículo: ${vehiculo?.aceiteRegistrado ?: "No informado"}",
+                    style = MaterialTheme.typography.bodySmall)
+                if (b.codigoTipo == "CAMBIO_ACEITE") {
+                    val aceite = vehiculo?.aceiteRegistrado
+                    if (!aceite.isNullOrBlank() && !aceite.equals("No informado", true)) {
+                        Text("Al elegir Cambio de aceite se propone «$aceite» como repuesto (editable).",
+                            style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = vm::proponerAceiteVehiculo, enabled = enabled) {
+                            Text("Volver a proponer aceite del vehículo")
+                        }
+                    } else {
+                        Text("Este vehículo no tiene tipo de aceite registrado; indícalo en el repuesto si aplica.",
+                            style = MaterialTheme.typography.bodySmall)
                     }
-                    Text("Es una sugerencia; confirma el repuesto real del servicio.", style = MaterialTheme.typography.bodySmall)
                 }
                 Text("Taller: Sin taller", style = MaterialTheme.typography.bodySmall)
                 if (!s.requiereSesion) {

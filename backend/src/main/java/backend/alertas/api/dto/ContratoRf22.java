@@ -10,6 +10,10 @@ import java.util.UUID;
 public final class ContratoRf22 {
     private ContratoRf22() { }
 
+    /**
+     * Bases confirmadas en el resumen (G89): el servidor las revalida antes de persistir.
+     * No forman parte de la huella de idempotencia de la configuración.
+     */
     public record ProgramarRequest(
             @NotNull UUID idOperacion,
             @NotBlank String codigoTipoMantenimiento,
@@ -18,7 +22,10 @@ public final class ContratoRf22 {
             @Positive Integer cantidadTiempo,
             @Positive Integer intervaloKm,
             @Size(max = 160) String servicioOtro,
-            @Positive Long idMantenimientoReferencia
+            @Positive Long idMantenimientoReferencia,
+            LocalDate fechaBaseConfirmada,
+            Integer kmBaseConfirmado,
+            Long idLecturaConfirmada
     ) { }
 
     public record TipoDto(Long idTipoMantenimiento, String codigo, String nombre) { }
