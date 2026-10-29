@@ -25,8 +25,11 @@ public class SeguridadSesionVehiculos {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.GET, "/api/v1/vehiculos", "/api/v1/vehiculos/catalogos",
                                 "/api/v1/vehiculos/cupo-registro", "/api/v1/vehiculos/identidad",
-                                "/api/v1/vehiculos/operaciones/*").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/vehiculos").authenticated()
+                                "/api/v1/vehiculos/operaciones/*", "/api/v1/vehiculos/kilometraje/operaciones/*",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/actual").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/vehiculos",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas").authenticated()
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(sesiones, json), AnonymousAuthenticationFilter.class)
                 .build();

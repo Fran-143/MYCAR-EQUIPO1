@@ -9,6 +9,9 @@
 **/google-services.json
 **/service-account*.json
 
+# Logs de crash JVM (Gradle/emulador)
+**/hs_err_pid*.log
+
 # Archivos generados por Android Studio
 **/.idea/
 *.iml

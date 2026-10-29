@@ -1,6 +1,7 @@
 package backend.vehiculos.controller;
 
 import backend.vehiculos.dto.DatosCatalogosVehiculo;
+import backend.vehiculos.dto.DatosDetalleVehiculo;
 import backend.vehiculos.dto.DatosListadoVehiculos;
 import backend.vehiculos.dto.DatosCupoRegistro;
 import backend.vehiculos.dto.DatosEstadoOperacionVehiculo;
@@ -42,6 +43,11 @@ public class VehiculosController {
     public org.springframework.http.ResponseEntity<IdentidadCuenta> identidad(Authentication autenticacion) {
         return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
                 .body(new IdentidadCuenta(usuario(autenticacion)));
+    }
+
+    @GetMapping("/{idVehiculo}")
+    public DatosDetalleVehiculo detalle(Authentication autenticacion, @PathVariable long idVehiculo) {
+        return consultas.consultarDetalle(usuario(autenticacion), idVehiculo);
     }
 
     @GetMapping
