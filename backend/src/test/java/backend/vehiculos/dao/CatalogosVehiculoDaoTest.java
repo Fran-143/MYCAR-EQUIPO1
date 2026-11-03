@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         properties = "spring.flyway.enabled=false"
 )
 @Transactional(readOnly = true)
+/** RF08 — TDD del DAO de catálogos (Arrange / Act / Assert). */
 class CatalogosVehiculoDaoTest {
 
     @Autowired
@@ -20,14 +21,12 @@ class CatalogosVehiculoDaoTest {
 
     @Test
     void recuperaCatalogosDesdePostgreSql() {
-        // ARRANGE:
-        // PostgreSQL local con las migraciones V1–V4 aplicadas.
-        // Spring proporciona el DAO y la conexión real.
+        // Arrange: PostgreSQL local con migraciones aplicadas; Spring inyecta el DAO.
 
-        // ACT
+        // Act
         var catalogos = catalogosDao.consultar();
 
-        // ASSERT
+        // Assert
         assertFalse(catalogos.usos().isEmpty());
         assertFalse(catalogos.tiposMotor().isEmpty());
         assertFalse(catalogos.combustibles().isEmpty());

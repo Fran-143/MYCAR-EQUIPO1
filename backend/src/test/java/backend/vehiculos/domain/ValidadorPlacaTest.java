@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** RF08 — TDD de ValidadorPlaca (Arrange / Act / Assert). */
 class ValidadorPlacaTest {
 
     @ParameterizedTest
@@ -16,7 +17,13 @@ class ValidadorPlacaTest {
             "M0N999"
     })
     void aceptaPlacasConElFormatoAcordado(String placa) {
-        assertTrue(ValidadorPlaca.esValida(placa));
+        // Arrange: placa válida parametrizada
+
+        // Act
+        boolean ok = ValidadorPlaca.esValida(placa);
+
+        // Assert
+        assertTrue(ok);
     }
 
     @ParameterizedTest
@@ -34,6 +41,12 @@ class ValidadorPlacaTest {
             "A1B234\n"
     })
     void rechazaPlacasQueNoCumplenElFormatoExacto(String placa) {
-        assertFalse(ValidadorPlaca.esValida(placa));
+        // Arrange: placa inválida parametrizada
+
+        // Act
+        boolean ok = ValidadorPlaca.esValida(placa);
+
+        // Assert
+        assertFalse(ok);
     }
 }

@@ -29,6 +29,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/** RF17 — TDD de RegistroMantenimientoService con DAO mock (Arrange / Act / Assert). */
 class RegistroMantenimientoServiceTest {
 
     private ValidadorRegistroMantenimiento validador;
@@ -84,12 +85,14 @@ class RegistroMantenimientoServiceTest {
 
     @Test
     void RF17_CP01_EF_validaYDelegaElGuardadoCompleto() {
+        // Arrange
         var solicitud = solicitudConRepuesto(1);
-
         when(dao.insertar(1L, 5L, solicitud)).thenReturn(900L);
 
+        // Act
         Long resultado = servicio.registrar(1L, solicitud);
 
+        // Assert
         assertEquals(Long.valueOf(900L), resultado);
 
         verify(validador).validar(solicitud.datos());

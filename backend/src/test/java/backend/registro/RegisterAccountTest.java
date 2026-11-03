@@ -11,6 +11,7 @@ import java.time.ZoneOffset;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/** RF01 — TDD del caso de uso RegisterAccount (patrón Arrange / Act / Assert). */
 class RegisterAccountTest {
     private final RegistrationValidator validator = mock(RegistrationValidator.class);
     private final RegistrationStore store = mock(RegistrationStore.class);
@@ -20,8 +21,13 @@ class RegisterAccountTest {
     private final RegistrationData data = new RegistrationData("Ana","Pérez","ana@example.com",LocalDate.of(1995,1,1),"FIXTURE-NO-LEGAL");
 
     @Test void argon2idHasRandomSaltExplicitCostAndNoPasswordTruncation() {
+        // Arrange
         String password = "Áb1!"+"ñ".repeat(60);
+
+        // Act
         String a = encoder.encode(password), b = encoder.encode(password);
+
+        // Assert
         assertTrue(a.startsWith("$argon2id$v=19$m=19456,t=2,p=1$"));
         assertNotEquals(a,b);
         assertTrue(a.length()<=255);
@@ -31,26 +37,40 @@ class RegisterAccountTest {
     }
 
     @Test void hashesOnlyAfterValidationAndStoresServerTime() {
+        // Arrange
         when(validator.validate(command)).thenReturn(data);
         when(store.createAccount(eq(data),anyString(),eq(clock.instant()))).thenAnswer(call -> {
             assertTrue(encoder.matches(command.contrasena(),call.getArgument(1)));
             return 41L;
         });
-        assertEquals(41L,new RegisterAccount(validator,new RegistrationPrivacyPolicy("FIXTURE-NO-LEGAL"),store,encoder,clock).register(command));
+
+        // Act
+        long id = new RegisterAccount(validator,new RegistrationPrivacyPolicy("FIXTURE-NO-LEGAL"),store,encoder,clock).register(command);
+
+        // Assert
+        assertEquals(41L, id);
         verify(store).emailExists(data.correo());
         verify(store).createAccount(eq(data),anyString(),eq(clock.instant()));
     }
 
     @Test void missingPrivacyVersionPreventsAllPersistence() {
+        // Arrange
         when(validator.validate(command)).thenReturn(data);
+
+        // Act + Assert
         assertThrows(RegistrationException.class, () -> new RegisterAccount(validator,new RegistrationPrivacyPolicy(""),store,encoder,clock).register(command));
         verifyNoInteractions(store);
     }
 
     @Test void existingEmailDoesNotCreateAnythingAndUsesGenericMessage() {
+        // Arrange
         when(validator.validate(command)).thenReturn(data);
         when(store.emailExists(data.correo())).thenReturn(true);
+
+        // Act
         var ex=assertThrows(RegistrationException.class, () -> new RegisterAccount(validator,new RegistrationPrivacyPolicy("FIXTURE-NO-LEGAL"),store,encoder,clock).register(command));
+
+        // Assert
         assertEquals("Correo no disponible.",ex.getMessage());
         verify(store,never()).createAccount(any(),anyString(),any());
     }

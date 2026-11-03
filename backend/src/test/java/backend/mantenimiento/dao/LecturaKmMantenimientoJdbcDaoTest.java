@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/** RF17 — TDD del DAO LecturaKmMantenimientoJdbcDao (Arrange / Act / Assert). */
 @EnabledIfSystemProperty(
         named = "mycar.catalogo.tests",
         matches = "true"
@@ -188,8 +189,12 @@ class LecturaKmMantenimientoJdbcDaoTest {
 
     @Test
     void recuperaLecturaConTodosSusDatos() {
+        // Arrange: idLectura creado en @BeforeEach
+
+        // Act
         var lectura = dao.buscarPorId(idLectura).orElseThrow();
 
+        // Assert
         assertEquals(idLectura, lectura.idLecturaKm());
         assertEquals(idVehiculo, lectura.idVehiculo());
         assertEquals(Integer.valueOf(21000), lectura.valorKm());
@@ -201,7 +206,13 @@ class LecturaKmMantenimientoJdbcDaoTest {
 
     @Test
     void devuelveVacioCuandoLaLecturaNoExiste() {
-        assertTrue(dao.buscarPorId(-1L).isEmpty());
+        // Arrange: id inexistente
+
+        // Act
+        var resultado = dao.buscarPorId(-1L);
+
+        // Assert
+        assertTrue(resultado.isEmpty());
     }
 
     @Test

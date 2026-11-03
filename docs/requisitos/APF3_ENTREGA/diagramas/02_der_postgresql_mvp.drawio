@@ -1,0 +1,38 @@
+<mxfile host="app.diagrams.net" agent="MyCar-APF3" version="22.0.0">
+  <diagram id="der" name="DER mycar Flyway V2">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1200">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="t" value="Figura 5.2.3 — DER lógico-físico (procedencia: backend/.../db/mvp/V2__tablas_mvp.sql). Cardinalidades 1:N según REFERENCES." style="text;html=1;fontStyle=1;fontSize=13;align=left;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="1200" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="u" value="usuario&#xa;PK id_usuario" style="shape=rectangle;whiteSpace=wrap;html=1;fillColor=#dae8fc;" vertex="1" parent="1"><mxGeometry x="60" y="80" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="p" value="plan&#xa;PK id_plan" style="shape=rectangle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="260" y="80" width="100" height="50" as="geometry"/></mxCell>
+        <mxCell id="su" value="suscripcion&#xa;PK id_suscripcion&#xa;FK id_usuario&#xa;FK id_plan" style="shape=rectangle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="160" y="180" width="140" height="70" as="geometry"/></mxCell>
+        <mxCell id="se" value="sesion&#xa;PK id_sesion&#xa;FK id_usuario" style="shape=rectangle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="40" y="280" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="v" value="vehiculo&#xa;PK id_vehiculo&#xa;FK id_usuario&#xa;FK uso/motor/combustible/aceite" style="shape=rectangle;whiteSpace=wrap;html=1;fillColor=#d5e8d4;" vertex="1" parent="1"><mxGeometry x="400" y="160" width="200" height="80" as="geometry"/></mxCell>
+        <mxCell id="lk" value="lectura_kilometraje&#xa;PK id_lectura_km&#xa;FK id_vehiculo&#xa;FK id_operacion" style="shape=rectangle;whiteSpace=wrap;html=1;fillColor=#fff2cc;" vertex="1" parent="1"><mxGeometry x="400" y="300" width="200" height="80" as="geometry"/></mxCell>
+        <mxCell id="op" value="operacion_idempotente&#xa;PK id_operacion&#xa;FK id_usuario" style="shape=rectangle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="200" y="300" width="160" height="70" as="geometry"/></mxCell>
+        <mxCell id="m" value="mantenimiento&#xa;PK id_mantenimiento&#xa;FK id_vehiculo&#xa;FK id_tipo_mantenimiento&#xa;FK lectura (compuesta)" style="shape=rectangle;whiteSpace=wrap;html=1;fillColor=#e1d5e7;" vertex="1" parent="1"><mxGeometry x="700" y="160" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="tm" value="tipo_mantenimiento&#xa;PK id_tipo_mantenimiento" style="shape=rectangle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="980" y="80" width="160" height="50" as="geometry"/></mxCell>
+        <mxCell id="a" value="alerta&#xa;PK id_alerta&#xa;FK id_vehiculo&#xa;FK id_tipo_mantenimiento&#xa;FK mantenimiento/lectura opc." style="shape=rectangle;whiteSpace=wrap;html=1;fillColor=#f8cecc;" vertex="1" parent="1"><mxGeometry x="700" y="320" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="ha" value="historial_alerta&#xa;PK id_historial_alerta&#xa;FK id_alerta" style="shape=rectangle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="980" y="340" width="160" height="70" as="geometry"/></mxCell>
+        <mxCell id="cat" value="Catálogos: uso_vehiculo, tipo_motor, combustible, tipo_aceite&#xa;(FK desde vehiculo)" style="shape=rectangle;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="400" y="60" width="280" height="50" as="geometry"/></mxCell>
+        <mxCell id="e1" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="u" target="v"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="u" target="se"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="v" target="lk"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="v" target="m"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="v" target="a"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="a" target="ha"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="tm" target="m"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="endArrow=ERmany;startArrow=ERone;html=1;" edge="1" parent="1" source="tm" target="a"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="n" value="Nota: DER en pata de gallo (1:N). Flyway V2 (+V5/V6). No certifica por sí solo ejecución en un host concreto." style="text;html=1;align=left;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="450" width="1100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="rel" value="Ida/vuelta (resumen): usuario 1—N vehiculo/sesion; vehiculo 1—N lectura/mantenimiento/alerta; alerta 1—N historial_alerta; tipo_mantenimiento 1—N mantenimiento y alerta. Cada hijo referencia al padre con #FK." style="text;html=1;align=left;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="485" width="1200" height="40" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

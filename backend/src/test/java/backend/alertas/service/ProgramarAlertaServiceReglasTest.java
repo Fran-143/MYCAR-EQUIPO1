@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** Reglas RF22: AMBOS, G89, POR_TIEMPO sin km, equivalencia; fecha_base nula en POR_KILOMETRAJE. */
+/** RF22 — TDD de reglas ProgramarAlerta (Arrange / Act / Assert). */
 class ProgramarAlertaServiceReglasTest {
     AlertasJdbcDao alertas;
     OperacionAlertaJdbcDao operaciones;
@@ -48,15 +48,18 @@ class ProgramarAlertaServiceReglasTest {
     }
 
     @Test void porKilometrajeInsertaSinFechaBase() {
+        // Arrange
         UUID op = UUID.randomUUID();
         var req = km(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenReturn(100L);
 
+        // Act
         var resp = service.programar(9L, 3L, req);
-        assertEquals(100L, resp.idAlerta());
 
+        // Assert
+        assertEquals(100L, resp.idAlerta());
         var cap = org.mockito.ArgumentCaptor.forClass(AlertasJdbcDao.DatosInsercion.class);
         verify(alertas).insertarAlerta(cap.capture());
         assertNull(cap.getValue().fechaBase(), "POR_KILOMETRAJE exige fecha_base NULL (ck_alerta_tiempo)");
@@ -67,6 +70,7 @@ class ProgramarAlertaServiceReglasTest {
     }
 
     @Test void ambosInsertaTiempoYKm() {
+        // Arrange
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
                 op, "CAMBIO_ACEITE", "AMBOS", "MESES", 6, 5000, null, null, hoy, 20000, 10L);
@@ -74,7 +78,11 @@ class ProgramarAlertaServiceReglasTest {
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenReturn(101L);
 
-        assertEquals(101L, service.programar(9L, 3L, req).idAlerta());
+        // Act
+        long id = service.programar(9L, 3L, req).idAlerta();
+
+        // Assert
+        assertEquals(101L, id);
         var cap = org.mockito.ArgumentCaptor.forClass(AlertasJdbcDao.DatosInsercion.class);
         verify(alertas).insertarAlerta(cap.capture());
         assertEquals(hoy, cap.getValue().fechaBase());
@@ -84,6 +92,7 @@ class ProgramarAlertaServiceReglasTest {
     }
 
     @Test void porTiempoSinLecturaPermiteProgramar() {
+        // Arrange
         when(alertas.ultimaLectura(3L)).thenReturn(null);
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
@@ -91,7 +100,12 @@ class ProgramarAlertaServiceReglasTest {
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenReturn(102L);
-        assertEquals(102L, service.programar(9L, 3L, req).idAlerta());
+
+        // Act
+        long id = service.programar(9L, 3L, req).idAlerta();
+
+        // Assert
+        assertEquals(102L, id);
         var cap = org.mockito.ArgumentCaptor.forClass(AlertasJdbcDao.DatosInsercion.class);
         verify(alertas).insertarAlerta(cap.capture());
         assertNull(cap.getValue().kmBase());
@@ -99,18 +113,24 @@ class ProgramarAlertaServiceReglasTest {
     }
 
     @Test void g89RechazaSiKmBaseCambio() {
+        // Arrange
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
                 op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", null, null, 5000, null, null,
                 null, 19000, 10L);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
+
+        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
+
+        // Assert
         assertEquals("BASES_CAMBIARON", ex.codigo());
         verify(alertas, never()).insertarAlerta(any());
     }
 
     @Test void tresAlertasDistintasNoEstanLimitadasPorTopeFicticio() {
+        // Arrange + Act: tres operaciones distintas
         for (int i = 0; i < 3; i++) {
             UUID op = UUID.randomUUID();
             int intervalo = 5000 + i * 1000;
@@ -120,21 +140,28 @@ class ProgramarAlertaServiceReglasTest {
             when(alertas.insertarAlerta(any())).thenReturn(10L + i);
             assertNotNull(service.programar(9L, 3L, req).idAlerta());
         }
+        // Assert
         verify(alertas, times(3)).insertarAlerta(any());
     }
 
     @Test void equivalenteActivaSeExplicaComoConflicto() {
+        // Arrange
         UUID op = UUID.randomUUID();
         var req = km(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenThrow(
                 new DataIntegrityViolationException("uq_alerta_equivalente_activa"));
+
+        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
+
+        // Assert
         assertEquals("ALERTA_EQUIVALENTE", ex.codigo());
     }
 
     @Test void criterioHelpers() {
+        // Arrange / Act / Assert (helpers puros)
         assertTrue(CriterioAlerta.usaTiempo("POR_TIEMPO"));
         assertTrue(CriterioAlerta.usaTiempo("AMBOS"));
         assertFalse(CriterioAlerta.usaTiempo("POR_KILOMETRAJE"));
@@ -144,6 +171,7 @@ class ProgramarAlertaServiceReglasTest {
     }
 
     @Test void reintentoMismaOperacionConfirmadaRecuperaSinInsertar() {
+        // Arrange
         UUID op = UUID.randomUUID();
         var req = km(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
@@ -153,7 +181,10 @@ class ProgramarAlertaServiceReglasTest {
                         op, 9L, huella, "CONFIRMADA",
                         "{\"idAlerta\":77,\"estado\":\"PROGRAMADA\"}")));
 
+        // Act
         var resp = service.programar(9L, 3L, req);
+
+        // Assert
         assertEquals(77L, resp.idAlerta());
         assertEquals("PROGRAMADA", resp.estado());
         assertEquals(op, resp.idOperacion());
@@ -161,6 +192,7 @@ class ProgramarAlertaServiceReglasTest {
     }
 
     @Test void segundaLlegadaEnProcesoNoDuplica() {
+        // Arrange
         UUID op = UUID.randomUUID();
         var req = km(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
@@ -168,12 +200,16 @@ class ProgramarAlertaServiceReglasTest {
         when(operaciones.buscarYBloquear(op)).thenReturn(Optional.of(
                 new OperacionAlertaJdbcDao.OperacionAlerta(op, 9L, huella, "EN_PROCESO", null)));
 
+        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
+
+        // Assert
         assertEquals("OPERACION_EN_PROCESO", ex.codigo());
         verify(alertas, never()).insertarAlerta(any());
     }
 
     @Test void kmObjetivoQueDesbordaEnteroSeRechaza() {
+        // Arrange
         when(alertas.ultimaLectura(3L)).thenReturn(new AlertasJdbcDao.LecturaActual(10L, Integer.MAX_VALUE - 10));
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
@@ -181,7 +217,11 @@ class ProgramarAlertaServiceReglasTest {
                 null, Integer.MAX_VALUE - 10, 10L);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
+
+        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
+
+        // Assert
         assertEquals("DATOS_INVALIDOS", ex.codigo());
         verify(alertas, never()).insertarAlerta(any());
     }

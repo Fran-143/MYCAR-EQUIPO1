@@ -26,3 +26,12 @@
 
 # Windows
 Thumbs.db
+# Auditoría local temporal (no compartir)
+.cursor_apf3_audit/
+
+
+# Logs locales de instalación Android
+android/install-err.txt
+android/install-out.txt
+android/install-out-ui.xml
+

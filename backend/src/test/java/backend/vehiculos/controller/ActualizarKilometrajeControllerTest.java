@@ -24,12 +24,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+/** RF14 — TDD del controlador de kilometraje (Arrange / Act / Assert). */
 class ActualizarKilometrajeControllerTest {
     MockMvc mvc;
     ActualizarKilometrajeService servicio;
     Authentication auth;
 
     @BeforeEach @SuppressWarnings("unchecked") void preparar() {
+        // Arrange compartido: identidad de sesión y MockMvc
         var proveedor = mock(ObjectProvider.class);
         IdentidadVehiculos identidad = mock(IdentidadVehiculos.class);
         when(proveedor.getIfAvailable()).thenReturn(identidad);
@@ -41,17 +43,23 @@ class ActualizarKilometrajeControllerTest {
     }
 
     @Test void consultaActualUsaPropietarioDeSesion() throws Exception {
+        // Arrange
         when(servicio.consultarActual(17, 5)).thenReturn(new ContextoKilometrajeActual(
                 5, 9, 50000, Instant.parse("2020-01-01T00:00:00Z"), 0, "ACTIVO"));
+
+        // Act + Assert
         mvc.perform(get("/api/v1/vehiculos/5/kilometraje/actual").principal(auth))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.kmActual").value(50000));
         verify(servicio).consultarActual(17, 5);
     }
 
     @Test void kmNoSuperiorEs409() throws Exception {
+        // Arrange
         UUID op = UUID.randomUUID();
         when(servicio.registrar(eq(17L), eq(5L), any(DatosActualizarKilometraje.class)))
                 .thenThrow(new ErrorRegistroVehiculo("KM_NO_SUPERIOR", Set.of("kmNuevo")));
+
+        // Act + Assert
         mvc.perform(post("/api/v1/vehiculos/5/kilometraje/lecturas").principal(auth)
                 .contentType("application/json")
                 .content("""

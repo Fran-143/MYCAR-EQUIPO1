@@ -13,6 +13,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/** RF18 — TDD de HistorialMantenimientoService con DAO mock (Arrange / Act / Assert). */
 class HistorialMantenimientoServiceTest {
     private HistorialMantenimientoDao dao;
     private HistorialMantenimientoService servicio;
@@ -20,16 +21,22 @@ class HistorialMantenimientoServiceTest {
     private final Vehiculo inactivo = new Vehiculo(11, "DEF456", "Nissan", "Versa", "INACTIVO", false);
 
     @BeforeEach void preparar() {
+        // Arrange compartido: DAO mock y vehículo propio activo
         dao = mock(HistorialMantenimientoDao.class);
         servicio = new HistorialMantenimientoService(dao);
         when(dao.vehiculoPropio(1, 10)).thenReturn(Optional.of(activo));
     }
 
     @Test void CP01_preservaKmHistoricosCostoNullCeroYAnulados() {
+        // Arrange
         var ultimo = registro(20, "2026-10-10", 49000, "ANULADO", BigDecimal.ZERO);
         var anterior = registro(19, "2026-09-20", 47000, "REALIZADO", null);
         when(dao.mantenimientosPropios(1, 10)).thenReturn(List.of(ultimo, anterior));
+
+        // Act
         var resultado = servicio.consultar(1, 10);
+
+        // Assert
         assertEquals(2, resultado.total());
         assertEquals(List.of(ultimo, anterior), resultado.mantenimientos());
         assertEquals(49000, resultado.mantenimientos().getFirst().kmServicio());
@@ -38,13 +45,21 @@ class HistorialMantenimientoServiceTest {
     }
 
     @Test void CP02_historialVacioEsUnResultadoValido() {
+        // Arrange: dao.mantenimientosPropios no stub → lista vacía por defecto de mock
+
+        // Act
         var r = servicio.consultar(1, 10);
+
+        // Assert
         assertEquals(0, r.total()); assertTrue(r.mantenimientos().isEmpty());
         assertEquals(activo, r.vehiculo());
     }
 
     @Test void CP03_sinVehiculosNoConsultaMantenimientos() {
+        // Act
         assertTrue(servicio.contexto(1).vehiculos().isEmpty());
+
+        // Assert
         verify(dao, never()).mantenimientosPropios(anyLong(), anyLong());
     }
 
