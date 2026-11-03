@@ -62,6 +62,9 @@ class MantenimientoViewModel(
         val nuevo = cambio(actual.borrador).copy(idOperacion = UUID.randomUUID().toString(), envioPendiente = false)
         recordar(nuevo)
         mutable.value = actual.copy(borrador = nuevo, errores = emptyMap(), mensaje = null)
+        if (nuevo.codigoTipo == "CAMBIO_ACEITE" && actual.borrador.codigoTipo != "CAMBIO_ACEITE") {
+            proponerAceiteVehiculo()
+        }
     }
     fun recargar() { viewModelScope.launch { cargarContexto() } }
     private suspend fun cargarContexto() {
@@ -140,6 +143,18 @@ class MantenimientoViewModel(
         cerrarEditor()
     }
     fun quitarRepuesto(id: String) { actualizar { b -> b.copy(repuestos = b.repuestos.filterNot { it.idLocal == id }) } }
+    fun proponerAceiteVehiculo() {
+        val aceite = mutable.value.contexto?.vehiculos
+            ?.firstOrNull { it.idVehiculo == mutable.value.borrador.idVehiculo }
+            ?.aceiteRegistrado?.takeIf { it.isNotBlank() && !it.equals("No informado", true) } ?: return
+        if (mutable.value.borrador.codigoTipo != "CAMBIO_ACEITE") return
+        editarRepuesto()
+        mutable.value.editor?.let { ed ->
+            mutable.value = mutable.value.copy(editor = ed.copy(nombre = aceite))
+        } ?: run {
+            mutable.value = mutable.value.copy(editor = RepuestoBorrador(nombre = aceite))
+        }
+    }
     fun guardar() {
         val s = mutable.value
         if (!s.editable) return

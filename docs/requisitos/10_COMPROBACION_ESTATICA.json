@@ -1,0 +1,21 @@
+{
+  "tablas_esperadas": 21,
+  "tablas_encontradas": 21,
+  "tablas_sin_duplicar": true,
+  "fk_tablas_validas": true,
+  "funciones_trigger_presentes": true,
+  "funciones_diseño": 16,
+  "triggers_definidos": 12,
+  "errores_lexicos_sql": {
+    "09_INSTALACION_TODO_EN_UNO.sql": [],
+    "01_ESQUEMA_MYCAR.sql": [],
+    "04_PRUEBAS_SMOKE_ROLLBACK.sql": [],
+    "00_CREAR_BASE_OPCIONAL.sql": [],
+    "02_CATALOGOS_INICIALES.sql": [],
+    "03_LOGICA_BD.sql": []
+  },
+  "sql_no_drop": true,
+  "instalacion_unificada_existe": true,
+  "pruebas_terminan_en_rollback": true,
+  "advertencia": "Revisión estática. No es una prueba de ejecución en un servidor PostgreSQL."
+}

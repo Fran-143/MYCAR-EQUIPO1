@@ -5,6 +5,7 @@ import backend.vehiculos.dao.CondicionesRegistroVehiculoDao;
 import backend.vehiculos.dao.ConsultaRegistroVehiculoDao;
 import backend.vehiculos.domain.ErrorRegistroVehiculo;
 import backend.vehiculos.dto.DatosCatalogosVehiculo;
+import backend.vehiculos.dto.DatosDetalleVehiculo;
 import backend.vehiculos.dto.DatosListadoVehiculos;
 import java.util.Locale;
 import java.util.Set;
@@ -46,6 +47,15 @@ public class ConsultaRegistroVehiculoService {
     public DatosCupoRegistro consultarCupo(long idUsuarioAutenticado) {
         condiciones.exigirCuentaActiva(idUsuarioAutenticado);
         return consultas.consultarCupo(idUsuarioAutenticado);
+    }
+
+    public DatosDetalleVehiculo consultarDetalle(long idUsuarioAutenticado, long idVehiculo) {
+        condiciones.exigirCuentaActiva(idUsuarioAutenticado);
+        if (idVehiculo <= 0) {
+            throw new ErrorRegistroVehiculo("VEHICULO_NO_ENCONTRADO");
+        }
+        return consultas.obtenerDetallePropio(idUsuarioAutenticado, idVehiculo)
+                .orElseThrow(() -> new ErrorRegistroVehiculo("VEHICULO_NO_ENCONTRADO"));
     }
 
     public DatosListadoVehiculos listarVehiculos(

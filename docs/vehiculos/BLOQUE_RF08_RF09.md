@@ -38,7 +38,7 @@ identificador estable de cuenta y contrato de renovación/logout. El host debe i
 - listadoRepository: RemoteListadoVehiculosRepository del mismo cliente autenticado.
 - pendientes: ArchivoSolicitudRegistroPendiente de ese servidor/cuenta.
 - onIrInicio y onIniciarSesion conectados al host real.
-- onVerDetalle se conecta al desarrollar RF10; de momento es opcional y no crea una pantalla ficticia.
+- onVerDetalle abre RF10 (`feat/detalle-vehiculo-rf10`); ver `BLOQUE_RF10.md` y `API_RF10.md`.
 
 RF06: acordar y conectar limpieza local, SavedStateHandle/ViewModel y trabajos pendientes.
 No se implementa logout ni se modifica su política sin el contrato. Un 401 sigue conservando el pendiente

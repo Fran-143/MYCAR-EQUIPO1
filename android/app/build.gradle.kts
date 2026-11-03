@@ -90,6 +90,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

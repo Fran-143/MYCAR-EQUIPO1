@@ -32,7 +32,8 @@ fun RegistrarMantenimientoRoute(
     onActualizarKm: ((Long) -> Unit)? = null,
     onSesionRequerida: (() -> Unit)? = null,
     archivoPendiente: ArchivoRegistroPendiente? = null,
-    estadoEnSistema: Boolean = true
+    estadoEnSistema: Boolean = true,
+    recargaToken: Int = 0
 ) {
     val context = LocalContext.current.applicationContext
     val factory = remember(repository, claveCuentaBorrador, idVehiculoInicial, archivoPendiente, estadoEnSistema) {
@@ -56,6 +57,7 @@ fun RegistrarMantenimientoRoute(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    LaunchedEffect(recargaToken) { if (recargaToken > 0) vm.recargar() }
     val cerrarConfirmado = { vm.finalizarConfirmacion(); onCerrar() }
     BackHandler {
         when {

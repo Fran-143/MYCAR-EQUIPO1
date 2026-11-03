@@ -19,7 +19,8 @@ fun EntradaRegistroMantenimiento(
     onActualizarKm: ((Long) -> Unit)? = null,
     onSesionRequerida: (() -> Unit)? = null,
     archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
-    estadoEnSistema: Boolean = true
+    estadoEnSistema: Boolean = true,
+    recargaToken: Int = 0
 ) {
     if (repository != null && !claveCuentaBorrador.isNullOrBlank()) {
         RegistrarMantenimientoRoute(
@@ -27,7 +28,8 @@ fun EntradaRegistroMantenimiento(
             onCerrar = onCerrar, modifier = modifier,
             idVehiculoInicial = idVehiculoInicial,
             onActualizarKm = onActualizarKm, onSesionRequerida = onSesionRequerida,
-            archivoPendiente = archivoPendiente, estadoEnSistema = estadoEnSistema
+            archivoPendiente = archivoPendiente, estadoEnSistema = estadoEnSistema,
+            recargaToken = recargaToken
         )
     } else {
         BackHandler(onBack = onCerrar)
@@ -55,6 +57,7 @@ private object AccionesSinSesion : AccionesMantenimiento {
     override fun cerrarEditor() {}
     override fun confirmarRepuesto() {}
     override fun quitarRepuesto(id: String) {}
+    override fun proponerAceiteVehiculo() {}
     override fun guardar() {}
     override fun reintentarMismaOperacion() {}
     override fun consultarOperacion() {}
