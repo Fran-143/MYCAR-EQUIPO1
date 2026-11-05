@@ -34,7 +34,6 @@ public class ProgramarAlertaService {
             throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible.");
         }
         var lectura = alertas.ultimaLectura(vehiculo);
-        // POR_TIEMPO puede abrirse sin km; KM/AMBOS se validan al configurar/guardar (G59).
         boolean hayKm = lectura != null;
         return new ContratoRf22.ContextoResponse(
                 alertas.hoyLima(), "America/Lima",
@@ -63,7 +62,30 @@ public class ProgramarAlertaService {
         alertas.exigirVehiculoPropioActivo(usuario, vehiculo);
         LocalDate hoy = alertas.hoyLima();
         var lectura = alertas.ultimaLectura(vehiculo);
-        revalidarBasesConfirmadas(req, hoy, lectura);
+        boolean desdeHoy = "DESDE_HOY".equals(req.origenCalculo());
+        boolean desdeMant = "DESDE_MANTENIMIENTO".equals(req.origenCalculo());
+
+        AlertasJdbcDao.MantenimientoBase mant = null;
+        if (desdeMant) {
+            if (req.idMantenimientoReferencia() == null) {
+                throw new ErrorAlertas("DATOS_INVALIDOS",
+                        "Selecciona un mantenimiento de referencia.", Set.of("idMantenimientoReferencia"));
+            }
+            mant = alertas.mantenimientoRealizado(vehiculo, req.idMantenimientoReferencia())
+                    .orElseThrow(() -> new ErrorAlertas("DATOS_INVALIDOS",
+                            "El mantenimiento de referencia no está disponible.",
+                            Set.of("idMantenimientoReferencia")));
+            if (!"REALIZADO".equals(mant.estado())) {
+                throw new ErrorAlertas("DATOS_INVALIDOS",
+                        "El mantenimiento de referencia no está disponible.",
+                        Set.of("idMantenimientoReferencia"));
+            }
+        } else if (req.idMantenimientoReferencia() != null) {
+            throw new ErrorAlertas("DATOS_INVALIDOS",
+                    "Desde hoy no admite mantenimiento de referencia.", Set.of("idMantenimientoReferencia"));
+        }
+
+        revalidarBasesConfirmadas(req, hoy, lectura, mant);
 
         if (CriterioAlerta.usaKm(req.criterio()) && lectura == null) {
             throw new ErrorAlertas("KILOMETRAJE_NO_DISPONIBLE",
@@ -71,15 +93,30 @@ public class ProgramarAlertaService {
         }
 
         long idTipo = alertas.idTipoPorCodigo(req.codigoTipoMantenimiento());
+        if (desdeMant && mant.idTipo() != idTipo) {
+            throw new ErrorAlertas("DATOS_INVALIDOS",
+                    "El mantenimiento no corresponde al tipo de servicio.",
+                    Set.of("idMantenimientoReferencia"));
+        }
+
         LocalDate fechaBase = null;
         LocalDate fechaObjetivo = null;
         Integer intervaloKm = null;
+        Integer kmBase = null;
         Integer kmObjetivo = null;
         String unidad = null;
         Integer cantidad = null;
         String servicio = "OTRO".equals(req.codigoTipoMantenimiento()) ? req.servicioOtro() : null;
         if (servicio != null && servicio.isBlank()) {
             throw new ErrorAlertas("DATOS_INVALIDOS", "Describe el servicio OTRO.", Set.of("servicioOtro"));
+        }
+        if (desdeMant && "OTRO".equals(req.codigoTipoMantenimiento())) {
+            String a = alertas.normalizarServicioOtro(servicio == null ? "" : servicio);
+            String b = alertas.normalizarServicioOtro(mant.servicioOtro() == null ? "" : mant.servicioOtro());
+            if (!Objects.equals(a, b)) {
+                throw new ErrorAlertas("DATOS_INVALIDOS",
+                        "El servicio OTRO no coincide con el mantenimiento.", Set.of("servicioOtro"));
+            }
         }
 
         if (CriterioAlerta.usaTiempo(req.criterio())) {
@@ -88,10 +125,11 @@ public class ProgramarAlertaService {
             if (unidad == null || cantidad == null) {
                 throw new ErrorAlertas("DATOS_INVALIDOS", "Completa tiempo.", Set.of("unidadTiempo", "cantidadTiempo"));
             }
-            fechaBase = hoy;
+            fechaBase = desdeHoy ? hoy : mant.fechaServicio();
             fechaObjetivo = alertas.calcularFechaObjetivo(fechaBase, unidad, cantidad);
-            if (!fechaObjetivo.isAfter(fechaBase)) {
-                throw new ErrorAlertas("OBJETIVO_NO_FUTURO", "La fecha objetivo debe ser futura.", Set.of("cantidadTiempo"));
+            if (!fechaObjetivo.isAfter(hoy)) {
+                throw new ErrorAlertas("OBJETIVO_NO_FUTURO",
+                        "La fecha objetivo debe ser posterior a hoy.", Set.of("cantidadTiempo"));
             }
         }
         if (CriterioAlerta.usaKm(req.criterio())) {
@@ -99,12 +137,21 @@ public class ProgramarAlertaService {
             if (intervaloKm == null || intervaloKm <= 0) {
                 throw new ErrorAlertas("DATOS_INVALIDOS", "Intervalo inválido.", Set.of("intervaloKm"));
             }
-            long suma = (long) lectura.valorKm() + (long) intervaloKm;
+            kmBase = desdeHoy ? lectura.valorKm() : mant.kmServicio();
+            if (kmBase == null || kmBase <= 0) {
+                throw new ErrorAlertas("DATOS_INVALIDOS",
+                        "No hay kilometraje base válido.", Set.of("intervaloKm"));
+            }
+            long suma = (long) kmBase + (long) intervaloKm;
             if (suma > Integer.MAX_VALUE) {
                 throw new ErrorAlertas("DATOS_INVALIDOS",
                         "El kilometraje objetivo supera el máximo permitido.", Set.of("intervaloKm"));
             }
             kmObjetivo = (int) suma;
+            if (kmObjetivo <= lectura.valorKm()) {
+                throw new ErrorAlertas("OBJETIVO_NO_FUTURO",
+                        "El kilometraje objetivo ya fue alcanzado.", Set.of("intervaloKm"));
+            }
         }
 
         String servicioNorm = alertas.normalizarServicioOtro(servicio == null ? "" : servicio);
@@ -115,10 +162,10 @@ public class ProgramarAlertaService {
 
         try {
             long idAlerta = alertas.insertarAlerta(new AlertasJdbcDao.DatosInsercion(
-                    vehiculo, idTipo, req.criterio(), servicio,
+                    vehiculo, idTipo, req.criterio(), req.origenCalculo(), servicio,
                     unidad, cantidad, fechaBase, fechaObjetivo,
-                    CriterioAlerta.usaKm(req.criterio()) ? lectura.valorKm() : null,
-                    intervaloKm, kmObjetivo, estado, firma, req.idMantenimientoReferencia()));
+                    kmBase, intervaloKm, kmObjetivo, estado, firma,
+                    desdeMant ? req.idMantenimientoReferencia() : null));
             alertas.historialInicial(idAlerta, estado);
             operaciones.confirmar(req.idOperacion(), usuario, idAlerta, estado);
             return new ContratoRf22.ProgramarResponse(req.idOperacion(), idAlerta, estado);
@@ -132,28 +179,37 @@ public class ProgramarAlertaService {
         }
     }
 
-    /**
-     * G89: si el resumen se basó en fecha/km distintos a los vigentes, no guardar;
-     * el cliente debe actualizar el resumen y pedir reconfirmación.
-     */
     private void revalidarBasesConfirmadas(
-            ContratoRf22.ProgramarRequest req, LocalDate hoy, AlertasJdbcDao.LecturaActual lectura) {
+            ContratoRf22.ProgramarRequest req,
+            LocalDate hoy,
+            AlertasJdbcDao.LecturaActual lectura,
+            AlertasJdbcDao.MantenimientoBase mant) {
+        boolean desdeHoy = "DESDE_HOY".equals(req.origenCalculo());
         if (CriterioAlerta.usaTiempo(req.criterio())) {
-            if (req.fechaBaseConfirmada() == null || !req.fechaBaseConfirmada().equals(hoy)) {
+            LocalDate esperada = desdeHoy ? hoy : mant.fechaServicio();
+            if (req.fechaBaseConfirmada() == null || !req.fechaBaseConfirmada().equals(esperada)) {
                 throw new ErrorAlertas("BASES_CAMBIARON",
-                        "La fecha actual cambió. Revisa el resumen y confirma de nuevo.");
+                        "La fecha base cambió. Revisa el resumen y confirma de nuevo.");
             }
         }
         if (CriterioAlerta.usaKm(req.criterio())) {
-            if (lectura == null) {
-                throw new ErrorAlertas("KILOMETRAJE_NO_DISPONIBLE",
-                        "Se necesita kilometraje vigente para programar por kilometraje o ambos.");
-            }
-            if (req.kmBaseConfirmado() == null || req.idLecturaConfirmada() == null
-                    || !Objects.equals(req.kmBaseConfirmado(), lectura.valorKm())
-                    || !Objects.equals(req.idLecturaConfirmada(), lectura.idLecturaKm())) {
-                throw new ErrorAlertas("BASES_CAMBIARON",
-                        "El kilometraje vigente cambió. Revisa el resumen y confirma de nuevo.");
+            if (desdeHoy) {
+                if (lectura == null) {
+                    throw new ErrorAlertas("KILOMETRAJE_NO_DISPONIBLE",
+                            "Se necesita kilometraje vigente para programar por kilometraje o ambos.");
+                }
+                if (req.kmBaseConfirmado() == null || req.idLecturaConfirmada() == null
+                        || !Objects.equals(req.kmBaseConfirmado(), lectura.valorKm())
+                        || !Objects.equals(req.idLecturaConfirmada(), lectura.idLecturaKm())) {
+                    throw new ErrorAlertas("BASES_CAMBIARON",
+                            "El kilometraje vigente cambió. Revisa el resumen y confirma de nuevo.");
+                }
+            } else {
+                if (req.kmBaseConfirmado() == null
+                        || !Objects.equals(req.kmBaseConfirmado(), mant.kmServicio())) {
+                    throw new ErrorAlertas("BASES_CAMBIARON",
+                            "El kilometraje del mantenimiento cambió. Revisa el resumen y confirma de nuevo.");
+                }
             }
         }
     }
@@ -184,6 +240,11 @@ public class ProgramarAlertaService {
     private void validar(ContratoRf22.ProgramarRequest req) {
         if (req == null || req.idOperacion() == null) {
             throw new ErrorAlertas("DATOS_INVALIDOS", "Solicitud incompleta.");
+        }
+        if (req.origenCalculo() == null
+                || (!"DESDE_HOY".equals(req.origenCalculo())
+                && !"DESDE_MANTENIMIENTO".equals(req.origenCalculo()))) {
+            throw new ErrorAlertas("DATOS_INVALIDOS", "Origen de cálculo inválido.", Set.of("origenCalculo"));
         }
     }
 }

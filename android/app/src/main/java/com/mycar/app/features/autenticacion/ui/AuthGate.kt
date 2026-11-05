@@ -117,7 +117,12 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(policy.documentUrl))
                             .addCategory(Intent.CATEGORY_BROWSABLE))
                     } catch (_: Exception) { registration.policyOpenFailed() }
-                })
+                },
+                onCodeChange = registration::editCode,
+                onConfirmCode = registration::confirmCode,
+                onResendCode = registration::resendCode,
+                onBackFromCode = registration::backFromCode)
+
             else -> WelcomeScreen(session.message, onLogin = { page = "login" },
                 onRegister = { registration.reset(); page = "registration" })
         }
@@ -134,38 +139,60 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
 @Composable
 private fun WelcomeScreen(message: String?, onLogin: () -> Unit, onRegister: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Scaffold(containerColor = colors.primaryContainer) { padding ->
+    Scaffold(containerColor = colors.background) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
             .heightIn(min = maxHeight).padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(64.dp))
-            Surface(shape = RoundedCornerShape(24.dp), color = colors.surface) {
-                Icon(painterResource(R.drawable.ic_auth_car), contentDescription = "MyCar",
-                    modifier = Modifier.padding(22.dp).size(48.dp), tint = colors.primary)
-            }
-            Spacer(Modifier.height(24.dp))
-            Text("MyCar", style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold, color = colors.onPrimaryContainer)
-            Spacer(Modifier.height(12.dp))
-            Text("Tu vehículo, organizado en un solo lugar.",
-                style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
-                color = colors.onPrimaryContainer)
             Spacer(Modifier.height(48.dp))
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = colors.onPrimaryContainer,
+                shadowElevation = 2.dp
+            ) {
+                Icon(painterResource(R.drawable.ic_auth_car), contentDescription = "MyCar",
+                    modifier = Modifier.padding(18.dp).size(40.dp), tint = colors.secondary)
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("MyCar", style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold, color = colors.onBackground)
+            Spacer(Modifier.height(8.dp))
+            Text("Controla tu vehículo, siempre al día",
+                style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center,
+                color = colors.onSurfaceVariant)
+            Spacer(Modifier.height(28.dp))
+            Icon(painterResource(R.drawable.ic_auth_car), contentDescription = null,
+                modifier = Modifier.size(120.dp), tint = colors.secondary)
+            Spacer(Modifier.height(16.dp))
+            Text("Gestiona mantenimientos, kilometraje y alertas preventivas",
+                style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
+                color = colors.onSurfaceVariant)
+            Spacer(Modifier.height(24.dp))
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
             message?.let {
-                Text(it, color = colors.onPrimaryContainer, textAlign = TextAlign.Center)
+                Text(it, color = colors.error, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
             }
-            Button(onClick = onLogin, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                shape = RoundedCornerShape(16.dp)) { Text("Iniciar sesión") }
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onRegister,
+            Button(
+                onClick = onLogin,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                shape = RoundedCornerShape(16.dp)) { Text("Crear cuenta") }
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.onPrimaryContainer,
+                    contentColor = colors.onPrimary
+                )
+            ) { Text("Iniciar sesión", fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onRegister,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onBackground)
+            ) { Text("Crear una cuenta", fontWeight = FontWeight.Medium) }
             Spacer(Modifier.height(32.dp))
             }
         }

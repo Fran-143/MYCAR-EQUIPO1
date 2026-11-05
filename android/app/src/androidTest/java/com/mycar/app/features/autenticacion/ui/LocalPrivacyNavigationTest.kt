@@ -5,7 +5,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
+import com.mycar.app.features.autenticacion.data.RegistrationFailure
+import com.mycar.app.features.autenticacion.data.RegistrationFailureKind
+import com.mycar.app.features.autenticacion.data.RegistrationRequest
 import com.mycar.app.features.autenticacion.data.RegistrationService
+import com.mycar.app.features.autenticacion.data.VerificationSession
 import com.mycar.app.features.autenticacion.domain.PrivacyPolicyConfiguration
 import com.mycar.app.features.autenticacion.domain.RegistrationForm
 import com.mycar.app.ui.theme.MyCarTheme
@@ -17,9 +21,21 @@ import org.junit.Test
 class LocalPrivacyNavigationTest {
     @get:Rule val compose = createComposeRule()
     private var calls = 0
+    private val service = object : RegistrationService {
+        override suspend fun register(request: RegistrationRequest) =
+            throw RegistrationFailure(RegistrationFailureKind.UNAVAILABLE)
+        override suspend fun startEmailVerification(request: RegistrationRequest): VerificationSession {
+            calls++
+            return VerificationSession("o", "os", "op", "ops", "em", 1, "123456")
+        }
+        override suspend fun resendEmailCode(session: VerificationSession, request: RegistrationRequest) = session
+        override suspend fun completeEmailVerification(
+            session: VerificationSession, code: String, request: RegistrationRequest
+        ) = Unit
+    }
     private fun show() {
         val policy = PrivacyPolicyConfiguration.academicLocal()
-        val vm = RegistrationViewModel(RegistrationService { calls++ }, policy)
+        val vm = RegistrationViewModel(service, policy)
         vm.edit { RegistrationForm("Ana", "Pérez", "persona@example.org", "01/01/1995", "Aa1!abcd", "Aa1!abcd") }
         compose.setContent {
             val state by vm.state.collectAsState()

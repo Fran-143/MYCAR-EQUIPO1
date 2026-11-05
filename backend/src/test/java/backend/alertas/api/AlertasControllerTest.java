@@ -50,7 +50,7 @@ class AlertasControllerTest {
         mvc.perform(post("/api/v1/rf22/vehiculos/3/alertas").principal(auth)
                 .contentType("application/json")
                 .content("""
-                        {"idOperacion":"%s","codigoTipoMantenimiento":"CAMBIO_ACEITE","criterio":"POR_KILOMETRAJE","intervaloKm":5000}
+                        {"idOperacion":"%s","codigoTipoMantenimiento":"CAMBIO_ACEITE","criterio":"POR_KILOMETRAJE","origenCalculo":"DESDE_HOY","intervaloKm":5000,"kmBaseConfirmado":20000,"idLecturaConfirmada":1}
                         """.formatted(op)))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.idAlerta").value(12));
     }
@@ -61,7 +61,7 @@ class AlertasControllerTest {
         mvc.perform(post("/api/v1/rf22/vehiculos/3/alertas").principal(auth)
                 .contentType("application/json")
                 .content("""
-                        {"idOperacion":"%s","codigoTipoMantenimiento":"CAMBIO_ACEITE","criterio":"POR_KILOMETRAJE","intervaloKm":5000}
+                        {"idOperacion":"%s","codigoTipoMantenimiento":"CAMBIO_ACEITE","criterio":"POR_KILOMETRAJE","origenCalculo":"DESDE_HOY","intervaloKm":5000,"kmBaseConfirmado":20000,"idLecturaConfirmada":1}
                         """.formatted(UUID.randomUUID())))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.codigo").value("ALERTA_EQUIVALENTE"));
     }

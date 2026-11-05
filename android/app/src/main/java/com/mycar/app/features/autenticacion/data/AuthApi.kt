@@ -30,6 +30,18 @@ interface AuthApi {
     @POST("api/v1/auth/registro")
     suspend fun register(@Body request: RegistrationRequest): Response<RegistrationResponse>
 
+    @POST("api/v1/auth/registro/verificacion/origen")
+    suspend fun verificationOrigin(): Response<VerificationOriginResponse>
+
+    @POST("api/v1/auth/registro/verificacion/emitir")
+    suspend fun verificationEmit(@Body body: VerificationEmitRequest): Response<VerificationEmitResponse>
+
+    @POST("api/v1/auth/registro/verificacion/reenviar")
+    suspend fun verificationResend(@Body body: VerificationEmitRequest): Response<VerificationEmitResponse>
+
+    @POST("api/v1/auth/registro/verificacion/completar")
+    suspend fun verificationComplete(@Body body: VerificationCompleteRequest): Response<RegistrationResponse>
+
     @POST("api/v1/auth/login")
     suspend fun login(@Body request: LoginRequest): Response<TokenResponse>
     @POST("api/v1/auth/renovar")

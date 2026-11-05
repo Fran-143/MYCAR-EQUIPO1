@@ -14,8 +14,13 @@ class ValidadorFormularioRegistroTest {
         val campos = errores(FormularioRegistroVehiculo()).keys
         assertTrue(campos.containsAll(listOf("marca", "modelo", "usoVehiculoCodigo", "placa", "anioFabricacion", "color", "idTipoMotor", "kilometrajeInicial")))
     }
+    @Test fun placaAceptaDosFormatos() {
+        listOf("A1B234", "ABC123", "XYZ000").forEach { assertFalse(errores(f.copy(placa = it)).containsKey("placa")) }
+    }
     @Test fun placaEsEstricta() {
-        listOf("a1B234", "A1B-234", " A1B234", "A1B234 ", "ABC123").forEach { assertTrue(errores(f.copy(placa = it)).containsKey("placa")) }
+        listOf("a1B234", "A1B-234", "ABC-123", " A1B234", "A1B234 ", "AB1234", "abc123").forEach {
+            assertTrue(errores(f.copy(placa = it)).containsKey("placa"))
+        }
     }
     @Test fun anioPositivoSinLimiteInferiorInventado() { assertFalse(errores(f.copy(anioFabricacion = "1")).containsKey("anioFabricacion")) }
     @Test fun anioNoPositivoFuturoOTextoSeRechaza() {

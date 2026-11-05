@@ -153,7 +153,7 @@ internal fun RegistrationScreen(
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(12.dp))
                 }
-                Text(if (state.busy) "Creando cuenta…" else "Crear cuenta")
+                Text(if (state.busy) "Enviando código…" else "Continuar")
             }
             TextButton(onClick = onBack, enabled = !state.busy, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text("Volver")

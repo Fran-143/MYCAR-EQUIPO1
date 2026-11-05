@@ -82,14 +82,14 @@ public class AlertasJdbcDao {
     public long insertarAlerta(DatosInsercion d) {
         return jdbc.queryForObject("""
                 INSERT INTO mycar.alerta(
-                    id_vehiculo, id_tipo_mantenimiento, criterio, servicio_otro,
+                    id_vehiculo, id_tipo_mantenimiento, criterio, origen_calculo, servicio_otro,
                     unidad_tiempo, cantidad_tiempo, fecha_base, fecha_objetivo,
                     km_base, intervalo_km, km_objetivo, estado, firma_equivalencia,
                     id_mantenimiento_referencia)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 RETURNING id_alerta
                 """, Long.class,
-                d.idVehiculo(), d.idTipo(), d.criterio(), d.servicioOtro(),
+                d.idVehiculo(), d.idTipo(), d.criterio(), d.origenCalculo(), d.servicioOtro(),
                 d.unidadTiempo(), d.cantidadTiempo(), d.fechaBase(), d.fechaObjetivo(),
                 d.kmBase(), d.intervaloKm(), d.kmObjetivo(), d.estado(), d.firma(),
                 d.idReferencia());
@@ -110,7 +110,7 @@ public class AlertasJdbcDao {
 
     public List<ContratoRf22.AlertaDto> listar(long vehiculo) {
         return jdbc.query("""
-                SELECT a.id_alerta, tm.codigo, tm.nombre, a.criterio, a.estado,
+                SELECT a.id_alerta, tm.codigo, tm.nombre, a.criterio, a.origen_calculo, a.estado,
                        a.fecha_objetivo, a.km_objetivo, a.km_base, a.intervalo_km,
                        a.servicio_otro, a.version_fila
                 FROM mycar.alerta a
@@ -122,6 +122,7 @@ public class AlertasJdbcDao {
                 rs.getString("codigo"),
                 rs.getString("nombre"),
                 rs.getString("criterio"),
+                rs.getString("origen_calculo"),
                 rs.getString("estado"),
                 rs.getObject("fecha_objetivo", LocalDate.class),
                 rs.getObject("km_objetivo", Integer.class),
@@ -140,7 +141,7 @@ public class AlertasJdbcDao {
 
     public List<ContratoRf22.ReferenciaDto> referenciasRealizadas(long vehiculo) {
         return jdbc.query("""
-                SELECT m.id_mantenimiento, tm.codigo, m.fecha_servicio, m.servicio_otro
+                SELECT m.id_mantenimiento, tm.codigo, m.fecha_servicio, m.km_servicio, m.servicio_otro
                 FROM mycar.mantenimiento m
                 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = m.id_tipo_mantenimiento
                 WHERE m.id_vehiculo = ? AND m.estado = 'REALIZADO'
@@ -148,7 +149,26 @@ public class AlertasJdbcDao {
                 LIMIT 30
                 """, (rs, n) -> new ContratoRf22.ReferenciaDto(
                 rs.getLong(1), rs.getString(2),
-                rs.getObject(3, LocalDate.class), rs.getString(4)), vehiculo);
+                rs.getObject(3, LocalDate.class),
+                rs.getObject(4, Integer.class),
+                rs.getString(5)), vehiculo);
+    }
+
+    public Optional<MantenimientoBase> mantenimientoRealizado(long vehiculo, long idMantenimiento) {
+        try {
+            return Optional.ofNullable(jdbc.queryForObject("""
+                    SELECT m.id_mantenimiento, m.id_tipo_mantenimiento, tm.codigo, m.fecha_servicio,
+                           m.km_servicio, m.servicio_otro, m.estado
+                    FROM mycar.mantenimiento m
+                    JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = m.id_tipo_mantenimiento
+                    WHERE m.id_vehiculo = ? AND m.id_mantenimiento = ?
+                    """, (rs, n) -> new MantenimientoBase(
+                    rs.getLong(1), rs.getLong(2), rs.getString(3),
+                    rs.getObject(4, LocalDate.class), rs.getObject(5, Integer.class),
+                    rs.getString(6), rs.getString(7)), vehiculo, idMantenimiento));
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
     }
 
     public Optional<Long> vehiculoDeAlerta(long idAlerta) {
@@ -168,8 +188,13 @@ public class AlertasJdbcDao {
 
     public record LecturaActual(long idLecturaKm, int valorKm) { }
 
+    public record MantenimientoBase(
+            long idMantenimiento, long idTipo, String codigoTipo, LocalDate fechaServicio,
+            Integer kmServicio, String servicioOtro, String estado
+    ) { }
+
     public record DatosInsercion(
-            long idVehiculo, long idTipo, String criterio, String servicioOtro,
+            long idVehiculo, long idTipo, String criterio, String origenCalculo, String servicioOtro,
             String unidadTiempo, Integer cantidadTiempo, LocalDate fechaBase, LocalDate fechaObjetivo,
             Integer kmBase, Integer intervaloKm, Integer kmObjetivo, String estado, String firma,
             Long idReferencia

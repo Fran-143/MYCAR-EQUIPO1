@@ -30,7 +30,7 @@ Planes e integración de la BD y el backend: Sebastián (ver
 - Android: Kotlin y Jetpack Compose.
 - Backend: Java 21 y Spring Boot 3.5.
 - Base de datos: PostgreSQL 17 en Docker. Base de desarrollo `mycar_mvp`, esquema `mycar`.
-- Migraciones: Flyway en `backend/src/main/resources/db/mvp` (**V1 a V6**). V6 cubre RF22 (POR_TIEMPO sin lectura).
+- Migraciones: Flyway en `backend/src/main/resources/db/mvp` (**V1 a V9**). V6 RF22 POR_TIEMPO sin lectura; V7 placa dual; V8 OTP esquema; V9 RF22 `origen_calculo` dual.
 
 Documentación de la base: [docs/db/mvp/README.md](docs/db/mvp/README.md).  
 Guía RF22/RF23: [docs/vehiculos/GUIA_RF22_RF23.md](docs/vehiculos/GUIA_RF22_RF23.md).
@@ -140,7 +140,7 @@ cd backend
 .\mvnw.cmd spring-boot:run
 ```
 
-Flyway aplicará migraciones pendientes (hasta V6).
+Flyway aplicará migraciones pendientes (hasta V9).
 
 ## Pruebas
 

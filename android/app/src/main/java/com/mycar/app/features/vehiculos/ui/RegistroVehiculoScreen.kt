@@ -3,7 +3,6 @@ package com.mycar.app.features.vehiculos.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -56,25 +54,6 @@ fun RegistroVehiculoRoute(
         onVolver, onIniciarSesion, { vm.finalizar(onVerVehiculos) }, { vm.finalizar(onIrInicio) }, modifier)
 }
 
-/** Colores de esta pantalla; no modifica el tema compartido con otros módulos. */
-@Composable
-private fun TemaRegistroVehiculo(content: @Composable () -> Unit) {
-    val colores = if (isSystemInDarkTheme()) darkColorScheme(
-        primary = Color(0xFFA8C4FF), onPrimary = Color(0xFF002B70),
-        primaryContainer = Color(0xFF173B70), onPrimaryContainer = Color(0xFFDAE6FF),
-        background = Color(0xFF10151F), surface = Color(0xFF171E2B),
-        onSurface = Color(0xFFE7EDF8), onSurfaceVariant = Color(0xFFBBC7DA),
-        outline = Color(0xFF64748B), outlineVariant = Color(0xFF37465D)
-    ) else lightColorScheme(
-        primary = Color(0xFF154EBD), onPrimary = Color.White,
-        primaryContainer = Color(0xFFEDF5FF), onPrimaryContainer = Color(0xFF103C91),
-        background = Color(0xFFF7FAFF), surface = Color.White,
-        onSurface = Color(0xFF17243D), onSurfaceVariant = Color(0xFF53647F),
-        outline = Color(0xFF8193AF), outlineVariant = Color(0xFFDAE4F1)
-    )
-    MaterialTheme(colorScheme = colores, typography = MaterialTheme.typography, content = content)
-}
-
 @Composable
 fun RegistroVehiculoScreen(
     estado: EstadoRegistroVehiculo,
@@ -94,8 +73,7 @@ fun RegistroVehiculoScreen(
     val puedeGuardar = !estado.ocupado && erroresLocales != null && erroresLocales.isEmpty()
     val estadoVisible = estado.copy(errores = estado.errores +
         erroresLocales.orEmpty().filterKeys { it in camposEditados })
-    TemaRegistroVehiculo {
-        Scaffold(
+    Scaffold(
             modifier = modifier.fillMaxSize().imePadding(),
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
@@ -182,7 +160,6 @@ fun RegistroVehiculoScreen(
                 }
             }
         }
-    }
 }
 
 @Composable
@@ -222,7 +199,7 @@ private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambia
         SelectorRegistro("Uso del vehículo *", f.usoVehiculoCodigo,
             catalogos.usos.map { it.codigo to it.nombre }, estado.errores["usoVehiculoCodigo"], habilitado) { onCambiar("usoVehiculoCodigo", it) }
         CampoRegistro("Placa *", "placa", f.placa, estado, onCambiar, mayusculas = true,
-            ejemplo = "Ej. A1B234", ayuda = "Sin espacios ni guiones.")
+            ejemplo = "Ej. A1B234 o ABC123", ayuda = "Dos formatos: A1B234 o ABC123. Sin espacios ni guiones.")
         CampoRegistro("Año de fabricación *", "anioFabricacion", f.anioFabricacion, estado, onCambiar,
             numerico = true, ejemplo = "Ej. 2020", ayuda = "Solo el año, no una fecha completa.")
         CampoRegistro("Color *", "color", f.color, estado, onCambiar, ejemplo = "Ej. Gris")

@@ -39,6 +39,14 @@ class AuthRepositoryTest {
 
         override suspend fun register(request: RegistrationRequest): Response<RegistrationResponse> =
             error("RF02 does not register accounts")
+        override suspend fun verificationOrigin(): Response<VerificationOriginResponse> =
+            error("RF02 does not verify email")
+        override suspend fun verificationEmit(body: VerificationEmitRequest): Response<VerificationEmitResponse> =
+            error("RF02 does not verify email")
+        override suspend fun verificationResend(body: VerificationEmitRequest): Response<VerificationEmitResponse> =
+            error("RF02 does not verify email")
+        override suspend fun verificationComplete(body: VerificationCompleteRequest): Response<RegistrationResponse> =
+            error("RF02 does not verify email")
         var loginCode = 200
         var renewCode = 200
         var networkFailure = false

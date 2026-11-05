@@ -1,0 +1,7 @@
+erDiagram
+    CONTROL_ORIGEN ||--o{ OPERACION_VERIFICACION : "FK control+finalidad+ORIGEN"
+    CONTROL_CORREO ||--o{ EMISION_CODIGO : "FK control+finalidad+CORREO"
+    OPERACION_VERIFICACION ||--o{ EMISION_CODIGO : "FK operacion+finalidad"
+    OPERACION_VERIFICACION ||--o{ INTENTO_VERIFICACION : "FK operacion+finalidad"
+    EMISION_CODIGO o|--o{ INTENTO_VERIFICACION : "FK emision+operacion+finalidad"
+    USUARIO o|--o| OPERACION_VERIFICACION : "usuario_resultado unico nullable"

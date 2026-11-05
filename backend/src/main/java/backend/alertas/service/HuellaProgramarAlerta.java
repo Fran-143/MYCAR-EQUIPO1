@@ -10,8 +10,9 @@ final class HuellaProgramarAlerta {
     private HuellaProgramarAlerta() { }
 
     static String calcular(long vehiculo, ContratoRf22.ProgramarRequest req) {
-        String canon = "RF22_PROGRAMAR_ALERTA_V1\u001f" + vehiculo + '\u001f'
+        String canon = "RF22_PROGRAMAR_ALERTA_V2\u001f" + vehiculo + '\u001f'
                 + req.codigoTipoMantenimiento() + '\u001f' + req.criterio() + '\u001f'
+                + nullSafe(req.origenCalculo()) + '\u001f'
                 + nullSafe(req.unidadTiempo()) + '\u001f' + nullSafe(req.cantidadTiempo()) + '\u001f'
                 + nullSafe(req.intervaloKm()) + '\u001f' + nullSafe(req.servicioOtro()) + '\u001f'
                 + nullSafe(req.idMantenimientoReferencia()) + '\u001f' + req.idOperacion();

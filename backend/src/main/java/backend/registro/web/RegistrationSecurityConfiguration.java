@@ -18,8 +18,14 @@ public class RegistrationSecurityConfiguration {
     @Bean
     @Order(1)
     SecurityFilterChain registrationSecurity(HttpSecurity http) throws Exception {
-        return http.securityMatcher("/api/v1/auth/registro")
-                .authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/registro")
+        return http.securityMatcher("/api/v1/auth/registro", "/api/v1/auth/registro/**")
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/auth/registro",
+                                "/api/v1/auth/registro/verificacion/origen",
+                                "/api/v1/auth/registro/verificacion/emitir",
+                                "/api/v1/auth/registro/verificacion/completar",
+                                "/api/v1/auth/registro/verificacion/reenviar")
                         .permitAll().anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)

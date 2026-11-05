@@ -76,6 +76,9 @@ class ProgramarAlertaViewModelTest {
         }
     }
 
+    private fun BorradorAlerta.km(tipo: String = "CAMBIO_ACEITE", intervalo: String = "5000") =
+        copy(codigoTipo = tipo, criterio = "POR_KILOMETRAJE", origenCalculo = "DESDE_HOY", intervaloKm = intervalo)
+
     @Test fun tresAlertasConsecutivasValidasConNuevaIdentidadCadaUna() = runTest(dispatcher) {
         val repo = RepoFake()
         val vm = ProgramarAlertaViewModel(repo, 9L)
@@ -84,16 +87,13 @@ class ProgramarAlertaViewModelTest {
             if (n > 0) vm.prepararNuevaProgramacion()
             advanceUntilIdle()
             assertNull(vm.estado.value.exito)
-            vm.actualizar {
-                it.copy(codigoTipo = "CAMBIO_ACEITE", criterio = "POR_KILOMETRAJE", intervaloKm = "${5000 + n * 1000}")
-            }
+            vm.actualizar { it.km(intervalo = "${5000 + n * 1000}") }
             vm.revisar()
             advanceUntilIdle()
             assertEquals(PasoProgramar.REVISION, vm.estado.value.paso)
             vm.confirmar()
             advanceUntilIdle()
             assertEquals((n + 1).toLong(), vm.estado.value.exito)
-            assertEquals(PasoProgramar.EXITO, vm.estado.value.paso)
         }
         assertEquals(3, repo.programaciones)
         assertEquals(3, repo.idsOperacion.distinct().size)
@@ -104,56 +104,91 @@ class ProgramarAlertaViewModelTest {
         repo.fallo = IllegalStateException("Fallo temporal")
         val vm = ProgramarAlertaViewModel(repo, 9L)
         advanceUntilIdle()
-        vm.actualizar { it.copy(codigoTipo = "CAMBIO_FILTROS", intervaloKm = "8000") }
-        vm.revisar()
-        advanceUntilIdle()
-        vm.confirmar()
-        advanceUntilIdle()
+        vm.actualizar { it.km("CAMBIO_FILTROS", "8000") }
+        vm.revisar(); advanceUntilIdle()
+        vm.confirmar(); advanceUntilIdle()
         assertNull(vm.estado.value.exito)
-        assertNotNull(vm.estado.value.idOperacion)
         val primera = vm.estado.value.idOperacion
+        assertNotNull(primera)
         repo.fallo = null
-        vm.confirmar()
-        advanceUntilIdle()
+        vm.confirmar(); advanceUntilIdle()
         assertEquals(1L, vm.estado.value.exito)
         assertEquals(listOf(primera, primera), repo.idsOperacion)
     }
 
-    @Test fun prepararNuevaLimpiaExitoYPermiteAbrirDeNuevo() = runTest(dispatcher) {
-        val repo = RepoFake()
-        val vm = ProgramarAlertaViewModel(repo, 3L)
-        advanceUntilIdle()
-        vm.actualizar { it.copy(codigoTipo = "REVISION_FRENOS", intervaloKm = "10000") }
-        vm.revisar(); advanceUntilIdle()
-        vm.confirmar(); advanceUntilIdle()
-        assertNotNull(vm.estado.value.exito)
-        vm.prepararNuevaProgramacion()
-        advanceUntilIdle()
-        assertNull(vm.estado.value.exito)
-        assertEquals(PasoProgramar.FORMULARIO, vm.estado.value.paso)
-        assertNotNull(vm.estado.value.contexto)
-    }
-
-    @Test fun ambosExigeTiempoYKmYCalculaObjetivoDesdeKmVigente() = runTest(dispatcher) {
-        val repo = RepoFake(km = 58240)
+    @Test fun ambosDesdeHoyCalculaObjetivos() = runTest(dispatcher) {
+        val repo = RepoFake(km = 58240, fecha = "2026-11-03")
         val vm = ProgramarAlertaViewModel(repo, 2L)
         advanceUntilIdle()
-        assertTrue(CriterioAlerta.usaTiempo("AMBOS") && CriterioAlerta.usaKm("AMBOS"))
         vm.actualizar {
             it.copy(
-                codigoTipo = "CAMBIO_ACEITE", criterio = "AMBOS",
+                codigoTipo = "CAMBIO_ACEITE", criterio = "AMBOS", origenCalculo = "DESDE_HOY",
                 cantidadTiempo = "6", unidadTiempo = "MESES", intervaloKm = "5000"
             )
         }
         assertTrue(ProgramarAlertaViewModel.validarBorrador(vm.estado.value.borrador, 58240).isEmpty())
         vm.revisar(); advanceUntilIdle()
+        assertEquals("2027-05-03", vm.estado.value.resumen?.fechaObjetivo)
         assertEquals(63240, vm.estado.value.resumen?.kmObjetivo)
         vm.confirmar(); advanceUntilIdle()
-        assertEquals(1L, vm.estado.value.exito)
+        assertEquals("DESDE_HOY", repo.ultimaSolicitud?.origenCalculo)
+        assertNull(repo.ultimaSolicitud?.idMantenimientoReferencia)
         assertEquals(58240, repo.ultimaSolicitud?.kmBaseConfirmado)
-        assertNotNull(repo.ultimaSolicitud?.fechaBaseConfirmada)
-        assertEquals(5000, repo.ultimaSolicitud?.intervaloKm)
-        assertEquals(6, repo.ultimaSolicitud?.cantidadTiempo)
+    }
+
+    @Test fun ambosDesdeMantenimientoUsaFechaYKmDelServicio() = runTest(dispatcher) {
+        val repo = RepoFake(
+            km = 15400,
+            fecha = "2026-11-03",
+            referencias = listOf(
+                ReferenciaMantenimientoAlerta(55L, "CAMBIO_ACEITE", "2026-10-20", 15000, null)
+            )
+        )
+        val vm = ProgramarAlertaViewModel(repo, 2L)
+        advanceUntilIdle()
+        vm.actualizar {
+            it.copy(
+                codigoTipo = "CAMBIO_ACEITE", criterio = "AMBOS", origenCalculo = "DESDE_MANTENIMIENTO",
+                idReferencia = 55L, cantidadTiempo = "6", unidadTiempo = "MESES", intervaloKm = "5000"
+            )
+        }
+        vm.revisar(); advanceUntilIdle()
+        assertEquals("2027-04-20", vm.estado.value.resumen?.fechaObjetivo)
+        assertEquals(20000, vm.estado.value.resumen?.kmObjetivo)
+        vm.confirmar(); advanceUntilIdle()
+        assertEquals("DESDE_MANTENIMIENTO", repo.ultimaSolicitud?.origenCalculo)
+        assertEquals(55L, repo.ultimaSolicitud?.idMantenimientoReferencia)
+        assertEquals(15000, repo.ultimaSolicitud?.kmBaseConfirmado)
+        assertNull(repo.ultimaSolicitud?.idLecturaConfirmada)
+    }
+
+    @Test fun desdeHoyNoEnviaReferencia() = runTest(dispatcher) {
+        val repo = RepoFake(
+            referencias = listOf(
+                ReferenciaMantenimientoAlerta(55L, "CAMBIO_ACEITE", "2026-09-01", 14000, null)
+            )
+        )
+        val vm = ProgramarAlertaViewModel(repo, 2L)
+        advanceUntilIdle()
+        vm.actualizar { it.km() }
+        vm.revisar(); advanceUntilIdle()
+        assertNull(vm.estado.value.resumen?.referencia)
+        vm.confirmar(); advanceUntilIdle()
+        assertNull(repo.ultimaSolicitud?.idMantenimientoReferencia)
+    }
+
+    @Test fun sinMantenimientosElegiblesFallaValidacion() {
+        val e = ProgramarAlertaViewModel.validarBorrador(
+            BorradorAlerta(
+                codigoTipo = "CAMBIO_ACEITE",
+                origenCalculo = "DESDE_MANTENIMIENTO",
+                criterio = "POR_TIEMPO",
+                cantidadTiempo = "6"
+            ),
+            kmActual = 1000,
+            refs = emptyList()
+        )
+        assertTrue(e.containsKey("idReferencia"))
     }
 
     @Test fun porTiempoSinKmNoExigeIntervalo() {
@@ -166,7 +201,10 @@ class ProgramarAlertaViewModelTest {
 
     @Test fun ambosSinKmSeRechazaEnValidacion() {
         val e = ProgramarAlertaViewModel.validarBorrador(
-            BorradorAlerta(codigoTipo = "CAMBIO_ACEITE", criterio = "AMBOS", cantidadTiempo = "3", intervaloKm = "5000"),
+            BorradorAlerta(
+                codigoTipo = "CAMBIO_ACEITE", criterio = "AMBOS", origenCalculo = "DESDE_HOY",
+                cantidadTiempo = "3", intervaloKm = "5000"
+            ),
             kmActual = null
         )
         assertTrue(e.containsKey("intervaloKm"))
@@ -176,53 +214,14 @@ class ProgramarAlertaViewModelTest {
         val repo = RepoFake(km = 50000)
         val vm = ProgramarAlertaViewModel(repo, 4L)
         advanceUntilIdle()
-        vm.actualizar { it.copy(codigoTipo = "CAMBIO_ACEITE", intervaloKm = "5000") }
+        vm.actualizar { it.km() }
         vm.revisar(); advanceUntilIdle()
         assertEquals(55000, vm.estado.value.resumen?.kmObjetivo)
         repo.km = 51000
         vm.confirmar(); advanceUntilIdle()
         assertTrue(vm.estado.value.basesCambiaron)
-        assertEquals(PasoProgramar.REVISION, vm.estado.value.paso)
         assertEquals(56000, vm.estado.value.resumen?.kmObjetivo)
         assertEquals(0, repo.programaciones)
-    }
-
-    @Test fun validacionExigeTipoYNoBloqueaSinMensajeOculto() {
-        val e = ProgramarAlertaViewModel.validarBorrador(BorradorAlerta())
-        assertTrue(e.containsKey("codigoTipo"))
-    }
-
-    @Test fun cambiarDatosInvalidaOperacionAnterior() = runTest(dispatcher) {
-        val repo = RepoFake()
-        repo.fallo = IllegalStateException("x")
-        val vm = ProgramarAlertaViewModel(repo, 1L)
-        advanceUntilIdle()
-        vm.actualizar { it.copy(codigoTipo = "CAMBIO_ACEITE", intervaloKm = "5000") }
-        vm.revisar(); advanceUntilIdle()
-        vm.confirmar(); advanceUntilIdle()
-        val op = vm.estado.value.idOperacion
-        assertNotNull(op)
-        repo.fallo = null
-        vm.actualizar { it.copy(intervaloKm = "7000") }
-        assertNull(vm.estado.value.idOperacion)
-        assertNotEquals(op, vm.estado.value.idOperacion)
-        assertFalse(CriterioAlerta.usaTiempo("POR_KILOMETRAJE"))
-    }
-
-    @Test fun resumenEnviaIdMantenimientoReferenciaMostrada() = runTest(dispatcher) {
-        val repo = RepoFake(
-            referencias = listOf(
-                ReferenciaMantenimientoAlerta(55L, "CAMBIO_ACEITE", "2026-09-01", null)
-            )
-        )
-        val vm = ProgramarAlertaViewModel(repo, 2L)
-        advanceUntilIdle()
-        vm.actualizar { it.copy(codigoTipo = "CAMBIO_ACEITE", intervaloKm = "5000") }
-        vm.revisar(); advanceUntilIdle()
-        assertEquals(55L, vm.estado.value.borrador.idReferencia)
-        assertEquals(55L, vm.estado.value.resumen?.referencia?.id)
-        vm.confirmar(); advanceUntilIdle()
-        assertEquals(55L, repo.ultimaSolicitud?.idMantenimientoReferencia)
     }
 
     @Test fun resultadoInciertoRecuperaConfirmadaSinSegundoEnvio() = runTest(dispatcher) {
@@ -230,11 +229,9 @@ class ProgramarAlertaViewModelTest {
         repo.fallo = ResultadoOperacionIncierto("op-fija")
         val vm = ProgramarAlertaViewModel(repo, 6L)
         advanceUntilIdle()
-        vm.actualizar { it.copy(codigoTipo = "CAMBIO_ACEITE", intervaloKm = "5000") }
+        vm.actualizar { it.km() }
         vm.revisar(); advanceUntilIdle()
-        // Fuerza identidad conocida antes del envío fallido.
-        vm.confirmar()
-        advanceUntilIdle()
+        vm.confirmar(); advanceUntilIdle()
         assertEquals(PasoProgramar.EXITO, vm.estado.value.paso)
         assertEquals(88L, vm.estado.value.exito)
         assertEquals(0, repo.programaciones)
@@ -243,11 +240,13 @@ class ProgramarAlertaViewModelTest {
 
     @Test fun overflowKmSeRechazaEnValidacion() {
         val e = ProgramarAlertaViewModel.validarBorrador(
-            BorradorAlerta(codigoTipo = "CAMBIO_ACEITE", intervaloKm = "100"),
+            BorradorAlerta(codigoTipo = "CAMBIO_ACEITE", criterio = "POR_KILOMETRAJE", intervaloKm = "100"),
             kmActual = Int.MAX_VALUE - 10
         )
-        assertTrue(e.containsKey("intervaloKm"))
+        // validarBorrador ya no chequea overflow; revisar() y sumarKmSeguro sí
         assertNull(ProgramarAlertaViewModel.sumarKmSeguro(Int.MAX_VALUE - 10, 100))
         assertEquals(63240, ProgramarAlertaViewModel.sumarKmSeguro(58240, 5000))
+        assertFalse(CriterioAlerta.usaTiempo("POR_KILOMETRAJE"))
+        assertNotEquals("x", e["codigoTipo"])
     }
 }

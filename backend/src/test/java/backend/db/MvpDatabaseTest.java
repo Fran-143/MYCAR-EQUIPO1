@@ -929,11 +929,13 @@ class MvpDatabaseTest {
         assertEquals("", text(c, "SELECT mycar.normalizar_servicio_otro('')"));
     }
 
-    @Test void rf22ReferenciaUltimaNormalizadaYNoOtroVehiculo() throws Exception {
+    @Test void rf22ReferenciaElegibleNoSoloUltimaYNoOtroVehiculo() throws Exception {
         Vehicle a = fixture(c), b = otherFixture(c);
-        long first = maintenance(c, a, a.reading, 20000, "OTRO", "Straße  correa");
+        long first = maintenance(c, a, a.reading, 20000, "OTRO", "Strasse  correa");
         long last = maintenance(c, a, a.reading, 20000, "OTRO", "STRASSE correa");
-        invalid(null, () -> alert(c, a, "OTRO", "straße correa", first, "a".repeat(64)));
+        // V9: cualquier REALIZADO elegible (no solo el último) con DESDE_MANTENIMIENTO.
+        long idFirst = alert(c, a, "OTRO", "straße correa", first, "a".repeat(64));
+        assertEquals("DESDE_MANTENIMIENTO", text(c, "SELECT origen_calculo FROM mycar.alerta WHERE id_alerta=?", idFirst));
         invalid(null, () -> alert(c, b, "OTRO", "straße correa", last, "b".repeat(64)));
         long id = alert(c, a, "OTRO", "straße correa", last, "c".repeat(64));
         assertEquals("straße correa", text(c, "SELECT servicio_otro FROM mycar.alerta WHERE id_alerta=?", id));
@@ -1190,7 +1192,8 @@ class MvpDatabaseTest {
     }
     static long part(Connection db, long u) throws SQLException { return insertId(db, "INSERT INTO mycar.repuesto(id_usuario,nombre) VALUES (?,'Filtro') RETURNING id_repuesto", u); }
     static long alert(Connection db, Vehicle v, String type, String other, Long ref, String signature) throws SQLException {
-        long id = insertId(db, "INSERT INTO mycar.alerta(id_vehiculo,id_tipo_mantenimiento,criterio,unidad_tiempo,cantidad_tiempo,fecha_base,fecha_objetivo,estado,firma_equivalencia,servicio_otro,id_mantenimiento_referencia) SELECT ?,id_tipo_mantenimiento,'POR_TIEMPO','SEMANAS',1,?,?,'PENDIENTE',?,?,? FROM mycar.tipo_mantenimiento WHERE codigo=? RETURNING id_alerta", v.id, LocalDate.now(LIMA), LocalDate.now(LIMA).plusDays(7), signature, other, ref, type);
+        String origen = ref == null ? "DESDE_HOY" : "DESDE_MANTENIMIENTO";
+        long id = insertId(db, "INSERT INTO mycar.alerta(id_vehiculo,id_tipo_mantenimiento,criterio,origen_calculo,unidad_tiempo,cantidad_tiempo,fecha_base,fecha_objetivo,estado,firma_equivalencia,servicio_otro,id_mantenimiento_referencia) SELECT ?,id_tipo_mantenimiento,'POR_TIEMPO',?,'SEMANAS',1,?,?,'PENDIENTE',?,?,? FROM mycar.tipo_mantenimiento WHERE codigo=? RETURNING id_alerta", v.id, origen, LocalDate.now(LIMA), LocalDate.now(LIMA).plusDays(7), signature, other, ref, type);
         history(db, id, "PENDIENTE"); return id;
     }
     static void history(Connection db, long id, String state) throws SQLException { exec(db, "INSERT INTO mycar.historial_alerta(id_alerta,estado_nuevo,motivo,version_destino) VALUES (?,?,'INICIAL_RF22',0)", id, state); }

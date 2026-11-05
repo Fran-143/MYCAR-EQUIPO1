@@ -5,16 +5,29 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.features.alertas.domain.AlertasRepository
+import com.mycar.app.features.alertas.domain.DatosAlerta
 import com.mycar.app.features.alertas.viewmodel.AlertasViewModel
 import com.mycar.app.features.alertas.viewmodel.FaseAlertas
 import com.mycar.app.features.alertas.viewmodel.FiltroAlertas
+import com.mycar.app.ui.theme.MyCarStatusPendiente
+import com.mycar.app.ui.theme.MyCarStatusProgramada
+import com.mycar.app.ui.theme.MyCarStatusProxima
+import com.mycar.app.ui.theme.MyCarStatusRealizada
+import com.mycar.app.ui.theme.MyCarStatusVencida
 
 @Composable
 fun AlertasRoute(
@@ -31,6 +44,14 @@ fun AlertasRoute(
         AlertasViewModel(repository, vehiculos, idVehiculoInicial)
     }
     val estado by vm.estado.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, vm) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.recargar()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(vehiculos, idVehiculoInicial) {
         val id = idVehiculoInicial ?: vehiculos.firstOrNull()?.first
         if (id != null) vm.seleccionar(id)
@@ -60,34 +81,73 @@ fun AlertasScreen(
     onProgramar: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MaterialTheme.colorScheme
     Column(
         modifier.fillMaxSize().statusBarsPadding().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Mis alertas", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Consulta y programa recordatorios de mantenimiento para tu vehículo.",
-            style = MaterialTheme.typography.bodySmall
-        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Alertas",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = colors.onPrimaryContainer
+            )
+            val id = estado.vehiculoId
+            if (id != null) {
+                Button(
+                    onClick = { onProgramar(id) },
+                    enabled = estado.fase != FaseAlertas.CARGANDO,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.tertiary)
+                ) { Text("+ Programar", fontWeight = FontWeight.SemiBold) }
+            }
+        }
+
         if (vehiculos.isEmpty()) {
             Text("No tienes vehículos activos para consultar alertas.")
             return@Column
         }
-        if (vehiculos.size > 1) {
-            var expandido by remember { mutableStateOf(false) }
-            OutlinedButton(onClick = { expandido = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(vehiculos.firstOrNull { it.first == estado.vehiculoId }?.second ?: "Elegir vehículo")
-            }
-            DropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
-                vehiculos.forEach { (id, etiqueta) ->
-                    DropdownMenuItem(
-                        text = { Text(etiqueta) },
-                        onClick = { expandido = false; onSeleccionar(id) }
-                    )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Vehículo seleccionado", style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+                if (vehiculos.size > 1) {
+                    var expandido by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(
+                            onClick = { expandido = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                vehiculos.firstOrNull { it.first == estado.vehiculoId }?.second ?: "Elegir vehículo",
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text("⌄")
+                        }
+                        DropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
+                            vehiculos.forEach { (id, etiqueta) ->
+                                DropdownMenuItem(
+                                    text = { Text(etiqueta) },
+                                    onClick = { expandido = false; onSeleccionar(id) }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Text(vehiculos.first().second, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
-        } else {
-            Text(vehiculos.first().second, style = MaterialTheme.typography.titleMedium)
         }
 
         Row(
@@ -99,7 +159,11 @@ fun AlertasScreen(
                     selected = estado.filtro == f,
                     onClick = { onFiltro(f) },
                     enabled = estado.fase != FaseAlertas.CARGANDO,
-                    label = { Text(f.etiqueta) }
+                    label = { Text(f.etiqueta) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = colors.onPrimaryContainer,
+                        selectedLabelColor = colors.onPrimary
+                    )
                 )
             }
         }
@@ -125,41 +189,72 @@ fun AlertasScreen(
                     )
                 }
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f, fill = false)
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f, fill = true)
                 ) {
                     items(estado.visibles, key = { it.id }) { a ->
-                        OutlinedCard(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(a.tipo, style = MaterialTheme.typography.titleMedium)
-                                Text("Estado: ${etiquetaEstado(a.estado)}")
-                                Text(etiquetaCriterio(a.criterio), style = MaterialTheme.typography.bodySmall)
-                                a.fechaObjetivo?.let {
-                                    Text("Fecha objetivo: $it", style = MaterialTheme.typography.bodySmall)
-                                }
-                                a.kmObjetivo?.let {
-                                    Text("Kilometraje objetivo: $it km", style = MaterialTheme.typography.bodySmall)
-                                }
-                                a.servicioOtro?.let {
-                                    Text(it, style = MaterialTheme.typography.bodySmall)
-                                }
-                            }
-                        }
+                        TarjetaAlerta(a)
                     }
                 }
             }
         }
-        val id = estado.vehiculoId
-        if (id != null) {
-            Button(
-                onClick = { onProgramar(id) },
-                enabled = estado.fase != FaseAlertas.CARGANDO,
-                modifier = Modifier.fillMaxWidth()
+    }
+}
+
+@Composable
+private fun TarjetaAlerta(a: DatosAlerta) {
+    val colors = MaterialTheme.colorScheme
+    val badge = colorEstado(a.estado)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Programar alerta")
+                Text(
+                    a.tipo.ifBlank { a.servicioOtro ?: "Servicio" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onPrimaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+                Surface(shape = RoundedCornerShape(50), color = badge.copy(alpha = 0.15f)) {
+                    Text(
+                        etiquetaEstado(a.estado).uppercase(),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = badge
+                    )
+                }
+            }
+            Text(etiquetaCriterio(a.criterio), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            a.fechaObjetivo?.let {
+                Text("Fecha: $it", style = MaterialTheme.typography.bodyMedium)
+            }
+            a.kmObjetivo?.let {
+                Text("Km objetivo: %,d km".format(it).replace(',', ' '), style = MaterialTheme.typography.bodyMedium)
+            }
+            a.servicioOtro?.takeIf { a.tipo.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
         }
     }
+}
+
+private fun colorEstado(estado: String): Color = when (estado) {
+    "PROGRAMADA" -> MyCarStatusProgramada
+    "PROXIMA" -> MyCarStatusProxima
+    "PENDIENTE" -> MyCarStatusPendiente
+    "VENCIDA" -> MyCarStatusVencida
+    "REALIZADA" -> MyCarStatusRealizada
+    else -> MyCarStatusRealizada
 }
 
 private fun etiquetaCriterio(criterio: String): String = when (criterio) {

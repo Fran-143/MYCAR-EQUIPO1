@@ -15,7 +15,8 @@ import java.util.UUID
 
 data class BorradorAlerta(
     val codigoTipo: String = "",
-    val criterio: String = "POR_KILOMETRAJE",
+    val criterio: String = "POR_TIEMPO",
+    val origenCalculo: String = "DESDE_HOY",
     val unidadTiempo: String = "MESES",
     val cantidadTiempo: String = "6",
     val intervaloKm: String = "5000",
@@ -40,6 +41,7 @@ data class EstadoProgramarAlerta(
     val borrador: BorradorAlerta = BorradorAlerta(),
     val paso: PasoProgramar = PasoProgramar.FORMULARIO,
     val resumen: ResumenAlerta? = null,
+    val preview: ResumenAlerta? = null,
     val cargando: Boolean = true,
     val enviando: Boolean = false,
     val exito: Long? = null,
@@ -51,30 +53,46 @@ data class EstadoProgramarAlerta(
 
 class ProgramarAlertaViewModel(
     private val repository: AlertasRepository,
-    private val idVehiculo: Long,
+    idVehiculoInicial: Long,
     borradorInicial: BorradorAlerta? = null
 ) : ViewModel() {
     private val mutable = MutableStateFlow(
-        EstadoProgramarAlerta(idVehiculo, borrador = borradorInicial ?: BorradorAlerta())
+        EstadoProgramarAlerta(idVehiculoInicial, borrador = borradorInicial ?: BorradorAlerta())
     )
     val estado = mutable.asStateFlow()
 
     init { cargar() }
 
+    fun cambiarVehiculo(idVehiculo: Long) {
+        if (mutable.value.enviando || mutable.value.exito != null) return
+        if (idVehiculo == mutable.value.idVehiculo) return
+        mutable.value = EstadoProgramarAlerta(
+            idVehiculo,
+            borrador = mutable.value.borrador.copy(idReferencia = null)
+        )
+        cargar()
+    }
+
     fun prepararNuevaProgramacion() {
-        mutable.value = EstadoProgramarAlerta(idVehiculo)
+        mutable.value = EstadoProgramarAlerta(mutable.value.idVehiculo)
         cargar()
     }
 
     fun cargar() {
         viewModelScope.launch {
+            val id = mutable.value.idVehiculo
             mutable.value = mutable.value.copy(
                 cargando = true, mensaje = null, exito = null, enviando = false,
-                paso = PasoProgramar.FORMULARIO, resumen = null, basesCambiaron = false
+                paso = PasoProgramar.FORMULARIO, resumen = null, preview = null, basesCambiaron = false
             )
             try {
-                val ctx = repository.contexto(idVehiculo)
-                mutable.value = mutable.value.copy(contexto = ctx, cargando = false)
+                val ctx = repository.contexto(id)
+                val b = mutable.value.borrador
+                mutable.value = mutable.value.copy(
+                    contexto = ctx,
+                    cargando = false,
+                    preview = calcularPreview(b, ctx)
+                )
             } catch (e: Exception) {
                 mutable.value = mutable.value.copy(
                     cargando = false,
@@ -87,13 +105,16 @@ class ProgramarAlertaViewModel(
     fun actualizar(cambio: (BorradorAlerta) -> BorradorAlerta) {
         if (mutable.value.enviando || mutable.value.exito != null) return
         if (mutable.value.paso == PasoProgramar.EXITO) return
+        val b = cambio(mutable.value.borrador)
+        val ctx = mutable.value.contexto
         mutable.value = mutable.value.copy(
-            borrador = cambio(mutable.value.borrador),
+            borrador = b,
             errores = emptyMap(),
             mensaje = null,
             idOperacion = null,
             paso = PasoProgramar.FORMULARIO,
             resumen = null,
+            preview = if (ctx != null) calcularPreview(b, ctx) else null,
             basesCambiaron = false
         )
     }
@@ -105,7 +126,6 @@ class ProgramarAlertaViewModel(
         )
     }
 
-    /** Calcula resumen local (mismas reglas G61) y pasa a revisión. */
     fun revisar() {
         val s = mutable.value
         if (s.enviando || s.exito != null) return
@@ -114,34 +134,39 @@ class ProgramarAlertaViewModel(
             mutable.value = s.copy(mensaje = "Carga el contexto antes de revisar.")
             return
         }
-        val errores = validarBorrador(s.borrador, ctx.kmActual)
+        val refs = referenciasElegibles(s.borrador, ctx)
+        val errores = validarBorrador(s.borrador, ctx.kmActual, refs)
         if (errores.isNotEmpty()) {
             mutable.value = s.copy(errores = errores, mensaje = errores.values.firstOrNull())
             return
         }
-        val b = s.borrador
-        val fechaBase = ctx.fechaServidor.take(10)
-        val fechaObj = if (CriterioAlerta.usaTiempo(b.criterio)) {
-            calcularFechaObjetivo(fechaBase, b.unidadTiempo, b.cantidadTiempo.toInt())
-        } else null
-        val kmObj = if (CriterioAlerta.usaKm(b.criterio)) {
-            sumarKmSeguro(ctx.kmActual!!, b.intervaloKm.toInt())
-        } else null
-        if (CriterioAlerta.usaKm(b.criterio) && kmObj == null) {
-            mutable.value = s.copy(
-                errores = mapOf("intervaloKm" to "El kilometraje objetivo supera el máximo permitido."),
-                mensaje = "El kilometraje objetivo supera el máximo permitido."
-            )
-            return
+        val resumen = calcularPreview(s.borrador, ctx)!!
+        if (CriterioAlerta.usaTiempo(s.borrador.criterio) && resumen.fechaObjetivo != null) {
+            val hoy = ctx.fechaServidor.take(10)
+            if (!LocalDate.parse(resumen.fechaObjetivo).isAfter(LocalDate.parse(hoy))) {
+                mutable.value = s.copy(
+                    errores = mapOf("cantidadTiempo" to "La fecha objetivo debe ser posterior a hoy."),
+                    mensaje = "La fecha objetivo debe ser posterior a hoy."
+                )
+                return
+            }
         }
-        val ref = ctx.referencias.firstOrNull {
-            it.codigoTipo == b.codigoTipo && (b.codigoTipo != "OTRO" || it.servicioOtro == b.servicioOtro)
+        if (CriterioAlerta.usaKm(s.borrador.criterio)) {
+            val kmObj = resumen.kmObjetivo
+            val vigente = ctx.kmActual
+            if (kmObj == null || vigente == null || kmObj <= vigente) {
+                mutable.value = s.copy(
+                    errores = mapOf("intervaloKm" to "El kilometraje objetivo ya fue alcanzado."),
+                    mensaje = "El kilometraje objetivo ya fue alcanzado."
+                )
+                return
+            }
         }
-        // G68/G71: la referencia mostrada en el resumen se envía al guardar.
         mutable.value = s.copy(
             paso = PasoProgramar.REVISION,
-            borrador = b.copy(idReferencia = ref?.id?.takeIf { it > 0 }),
-            resumen = ResumenAlerta(fechaBase, ctx.kmActual, ctx.idLecturaActual, fechaObj, kmObj, ref),
+            borrador = s.borrador.copy(idReferencia = resumen.referencia?.id?.takeIf { it > 0 }),
+            resumen = resumen,
+            preview = resumen,
             errores = emptyMap(),
             mensaje = null,
             basesCambiaron = false
@@ -153,45 +178,43 @@ class ProgramarAlertaViewModel(
         if (s.enviando || s.exito != null || s.paso != PasoProgramar.REVISION) return
         val resumen = s.resumen ?: return
         val idOperacion = s.idOperacion ?: UUID.randomUUID().toString()
+        val idVehiculo = s.idVehiculo
         mutable.value = s.copy(enviando = true, mensaje = null, idOperacion = idOperacion)
         viewModelScope.launch {
             try {
-                // Reconsulta local de bases (G89 cliente) antes del POST.
                 val ctx = repository.contexto(idVehiculo)
                 val b = mutable.value.borrador
-                if (CriterioAlerta.usaTiempo(b.criterio) && ctx.fechaServidor.take(10) != resumen.fechaBase) {
-                    mutable.value = mutable.value.copy(
-                        enviando = false, contexto = ctx, basesCambiaron = true,
-                        paso = PasoProgramar.REVISION,
-                        resumen = recalcularResumen(b, ctx),
-                        mensaje = "La fecha actual cambió. Revisa el resumen y confirma de nuevo.",
-                        idOperacion = null
-                    )
-                    return@launch
-                }
-                if (CriterioAlerta.usaKm(b.criterio) &&
-                    (ctx.kmActual != resumen.kmBase || ctx.idLecturaActual != resumen.idLectura)
+                val esperado = calcularPreview(b, ctx)
+                if (esperado == null || esperado.fechaBase != resumen.fechaBase
+                    || esperado.kmBase != resumen.kmBase
+                    || esperado.referencia?.id != resumen.referencia?.id
                 ) {
                     mutable.value = mutable.value.copy(
                         enviando = false, contexto = ctx, basesCambiaron = true,
                         paso = PasoProgramar.REVISION,
-                        resumen = recalcularResumen(b, ctx),
-                        mensaje = "El kilometraje vigente cambió. Revisa el resumen y confirma de nuevo.",
+                        resumen = esperado,
+                        preview = esperado,
+                        mensaje = "Las bases cambiaron. Revisa el resumen y confirma de nuevo.",
                         idOperacion = null
                     )
                     return@launch
                 }
-                val idRef = resumen.referencia?.id?.takeIf { it > 0 } ?: b.idReferencia
+                val idRef = if (b.origenCalculo == "DESDE_MANTENIMIENTO") {
+                    resumen.referencia?.id?.takeIf { it > 0 } ?: b.idReferencia
+                } else null
                 val id = repository.programar(idVehiculo, ProgramarAlertaDto(
-                    idOperacion, b.codigoTipo, b.criterio,
-                    b.unidadTiempo.takeIf { CriterioAlerta.usaTiempo(b.criterio) },
-                    b.cantidadTiempo.toIntOrNull()?.takeIf { CriterioAlerta.usaTiempo(b.criterio) },
-                    b.intervaloKm.toIntOrNull()?.takeIf { CriterioAlerta.usaKm(b.criterio) },
-                    b.servicioOtro.takeIf { b.codigoTipo == "OTRO" },
-                    idRef,
-                    resumen.fechaBase.takeIf { CriterioAlerta.usaTiempo(b.criterio) },
-                    resumen.kmBase,
-                    resumen.idLectura
+                    idOperacion = idOperacion,
+                    codigoTipoMantenimiento = b.codigoTipo,
+                    criterio = b.criterio,
+                    origenCalculo = b.origenCalculo,
+                    unidadTiempo = b.unidadTiempo.takeIf { CriterioAlerta.usaTiempo(b.criterio) },
+                    cantidadTiempo = b.cantidadTiempo.toIntOrNull()?.takeIf { CriterioAlerta.usaTiempo(b.criterio) },
+                    intervaloKm = b.intervaloKm.toIntOrNull()?.takeIf { CriterioAlerta.usaKm(b.criterio) },
+                    servicioOtro = b.servicioOtro.takeIf { b.codigoTipo == "OTRO" },
+                    idMantenimientoReferencia = idRef,
+                    fechaBaseConfirmada = resumen.fechaBase.takeIf { CriterioAlerta.usaTiempo(b.criterio) },
+                    kmBaseConfirmado = resumen.kmBase,
+                    idLecturaConfirmada = resumen.idLectura.takeIf { b.origenCalculo == "DESDE_HOY" }
                 ))
                 mutable.value = mutable.value.copy(
                     enviando = false, exito = id, mensaje = null, idOperacion = null,
@@ -208,7 +231,8 @@ class ProgramarAlertaViewModel(
                         mutable.value = mutable.value.copy(
                             enviando = false, contexto = ctx, basesCambiaron = true,
                             paso = PasoProgramar.REVISION,
-                            resumen = recalcularResumen(b, ctx),
+                            resumen = calcularPreview(b, ctx),
+                            preview = calcularPreview(b, ctx),
                             mensaje = msg.ifBlank { "Las bases cambiaron. Revisa el resumen." },
                             idOperacion = null
                         )
@@ -240,12 +264,8 @@ class ProgramarAlertaViewModel(
             val estadoOp = repository.operacion(idOperacion)
             when (estadoOp.estado) {
                 "CONFIRMADA" -> mutable.value = mutable.value.copy(
-                    enviando = false,
-                    exito = estadoOp.idAlerta,
-                    mensaje = null,
-                    idOperacion = null,
-                    paso = PasoProgramar.EXITO,
-                    basesCambiaron = false
+                    enviando = false, exito = estadoOp.idAlerta, mensaje = null, idOperacion = null,
+                    paso = PasoProgramar.EXITO, basesCambiaron = false
                 )
                 "EN_PROCESO" -> mutable.value = mutable.value.copy(
                     enviando = false,
@@ -264,50 +284,90 @@ class ProgramarAlertaViewModel(
         }
     }
 
-    private fun recalcularResumen(
-        b: BorradorAlerta,
-        ctx: com.mycar.app.features.alertas.domain.ContextoProgramarAlerta
-    ): ResumenAlerta {
-        val fechaBase = ctx.fechaServidor.take(10)
-        val ref = ctx.referencias.firstOrNull {
-            it.codigoTipo == b.codigoTipo && (b.codigoTipo != "OTRO" || it.servicioOtro == b.servicioOtro)
-        }
-        return ResumenAlerta(
-            fechaBase = fechaBase,
-            kmBase = ctx.kmActual,
-            idLectura = ctx.idLecturaActual,
-            fechaObjetivo = if (CriterioAlerta.usaTiempo(b.criterio))
-                calcularFechaObjetivo(fechaBase, b.unidadTiempo, b.cantidadTiempo.toIntOrNull() ?: 1)
-            else null,
-            kmObjetivo = if (CriterioAlerta.usaKm(b.criterio) && ctx.kmActual != null)
-                sumarKmSeguro(ctx.kmActual, b.intervaloKm.toIntOrNull() ?: 0)
-            else null,
-            referencia = ref
-        )
-    }
-
     companion object {
-        fun validarBorrador(b: BorradorAlerta, kmActual: Int? = null): Map<String, String> = buildMap {
-            if (b.codigoTipo.isBlank()) put("codigoTipo", "Selecciona un tipo de mantenimiento")
+        fun referenciasElegibles(
+            b: BorradorAlerta,
+            ctx: com.mycar.app.features.alertas.domain.ContextoProgramarAlerta
+        ): List<ReferenciaMantenimientoAlerta> =
+            ctx.referencias.filter {
+                it.codigoTipo == b.codigoTipo &&
+                    (b.codigoTipo != "OTRO" || it.servicioOtro == b.servicioOtro)
+            }
+
+        fun calcularPreview(
+            b: BorradorAlerta,
+            ctx: com.mycar.app.features.alertas.domain.ContextoProgramarAlerta
+        ): ResumenAlerta? {
+            if (b.codigoTipo.isBlank()) return null
+            val refs = referenciasElegibles(b, ctx)
+            val ref = if (b.origenCalculo == "DESDE_MANTENIMIENTO") {
+                refs.firstOrNull { it.id == b.idReferencia }
+            } else null
+            if (b.origenCalculo == "DESDE_MANTENIMIENTO" && ref == null) {
+                return ResumenAlerta(
+                    fechaBase = "—",
+                    kmBase = null,
+                    idLectura = null,
+                    fechaObjetivo = null,
+                    kmObjetivo = null,
+                    referencia = null
+                )
+            }
+            val fechaBase = when (b.origenCalculo) {
+                "DESDE_MANTENIMIENTO" -> ref!!.fecha.take(10)
+                else -> ctx.fechaServidor.take(10)
+            }
+            val kmBase = when {
+                !CriterioAlerta.usaKm(b.criterio) -> null
+                b.origenCalculo == "DESDE_MANTENIMIENTO" -> ref?.kmServicio
+                else -> ctx.kmActual
+            }
+            val cantidad = b.cantidadTiempo.toIntOrNull()
+            val intervalo = b.intervaloKm.toIntOrNull()
+            val fechaObj = if (CriterioAlerta.usaTiempo(b.criterio) && cantidad != null && cantidad > 0) {
+                calcularFechaObjetivo(fechaBase, b.unidadTiempo, cantidad)
+            } else null
+            val kmObj = if (CriterioAlerta.usaKm(b.criterio) && kmBase != null && intervalo != null && intervalo > 0) {
+                sumarKmSeguro(kmBase, intervalo)
+            } else null
+            return ResumenAlerta(
+                fechaBase = fechaBase,
+                kmBase = kmBase,
+                idLectura = ctx.idLecturaActual.takeIf { b.origenCalculo == "DESDE_HOY" },
+                fechaObjetivo = fechaObj,
+                kmObjetivo = kmObj,
+                referencia = ref
+            )
+        }
+
+        fun validarBorrador(
+            b: BorradorAlerta,
+            kmActual: Int? = null,
+            refs: List<ReferenciaMantenimientoAlerta> = emptyList()
+        ): Map<String, String> = buildMap {
+            if (b.codigoTipo.isBlank()) put("codigoTipo", "Selecciona un tipo de servicio")
+            if (b.origenCalculo !in setOf("DESDE_HOY", "DESDE_MANTENIMIENTO")) {
+                put("origenCalculo", "Elige desde cuándo calcular")
+            }
+            if (b.origenCalculo == "DESDE_MANTENIMIENTO") {
+                if (refs.isEmpty()) {
+                    put("idReferencia", "No hay mantenimientos registrados para este vehículo y servicio")
+                } else if (b.idReferencia == null || refs.none { it.id == b.idReferencia }) {
+                    put("idReferencia", "Selecciona el mantenimiento registrado")
+                }
+            }
             if (CriterioAlerta.usaTiempo(b.criterio) && b.cantidadTiempo.toIntOrNull()?.let { it > 0 } != true)
                 put("cantidadTiempo", "Indica una cantidad de tiempo válida")
             if (CriterioAlerta.usaTiempo(b.criterio) && b.unidadTiempo !in setOf("SEMANAS", "MESES"))
                 put("unidadTiempo", "Elige semanas o meses")
             if (CriterioAlerta.usaKm(b.criterio) && b.intervaloKm.toIntOrNull()?.let { it > 0 } != true)
                 put("intervaloKm", "Indica un intervalo de kilómetros válido")
-            if (CriterioAlerta.usaKm(b.criterio) && kmActual == null)
+            if (CriterioAlerta.usaKm(b.criterio) && b.origenCalculo == "DESDE_HOY" && kmActual == null)
                 put("intervaloKm", "Se necesita kilometraje vigente para este criterio")
-            if (CriterioAlerta.usaKm(b.criterio) && kmActual != null) {
-                val intervalo = b.intervaloKm.toIntOrNull()
-                if (intervalo != null && intervalo > 0 && sumarKmSeguro(kmActual, intervalo) == null) {
-                    put("intervaloKm", "El kilometraje objetivo supera el máximo permitido.")
-                }
-            }
             if (b.codigoTipo == "OTRO" && b.servicioOtro.isBlank())
                 put("servicioOtro", "Describe el servicio OTRO")
         }
 
-        /** Suma km_base + intervalo evitando desbordamiento de Int (rango INTEGER). */
         fun sumarKmSeguro(kmBase: Int, intervalo: Int): Int? {
             val suma = kmBase.toLong() + intervalo.toLong()
             return if (suma > Int.MAX_VALUE) null else suma.toInt()

@@ -29,19 +29,25 @@ adaptadas se ejecutaron en PostgreSQL real y tienen pruebas de regresión.
 | V2 | `V2__tablas_mvp.sql` | 21 tablas, PK/FK, CHECK e índices. Rechaza un esquema con relaciones de negocio sin tocar sus datos. Admite la tabla técnica de Flyway. |
 | V3 | `V3__catalogos_mvp.sql` | Free, Particular/Taxi, siete tipos de mantenimiento y opciones vehiculares iniciales. |
 | V4 | `V4__funciones_y_triggers_mvp.sql` | Cálculo de estados, integridad entre tablas, historial, login y sincronización RF23. |
+| V5 | `V5__validacion_identificadores_vehiculo.sql` | CHECK VIN / motor / serie (RF08). |
+| V6 | `V6__rf22_tiempo_sin_lectura.sql` | RF22 POR_TIEMPO sin lectura; sync RF23 I24. |
+| V7 | `V7__placa_dos_formatos.sql` | Placa A1B234 o ABC123. |
+| V8 | `V8__rf01_verificacion_correo.sql` | RF01 Nayu: `correo_verificado_utc` + 4 tablas (`proposito` multi-RF). Conservar. |
+| V9 | `V9__rf22_origen_calculo.sql` | RF22: `origen_calculo` DESDE_HOY / DESDE_MANTENIMIENTO; trigger bases duales. |
+| V10 | `V10__rf01_verificacion_aislada.sql` | RF01 Elsa/Francesca: reemplaza tablas V8 por DDL UUID/BYTEA (`finalidad` REGISTRO). |
 
 Ruta: `backend/src/main/resources/db/mvp`. No hay `CREATE DATABASE`, `DROP`,
 limpieza de tablas, baseline automático ni instalador todo-en-uno. Solo V1 crea
 el esquema; los demás archivos se ejecutan dentro de las transacciones de Flyway.
-V2–V4 no deben ejecutarse también manualmente desde pgAdmin.
+V2–V8 no deben ejecutarse también manualmente desde pgAdmin.
 
 V1 en Git conserva SHA-256:
 `65e5a7bef83ce744310d3540fb4055b382819c8e3ae70ce8ec6b5535142e319b`.
 La prueba tolera únicamente la representación CRLF/LF de un checkout Windows.
 
-## Las 21 tablas
+## Las 21 tablas base (+ 4 de verificación RF01; tras V10 = esquema Elsa)
 
-1. usuario
+1. usuario (V8 añade `correo_verificado_utc` nullable)
 2. plan
 3. suscripcion
 4. preferencia_notificacion
@@ -62,6 +68,12 @@ La prueba tolera únicamente la representación CRLF/LF de un checkout Windows.
 19. mantenimiento_repuesto
 20. alerta
 21. historial_alerta
+22. control_verificacion (V8 Nayu → V10 Elsa/Francesca)
+23. operacion_verificacion (V8 → V10)
+24. emision_codigo (V8 → V10)
+25. intento_verificacion (V8 → V10)
+
+Ver coordinación: `docs/auth/RF01_VERIFICACION_CORREO_COORDINACION_ELSA.md`.
 
 `flyway_schema_history` no cuenta como tabla del negocio. `vehiculo.km_actual`
 e `id_lectura_km_actual` son derivados opcionales del diccionario; se conserva el

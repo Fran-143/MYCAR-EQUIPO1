@@ -2,6 +2,7 @@ package com.mycar.app.features.autenticacion
 
 import com.mycar.app.features.autenticacion.data.*
 import com.mycar.app.features.autenticacion.domain.*
+import com.mycar.app.features.autenticacion.ui.RegistrationStep
 import com.mycar.app.features.autenticacion.ui.RegistrationViewModel
 import java.security.MessageDigest
 import java.time.Clock
@@ -14,7 +15,7 @@ import org.junit.Test
 class LocalPrivacyPolicyTest {
     private val local = PrivacyPolicyConfiguration.academicLocal()
     private val clock = Clock.fixed(Instant.parse("2026-10-28T12:00:00Z"), ZoneOffset.UTC)
-    private fun vm(service: RegistrationService = RegistrationService { error("Must not submit") }) =
+    private fun vm(service: RegistrationService = fakeRegistrationService(onStart = { error("Must not submit") })) =
         RegistrationViewModel(service, local, clock, Dispatchers.Unconfined)
     private fun fill(vm: RegistrationViewModel, accepted: Boolean = false) = vm.edit {
         RegistrationForm("Ana", "Pérez", "persona@example.org", "01/01/1995", "Aa1!abcd", "Aa1!abcd", accepted)
@@ -70,7 +71,7 @@ class LocalPrivacyPolicyTest {
     }
     @Test fun consentCannotBypassConsultation() {
         var calls = 0
-        val vm = vm(RegistrationService { calls++ })
+        val vm = vm(fakeRegistrationService(onStart = { calls++; error("no") }))
         fill(vm, accepted = true)
         vm.submit()
         assertEquals(0, calls)
@@ -78,7 +79,7 @@ class LocalPrivacyPolicyTest {
     }
     @Test fun readingDoesNotReplaceMandatoryConsent() {
         var calls = 0
-        val vm = vm(RegistrationService { calls++ })
+        val vm = vm(fakeRegistrationService(onStart = { calls++; error("no") }))
         fill(vm)
         vm.openLocalPolicy(); vm.localPolicyLoaded(); vm.closeLocalPolicy()
         vm.submit()
@@ -87,16 +88,18 @@ class LocalPrivacyPolicyTest {
     }
     @Test fun explicitConsentSendsExactLocalVersionAndDoesNotSignIn() {
         var sent: RegistrationRequest? = null
-        val vm = vm(RegistrationService { sent = it })
+        val vm = vm(fakeRegistrationService(onStart = {
+            sent = it
+            VerificationSession("o", "os", "op", "ops", "em", 1, "123456")
+        }))
         fill(vm)
         vm.openLocalPolicy(); vm.localPolicyLoaded(); vm.closeLocalPolicy()
         vm.edit { it.copy(privacidadAceptada = true) }
         vm.submit()
         assertEquals("1.0", sent?.consentimientoPrivacidad?.version)
         assertEquals(true, sent?.consentimientoPrivacidad?.aceptado)
-        assertTrue(vm.state.value.success)
-        assertEquals("", vm.state.value.form.contrasena)
-        assertFalse(vm.state.value.form.privacidadAceptada)
+        assertEquals(RegistrationStep.CODE, vm.state.value.step)
+        assertFalse(vm.state.value.success)
     }
     @Test fun resetRequiresConsultationAndConsentAgain() {
         val vm = vm()

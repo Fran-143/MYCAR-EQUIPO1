@@ -68,6 +68,12 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
+		<!-- RF01: envío OTP por SMTP -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- Controlador PostgreSQL -->
 		<dependency>
 			<groupId>org.postgresql</groupId>

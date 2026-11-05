@@ -21,12 +21,23 @@ data class ContextoRf22Dto(
     val tipos: List<TipoAlertaDto>?, val referencias: List<ReferenciaAlertaDto>?, val programacionDisponible: Boolean?
 )
 data class TipoAlertaDto(val idTipoMantenimiento: Long?, val codigo: String?, val nombre: String?)
-data class ReferenciaAlertaDto(val idMantenimiento: Long?, val codigoTipo: String?, val fechaServicio: String?, val servicioOtro: String?)
+data class ReferenciaAlertaDto(
+    val idMantenimiento: Long?,
+    val codigoTipo: String?,
+    val fechaServicio: String?,
+    val kmServicio: Int?,
+    val servicioOtro: String?
+)
 data class ProgramarAlertaDto(
-    val idOperacion: String, val codigoTipoMantenimiento: String, val criterio: String,
-    val unidadTiempo: String? = null, val cantidadTiempo: Int? = null, val intervaloKm: Int? = null,
-    val servicioOtro: String? = null, val idMantenimientoReferencia: Long? = null,
-    /** Bases del resumen (G89); el servidor las revalida. */
+    val idOperacion: String,
+    val codigoTipoMantenimiento: String,
+    val criterio: String,
+    val origenCalculo: String,
+    val unidadTiempo: String? = null,
+    val cantidadTiempo: Int? = null,
+    val intervaloKm: Int? = null,
+    val servicioOtro: String? = null,
+    val idMantenimientoReferencia: Long? = null,
     val fechaBaseConfirmada: String? = null,
     val kmBaseConfirmado: Int? = null,
     val idLecturaConfirmada: Long? = null
@@ -39,6 +50,7 @@ data class EstadoOperacionAlertaDto(
 )
 data class AlertaItemDto(
     val idAlerta: Long?, val codigoTipo: String?, val nombreTipo: String?, val criterio: String?,
+    val origenCalculo: String? = null,
     val estado: String?, val fechaObjetivo: String?, val kmObjetivo: Int?, val kmBase: Int?,
     val intervaloKm: Int?, val servicioOtro: String?, val versionFila: Int?
 )

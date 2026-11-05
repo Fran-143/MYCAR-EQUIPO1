@@ -42,10 +42,12 @@ class AlertasViewModel(
     init { mutable.value.vehiculoId?.let { cargar(it) } }
 
     fun seleccionar(id: Long) {
-        if (mutable.value.vehiculoId == id &&
-            (mutable.value.fase == FaseAlertas.LISTO || mutable.value.fase == FaseAlertas.VACIO)) return
+        // RF23: al abrir/cambiar vehículo siempre vuelve a listar (sincroniza estados tras RF14).
+        val cambioVehiculo = mutable.value.vehiculoId != id
         mutable.value = mutable.value.copy(
-            vehiculoId = id, fase = FaseAlertas.CARGANDO, filtro = FiltroAlertas.TODAS
+            vehiculoId = id,
+            fase = FaseAlertas.CARGANDO,
+            filtro = if (cambioVehiculo) FiltroAlertas.TODAS else mutable.value.filtro
         )
         cargar(id)
     }

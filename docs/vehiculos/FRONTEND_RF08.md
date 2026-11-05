@@ -22,7 +22,7 @@ No se convierte automáticamente una entrada inválida en un dato diferente.
 
 ## Diferencias necesarias con la imagen de referencia
 
-- La placa conserva el contrato A1B234: sin guiones ni espacios. El ejemplo ABC-123 de la imagen no cumple la regla actualmente aprobada.
+- La placa admite **A1B234** o **ABC123**: sin guiones ni espacios. El ejemplo ABC-123 (con guion) no cumple la regla.
 - El año de fabricación es un entero (ej. 2020), no una fecha completa. No se añade un selector de fecha.
 - Se conserva una ilustración. No hay un botón «Agregar imagen»: todavía no existe un contrato para enviar y persistir la foto desde RF08. Añadirlo requiere acordar con el equipo su almacenamiento, endpoint y límites.
 - Se mantiene la selección de usos que devuelva el backend; no se inventa un catálogo «Particular / Taxi» combinado.

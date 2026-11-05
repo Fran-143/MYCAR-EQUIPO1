@@ -4,7 +4,13 @@ import com.mycar.app.features.alertas.data.ProgramarAlertaDto
 import java.io.IOException
 
 data class TipoAlerta(val codigo: String, val nombre: String)
-data class ReferenciaMantenimientoAlerta(val id: Long, val codigoTipo: String, val fecha: String, val servicioOtro: String?)
+data class ReferenciaMantenimientoAlerta(
+    val id: Long,
+    val codigoTipo: String,
+    val fecha: String,
+    val kmServicio: Int?,
+    val servicioOtro: String?
+)
 data class ContextoProgramarAlerta(
     val fechaServidor: String, val kmActual: Int?, val idLecturaActual: Long?,
     val tipos: List<TipoAlerta>, val referencias: List<ReferenciaMantenimientoAlerta>, val disponible: Boolean

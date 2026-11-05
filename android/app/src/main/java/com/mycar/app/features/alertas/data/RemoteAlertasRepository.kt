@@ -23,8 +23,13 @@ class RemoteAlertasRepository(private val api: AlertasApi) : AlertasRepository {
                 c.tipos.orEmpty().map { TipoAlerta(it.codigo.orEmpty(), it.nombre.orEmpty()) }
                     .filter { it.codigo.isNotBlank() },
                 c.referencias.orEmpty().map {
-                    ReferenciaMantenimientoAlerta(it.idMantenimiento ?: 0, it.codigoTipo.orEmpty(),
-                        it.fechaServicio.orEmpty(), it.servicioOtro)
+                    ReferenciaMantenimientoAlerta(
+                        it.idMantenimiento ?: 0,
+                        it.codigoTipo.orEmpty(),
+                        it.fechaServicio.orEmpty(),
+                        it.kmServicio,
+                        it.servicioOtro
+                    )
                 },
                 c.programacionDisponible == true
             )

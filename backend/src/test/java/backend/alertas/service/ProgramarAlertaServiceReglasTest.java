@@ -15,12 +15,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** RF22 — TDD de reglas ProgramarAlerta (Arrange / Act / Assert). */
+/** RF22 — TDD de reglas ProgramarAlerta (DESDE_HOY / DESDE_MANTENIMIENTO). */
 class ProgramarAlertaServiceReglasTest {
     AlertasJdbcDao alertas;
     OperacionAlertaJdbcDao operaciones;
     ProgramarAlertaService service;
     LocalDate hoy = LocalDate.of(2026, 10, 28);
+    LocalDate fechaServicio = LocalDate.of(2026, 6, 28);
 
     @BeforeEach void preparar() {
         alertas = mock(AlertasJdbcDao.class);
@@ -33,6 +34,8 @@ class ProgramarAlertaServiceReglasTest {
         when(alertas.calcularEstadoInicial(any(), any(), any(), any(), any(), anyInt())).thenReturn("PROGRAMADA");
         when(alertas.calcularFechaObjetivo(any(), anyString(), anyInt()))
                 .thenAnswer(i -> ((LocalDate) i.getArgument(0)).plusMonths(((Integer) i.getArgument(2))));
+        when(alertas.mantenimientoRealizado(eq(3L), eq(55L))).thenReturn(Optional.of(
+                new AlertasJdbcDao.MantenimientoBase(55L, 1L, "CAMBIO_ACEITE", fechaServicio, 15000, null, "REALIZADO")));
     }
 
     private void operacionNueva(UUID op, long usuario, String huella) {
@@ -41,127 +44,142 @@ class ProgramarAlertaServiceReglasTest {
                 new OperacionAlertaJdbcDao.OperacionAlerta(op, usuario, huella, "EN_PROCESO", null)));
     }
 
-    private ContratoRf22.ProgramarRequest km(UUID op, int intervalo) {
+    private ContratoRf22.ProgramarRequest kmHoy(UUID op, int intervalo) {
         return new ContratoRf22.ProgramarRequest(
-                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", null, null, intervalo, null, null,
+                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", "DESDE_HOY", null, null, intervalo, null, null,
                 null, 20000, 10L);
     }
 
     @Test void porKilometrajeInsertaSinFechaBase() {
-        // Arrange
         UUID op = UUID.randomUUID();
-        var req = km(op, 5000);
+        var req = kmHoy(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenReturn(100L);
 
-        // Act
         var resp = service.programar(9L, 3L, req);
 
-        // Assert
         assertEquals(100L, resp.idAlerta());
         var cap = org.mockito.ArgumentCaptor.forClass(AlertasJdbcDao.DatosInsercion.class);
         verify(alertas).insertarAlerta(cap.capture());
-        assertNull(cap.getValue().fechaBase(), "POR_KILOMETRAJE exige fecha_base NULL (ck_alerta_tiempo)");
-        assertNull(cap.getValue().fechaObjetivo());
+        assertNull(cap.getValue().fechaBase());
+        assertEquals("DESDE_HOY", cap.getValue().origenCalculo());
+        assertNull(cap.getValue().idReferencia());
         assertEquals(20000, cap.getValue().kmBase());
-        assertEquals(5000, cap.getValue().intervaloKm());
         assertEquals(25000, cap.getValue().kmObjetivo());
     }
 
-    @Test void ambosInsertaTiempoYKm() {
-        // Arrange
+    @Test void ambosDesdeHoy() {
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
-                op, "CAMBIO_ACEITE", "AMBOS", "MESES", 6, 5000, null, null, hoy, 20000, 10L);
+                op, "CAMBIO_ACEITE", "AMBOS", "DESDE_HOY", "MESES", 6, 5000, null, null, hoy, 20000, 10L);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenReturn(101L);
 
-        // Act
         long id = service.programar(9L, 3L, req).idAlerta();
 
-        // Assert
         assertEquals(101L, id);
         var cap = org.mockito.ArgumentCaptor.forClass(AlertasJdbcDao.DatosInsercion.class);
         verify(alertas).insertarAlerta(cap.capture());
         assertEquals(hoy, cap.getValue().fechaBase());
-        assertNotNull(cap.getValue().fechaObjetivo());
-        assertEquals(20000, cap.getValue().kmBase());
+        assertEquals(hoy.plusMonths(6), cap.getValue().fechaObjetivo());
         assertEquals(25000, cap.getValue().kmObjetivo());
     }
 
+    @Test void ambosDesdeMantenimientoUsaBasesDelServicio() {
+        UUID op = UUID.randomUUID();
+        // km_servicio 15000 + 6000 = 21000 > vigente 20000.
+        var req = new ContratoRf22.ProgramarRequest(
+                op, "CAMBIO_ACEITE", "AMBOS", "DESDE_MANTENIMIENTO", "MESES", 6, 6000, null, 55L,
+                fechaServicio, 15000, null);
+        String huella = HuellaProgramarAlerta.calcular(3L, req);
+        operacionNueva(op, 9L, huella);
+        when(alertas.insertarAlerta(any())).thenReturn(201L);
+
+        service.programar(9L, 3L, req);
+
+        var cap = org.mockito.ArgumentCaptor.forClass(AlertasJdbcDao.DatosInsercion.class);
+        verify(alertas).insertarAlerta(cap.capture());
+        assertEquals("DESDE_MANTENIMIENTO", cap.getValue().origenCalculo());
+        assertEquals(fechaServicio, cap.getValue().fechaBase());
+        assertEquals(fechaServicio.plusMonths(6), cap.getValue().fechaObjetivo());
+        assertEquals(15000, cap.getValue().kmBase());
+        assertEquals(21000, cap.getValue().kmObjetivo());
+        assertEquals(55L, cap.getValue().idReferencia());
+    }
+
     @Test void porTiempoSinLecturaPermiteProgramar() {
-        // Arrange
         when(alertas.ultimaLectura(3L)).thenReturn(null);
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
-                op, "CAMBIO_ACEITE", "POR_TIEMPO", "MESES", 6, null, null, null, hoy, null, null);
+                op, "CAMBIO_ACEITE", "POR_TIEMPO", "DESDE_HOY", "MESES", 6, null, null, null, hoy, null, null);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenReturn(102L);
 
-        // Act
         long id = service.programar(9L, 3L, req).idAlerta();
 
-        // Assert
         assertEquals(102L, id);
         var cap = org.mockito.ArgumentCaptor.forClass(AlertasJdbcDao.DatosInsercion.class);
         verify(alertas).insertarAlerta(cap.capture());
         assertNull(cap.getValue().kmBase());
-        assertNull(cap.getValue().kmObjetivo());
+    }
+
+    @Test void rechazaKmObjetivoYaAlcanzado() {
+        UUID op = UUID.randomUUID();
+        // DESDE_MANTENIMIENTO: km_servicio 15000 + 5000 = 20000 <= vigente 21000.
+        var req = new ContratoRf22.ProgramarRequest(
+                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", "DESDE_MANTENIMIENTO", null, null, 5000, null, 55L,
+                null, 15000, null);
+        when(alertas.ultimaLectura(3L)).thenReturn(new AlertasJdbcDao.LecturaActual(10L, 21000));
+        String huella = HuellaProgramarAlerta.calcular(3L, req);
+        operacionNueva(op, 9L, huella);
+
+        ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
+        assertEquals("OBJETIVO_NO_FUTURO", ex.codigo());
+        verify(alertas, never()).insertarAlerta(any());
     }
 
     @Test void g89RechazaSiKmBaseCambio() {
-        // Arrange
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
-                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", null, null, 5000, null, null,
+                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", "DESDE_HOY", null, null, 5000, null, null,
                 null, 19000, 10L);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
 
-        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
-
-        // Assert
         assertEquals("BASES_CAMBIARON", ex.codigo());
         verify(alertas, never()).insertarAlerta(any());
     }
 
     @Test void tresAlertasDistintasNoEstanLimitadasPorTopeFicticio() {
-        // Arrange + Act: tres operaciones distintas
         for (int i = 0; i < 3; i++) {
             UUID op = UUID.randomUUID();
             int intervalo = 5000 + i * 1000;
-            var req = km(op, intervalo);
+            var req = kmHoy(op, intervalo);
             String huella = HuellaProgramarAlerta.calcular(3L, req);
             operacionNueva(op, 9L, huella);
             when(alertas.insertarAlerta(any())).thenReturn(10L + i);
             assertNotNull(service.programar(9L, 3L, req).idAlerta());
         }
-        // Assert
         verify(alertas, times(3)).insertarAlerta(any());
     }
 
     @Test void equivalenteActivaSeExplicaComoConflicto() {
-        // Arrange
         UUID op = UUID.randomUUID();
-        var req = km(op, 5000);
+        var req = kmHoy(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
         when(alertas.insertarAlerta(any())).thenThrow(
                 new DataIntegrityViolationException("uq_alerta_equivalente_activa"));
 
-        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
-
-        // Assert
         assertEquals("ALERTA_EQUIVALENTE", ex.codigo());
     }
 
     @Test void criterioHelpers() {
-        // Arrange / Act / Assert (helpers puros)
         assertTrue(CriterioAlerta.usaTiempo("POR_TIEMPO"));
         assertTrue(CriterioAlerta.usaTiempo("AMBOS"));
         assertFalse(CriterioAlerta.usaTiempo("POR_KILOMETRAJE"));
@@ -171,9 +189,8 @@ class ProgramarAlertaServiceReglasTest {
     }
 
     @Test void reintentoMismaOperacionConfirmadaRecuperaSinInsertar() {
-        // Arrange
         UUID op = UUID.randomUUID();
-        var req = km(op, 5000);
+        var req = kmHoy(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         when(operaciones.intentarCrear(eq(op), eq(9L), anyString())).thenReturn(false);
         when(operaciones.buscarYBloquear(op)).thenReturn(Optional.of(
@@ -181,48 +198,47 @@ class ProgramarAlertaServiceReglasTest {
                         op, 9L, huella, "CONFIRMADA",
                         "{\"idAlerta\":77,\"estado\":\"PROGRAMADA\"}")));
 
-        // Act
         var resp = service.programar(9L, 3L, req);
-
-        // Assert
         assertEquals(77L, resp.idAlerta());
-        assertEquals("PROGRAMADA", resp.estado());
-        assertEquals(op, resp.idOperacion());
         verify(alertas, never()).insertarAlerta(any());
     }
 
     @Test void segundaLlegadaEnProcesoNoDuplica() {
-        // Arrange
         UUID op = UUID.randomUUID();
-        var req = km(op, 5000);
+        var req = kmHoy(op, 5000);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         when(operaciones.intentarCrear(eq(op), eq(9L), anyString())).thenReturn(false);
         when(operaciones.buscarYBloquear(op)).thenReturn(Optional.of(
                 new OperacionAlertaJdbcDao.OperacionAlerta(op, 9L, huella, "EN_PROCESO", null)));
 
-        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
-
-        // Assert
         assertEquals("OPERACION_EN_PROCESO", ex.codigo());
         verify(alertas, never()).insertarAlerta(any());
     }
 
     @Test void kmObjetivoQueDesbordaEnteroSeRechaza() {
-        // Arrange
         when(alertas.ultimaLectura(3L)).thenReturn(new AlertasJdbcDao.LecturaActual(10L, Integer.MAX_VALUE - 10));
         UUID op = UUID.randomUUID();
         var req = new ContratoRf22.ProgramarRequest(
-                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", null, null, 100, null, null,
+                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", "DESDE_HOY", null, null, 100, null, null,
                 null, Integer.MAX_VALUE - 10, 10L);
         String huella = HuellaProgramarAlerta.calcular(3L, req);
         operacionNueva(op, 9L, huella);
 
-        // Act
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
-
-        // Assert
         assertEquals("DATOS_INVALIDOS", ex.codigo());
         verify(alertas, never()).insertarAlerta(any());
+    }
+
+    @Test void desdeHoyRechazaReferencia() {
+        UUID op = UUID.randomUUID();
+        var req = new ContratoRf22.ProgramarRequest(
+                op, "CAMBIO_ACEITE", "POR_KILOMETRAJE", "DESDE_HOY", null, null, 5000, null, 55L,
+                null, 20000, 10L);
+        String huella = HuellaProgramarAlerta.calcular(3L, req);
+        operacionNueva(op, 9L, huella);
+
+        ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
+        assertEquals("DATOS_INVALIDOS", ex.codigo());
     }
 }

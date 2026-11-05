@@ -49,43 +49,173 @@ class AuthRepository(
 ) : RegistrationService {
     private val registrationMutex = Mutex()
 
-    override suspend fun register(request: RegistrationRequest) = withContext(Dispatchers.IO) {
-        if (!registrationPolicy.available) throw RegistrationFailure(RegistrationFailureKind.PRIVACY_PENDING)
-        if (request.consentimientoPrivacidad.version != registrationPolicy.version)
-            throw RegistrationFailure(RegistrationFailureKind.VERSION_MISMATCH)
-        if (!request.consentimientoPrivacidad.aceptado)
-            throw RegistrationFailure(RegistrationFailureKind.VALIDATION,
-                mapOf("privacidadAceptada" to RegistrationValidator.messages.getValue("privacidadAceptada")))
+    override suspend fun register(request: RegistrationRequest) {
+        // Registro directo deshabilitado en backend (OTP obligatorio).
+        throw RegistrationFailure(RegistrationFailureKind.UNAVAILABLE)
+    }
+
+    override suspend fun startEmailVerification(request: RegistrationRequest): VerificationSession =
+        withContext(Dispatchers.IO) {
+            guardRegistration(request)
+            if (!registrationMutex.tryLock()) throw RegistrationFailure(RegistrationFailureKind.IN_PROGRESS)
+            try {
+                val origin = api.verificationOrigin()
+                if (!origin.isSuccessful) throw mapRegistrationHttp(origin.code(), origin.errorBody()?.string())
+                val o = origin.body()
+                if (o?.idOrigen.isNullOrBlank() || o?.secretoOrigen.isNullOrBlank())
+                    throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+                emitVerification(
+                    VerificationEmitRequest(
+                        idOrigen = o.idOrigen!!,
+                        secretoOrigen = o.secretoOrigen!!,
+                        idSolicitud = UUID.randomUUID().toString(),
+                        revision = 0,
+                        formulario = request
+                    )
+                )
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (known: RegistrationFailure) { throw known
+            } catch (_: IOException) { throw RegistrationFailure(RegistrationFailureKind.NETWORK)
+            } catch (_: Exception) { throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+            } finally { registrationMutex.unlock() }
+        }
+
+    override suspend fun resendEmailCode(
+        session: VerificationSession,
+        request: RegistrationRequest
+    ): VerificationSession = withContext(Dispatchers.IO) {
+        guardRegistration(request)
         if (!registrationMutex.tryLock()) throw RegistrationFailure(RegistrationFailureKind.IN_PROGRESS)
         try {
-            val response = api.register(request)
+            emitVerification(
+                VerificationEmitRequest(
+                    idOrigen = session.idOrigen,
+                    secretoOrigen = session.secretoOrigen,
+                    idOperacion = session.idOperacion,
+                    secretoOperacion = session.secretoOperacion,
+                    idSolicitud = UUID.randomUUID().toString(),
+                    revision = session.revision,
+                    formulario = request
+                )
+            )
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (known: RegistrationFailure) { throw known
+        } catch (_: IOException) { throw RegistrationFailure(RegistrationFailureKind.NETWORK)
+        } catch (_: Exception) { throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+        } finally { registrationMutex.unlock() }
+    }
+
+    override suspend fun completeEmailVerification(
+        session: VerificationSession,
+        code: String,
+        request: RegistrationRequest
+    ) = withContext(Dispatchers.IO) {
+        guardRegistration(request)
+        if (!registrationMutex.tryLock()) throw RegistrationFailure(RegistrationFailureKind.IN_PROGRESS)
+        try {
+            val response = api.verificationComplete(
+                VerificationCompleteRequest(
+                    idOperacion = session.idOperacion,
+                    secretoOperacion = session.secretoOperacion,
+                    idSolicitud = UUID.randomUUID().toString(),
+                    revision = session.revision,
+                    idEmision = session.idEmision,
+                    codigo = code.trim(),
+                    formulario = request
+                )
+            )
             if (response.code() == 201) {
                 val body = response.body()
                 if (body?.resultado != "CUENTA_CREADA" || body.destino != "INICIO_SESION")
                     throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
-                // No se llama a login, persist, load ni se modifica el estado de sesión.
             } else {
-                val error = response.errorBody()?.use { body ->
-                    try { Gson().fromJson(body.string(), RegistrationError::class.java) }
-                    catch (_: Exception) { null }
-                }
-                throw when (response.code()) {
-                    400 -> {
-                        val fields = error?.erroresPorCampo?.keys.orEmpty()
-                            .mapNotNull { key -> RegistrationValidator.messages[key]?.let { key to it } }.toMap()
-                        RegistrationFailure(if ("versionPrivacidad" in fields) RegistrationFailureKind.VERSION_MISMATCH
-                            else RegistrationFailureKind.VALIDATION, fields)
-                    }
-                    409 -> RegistrationFailure(RegistrationFailureKind.EMAIL_UNAVAILABLE)
-                    503, 500 -> RegistrationFailure(RegistrationFailureKind.UNAVAILABLE)
-                    else -> RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
-                }
+                throw mapRegistrationHttp(response.code(), response.errorBody()?.string())
             }
         } catch (cancelled: CancellationException) { throw cancelled
         } catch (known: RegistrationFailure) { throw known
         } catch (_: IOException) { throw RegistrationFailure(RegistrationFailureKind.NETWORK)
         } catch (_: Exception) { throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
         } finally { registrationMutex.unlock() }
+    }
+
+    private fun guardRegistration(request: RegistrationRequest) {
+        if (!registrationPolicy.available) throw RegistrationFailure(RegistrationFailureKind.PRIVACY_PENDING)
+        if (request.consentimientoPrivacidad.version != registrationPolicy.version)
+            throw RegistrationFailure(RegistrationFailureKind.VERSION_MISMATCH)
+        if (!request.consentimientoPrivacidad.aceptado)
+            throw RegistrationFailure(RegistrationFailureKind.VALIDATION,
+                mapOf("privacidadAceptada" to RegistrationValidator.messages.getValue("privacidadAceptada")))
+    }
+
+    private suspend fun emitVerification(body: VerificationEmitRequest): VerificationSession {
+        val response = api.verificationEmit(body)
+        if (response.code() != 202 && response.code() != 200) {
+            throw mapRegistrationHttp(response.code(), response.errorBody()?.string())
+        }
+        val emit = response.body()
+        if (emit?.resultado != "EMISION_CREADA" ||
+            emit.idOperacion.isNullOrBlank() ||
+            emit.secretoOperacion.isNullOrBlank() ||
+            emit.idEmision.isNullOrBlank()) {
+            throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+        }
+        return VerificationSession(
+            idOrigen = body.idOrigen,
+            secretoOrigen = body.secretoOrigen,
+            idOperacion = emit.idOperacion!!,
+            secretoOperacion = emit.secretoOperacion!!,
+            idEmision = emit.idEmision!!,
+            revision = emit.revision,
+            codigoDesarrollo = emit.codigoDesarrollo
+        )
+    }
+
+    private fun mapRegistrationHttp(code: Int, raw: String?): RegistrationFailure {
+        val error = try {
+            raw?.let { Gson().fromJson(it, RegistrationError::class.java) }
+        } catch (_: Exception) { null }
+        val codigo = error?.codigo.orEmpty()
+        val mensajeServidor = error?.mensaje?.takeIf { it.isNotBlank() }
+        return when {
+            code == 400 -> {
+                val fields = error?.erroresPorCampo?.keys.orEmpty()
+                    .mapNotNull { key -> RegistrationValidator.messages[key]?.let { key to it } }.toMap()
+                RegistrationFailure(if ("versionPrivacidad" in fields) RegistrationFailureKind.VERSION_MISMATCH
+                    else RegistrationFailureKind.VALIDATION, fields)
+            }
+            code == 409 -> RegistrationFailure(RegistrationFailureKind.EMAIL_UNAVAILABLE)
+            code == 429 || codigo in RATE_LIMIT_CODES -> RegistrationFailure(
+                RegistrationFailureKind.RATE_LIMITED,
+                detail = mensajeServidor ?: messageForRateLimit(codigo)
+            )
+            code == 422 -> RegistrationFailure(
+                RegistrationFailureKind.VALIDATION,
+                detail = mensajeServidor ?: "Código incorrecto o solicitud inválida."
+            )
+            code == 503 || code == 500 || code == 410 ->
+                RegistrationFailure(RegistrationFailureKind.UNAVAILABLE)
+            else -> RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+        }
+    }
+
+    private companion object {
+        val RATE_LIMIT_CODES = setOf(
+            "ESPERA_REENVIO", "LIMITE_ENVIO", "LIMITE_TECNICO",
+            "RESERVA_PENDIENTE", "PAUSA_TECNICA", "BLOQUEO_ACTIVO", "BLOQUEO_INICIADO"
+        )
+
+        fun messageForRateLimit(codigo: String) = when (codigo) {
+            "ESPERA_REENVIO" ->
+                "Ya enviamos un código a este correo. Espera 10 minutos antes de pedir otro."
+            "LIMITE_ENVIO", "LIMITE_TECNICO" ->
+                "Alcanzaste el límite de envíos. Espera un rato e inténtalo de nuevo."
+            "RESERVA_PENDIENTE", "PAUSA_TECNICA" ->
+                "Hay un envío en curso. Espera unos segundos e inténtalo de nuevo."
+            "BLOQUEO_ACTIVO", "BLOQUEO_INICIADO" ->
+                "Demasiados intentos fallidos. Espera aproximadamente 1 hora antes de reintentar."
+            else ->
+                "Ya enviamos un código a este correo. Espera 10 minutos antes de pedir otro."
+        }
     }
 
     private val mutex = Mutex()

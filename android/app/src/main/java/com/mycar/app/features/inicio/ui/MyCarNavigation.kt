@@ -137,6 +137,7 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                                     onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     onActualizado={
                                         recargaInicio++
+                                        recargaAlertas++
                                         if (kmOrigenDetalle && vehiculoDetalleId == idKm) recargaDetalle++
                                     },
                                     modifier=Modifier.fillMaxSize().statusBarsPadding())
@@ -217,10 +218,29 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                                 }
                             }
                             SeccionMyCar.ALERTAS -> {
+                                var vehiculosAlertas by remember(cuenta.ciclo) {
+                                    mutableStateOf<List<Pair<Long, String>>>(emptyList())
+                                }
+                                LaunchedEffect(cuenta.mantenimiento) {
+                                    runCatching {
+                                        val ctx = cuenta.mantenimiento.contexto()
+                                        vehiculosAlertas = ctx.vehiculos.map {
+                                            it.idVehiculo to "${it.marca} ${it.modelo} · ${it.placa}"
+                                        }
+                                        if (vehiculoAlertas == null) {
+                                            vehiculoAlertas = vehiculoMantenimiento
+                                                ?: vehiculosAlertas.firstOrNull()?.first
+                                        }
+                                    }
+                                }
                                 val idProgramar = alertasProgramarId
                                 if (idProgramar != null) {
                                     ProgramarAlertaRoute(
-                                        cuenta.alertas, idProgramar, alertasSesion, borradorInicial = null,
+                                        repository = cuenta.alertas,
+                                        idVehiculo = idProgramar,
+                                        vehiculos = vehiculosAlertas,
+                                        sesionFormulario = alertasSesion,
+                                        borradorInicial = null,
                                         onVolver={ alertasProgramarId = null },
                                         onExito={
                                             // G108: volver a Alertas con el mismo vehículo y filtro Todas.
@@ -231,21 +251,6 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                                         },
                                         modifier=Modifier.statusBarsPadding())
                                 } else {
-                                    var vehiculosAlertas by remember(cuenta.ciclo) {
-                                        mutableStateOf<List<Pair<Long, String>>>(emptyList())
-                                    }
-                                    LaunchedEffect(cuenta.mantenimiento) {
-                                        runCatching {
-                                            val ctx = cuenta.mantenimiento.contexto()
-                                            vehiculosAlertas = ctx.vehiculos.map {
-                                                it.idVehiculo to "${it.placa} · ${it.marca} ${it.modelo}"
-                                            }
-                                            if (vehiculoAlertas == null) {
-                                                vehiculoAlertas = vehiculoMantenimiento
-                                                    ?: vehiculosAlertas.firstOrNull()?.first
-                                            }
-                                        }
-                                    }
                                     AlertasRoute(
                                         cuenta.alertas, vehiculosAlertas, vehiculoAlertas,
                                         onProgramar={ abrirProgramarAlerta(it) },

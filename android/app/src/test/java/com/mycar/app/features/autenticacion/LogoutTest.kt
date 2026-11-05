@@ -52,6 +52,10 @@ class LogoutTest {
         var validationStarted = CompletableDeferred<Unit>()
         val loginStarted = CompletableDeferred<Unit>()
         override suspend fun register(request: RegistrationRequest): Response<RegistrationResponse> = error("No registration")
+        override suspend fun verificationOrigin(): Response<VerificationOriginResponse> = error("No verification")
+        override suspend fun verificationEmit(body: VerificationEmitRequest): Response<VerificationEmitResponse> = error("No verification")
+        override suspend fun verificationResend(body: VerificationEmitRequest): Response<VerificationEmitResponse> = error("No verification")
+        override suspend fun verificationComplete(body: VerificationCompleteRequest): Response<RegistrationResponse> = error("No verification")
         override suspend fun login(request: LoginRequest): Response<TokenResponse> {
             loginStarted.complete(Unit)
             loginGate?.await()

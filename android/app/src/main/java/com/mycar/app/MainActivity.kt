@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if(intent.getBooleanExtra("abrir_vehiculos",false)) solicitudesVehiculos++
         comprobarRedLocal()
-        setContent { MyCarTheme(dynamicColor=false) {
+        setContent { MyCarTheme(darkTheme = false, dynamicColor = false) {
             if (redLocalDisponible) {
                 val sesion: SesionVehiculosViewModel = viewModel()
                 AuthGate { MyCarNavigation(solicitudesVehiculos, sesion) }
