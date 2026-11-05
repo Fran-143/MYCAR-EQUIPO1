@@ -8,6 +8,7 @@ import com.mycar.app.features.alertas.domain.DatosAlerta
 import com.mycar.app.features.alertas.domain.EstadoOperacionAlerta
 import com.mycar.app.features.alertas.domain.ReferenciaMantenimientoAlerta
 import com.mycar.app.features.alertas.domain.ResultadoOperacionIncierto
+import com.mycar.app.features.alertas.domain.SolicitudAtenderAlerta
 import com.mycar.app.features.alertas.domain.TipoAlerta
 import com.mycar.app.features.alertas.viewmodel.BorradorAlerta
 import com.mycar.app.features.alertas.viewmodel.PasoProgramar
@@ -74,6 +75,8 @@ class ProgramarAlertaViewModelTest {
             consultasOperacion++
             return EstadoOperacionAlerta(estadoOperacion, idAlertaOperacion)
         }
+        override suspend fun atender(idVehiculo: Long, idAlerta: Long, solicitud: SolicitudAtenderAlerta) = error("no usado")
+        override suspend fun anular(idVehiculo: Long, idAlerta: Long) = error("no usado")
     }
 
     private fun BorradorAlerta.km(tipo: String = "CAMBIO_ACEITE", intervalo: String = "5000") =

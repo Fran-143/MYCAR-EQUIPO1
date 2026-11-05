@@ -2,6 +2,7 @@ package backend.alertas.api;
 
 import backend.alertas.api.dto.ContratoRf22;
 import backend.alertas.seguridad.IdentidadAlertas;
+import backend.alertas.service.AtenderAlertaService;
 import backend.alertas.service.ProgramarAlertaService;
 import backend.alertas.service.SincronizarAlertasService;
 import jakarta.validation.Valid;
@@ -19,14 +20,17 @@ import org.springframework.web.bind.annotation.*;
 public class AlertasController {
     private final ProgramarAlertaService programar;
     private final SincronizarAlertasService sincronizar;
+    private final AtenderAlertaService atender;
     private final ObjectProvider<IdentidadAlertas> identidades;
 
     public AlertasController(
             ProgramarAlertaService programar,
             SincronizarAlertasService sincronizar,
+            AtenderAlertaService atender,
             ObjectProvider<IdentidadAlertas> identidades) {
         this.programar = programar;
         this.sincronizar = sincronizar;
+        this.atender = atender;
         this.identidades = identidades;
     }
 
@@ -50,6 +54,21 @@ public class AlertasController {
     @GetMapping("/operaciones/{idOperacion}")
     public ContratoRf22.EstadoResponse operacion(Authentication auth, @PathVariable UUID idOperacion) {
         return programar.consultarOperacion(usuario(auth), idOperacion);
+    }
+
+    /** RF24 acción A — incluye VENCIDA. */
+    @PostMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}/atender")
+    public ContratoRf22.AtenderResponse atender(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta,
+            @Valid @RequestBody ContratoRf22.AtenderRequest body) {
+        return atender.atender(usuario(auth), idVehiculo, idAlerta, body);
+    }
+
+    /** RF24-EA08 — anulación manual; no anula el mantenimiento histórico. */
+    @PostMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}/anular")
+    public ContratoRf22.AnularAlertaResponse anularAlerta(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta) {
+        return atender.anular(usuario(auth), idVehiculo, idAlerta);
     }
 
     private long usuario(Authentication auth) {

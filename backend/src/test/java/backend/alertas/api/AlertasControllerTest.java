@@ -3,6 +3,7 @@ package backend.alertas.api;
 import backend.alertas.api.dto.ContratoRf22;
 import backend.alertas.model.ErrorAlertas;
 import backend.alertas.seguridad.IdentidadAlertas;
+import backend.alertas.service.AtenderAlertaService;
 import backend.alertas.service.ProgramarAlertaService;
 import backend.alertas.service.SincronizarAlertasService;
 import java.time.LocalDate;
@@ -24,6 +25,7 @@ class AlertasControllerTest {
     MockMvc mvc;
     ProgramarAlertaService programar;
     SincronizarAlertasService sincronizar;
+    AtenderAlertaService atender;
     Authentication auth;
 
     @BeforeEach @SuppressWarnings("unchecked") void preparar() {
@@ -33,8 +35,9 @@ class AlertasControllerTest {
         when(identidad.exigirUsuario(any())).thenReturn(9L);
         programar = mock(ProgramarAlertaService.class);
         sincronizar = mock(SincronizarAlertasService.class);
+        atender = mock(AtenderAlertaService.class);
         auth = UsernamePasswordAuthenticationToken.authenticated("fixture", null, List.of());
-        mvc = MockMvcBuilders.standaloneSetup(new AlertasController(programar, sincronizar, proveedor))
+        mvc = MockMvcBuilders.standaloneSetup(new AlertasController(programar, sincronizar, atender, proveedor))
                 .setControllerAdvice(new ErroresAlertasController()).build();
     }
 

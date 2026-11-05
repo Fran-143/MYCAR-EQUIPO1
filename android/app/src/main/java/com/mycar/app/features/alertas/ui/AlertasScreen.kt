@@ -67,7 +67,8 @@ fun AlertasRoute(
         }
     }
     AlertasScreen(
-        estado, vehiculos, vm::seleccionar, vm::cambiarFiltro, vm::recargar, onProgramar, modifier
+        estado, vehiculos, vm::seleccionar, vm::cambiarFiltro, vm::recargar, onProgramar,
+        onAtender = vm::atender, onAnular = vm::anular, modifier = modifier
     )
 }
 
@@ -79,6 +80,8 @@ fun AlertasScreen(
     onFiltro: (FiltroAlertas) -> Unit,
     onRecargar: () -> Unit,
     onProgramar: (Long) -> Unit,
+    onAtender: (Long, Int, String, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onAnular: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
@@ -188,12 +191,20 @@ fun AlertasScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+                estado.avisoAccion?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = colors.tertiary)
+                }
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.weight(1f, fill = true)
                 ) {
                     items(estado.visibles, key = { it.id }) { a ->
-                        TarjetaAlerta(a)
+                        TarjetaAlerta(
+                            a,
+                            ocupado = estado.ocupadoAccion,
+                            onAtender = onAtender,
+                            onAnular = onAnular
+                        )
                     }
                 }
             }
@@ -202,9 +213,19 @@ fun AlertasScreen(
 }
 
 @Composable
-private fun TarjetaAlerta(a: DatosAlerta) {
+private fun TarjetaAlerta(
+    a: DatosAlerta,
+    ocupado: Boolean = false,
+    onAtender: (Long, Int, String, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onAnular: (Long) -> Unit = {}
+) {
     val colors = MaterialTheme.colorScheme
     val badge = colorEstado(a.estado)
+    val atendible = a.estado in setOf("PROXIMA", "PENDIENTE", "VENCIDA")
+    val anulable = a.estado in setOf("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA")
+    var dialogAtender by remember { mutableStateOf(false) }
+    var dialogAnular by remember { mutableStateOf(false) }
+    var kmTexto by remember { mutableStateOf(a.kmObjetivo?.toString().orEmpty()) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -244,7 +265,63 @@ private fun TarjetaAlerta(a: DatosAlerta) {
             a.servicioOtro?.takeIf { a.tipo.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
+            if (atendible || anulable) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (atendible) {
+                        Button(
+                            onClick = { dialogAtender = true },
+                            enabled = !ocupado,
+                            shape = RoundedCornerShape(10.dp)
+                        ) { Text("Atender") }
+                    }
+                    if (anulable) {
+                        OutlinedButton(
+                            onClick = { dialogAnular = true },
+                            enabled = !ocupado,
+                            shape = RoundedCornerShape(10.dp)
+                        ) { Text("Anular") }
+                    }
+                }
+            }
         }
+    }
+    if (dialogAtender) {
+        AlertDialog(
+            onDismissRequest = { dialogAtender = false },
+            title = { Text("Atender alerta") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Se registrará un mantenimiento nuevo y la alerta pasará a REALIZADA.")
+                    OutlinedTextField(
+                        value = kmTexto,
+                        onValueChange = { kmTexto = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Km del servicio") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val km = kmTexto.toIntOrNull()
+                    if (km != null && km > 0) {
+                        dialogAtender = false
+                        onAtender(a.id, km, java.time.LocalDate.now().toString(), null, null)
+                    }
+                }) { Text("Confirmar") }
+            },
+            dismissButton = { TextButton(onClick = { dialogAtender = false }) { Text("Cancelar") } }
+        )
+    }
+    if (dialogAnular) {
+        AlertDialog(
+            onDismissRequest = { dialogAnular = false },
+            title = { Text("¿Anular alerta?") },
+            text = { Text("La alerta quedará ANULADA. El mantenimiento histórico de referencia no se anula.") },
+            confirmButton = {
+                TextButton(onClick = { dialogAnular = false; onAnular(a.id) }) { Text("Anular") }
+            },
+            dismissButton = { TextButton(onClick = { dialogAnular = false }) { Text("Cancelar") } }
+        )
     }
 }
 

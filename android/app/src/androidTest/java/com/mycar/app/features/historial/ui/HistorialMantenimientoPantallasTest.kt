@@ -53,12 +53,14 @@ class HistorialMantenimientoPantallasTest {
         compose.runOnIdle { assertEquals(11L, seleccionado); assertTrue(!inactivo.principal) }
     }
 
-    @Test fun inactivoSeConsultaPeroRegistrarPermaneceBloqueadoYPestanasFuturasTambien() {
+    @Test fun inactivoSeConsultaPeroRegistrarPermaneceBloqueadoYPestanasRf25SonSeleccionables() {
         mostrar(EstadoHistorial(FaseHistorial.LISTO, listOf(inactivo), inactivo, registros))
         compose.onNodeWithTag("rf18.registrar").assertIsNotEnabled()
-        compose.onNodeWithTag("rf18.tab.km").assertIsNotEnabled()
-        compose.onNodeWithTag("rf18.tab.talleres").assertIsNotEnabled()
+        compose.onNodeWithTag("rf18.tab.km").assertIsEnabled()
+        compose.onNodeWithTag("rf18.tab.talleres").assertIsEnabled()
         compose.onNodeWithTag("rf18.registro.21").assertExists()
+        compose.onNodeWithTag("rf18.tab.km").performClick()
+        compose.onNodeWithText("Historial de kilometraje").assertExists()
     }
 
     @Test fun errorOcultaTarjetasPreviasYOfreceReintentoManual() {
@@ -91,6 +93,9 @@ class HistorialMantenimientoPantallasTest {
         val repository = object : HistorialRepository {
             override suspend fun vehiculos(): List<VehiculoHistorial> { consultas.incrementAndGet(); return listOf(activo) }
             override suspend fun historial(idVehiculo: Long): ResultadoHistorial { consultas.incrementAndGet(); return ResultadoHistorial(activo, registros) }
+            override suspend fun detalle(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
+            override suspend fun modificar(idVehiculo: Long, idMantenimiento: Long, datos: ModificarMantenimientoDatos) = error("no usado")
+            override suspend fun anular(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
         }
         compose.setContent { MyCarTheme {
             EntradaHistorialMantenimiento(repository, null, null, {}, {}, {}, registroDisponible = true)
@@ -108,6 +113,9 @@ class HistorialMantenimientoPantallasTest {
                 consultas.incrementAndGet()
                 return ResultadoHistorial(activo, emptyList())
             }
+            override suspend fun detalle(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
+            override suspend fun modificar(idVehiculo: Long, idMantenimiento: Long, datos: ModificarMantenimientoDatos) = error("no usado")
+            override suspend fun anular(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
         }
         val mantenimiento = object : MantenimientoRepository {
             override suspend fun contexto() = ContextoRf17Dto("2026-10-27", "America/Lima",

@@ -18,6 +18,9 @@ class RemoteHistorialRepositoryTest {
     private class Api(var contexto: Response<ContextoHistorialDto>, var resultado: Response<ResultadoHistorialDto>) : HistorialApi {
         override suspend fun contexto() = contexto
         override suspend fun historial(id: Long) = resultado
+        override suspend fun detalle(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
+        override suspend fun modificar(idVehiculo: Long, idMantenimiento: Long, body: ModificarMantenimientoDto) = error("no usado")
+        override suspend fun anular(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
     }
     private fun api(registros: String = "$cero,$nulo", total: Int = 2, v: String = vehiculo): Api = Api(
         Response.success(gson.fromJson("""{"vehiculos":[$vehiculo]}""", ContextoHistorialDto::class.java)),

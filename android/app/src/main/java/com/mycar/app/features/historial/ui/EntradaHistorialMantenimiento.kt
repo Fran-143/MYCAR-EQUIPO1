@@ -85,7 +85,10 @@ fun EntradaHistorialMantenimiento(
     modifier: Modifier = Modifier, registroDisponible: Boolean = false,
     onIniciarSesion: (() -> Unit)? = null
 ) {
-    BackHandler(onBack = onVolver)
+    var detalleId by rememberSaveable { mutableStateOf<Long?>(null) }
+    BackHandler(onBack = {
+        if (detalleId != null) detalleId = null else onVolver()
+    })
     if (repository == null || claveCuenta.isNullOrBlank()) {
         HistorialMantenimientoScreen(EstadoHistorial(), onVolver, {}, {}, {}, {}, modifier,
             registroDisponible = false, onIniciarSesion = onIniciarSesion)
@@ -104,7 +107,9 @@ fun EntradaHistorialMantenimiento(
     val estado by vm.estado.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, vm) {
-        val observer = LifecycleEventObserver { _, evento -> if (evento == Lifecycle.Event.ON_RESUME) vm.recargar() }
+        val observer = LifecycleEventObserver { _, evento ->
+            if (evento == Lifecycle.Event.ON_RESUME && detalleId == null) vm.recargar()
+        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -112,6 +117,23 @@ fun EntradaHistorialMantenimiento(
         if (estado.fase == com.mycar.app.features.historial.domain.FaseHistorial.LISTO)
             estado.seleccionado?.id?.let(onSeleccionConfirmada)
     }
-    HistorialMantenimientoScreen(estado, onVolver, vm::seleccionar, vm::reintentar, vm::recargar,
-        onRegistrar, modifier, registroDisponible, onIniciarSesion)
+    val idVehiculoDetalle = estado.seleccionado?.id
+    if (detalleId != null && idVehiculoDetalle != null) {
+        DetalleMantenimientoRoute(
+            repository = repository,
+            idVehiculo = idVehiculoDetalle,
+            idMantenimiento = detalleId!!,
+            onVolver = {
+                detalleId = null
+                vm.recargar()
+            },
+            modifier = modifier
+        )
+    } else {
+        HistorialMantenimientoScreen(
+            estado, onVolver, vm::seleccionar, vm::reintentar, vm::recargar,
+            onRegistrar, modifier, registroDisponible, onIniciarSesion,
+            onVerDetalle = { detalleId = it }
+        )
+    }
 }

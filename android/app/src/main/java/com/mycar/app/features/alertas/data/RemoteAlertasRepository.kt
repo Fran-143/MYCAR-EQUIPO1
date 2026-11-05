@@ -7,6 +7,7 @@ import com.mycar.app.features.alertas.domain.DatosAlerta
 import com.mycar.app.features.alertas.domain.EstadoOperacionAlerta
 import com.mycar.app.features.alertas.domain.ReferenciaMantenimientoAlerta
 import com.mycar.app.features.alertas.domain.ResultadoOperacionIncierto
+import com.mycar.app.features.alertas.domain.SolicitudAtenderAlerta
 import com.mycar.app.features.alertas.domain.TipoAlerta
 import java.io.IOException
 import java.util.UUID
@@ -72,6 +73,32 @@ class RemoteAlertasRepository(private val api: AlertasApi) : AlertasRepository {
             return EstadoOperacionAlerta(r.estado.orEmpty(), r.resultado?.idAlerta)
         } catch (e: Exception) {
             throw IOException(mensajeHttp(e, "No se pudo consultar la operación"), e)
+        }
+    }
+
+    override suspend fun atender(idVehiculo: Long, idAlerta: Long, solicitud: SolicitudAtenderAlerta): Long {
+        try {
+            val r = api.atender(
+                idVehiculo, idAlerta,
+                AtenderAlertaDto(
+                    idOperacion = UUID.randomUUID().toString(),
+                    fechaServicio = solicitud.fechaServicio,
+                    kmServicio = solicitud.kmServicio,
+                    costoTotal = solicitud.costoTotal,
+                    observaciones = solicitud.observaciones
+                )
+            )
+            return r.idMantenimientoAtencion ?: error("Sin idMantenimientoAtencion")
+        } catch (e: Exception) {
+            throw IOException(mensajeHttp(e, "No se pudo atender la alerta"), e)
+        }
+    }
+
+    override suspend fun anular(idVehiculo: Long, idAlerta: Long) {
+        try {
+            api.anular(idVehiculo, idAlerta)
+        } catch (e: Exception) {
+            throw IOException(mensajeHttp(e, "No se pudo anular la alerta"), e)
         }
     }
 

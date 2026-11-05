@@ -13,7 +13,34 @@ public final class DatosHistorial {
 
     public record Mantenimiento(long idMantenimiento, String codigoTipo, String tipo,
                                 String servicioOtro, @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate fechaServicio,
-                                Integer kmServicio, String estado, BigDecimal costoTotal) { }
+                                Integer kmServicio, String estado, BigDecimal costoTotal,
+                                String taller) {
+        public Mantenimiento(long idMantenimiento, String codigoTipo, String tipo,
+                             String servicioOtro, LocalDate fechaServicio,
+                             Integer kmServicio, String estado, BigDecimal costoTotal) {
+            this(idMantenimiento, codigoTipo, tipo, servicioOtro, fechaServicio, kmServicio, estado, costoTotal, null);
+        }
+    }
+
+    /** RF19: detalle con campos de solo lectura + editables RF20. */
+    public record DetalleMantenimiento(
+            long idMantenimiento, long idVehiculo, String codigoTipo, String tipo,
+            String servicioOtro, @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd") LocalDate fechaServicio,
+            Integer kmServicio, String estado, BigDecimal costoTotal,
+            String observaciones, String taller,
+            boolean editable, boolean anulable, boolean bloqueadoPorAlertaActiva,
+            List<RepuestoDetalle> repuestos
+    ) {
+        public DetalleMantenimiento {
+            repuestos = repuestos == null ? List.of() : List.copyOf(repuestos);
+        }
+    }
+
+    public record RepuestoDetalle(String nombre, String marca, Integer cantidad, BigDecimal precioUnitario) { }
+
+    public record ModificarMantenimientoRequest(BigDecimal costoTotal, String observaciones, String taller) { }
+
+    public record AnularMantenimientoResponse(long idMantenimiento, String estado) { }
 
     public record Contexto(List<Vehiculo> vehiculos) {
         public Contexto { vehiculos = List.copyOf(vehiculos); }

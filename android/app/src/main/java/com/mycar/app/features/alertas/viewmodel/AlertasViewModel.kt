@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mycar.app.features.alertas.domain.AlertasRepository
 import com.mycar.app.features.alertas.domain.DatosAlerta
+import com.mycar.app.features.alertas.domain.SolicitudAtenderAlerta
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 enum class FaseAlertas { CARGANDO, LISTO, ERROR, VACIO }
 
@@ -28,6 +30,8 @@ data class EstadoAlertas(
     val visibles: List<DatosAlerta> = emptyList(),
     val filtro: FiltroAlertas = FiltroAlertas.TODAS,
     val mensaje: String? = null,
+    val avisoAccion: String? = null,
+    val ocupadoAccion: Boolean = false,
     val generacion: Int = 0
 )
 
@@ -76,6 +80,46 @@ class AlertasViewModel(
         val id = mutable.value.vehiculoId ?: vehiculos.firstOrNull()?.first ?: return
         mutable.value = mutable.value.copy(vehiculoId = id, fase = FaseAlertas.CARGANDO)
         cargar(id)
+    }
+
+    fun atender(idAlerta: Long, kmServicio: Int, fechaServicio: String = LocalDate.now().toString(),
+                costo: String? = null, observaciones: String? = null) {
+        val vehiculo = mutable.value.vehiculoId ?: return
+        if (mutable.value.ocupadoAccion || kmServicio <= 0) return
+        mutable.value = mutable.value.copy(ocupadoAccion = true, avisoAccion = null)
+        viewModelScope.launch {
+            try {
+                repository.atender(
+                    vehiculo, idAlerta,
+                    SolicitudAtenderAlerta(fechaServicio, kmServicio, costo, observaciones)
+                )
+                mutable.value = mutable.value.copy(ocupadoAccion = false, avisoAccion = "Alerta atendida")
+                recargar()
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    ocupadoAccion = false,
+                    avisoAccion = e.message ?: "No se pudo atender la alerta"
+                )
+            }
+        }
+    }
+
+    fun anular(idAlerta: Long) {
+        val vehiculo = mutable.value.vehiculoId ?: return
+        if (mutable.value.ocupadoAccion) return
+        mutable.value = mutable.value.copy(ocupadoAccion = true, avisoAccion = null)
+        viewModelScope.launch {
+            try {
+                repository.anular(vehiculo, idAlerta)
+                mutable.value = mutable.value.copy(ocupadoAccion = false, avisoAccion = "Alerta anulada")
+                recargar()
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    ocupadoAccion = false,
+                    avisoAccion = e.message ?: "No se pudo anular la alerta"
+                )
+            }
+        }
     }
 
     private fun cargar(id: Long) {

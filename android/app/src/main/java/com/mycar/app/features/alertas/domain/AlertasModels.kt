@@ -25,11 +25,20 @@ data class EstadoOperacionAlerta(
     val idAlerta: Long?
 )
 
+data class SolicitudAtenderAlerta(
+    val fechaServicio: String,
+    val kmServicio: Int,
+    val costoTotal: String? = null,
+    val observaciones: String? = null
+)
+
 interface AlertasRepository {
     suspend fun contexto(idVehiculo: Long): ContextoProgramarAlerta
     suspend fun listar(idVehiculo: Long): Pair<Int, List<DatosAlerta>>
     suspend fun programar(idVehiculo: Long, solicitud: ProgramarAlertaDto): Long
     suspend fun operacion(idOperacion: String): EstadoOperacionAlerta
+    suspend fun atender(idVehiculo: Long, idAlerta: Long, solicitud: SolicitudAtenderAlerta): Long
+    suspend fun anular(idVehiculo: Long, idAlerta: Long)
 }
 
 /** Resultado HTTP 202 / operación aún no confirmada; el cliente debe consultar idOperacion. */

@@ -14,6 +14,19 @@ interface AlertasApi {
 
     @GET("api/v1/rf22/operaciones/{idOperacion}")
     suspend fun operacion(@Path("idOperacion") idOperacion: String): EstadoOperacionAlertaDto
+
+    @POST("api/v1/rf22/vehiculos/{idVehiculo}/alertas/{idAlerta}/atender")
+    suspend fun atender(
+        @Path("idVehiculo") idVehiculo: Long,
+        @Path("idAlerta") idAlerta: Long,
+        @Body body: AtenderAlertaDto
+    ): AtenderAlertaRespuestaDto
+
+    @POST("api/v1/rf22/vehiculos/{idVehiculo}/alertas/{idAlerta}/anular")
+    suspend fun anular(
+        @Path("idVehiculo") idVehiculo: Long,
+        @Path("idAlerta") idAlerta: Long
+    ): AnularAlertaRespuestaDto
 }
 
 data class ContextoRf22Dto(
@@ -55,3 +68,20 @@ data class AlertaItemDto(
     val intervaloKm: Int?, val servicioOtro: String?, val versionFila: Int?
 )
 data class ListaAlertasDto(val alertasSincronizadas: Int?, val alertas: List<AlertaItemDto>?)
+
+data class AtenderAlertaDto(
+    val idOperacion: String,
+    val fechaServicio: String,
+    val kmServicio: Int,
+    val origenKmServicio: String = "HISTORICO_MANUAL",
+    val idLecturaKmReferencia: Long? = null,
+    val costoTotal: String? = null,
+    val observaciones: String? = null
+)
+data class AtenderAlertaRespuestaDto(
+    val idAlerta: Long?,
+    val estadoAlerta: String?,
+    val idMantenimientoAtencion: Long?,
+    val idOperacion: String?
+)
+data class AnularAlertaRespuestaDto(val idAlerta: Long?, val estado: String?)

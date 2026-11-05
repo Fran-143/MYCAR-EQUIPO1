@@ -21,13 +21,53 @@ data class MantenimientoHistorial(
 
 data class ResultadoHistorial(val vehiculo: VehiculoHistorial, val mantenimientos: List<MantenimientoHistorial>)
 
+data class RepuestoHistorial(
+    val nombre: String, val marca: String?, val cantidad: Int, val precioUnitario: BigDecimal?
+)
+
+/** RF19 detalle (+ flags RF20/RF21). */
+data class DetalleMantenimientoHistorial(
+    val id: Long,
+    val idVehiculo: Long,
+    val codigoTipo: String,
+    val tipo: String,
+    val servicioOtro: String?,
+    val fecha: LocalDate,
+    val kmServicio: Int,
+    val estado: String,
+    val costo: BigDecimal?,
+    val observaciones: String?,
+    val taller: String?,
+    val editable: Boolean,
+    val anulable: Boolean,
+    val bloqueadoPorAlertaActiva: Boolean,
+    val repuestos: List<RepuestoHistorial> = emptyList()
+) {
+    val titulo: String get() = if (codigoTipo == "OTRO") servicioOtro.orEmpty() else tipo
+}
+
+data class ModificarMantenimientoDatos(
+    val costoTotal: BigDecimal?,
+    val observaciones: String?,
+    val taller: String?
+)
+
 interface HistorialRepository {
     suspend fun vehiculos(): List<VehiculoHistorial>
     suspend fun historial(idVehiculo: Long): ResultadoHistorial
+    suspend fun detalle(idVehiculo: Long, idMantenimiento: Long): DetalleMantenimientoHistorial
+    suspend fun modificar(idVehiculo: Long, idMantenimiento: Long, datos: ModificarMantenimientoDatos): DetalleMantenimientoHistorial
+    suspend fun anular(idVehiculo: Long, idMantenimiento: Long)
 }
 
-enum class CodigoErrorHistorial { SESION, VEHICULO_NO_DISPONIBLE, CONEXION, INTEGRACION, DATOS }
-class ErrorHistorial(val codigo: CodigoErrorHistorial, override val message: String) : Exception(message)
+enum class CodigoErrorHistorial {
+    SESION, VEHICULO_NO_DISPONIBLE, MANTENIMIENTO_NO_DISPONIBLE, ALERTA_ACTIVA, CONEXION, INTEGRACION, DATOS
+}
+class ErrorHistorial(
+    val codigo: CodigoErrorHistorial,
+    override val message: String,
+    val idAlerta: Long? = null
+) : Exception(message)
 
 enum class FaseHistorial {
     SESION_REQUERIDA, CARGANDO_VEHICULOS, SIN_VEHICULOS, SIN_SELECCION,

@@ -26,6 +26,9 @@ class RemoteResumenInicioRepositoryTest {
                 return ResultadoHistorial(VehiculoHistorial(idVehiculo,"A1B234","Toyota","Corolla","ACTIVO",true),
                     listOf(MantenimientoHistorial(1,"FRENOS","Frenos",null,LocalDate.of(2026,9,10),57000,"REALIZADO",null)))
             }
+            override suspend fun detalle(idVehiculo: Long, idMantenimiento: Long) = error("Inicio no consulta detalle")
+            override suspend fun modificar(idVehiculo: Long, idMantenimiento: Long, datos: ModificarMantenimientoDatos) = error("Inicio no modifica")
+            override suspend fun anular(idVehiculo: Long, idMantenimiento: Long) = error("Inicio no anula")
         },object:MantenimientoRepository {
             override suspend fun contexto()=ContextoRf17Dto("2026-10-27","America/Lima",listOf(
                 VehiculoRf17Dto(1,"A1B234","Toyota","Corolla",true,9,58240,"2026-10-27T12:00:00Z",null)),emptyList(),true)

@@ -108,6 +108,21 @@ public class AlertasJdbcDao {
         return n == null ? 0 : n;
     }
 
+    /** Vehículos ACTIVO con al menos una alerta evaluable (para job diario RF23). */
+    public List<VehiculoActivo> listarVehiculosActivosConAlertasEvaluables() {
+        return jdbc.query("""
+                SELECT DISTINCT v.id_vehiculo, v.id_usuario
+                FROM mycar.vehiculo v
+                JOIN mycar.usuario u ON u.id_usuario = v.id_usuario AND u.estado_cuenta = 'ACTIVA'
+                JOIN mycar.alerta a ON a.id_vehiculo = v.id_vehiculo
+                WHERE v.estado_vehiculo = 'ACTIVO'
+                  AND a.estado IN ('PROGRAMADA','PROXIMA','PENDIENTE','VENCIDA')
+                ORDER BY v.id_vehiculo
+                """, (rs, n) -> new VehiculoActivo(rs.getLong(1), rs.getLong(2)));
+    }
+
+    public record VehiculoActivo(long idVehiculo, long idUsuario) { }
+
     public List<ContratoRf22.AlertaDto> listar(long vehiculo) {
         return jdbc.query("""
                 SELECT a.id_alerta, tm.codigo, tm.nombre, a.criterio, a.origen_calculo, a.estado,
@@ -180,11 +195,72 @@ public class AlertasJdbcDao {
         }
     }
 
+    public Optional<AlertaOperable> bloquearAlertaPropia(long usuario, long vehiculo, long idAlerta) {
+        exigirTx();
+        return jdbc.query("""
+                SELECT a.id_alerta, a.id_vehiculo, a.estado, a.version_fila, tm.codigo, a.servicio_otro,
+                       a.fecha_vencida_verificable, a.id_lectura_vencida_evidencia
+                FROM mycar.alerta a
+                JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
+                JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
+                WHERE a.id_alerta = ? AND a.id_vehiculo = ? AND v.id_usuario = ?
+                  AND v.estado_vehiculo = 'ACTIVO'
+                FOR UPDATE OF a
+                """, (rs, n) -> new AlertaOperable(
+                rs.getLong("id_alerta"), rs.getLong("id_vehiculo"), rs.getString("estado"),
+                rs.getInt("version_fila"), rs.getString("codigo"), rs.getString("servicio_otro"),
+                rs.getObject("fecha_vencida_verificable", LocalDate.class),
+                rs.getObject("id_lectura_vencida_evidencia", Long.class)), idAlerta, vehiculo, usuario)
+                .stream().findFirst();
+    }
+
+    public void marcarRealizada(long idAlerta, String estadoAnterior, int versionEsperada,
+                                long idMantenimientoAtencion, String motivo) {
+        exigirTx();
+        int filas = jdbc.update("""
+                UPDATE mycar.alerta
+                SET estado = 'REALIZADA', version_fila = version_fila + 1,
+                    fecha_estado_utc = clock_timestamp(),
+                    id_mantenimiento_atencion = ?
+                WHERE id_alerta = ? AND version_fila = ?
+                  AND estado IN ('PROXIMA','PENDIENTE','VENCIDA')
+                """, idMantenimientoAtencion, idAlerta, versionEsperada);
+        if (filas != 1) throw new IllegalStateException("No se pudo marcar la alerta como REALIZADA");
+        jdbc.update("""
+                INSERT INTO mycar.historial_alerta
+                  (id_alerta, estado_anterior, estado_nuevo, motivo, version_destino)
+                VALUES (?, ?, 'REALIZADA', ?, ?)
+                """, idAlerta, estadoAnterior, motivo, versionEsperada + 1);
+    }
+
+    public void marcarAnuladaManual(long idAlerta, String estadoAnterior, int versionEsperada) {
+        exigirTx();
+        int filas = jdbc.update("""
+                UPDATE mycar.alerta
+                SET estado = 'ANULADA', version_fila = version_fila + 1,
+                    fecha_estado_utc = clock_timestamp()
+                WHERE id_alerta = ? AND version_fila = ?
+                  AND estado IN ('PROGRAMADA','PROXIMA','PENDIENTE','VENCIDA')
+                """, idAlerta, versionEsperada);
+        if (filas != 1) throw new IllegalStateException("No se pudo anular la alerta");
+        jdbc.update("""
+                INSERT INTO mycar.historial_alerta
+                  (id_alerta, estado_anterior, estado_nuevo, motivo, version_destino)
+                VALUES (?, ?, 'ANULADA', 'ANULACION_MANUAL_RF24', ?)
+                """, idAlerta, estadoAnterior, versionEsperada + 1);
+    }
+
     private void exigirTx() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("Alertas requiere transacción activa");
         }
     }
+
+    public record AlertaOperable(
+            long idAlerta, long idVehiculo, String estado, int versionFila,
+            String codigoTipo, String servicioOtro,
+            LocalDate fechaVencidaVerificable, Long idLecturaVencidaEvidencia
+    ) { }
 
     public record LecturaActual(long idLecturaKm, int valorKm) { }
 

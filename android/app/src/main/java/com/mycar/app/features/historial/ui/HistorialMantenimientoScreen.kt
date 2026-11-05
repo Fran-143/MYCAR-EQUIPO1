@@ -35,8 +35,10 @@ fun HistorialMantenimientoScreen(
     onRegistrar: (Long) -> Unit,
     modifier: Modifier = Modifier,
     registroDisponible: Boolean = false,
-    onIniciarSesion: (() -> Unit)? = null
+    onIniciarSesion: (() -> Unit)? = null,
+    onVerDetalle: ((Long) -> Unit)? = null
 ) {
+    var pestana by remember { mutableStateOf(PestanaHistorial.MANTENIMIENTOS) }
     Column(modifier.fillMaxSize().background(FondoHistorial).testTag("rf18.pantalla")) {
         Surface(color = Color.White) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
@@ -50,57 +52,72 @@ fun HistorialMantenimientoScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = CelesteHistorial)) { Text("Registrar") }
             }
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp),
+        LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
             if (estado.vehiculos.isNotEmpty()) {
                 item { SelectorVehiculoHistorial(estado, onSeleccionar) }
             }
-            item { PestanasHistorial() }
+            item { PestanasHistorial(pestana) { pestana = it } }
             estado.aviso?.let { item { MensajeHistorial("Vehículo no disponible", it) } }
-            when (estado.fase) {
-                FaseHistorial.SESION_REQUERIDA -> item {
-                    MensajeHistorial("Tu historial, en un solo lugar",
-                        "Inicia sesión para consultar los mantenimientos de tus vehículos.") {
-                        onIniciarSesion?.let { Button(onClick = it) { Text("Iniciar sesión") } }
-                    }
+            when (pestana) {
+                PestanaHistorial.KILOMETRAJE -> item {
+                    MensajeHistorial("Historial de kilometraje",
+                        if (estado.seleccionado == null) "Elige un vehículo para ver lecturas."
+                        else "Todavía no hay lecturas para mostrar en esta pestaña.")
                 }
-                FaseHistorial.CARGANDO_VEHICULOS, FaseHistorial.CARGANDO_HISTORIAL -> item {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        LinearProgressIndicator(Modifier.fillMaxWidth().testTag("rf18.cargando"), color = CelesteHistorial)
-                        Text(if (estado.fase == FaseHistorial.CARGANDO_VEHICULOS) "Cargando tus vehículos…"
-                            else "Cargando el historial del vehículo…", color = AzulHistorial)
-                    }
+                PestanaHistorial.TALLERES -> item {
+                    MensajeHistorial("Talleres del vehículo",
+                        if (estado.seleccionado == null) "Elige un vehículo para ver talleres."
+                        else "Todavía no hay talleres asociados a este vehículo.")
                 }
-                FaseHistorial.SIN_VEHICULOS -> item {
-                    MensajeHistorial("No tienes vehículos registrados",
-                        "Aquí podrás consultar su historial cuando tengas un vehículo registrado.")
-                }
-                FaseHistorial.SIN_SELECCION -> item {
-                    MensajeHistorial("Elige un vehículo", "Selecciona uno de tus vehículos para consultar su historial. Esta elección no cambia tu vehículo principal.")
-                }
-                FaseHistorial.ERROR_VEHICULOS, FaseHistorial.ERROR_HISTORIAL -> item {
-                    MensajeHistorial("No se pudo cargar el historial", estado.mensaje ?: "Inténtalo nuevamente") {
-                        Button(onClick = onReintentar, modifier = Modifier.testTag("rf18.reintentar")) { Text("Reintentar") }
-                    }
-                }
-                FaseHistorial.LISTO -> {
-                    item {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${estado.contador} registros", Modifier.weight(1f).testTag("rf18.contador"),
-                                style = MaterialTheme.typography.labelLarge, color = AzulHistorial)
-                            Text("Más recientes primero", style = MaterialTheme.typography.labelMedium, color = AzulHistorial)
+                PestanaHistorial.MANTENIMIENTOS -> when (estado.fase) {
+                    FaseHistorial.SESION_REQUERIDA -> item {
+                        MensajeHistorial("Tu historial, en un solo lugar",
+                            "Inicia sesión para consultar los mantenimientos de tus vehículos.") {
+                            onIniciarSesion?.let { Button(onClick = it) { Text("Iniciar sesión") } }
                         }
                     }
-                    if (estado.seleccionado?.activo == false) item {
-                        MensajeHistorial("Vehículo inactivo", "Puedes consultar su historial. El registro de mantenimientos está disponible para vehículos activos.")
+                    FaseHistorial.CARGANDO_VEHICULOS, FaseHistorial.CARGANDO_HISTORIAL -> item {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth().testTag("rf18.cargando"), color = CelesteHistorial)
+                            Text(if (estado.fase == FaseHistorial.CARGANDO_VEHICULOS) "Cargando tus vehículos…"
+                                else "Cargando el historial del vehículo…", color = AzulHistorial)
+                        }
                     }
-                    if (estado.mantenimientos.isEmpty()) item {
-                        MensajeHistorial("Todavía no hay mantenimientos", "Este vehículo tiene 0 registros de mantenimiento.")
+                    FaseHistorial.SIN_VEHICULOS -> item {
+                        MensajeHistorial("No tienes vehículos registrados",
+                            "Aquí podrás consultar su historial cuando tengas un vehículo registrado.")
                     }
-                    items(estado.mantenimientos, key = { it.id }) { TarjetaMantenimientoHistorial(it) }
+                    FaseHistorial.SIN_SELECCION -> item {
+                        MensajeHistorial("Elige un vehículo", "Selecciona uno de tus vehículos para consultar su historial. Esta elección no cambia tu vehículo principal.")
+                    }
+                    FaseHistorial.ERROR_VEHICULOS, FaseHistorial.ERROR_HISTORIAL -> item {
+                        MensajeHistorial("No se pudo cargar el historial", estado.mensaje ?: "Inténtalo nuevamente") {
+                            Button(onClick = onReintentar, modifier = Modifier.testTag("rf18.reintentar")) { Text("Reintentar") }
+                        }
+                    }
+                    FaseHistorial.LISTO -> {
+                        item {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${estado.contador} registros", Modifier.weight(1f).testTag("rf18.contador"),
+                                    style = MaterialTheme.typography.labelLarge, color = AzulHistorial)
+                                Text("Más recientes primero", style = MaterialTheme.typography.labelMedium, color = AzulHistorial)
+                            }
+                        }
+                        if (estado.seleccionado?.activo == false) item {
+                            MensajeHistorial("Vehículo inactivo", "Puedes consultar su historial. El registro de mantenimientos está disponible para vehículos activos.")
+                        }
+                        if (estado.mantenimientos.isEmpty()) item {
+                            MensajeHistorial("Todavía no hay mantenimientos", "Este vehículo tiene 0 registros de mantenimiento.")
+                        }
+                        items(estado.mantenimientos, key = { it.id }) {
+                            TarjetaMantenimientoHistorial(it, onVerDetalle = onVerDetalle)
+                        }
+                    }
                 }
             }
-            if (estado.fase !in setOf(FaseHistorial.SESION_REQUERIDA, FaseHistorial.CARGANDO_VEHICULOS)) {
+            if (pestana == PestanaHistorial.MANTENIMIENTOS &&
+                estado.fase !in setOf(FaseHistorial.SESION_REQUERIDA, FaseHistorial.CARGANDO_VEHICULOS)) {
                 item {
                     TextButton(onClick = onActualizar, enabled = !estado.cargando,
                         modifier = Modifier.fillMaxWidth().testTag("rf18.actualizar")) { Text("Actualizar historial") }
@@ -109,6 +126,8 @@ fun HistorialMantenimientoScreen(
         }
     }
 }
+
+private enum class PestanaHistorial { MANTENIMIENTOS, KILOMETRAJE, TALLERES }
 
 @Composable
 private fun SelectorVehiculoHistorial(estado: EstadoHistorial, onSeleccionar: (Long) -> Unit) {
@@ -143,28 +162,39 @@ private fun SelectorVehiculoHistorial(estado: EstadoHistorial, onSeleccionar: (L
 }
 
 @Composable
-private fun PestanasHistorial() {
+private fun PestanasHistorial(activa: PestanaHistorial, onCambiar: (PestanaHistorial) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Surface(Modifier.weight(1f), color = Color.White, shape = RoundedCornerShape(10.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, CelesteHistorial)) {
-            Text("Mantenimientos", Modifier.padding(vertical = 18.dp, horizontal = 4.dp),
-                color = CelesteHistorial, style = MaterialTheme.typography.labelMedium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontWeight = FontWeight.Bold)
-        }
-        listOf("Kilometraje" to "rf18.tab.km", "Talleres" to "rf18.tab.talleres").forEach { (texto, tag) ->
-            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f).testTag(tag),
-                shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 3.dp, vertical = 10.dp)) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(texto, style = MaterialTheme.typography.labelMedium)
-                    Text("Próximamente", style = MaterialTheme.typography.labelSmall)
-                }
+        listOf(
+            PestanaHistorial.MANTENIMIENTOS to ("Mantenimientos" to "rf18.tab.mant"),
+            PestanaHistorial.KILOMETRAJE to ("Kilometraje" to "rf18.tab.km"),
+            PestanaHistorial.TALLERES to ("Talleres" to "rf18.tab.talleres")
+        ).forEach { (pestana, etiqueta) ->
+            val seleccionada = pestana == activa
+            OutlinedButton(
+                onClick = { onCambiar(pestana) },
+                enabled = true,
+                modifier = Modifier.weight(1f).testTag(etiqueta.second),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 3.dp, vertical = 10.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, if (seleccionada) CelesteHistorial else AzulHistorial.copy(alpha = 0.25f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (seleccionada) Color.White else Color.Transparent,
+                    contentColor = if (seleccionada) CelesteHistorial else AzulHistorial)
+            ) {
+                Text(etiqueta.first, style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
 }
 
 @Composable
-private fun TarjetaMantenimientoHistorial(m: MantenimientoHistorial) {
+private fun TarjetaMantenimientoHistorial(
+    m: MantenimientoHistorial,
+    onVerDetalle: ((Long) -> Unit)? = null
+) {
     val realizado = m.estado == "REALIZADO"
     Card(Modifier.fillMaxWidth().testTag("rf18.registro.${m.id}"), shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
@@ -182,8 +212,13 @@ private fun TarjetaMantenimientoHistorial(m: MantenimientoHistorial) {
             Text(if (m.costo == null) "Costo: No registrado" else "Costo: S/ ${m.costo.setScale(2, RoundingMode.UNNECESSARY).toPlainString()}",
                 color = AzulHistorial, style = MaterialTheme.typography.bodyMedium)
             m.taller?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            TextButton(onClick = {}, enabled = false, contentPadding = PaddingValues(0.dp),
-                modifier = Modifier.testTag("rf18.detalle.${m.id}")) { Text("Ver detalle · Próximamente") }
+            val puedeDetalle = onVerDetalle != null
+            TextButton(
+                onClick = { onVerDetalle?.invoke(m.id) },
+                enabled = puedeDetalle,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.testTag("rf18.detalle.${m.id}")
+            ) { Text(if (puedeDetalle) "Ver detalle" else "Ver detalle · Próximamente") }
         }
     }
 }

@@ -32,6 +32,31 @@ public class HistorialMantenimientoController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(servicio.consultar(usuario(autenticacion), idVehiculo));
     }
 
+    /** RF19 */
+    @GetMapping("/vehiculos/{idVehiculo}/mantenimientos/{idMantenimiento}")
+    public ResponseEntity<DetalleMantenimiento> detalle(
+            Authentication autenticacion, @PathVariable long idVehiculo, @PathVariable long idMantenimiento) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(servicio.detalle(usuario(autenticacion), idVehiculo, idMantenimiento));
+    }
+
+    /** RF20 — solo costo, observaciones y taller. */
+    @PatchMapping("/vehiculos/{idVehiculo}/mantenimientos/{idMantenimiento}")
+    public ResponseEntity<DetalleMantenimiento> modificar(
+            Authentication autenticacion, @PathVariable long idVehiculo, @PathVariable long idMantenimiento,
+            @RequestBody ModificarMantenimientoRequest body) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(servicio.modificar(usuario(autenticacion), idVehiculo, idMantenimiento, body));
+    }
+
+    /** RF21 — bloquea si hay alerta activa referenciando. */
+    @PostMapping("/vehiculos/{idVehiculo}/mantenimientos/{idMantenimiento}/anular")
+    public ResponseEntity<AnularMantenimientoResponse> anular(
+            Authentication autenticacion, @PathVariable long idVehiculo, @PathVariable long idMantenimiento) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(servicio.anular(usuario(autenticacion), idVehiculo, idMantenimiento));
+    }
+
     private long usuario(Authentication autenticacion) {
         if (autenticacion == null || !autenticacion.isAuthenticated()
                 || autenticacion instanceof AnonymousAuthenticationToken) throw new SesionMantenimientoNoValidada();

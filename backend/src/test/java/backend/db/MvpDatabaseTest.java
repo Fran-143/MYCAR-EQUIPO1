@@ -965,17 +965,16 @@ class MvpDatabaseTest {
         invalid(null, () -> exec(c, "UPDATE mycar.historial_alerta SET motivo='Modificar' WHERE id_alerta=?", id));
     }
 
-    @Test void rf23VeintinueveVsTreintaDiasDesdeEvidenciaNoDesdeCommit() throws Exception {
+    @Test void rf23VeintinueveYTreintaDiasPermanecenVencidasSinAnulacionAutomatica() throws Exception {
         Vehicle v = fixture(c);
         long day29 = historicTimeAlert(c, v, 29, "a".repeat(64));
         long day30 = historicTimeAlert(c, v, 30, "b".repeat(64));
         assertEquals(2, number(c, "SELECT mycar.sincronizar_alertas_vehiculo(?,?)", v.id, v.user));
         assertEquals("VENCIDA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", day29));
-        assertEquals("ANULADA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", day30));
-        assertEquals(1, number(c, "SELECT count(*) FROM mycar.historial_alerta WHERE id_alerta=? AND estado_anterior IS NOT NULL", day30));
+        assertEquals("VENCIDA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", day30));
         assertEquals(0, number(c, "SELECT mycar.sincronizar_alertas_vehiculo(?,?)", v.id, v.user));
+        assertEquals(0, number(c, "SELECT count(*) FROM mycar.historial_alerta WHERE motivo='VENCIMIENTO_30_DIAS'"));
         invalid(null, () -> exec(c, "UPDATE mycar.alerta SET fecha_vencida_verificable=fecha_vencida_verificable+1 WHERE id_alerta=?", day30));
-        assertEquals(1, number(c, "SELECT count(*) FROM mycar.historial_alerta WHERE id_alerta=? AND motivo='VENCIMIENTO_30_DIAS'", day30));
     }
 
     @Test void rf23RechazaTitularAjenoYRollbackSiFallaHistorial() throws Exception {
@@ -994,7 +993,7 @@ class MvpDatabaseTest {
         long first = historicalReading(c, v, 21381, 30);
         long later = historicalReading(c, v, 22000, 15);
         assertEquals(1, number(c, "SELECT mycar.sincronizar_alertas_vehiculo(?,?)", v.id, v.user));
-        assertEquals("ANULADA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", id));
+        assertEquals("VENCIDA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", id));
         assertEquals(first, number(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", id));
         assertEquals(LocalDate.now(LIMA).minusDays(30).toString(), text(c, "SELECT fecha_vencida_verificable FROM mycar.alerta WHERE id_alerta=?", id));
         invalid(null, () -> exec(c, "UPDATE mycar.alerta SET id_lectura_vencida_evidencia=? WHERE id_alerta=?", later, id));
@@ -1022,7 +1021,8 @@ class MvpDatabaseTest {
         assertNull(text(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", timeFirst));
         assertNull(text(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", tie));
         assertEquals(proof, number(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", kmFirst));
-        assertEquals(3, number(c, "SELECT count(*) FROM mycar.alerta WHERE estado='ANULADA'"));
+        assertEquals(3, number(c, "SELECT count(*) FROM mycar.alerta WHERE estado='VENCIDA'"));
+        assertEquals(0, number(c, "SELECT count(*) FROM mycar.alerta WHERE estado='ANULADA'"));
     }
 
     @Test void esquemaNoVacioSeRechazaSinModificarFilaExistente() throws Exception {

@@ -70,5 +70,30 @@ public final class ContratoRf22 {
 
     public record EstadoResponse(UUID idOperacion, String estado, ProgramarResponse resultado) { }
 
+    /** RF24 acción A: registrar mantenimiento nuevo y marcar alerta REALIZADA. */
+    public record AtenderRequest(
+            @NotNull UUID idOperacion,
+            @NotNull LocalDate fechaServicio,
+            @NotNull @Positive Integer kmServicio,
+            @NotBlank @Pattern(regexp = "LECTURA|HISTORICO_MANUAL") String origenKmServicio,
+            @Positive Long idLecturaKmReferencia,
+            @DecimalMin("0") java.math.BigDecimal costoTotal,
+            String observaciones,
+            java.util.List<AtenderRepuesto> repuestos
+    ) { }
+
+    public record AtenderRepuesto(
+            @NotBlank String nombre,
+            String marca,
+            @NotNull @Positive Integer cantidad,
+            @DecimalMin("0") java.math.BigDecimal precioUnitario
+    ) { }
+
+    public record AtenderResponse(
+            Long idAlerta, String estadoAlerta, Long idMantenimientoAtencion, UUID idOperacion
+    ) { }
+
+    public record AnularAlertaResponse(Long idAlerta, String estado) { }
+
     public record ErrorResponse(String codigo, String mensaje, Map<String, String> campos, boolean resultadoIncierto) { }
 }
