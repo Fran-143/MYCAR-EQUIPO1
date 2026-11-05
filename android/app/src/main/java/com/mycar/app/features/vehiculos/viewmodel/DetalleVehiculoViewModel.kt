@@ -56,6 +56,7 @@ class DetalleVehiculoViewModel(
                     mensaje = when {
                         sesion -> "Inicia sesión para ver este vehículo."
                         noDisponible -> "Este vehículo no está disponible en tu cuenta."
+                        fallo != null -> "No se pudo cargar el detalle (${fallo.codigo}). Inténtalo nuevamente."
                         else -> "No se pudo cargar el detalle. Inténtalo nuevamente."
                     }
                 )

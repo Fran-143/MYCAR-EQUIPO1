@@ -147,6 +147,44 @@ public class AlertasJdbcDao {
                 rs.getInt("version_fila")), vehiculo);
     }
 
+    /** RF24: detalle propio (categoria=MANTENIMIENTO) con ficha de vehículo. */
+    public Optional<DetalleAlertaFila> obtenerDetallePropio(long usuario, long vehiculo, long idAlerta) {
+        return jdbc.query("""
+                SELECT a.id_alerta, a.id_vehiculo, a.id_tipo_mantenimiento, tm.codigo, tm.nombre,
+                       a.criterio, a.origen_calculo, a.estado,
+                       to_char(a.fecha_estado_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS fecha_estado,
+                       a.fecha_objetivo, a.km_objetivo, a.km_base, a.intervalo_km,
+                       a.unidad_tiempo, a.cantidad_tiempo, a.fecha_base, a.servicio_otro,
+                       a.id_mantenimiento_referencia, a.id_mantenimiento_atencion, a.version_fila,
+                       v.placa, v.marca, v.modelo, v.estado_vehiculo
+                FROM mycar.alerta a
+                JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
+                JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
+                WHERE a.id_alerta = ? AND a.id_vehiculo = ? AND v.id_usuario = ?
+                  AND a.categoria = 'MANTENIMIENTO' AND a.estado <> 'ANULADA'
+                """, (rs, n) -> new DetalleAlertaFila(
+                rs.getLong("id_alerta"), rs.getLong("id_vehiculo"), rs.getLong("id_tipo_mantenimiento"),
+                rs.getString("codigo"), rs.getString("nombre"), rs.getString("criterio"),
+                rs.getString("origen_calculo"), rs.getString("estado"), rs.getString("fecha_estado"),
+                rs.getObject("fecha_objetivo", LocalDate.class), rs.getObject("km_objetivo", Integer.class),
+                rs.getObject("km_base", Integer.class), rs.getObject("intervalo_km", Integer.class),
+                rs.getString("unidad_tiempo"), rs.getObject("cantidad_tiempo", Integer.class),
+                rs.getObject("fecha_base", LocalDate.class), rs.getString("servicio_otro"),
+                rs.getObject("id_mantenimiento_referencia", Long.class),
+                rs.getObject("id_mantenimiento_atencion", Long.class), rs.getInt("version_fila"),
+                rs.getString("placa"), rs.getString("marca"), rs.getString("modelo"),
+                rs.getString("estado_vehiculo")), idAlerta, vehiculo, usuario).stream().findFirst();
+    }
+
+    public record DetalleAlertaFila(
+            long idAlerta, long idVehiculo, long idTipoMantenimiento,
+            String codigoTipo, String nombreTipo, String criterio, String origenCalculo, String estado,
+            String fechaEstadoUtc, LocalDate fechaObjetivo, Integer kmObjetivo, Integer kmBase,
+            Integer intervaloKm, String unidadTiempo, Integer cantidadTiempo, LocalDate fechaBase,
+            String servicioOtro, Long idMantenimientoReferencia, Long idMantenimientoAtencion,
+            int versionFila, String placa, String marca, String modelo, String estadoVehiculo
+    ) { }
+
     public List<ContratoRf22.TipoDto> tiposActivos() {
         return jdbc.query("""
                 SELECT id_tipo_mantenimiento, codigo, nombre

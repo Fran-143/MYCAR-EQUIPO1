@@ -12,9 +12,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mycar.app.features.mantenimiento.data.ResultadoRf17Dto
+import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
 
 @Composable
-internal fun ResultadoMantenimientoScreen(r: ResultadoRf17Dto, modifier: Modifier, onVolver: () -> Unit) {
+internal fun ResultadoMantenimientoScreen(
+    r: ResultadoRf17Dto,
+    modifier: Modifier,
+    onVolver: () -> Unit,
+    oferta: OfertaProgramarAlerta? = null,
+    onProgramarAlerta: (OfertaProgramarAlerta) -> Unit = {}
+) {
     Column(modifier.fillMaxSize().testTag("rf17.resultado").verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(16.dp))
@@ -33,8 +40,21 @@ internal fun ResultadoMantenimientoScreen(r: ResultadoRf17Dto, modifier: Modifie
                 DatoResultado("Repuestos", r.cantidadRepuestos?.toString() ?: "—")
             }
         }
-        AvisoMantenimiento("Las recomendaciones se conservaron sin crear una alerta.")
-        Button(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
+        if (oferta != null) {
+            AvisoMantenimiento("¿Quieres programar ahora la alerta con la recomendación indicada?")
+            Button(
+                onClick = { onProgramarAlerta(oferta) },
+                modifier = Modifier.fillMaxWidth().testTag("rf17.programar.alerta"),
+                shape = RoundedCornerShape(14.dp)
+            ) { Text("Sí, programar alerta") }
+            OutlinedButton(
+                onClick = onVolver,
+                modifier = Modifier.fillMaxWidth().testTag("rf17.resultado.volver")
+            ) { Text("Ahora no") }
+        } else {
+            AvisoMantenimiento("Las recomendaciones se conservaron sin crear una alerta.")
+            Button(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
+        }
     }
 }
 

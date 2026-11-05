@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import backend.vehiculos.dto.DatosDetalleVehiculo;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -123,14 +122,14 @@ public class ConsultaRegistroVehiculoDao {
                 rs.getString("modelo"), rs.getInt("anio_fabricacion"), rs.getString("uso"),
                 rs.getString("color"), rs.getString("motor"), rs.getString("combustible"),
                 rs.getString("estado_vehiculo"), rs.getBoolean("es_principal"),
-                rs.getObject("valor_km", Integer.class), instant(rs.getTimestamp("fecha_lectura_utc")),
+                rs.getObject("valor_km", Integer.class), isoUtc(rs.getTimestamp("fecha_lectura_utc")),
                 rs.getString("numero_vin"), rs.getString("numero_serie"), rs.getString("numero_motor"),
                 rs.getString("aceite"), rs.getBoolean("es_electrico")
         ), idUsuario, idVehiculo).stream().findFirst();
     }
 
-    private static Instant instant(Timestamp marca) {
-        return marca == null ? null : marca.toInstant();
+    private static String isoUtc(Timestamp marca) {
+        return marca == null ? null : marca.toInstant().toString();
     }
 
     public record OperacionConsultada(String estado, String respuestaJson) {

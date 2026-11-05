@@ -18,9 +18,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.R
 import com.mycar.app.features.alertas.ui.AlertasRoute
 import com.mycar.app.features.alertas.ui.ProgramarAlertaRoute
+import com.mycar.app.features.alertas.viewmodel.BorradorAlerta
 import com.mycar.app.features.historial.ui.FlujoHistorialMantenimiento
 import com.mycar.app.features.inicio.domain.*
 import com.mycar.app.features.inicio.viewmodel.ResumenInicioViewModel
+import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
 import com.mycar.app.features.sesion.viewmodel.SesionVehiculosViewModel
 import com.mycar.app.features.vehiculos.ui.ActualizarKilometrajeRoute
 import com.mycar.app.features.vehiculos.ui.DetalleVehiculoRoute
@@ -48,6 +50,7 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
     var recargaAlertas by rememberSaveable { mutableIntStateOf(0) }
     var alertasFiltroTodasTrasExito by rememberSaveable { mutableStateOf(false) }
     var formularioAbierto by remember { mutableStateOf(false) }
+    var borradorAlertaRf17 by remember { mutableStateOf<BorradorAlerta?>(null) }
     val navegacion=NavegacionInicio(SeccionMyCar.valueOf(seccionNombre),secundariaNombre?.let(SecundariaMyCar::valueOf))
     fun navegar(n: NavegacionInicio) { seccionNombre=n.seccion.name; secundariaNombre=n.secundaria?.name; formularioAbierto=false }
     LaunchedEffect(solicitudVehiculos) { if(solicitudVehiculos>0) navegar(navegacion.abrir(SeccionMyCar.VEHICULOS)) }
@@ -62,10 +65,33 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
         kmSesion++
         kmOverlayMantenimiento = id
     }
-    fun abrirProgramarAlerta(id: Long) {
+    fun abrirProgramarAlerta(id: Long, borrador: BorradorAlerta? = null) {
         alertasSesion++
         alertasProgramarId = id
         vehiculoAlertas = id
+        borradorAlertaRf17 = borrador
+        navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
+    }
+    fun abrirProgramarDesdeRf17(oferta: OfertaProgramarAlerta) {
+        val intervalo = oferta.proximoKm?.let { pk -> (pk - oferta.kmServicio).takeIf { it > 0 } }
+        val criterio = when {
+            intervalo != null && oferta.proximaFecha != null -> "AMBOS"
+            intervalo != null -> "POR_KILOMETRAJE"
+            else -> "POR_TIEMPO"
+        }
+        abrirProgramarAlerta(
+            oferta.idVehiculo,
+            BorradorAlerta(
+                codigoTipo = oferta.codigoTipo,
+                criterio = criterio,
+                origenCalculo = "DESDE_MANTENIMIENTO",
+                unidadTiempo = "MESES",
+                cantidadTiempo = "6",
+                intervaloKm = (intervalo ?: 5000).toString(),
+                servicioOtro = oferta.servicioOtro.orEmpty(),
+                idReferencia = oferta.idMantenimiento
+            )
+        )
     }
     LaunchedEffect(cuenta?.ciclo) {
         vehiculoMantenimiento=null; vehiculoDetalleId=null; vehiculoKmId=null; kmOverlayMantenimiento=null
@@ -200,7 +226,8 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                                         onActualizarKm={ abrirKmDesdeMantenimiento(it) },
                                         idVehiculoInicial=vehiculoMantenimiento, archivoPendiente=cuenta.archivoMantenimiento,
                                         estadoEnSistema=false, onRegistroAbierto={ formularioAbierto=it },
-                                        recargaRegistroToken = recargaMantenimiento)
+                                        recargaRegistroToken = recargaMantenimiento,
+                                        onProgramarAlerta = { abrirProgramarDesdeRf17(it) })
                                     if (idKmOverlay != null) {
                                         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                                             ActualizarKilometrajeRoute(
@@ -240,11 +267,15 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
                                         idVehiculo = idProgramar,
                                         vehiculos = vehiculosAlertas,
                                         sesionFormulario = alertasSesion,
-                                        borradorInicial = null,
-                                        onVolver={ alertasProgramarId = null },
+                                        borradorInicial = borradorAlertaRf17,
+                                        onVolver={
+                                            alertasProgramarId = null
+                                            borradorAlertaRf17 = null
+                                        },
                                         onExito={
                                             // G108: volver a Alertas con el mismo vehículo y filtro Todas.
                                             alertasProgramarId = null
+                                            borradorAlertaRf17 = null
                                             vehiculoAlertas = idProgramar
                                             alertasFiltroTodasTrasExito = true
                                             recargaAlertas++

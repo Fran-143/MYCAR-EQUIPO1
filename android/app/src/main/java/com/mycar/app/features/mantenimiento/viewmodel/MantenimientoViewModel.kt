@@ -15,6 +15,17 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.util.UUID
 
+/** Tras RF17, datos para abrir RF22 con referencia al mantenimiento recién creado. */
+data class OfertaProgramarAlerta(
+    val idVehiculo: Long,
+    val idMantenimiento: Long,
+    val codigoTipo: String,
+    val servicioOtro: String?,
+    val kmServicio: Int,
+    val proximaFecha: String?,
+    val proximoKm: Int?
+)
+
 data class MantenimientoUiState(
     val borrador: BorradorMantenimiento = BorradorMantenimiento(),
     val contexto: ContextoRf17Dto? = null, val lecturas: List<LecturaRf17Dto> = emptyList(),
@@ -24,7 +35,10 @@ data class MantenimientoUiState(
     val errores: Map<String,String> = emptyMap(), val editor: RepuestoBorrador? = null,
     val erroresEditor: Map<String,String> = emptyMap(), val confirmarSalida: Boolean = false,
     val vehiculoPendiente: Long? = null, val recuperacionBloqueada: Boolean = false,
-    val requiereSesion: Boolean = false
+    val requiereSesion: Boolean = false,
+    /** true si el usuario eligió «Guardar y programar alerta». */
+    val programarAlertaTrasExito: Boolean = false,
+    val ofertaProgramarAlerta: OfertaProgramarAlerta? = null
 ) {
     val editable get() = !requiereSesion && !enviando && !incierto && resultado == null && !recuperacionBloqueada
 }
@@ -155,7 +169,7 @@ class MantenimientoViewModel(
             mutable.value = mutable.value.copy(editor = RepuestoBorrador(nombre = aceite))
         }
     }
-    fun guardar() {
+    fun guardar(programarAlerta: Boolean = false) {
         val s = mutable.value
         if (!s.editable) return
         val errores = ValidacionFormularioMantenimiento.formulario(s.borrador, s.contexto)
@@ -163,6 +177,7 @@ class MantenimientoViewModel(
         if (s.contexto?.registroDisponible != true) {
             mutable.value = s.copy(mensaje = "El registro aún no está disponible. Conserva el borrador."); return
         }
+        mutable.value = s.copy(programarAlertaTrasExito = programarAlerta)
         enviar(s.borrador)
     }
     fun reintentarMismaOperacion() {
@@ -223,7 +238,19 @@ class MantenimientoViewModel(
             throw ErrorMantenimientoRemoto("RESPUESTA_INVALIDA", "La respuesta no confirma esta solicitud", true)
         withContext(Dispatchers.IO) { archivo.borrar() }
         saved.remove<String>("rf17.borrador")
-        mutable.value = mutable.value.copy(enviando = false, incierto = false, resultado = r, mensaje = null)
+        val oferta = if (mutable.value.programarAlertaTrasExito) OfertaProgramarAlerta(
+            idVehiculo = requireNotNull(b.idVehiculo),
+            idMantenimiento = requireNotNull(r.idMantenimiento),
+            codigoTipo = b.codigoTipo,
+            servicioOtro = b.servicioOtro.takeIf { it.isNotBlank() },
+            kmServicio = requireNotNull(b.km.toIntOrNull() ?: r.kmServicio),
+            proximaFecha = b.proximaFecha.takeIf { it.isNotBlank() },
+            proximoKm = b.proximoKm.toIntOrNull()
+        ) else null
+        mutable.value = mutable.value.copy(
+            enviando = false, incierto = false, resultado = r, mensaje = null,
+            ofertaProgramarAlerta = oferta
+        )
     }
     fun finalizarConfirmacion() {
         if (mutable.value.resultado == null) return

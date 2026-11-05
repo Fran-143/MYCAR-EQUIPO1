@@ -68,6 +68,36 @@ public final class ContratoRf22 {
 
     public record ListaResponse(int alertasSincronizadas, List<AlertaDto> alertas) { }
 
+    /** RF24 B1 — detalle de alerta MANTENIMIENTO propia + vehículo + acciones. */
+    public record VehiculoResumenDto(Long idVehiculo, String placa, String marca, String modelo, String estadoVehiculo) { }
+
+    public record AccionesDetalleDto(boolean atender, boolean anular) { }
+
+    public record DetalleAlertaDto(
+            Long idAlerta,
+            String categoria,
+            String codigoTipo,
+            String nombreTipo,
+            String criterio,
+            String origenCalculo,
+            String estado,
+            String fechaEstadoUtc,
+            LocalDate fechaObjetivo,
+            Integer kmObjetivo,
+            Integer kmBase,
+            Integer intervaloKm,
+            String unidadTiempo,
+            Integer cantidadTiempo,
+            LocalDate fechaBase,
+            String servicioOtro,
+            Long idTipoMantenimiento,
+            Long idMantenimientoReferencia,
+            Long idMantenimientoAtencion,
+            int versionFila,
+            VehiculoResumenDto vehiculo,
+            AccionesDetalleDto acciones
+    ) { }
+
     public record EstadoResponse(UUID idOperacion, String estado, ProgramarResponse resultado) { }
 
     /** RF24 acción A: registrar mantenimiento nuevo y marcar alerta REALIZADA. */

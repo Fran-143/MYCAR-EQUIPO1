@@ -44,6 +44,13 @@ public class AlertasController {
         return sincronizar.listarMisAlertas(usuario(auth), idVehiculo);
     }
 
+    /** RF24 B1 — consultarDetalleAlertaUsuario + sync + acciones. */
+    @GetMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}")
+    public ContratoRf22.DetalleAlertaDto detalle(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta) {
+        return sincronizar.consultarDetalle(usuario(auth), idVehiculo, idAlerta);
+    }
+
     @PostMapping("/vehiculos/{idVehiculo}/alertas")
     @ResponseStatus(HttpStatus.CREATED)
     public ContratoRf22.ProgramarResponse programar(

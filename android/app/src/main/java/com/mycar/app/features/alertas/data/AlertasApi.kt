@@ -9,6 +9,12 @@ interface AlertasApi {
     @GET("api/v1/rf22/vehiculos/{idVehiculo}/alertas")
     suspend fun listar(@Path("idVehiculo") idVehiculo: Long): ListaAlertasDto
 
+    @GET("api/v1/rf22/vehiculos/{idVehiculo}/alertas/{idAlerta}")
+    suspend fun detalle(
+        @Path("idVehiculo") idVehiculo: Long,
+        @Path("idAlerta") idAlerta: Long
+    ): DetalleAlertaDto
+
     @POST("api/v1/rf22/vehiculos/{idVehiculo}/alertas")
     suspend fun programar(@Path("idVehiculo") idVehiculo: Long, @Body body: ProgramarAlertaDto): ProgramarRespuestaDto
 
@@ -68,6 +74,19 @@ data class AlertaItemDto(
     val intervaloKm: Int?, val servicioOtro: String?, val versionFila: Int?
 )
 data class ListaAlertasDto(val alertasSincronizadas: Int?, val alertas: List<AlertaItemDto>?)
+
+data class VehiculoResumenAlertaDto(
+    val idVehiculo: Long?, val placa: String?, val marca: String?, val modelo: String?, val estadoVehiculo: String?
+)
+data class AccionesDetalleAlertaDto(val atender: Boolean?, val anular: Boolean?)
+data class DetalleAlertaDto(
+    val idAlerta: Long?, val categoria: String?, val codigoTipo: String?, val nombreTipo: String?,
+    val criterio: String?, val origenCalculo: String?, val estado: String?, val fechaEstadoUtc: String?,
+    val fechaObjetivo: String?, val kmObjetivo: Int?, val kmBase: Int?, val intervaloKm: Int?,
+    val unidadTiempo: String?, val cantidadTiempo: Int?, val fechaBase: String?, val servicioOtro: String?,
+    val idTipoMantenimiento: Long?, val idMantenimientoReferencia: Long?, val idMantenimientoAtencion: Long?,
+    val versionFila: Int?, val vehiculo: VehiculoResumenAlertaDto?, val acciones: AccionesDetalleAlertaDto?
+)
 
 data class AtenderAlertaDto(
     val idOperacion: String,

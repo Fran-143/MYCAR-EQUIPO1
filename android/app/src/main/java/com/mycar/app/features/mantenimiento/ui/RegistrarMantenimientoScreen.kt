@@ -19,24 +19,34 @@ import com.mycar.app.features.mantenimiento.viewmodel.MantenimientoViewModel
 internal fun RegistrarMantenimientoScreen(
     s: MantenimientoUiState, vm: MantenimientoViewModel, modifier: Modifier,
     onCerrar: () -> Unit, onCerrarConfirmado: () -> Unit,
-    onActualizarKm: ((Long) -> Unit)?, onSesionRequerida: (() -> Unit)?
+    onActualizarKm: ((Long) -> Unit)?, onSesionRequerida: (() -> Unit)?,
+    onProgramarAlerta: ((com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta) -> Unit)? = null
 ) {
     val acciones = remember(vm) { AccionesDesdeViewModel(vm) }
     FormularioRegistroMantenimiento(s, acciones, modifier, onCerrar, onCerrarConfirmado,
-        onActualizarKm, onSesionRequerida)
+        onActualizarKm, onSesionRequerida, onProgramarAlerta)
 }
 
 @Composable
 internal fun FormularioRegistroMantenimiento(
     s: MantenimientoUiState, vm: AccionesMantenimiento, modifier: Modifier,
     onCerrar: () -> Unit, onCerrarConfirmado: () -> Unit,
-    onActualizarKm: ((Long) -> Unit)?, onSesionRequerida: (() -> Unit)?
+    onActualizarKm: ((Long) -> Unit)?, onSesionRequerida: (() -> Unit)?,
+    onProgramarAlerta: ((com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta) -> Unit)? = null
 ) {
     val b = s.borrador
     val vehiculo = s.contexto?.vehiculos?.firstOrNull { it.idVehiculo == b.idVehiculo }
     val enabled = s.editable && !s.cargando
     s.resultado?.let {
-        ResultadoMantenimientoScreen(it, modifier, onCerrarConfirmado)
+        ResultadoMantenimientoScreen(
+            r = it,
+            modifier = modifier,
+            oferta = s.ofertaProgramarAlerta,
+            onVolver = onCerrarConfirmado,
+            onProgramarAlerta = { oferta ->
+                onProgramarAlerta?.invoke(oferta) ?: onCerrarConfirmado()
+            }
+        )
         return
     }
     Column(modifier.fillMaxSize()) {
@@ -188,7 +198,7 @@ internal fun FormularioRegistroMantenimiento(
                 CampoMantenimiento("Próximo kilometraje sugerido", b.proximoKm, enabled,
                     s.errores["proximoKmSugerido"], KeyboardType.Number) { v -> vm.actualizar { it.copy(proximoKm = v) } }
                 if (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank()) {
-                    Text("Tras guardar, puedes programar una alerta equivalente desde Alertas (RF22).",
+                    Text("Puedes guardar y programar una alerta preventiva con esta recomendación.",
                         style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -196,12 +206,36 @@ internal fun FormularioRegistroMantenimiento(
         }
         HorizontalDivider()
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            Button(onClick = vm::guardar, enabled = enabled && s.contexto?.registroDisponible == true,
-                modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
-                shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)) {
-                Text(if (s.enviando) "Guardando…" else if (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank())
-                    "No, solo guardar" else "Guardar mantenimiento")
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val hayRecomendacion = b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank()
+            val puedeGuardar = enabled && s.contexto?.registroDisponible == true
+            if (hayRecomendacion) {
+                Button(
+                    onClick = { vm.guardar(programarAlerta = true) },
+                    enabled = puedeGuardar,
+                    modifier = Modifier.fillMaxWidth().testTag("rf17.guardar.alerta"),
+                    shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)
+                ) {
+                    Text(if (s.enviando && s.programarAlertaTrasExito) "Guardando…" else "Sí, programar alerta")
+                }
+                OutlinedButton(
+                    onClick = { vm.guardar(programarAlerta = false) },
+                    enabled = puedeGuardar && !s.enviando,
+                    modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
+                    shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)
+                ) {
+                    Text(if (s.enviando && !s.programarAlertaTrasExito) "Guardando…" else "No, solo guardar")
+                }
+            } else {
+                Button(
+                    onClick = { vm.guardar(programarAlerta = false) },
+                    enabled = puedeGuardar,
+                    modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
+                    shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)
+                ) {
+                    Text(if (s.enviando) "Guardando…" else "Guardar mantenimiento")
+                }
             }
             TextButton(onClick = { if (s.requiereSesion) onCerrar() else vm.solicitarSalir() },
                 enabled = !s.enviando && !s.incierto, modifier = Modifier.testTag("rf17.cancelar")) { Text("Cancelar") }

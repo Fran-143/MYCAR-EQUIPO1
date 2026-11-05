@@ -1,5 +1,6 @@
 package com.mycar.app.features.alertas.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,10 +45,11 @@ fun AlertasRoute(
         AlertasViewModel(repository, vehiculos, idVehiculoInicial)
     }
     val estado by vm.estado.collectAsStateWithLifecycle()
+    var detalleId by remember { mutableStateOf<Long?>(null) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, vm) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) vm.recargar()
+            if (event == Lifecycle.Event.ON_RESUME && detalleId == null) vm.recargar()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -66,10 +68,27 @@ fun AlertasRoute(
             }
         }
     }
-    AlertasScreen(
-        estado, vehiculos, vm::seleccionar, vm::cambiarFiltro, vm::recargar, onProgramar,
-        onAtender = vm::atender, onAnular = vm::anular, modifier = modifier
-    )
+    val idDetalle = detalleId
+    val idVehiculo = estado.vehiculoId
+    if (idDetalle != null && idVehiculo != null) {
+        DetalleAlertaRoute(
+            repository = repository,
+            idVehiculo = idVehiculo,
+            idAlerta = idDetalle,
+            onVolver = {
+                detalleId = null
+                vm.recargar()
+            },
+            modifier = modifier
+        )
+    } else {
+        AlertasScreen(
+            estado, vehiculos, vm::seleccionar, vm::cambiarFiltro, vm::recargar, onProgramar,
+            onAtender = vm::atender, onAnular = vm::anular,
+            onVerDetalle = { detalleId = it },
+            modifier = modifier
+        )
+    }
 }
 
 @Composable
@@ -82,6 +101,7 @@ fun AlertasScreen(
     onProgramar: (Long) -> Unit,
     onAtender: (Long, Int, String, String?, String?) -> Unit = { _, _, _, _, _ -> },
     onAnular: (Long) -> Unit = {},
+    onVerDetalle: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
@@ -203,7 +223,8 @@ fun AlertasScreen(
                             a,
                             ocupado = estado.ocupadoAccion,
                             onAtender = onAtender,
-                            onAnular = onAnular
+                            onAnular = onAnular,
+                            onVerDetalle = onVerDetalle
                         )
                     }
                 }
@@ -217,7 +238,8 @@ private fun TarjetaAlerta(
     a: DatosAlerta,
     ocupado: Boolean = false,
     onAtender: (Long, Int, String, String?, String?) -> Unit = { _, _, _, _, _ -> },
-    onAnular: (Long) -> Unit = {}
+    onAnular: (Long) -> Unit = {},
+    onVerDetalle: (Long) -> Unit = {}
 ) {
     val colors = MaterialTheme.colorScheme
     val badge = colorEstado(a.estado)
@@ -227,7 +249,7 @@ private fun TarjetaAlerta(
     var dialogAnular by remember { mutableStateOf(false) }
     var kmTexto by remember { mutableStateOf(a.kmObjetivo?.toString().orEmpty()) }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable { onVerDetalle(a.id) },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -265,6 +287,7 @@ private fun TarjetaAlerta(
             a.servicioOtro?.takeIf { a.tipo.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
+            TextButton(onClick = { onVerDetalle(a.id) }) { Text("Ver detalle →") }
             if (atendible || anulable) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (atendible) {

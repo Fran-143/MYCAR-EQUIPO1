@@ -7,6 +7,7 @@ import com.mycar.app.features.mantenimiento.domain.BorradorMantenimiento
 import com.mycar.app.features.mantenimiento.domain.MantenimientoRepository
 import com.mycar.app.features.mantenimiento.domain.RepuestoBorrador
 import com.mycar.app.features.mantenimiento.viewmodel.MantenimientoUiState
+import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
 
 /** Entrada de producción. El host entregará el repositorio y la clave opaca de la sesión real. */
 @Composable
@@ -20,7 +21,8 @@ fun EntradaRegistroMantenimiento(
     onSesionRequerida: (() -> Unit)? = null,
     archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
     estadoEnSistema: Boolean = true,
-    recargaToken: Int = 0
+    recargaToken: Int = 0,
+    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null
 ) {
     if (repository != null && !claveCuentaBorrador.isNullOrBlank()) {
         RegistrarMantenimientoRoute(
@@ -29,7 +31,8 @@ fun EntradaRegistroMantenimiento(
             idVehiculoInicial = idVehiculoInicial,
             onActualizarKm = onActualizarKm, onSesionRequerida = onSesionRequerida,
             archivoPendiente = archivoPendiente, estadoEnSistema = estadoEnSistema,
-            recargaToken = recargaToken
+            recargaToken = recargaToken,
+            onProgramarAlerta = onProgramarAlerta
         )
     } else {
         BackHandler(onBack = onCerrar)
@@ -58,7 +61,7 @@ private object AccionesSinSesion : AccionesMantenimiento {
     override fun confirmarRepuesto() {}
     override fun quitarRepuesto(id: String) {}
     override fun proponerAceiteVehiculo() {}
-    override fun guardar() {}
+    override fun guardar(programarAlerta: Boolean) {}
     override fun reintentarMismaOperacion() {}
     override fun consultarOperacion() {}
     override fun solicitarSalir() {}

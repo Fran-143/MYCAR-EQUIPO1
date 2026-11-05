@@ -1,7 +1,5 @@
 package backend.vehiculos.dto;
 
-import java.time.Instant;
-
 /** Contrato técnico RF10: lectura completa de un vehículo propio. */
 public record DatosDetalleVehiculo(
         long idVehiculo,
@@ -16,7 +14,8 @@ public record DatosDetalleVehiculo(
         String estadoVehiculo,
         boolean principal,
         Integer kilometrajeActual,
-        Instant fechaUltimaLecturaKm,
+        /** ISO-8601 UTC; String para que Gson/Android no falle con Instant numérico. */
+        String fechaUltimaLecturaKm,
         String numeroVin,
         String numeroSerie,
         String numeroMotor,

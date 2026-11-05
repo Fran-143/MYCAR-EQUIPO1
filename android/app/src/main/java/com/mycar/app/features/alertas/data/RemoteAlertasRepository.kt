@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.mycar.app.features.alertas.domain.AlertasRepository
 import com.mycar.app.features.alertas.domain.ContextoProgramarAlerta
 import com.mycar.app.features.alertas.domain.DatosAlerta
+import com.mycar.app.features.alertas.domain.DetalleAlerta
 import com.mycar.app.features.alertas.domain.EstadoOperacionAlerta
 import com.mycar.app.features.alertas.domain.ReferenciaMantenimientoAlerta
 import com.mycar.app.features.alertas.domain.ResultadoOperacionIncierto
@@ -48,6 +49,42 @@ class RemoteAlertasRepository(private val api: AlertasApi) : AlertasRepository {
             }
         } catch (e: Exception) {
             throw IOException(mensajeHttp(e, "No se pudieron cargar las alertas"), e)
+        }
+    }
+
+    override suspend fun detalle(idVehiculo: Long, idAlerta: Long): DetalleAlerta {
+        try {
+            val d = api.detalle(idVehiculo, idAlerta)
+            val id = d.idAlerta ?: throw IOException("Detalle de alerta incompleto")
+            val v = d.vehiculo
+            val etiqueta = listOfNotNull(v?.marca, v?.modelo).joinToString(" ").trim()
+                .ifBlank { "Vehículo" } + (v?.placa?.let { " · $it" } ?: "")
+            return DetalleAlerta(
+                id = id,
+                categoria = d.categoria.orEmpty().ifBlank { "MANTENIMIENTO" },
+                codigoTipo = d.codigoTipo.orEmpty(),
+                tipo = d.nombreTipo.orEmpty(),
+                criterio = d.criterio.orEmpty(),
+                origenCalculo = d.origenCalculo.orEmpty(),
+                estado = d.estado.orEmpty(),
+                fechaEstadoUtc = d.fechaEstadoUtc,
+                fechaObjetivo = d.fechaObjetivo,
+                kmObjetivo = d.kmObjetivo,
+                kmBase = d.kmBase,
+                intervaloKm = d.intervaloKm,
+                unidadTiempo = d.unidadTiempo,
+                cantidadTiempo = d.cantidadTiempo,
+                fechaBase = d.fechaBase,
+                servicioOtro = d.servicioOtro,
+                idMantenimientoReferencia = d.idMantenimientoReferencia,
+                idMantenimientoAtencion = d.idMantenimientoAtencion,
+                versionFila = d.versionFila ?: 0,
+                vehiculoEtiqueta = etiqueta,
+                puedeAtender = d.acciones?.atender == true,
+                puedeAnular = d.acciones?.anular == true
+            )
+        } catch (e: Exception) {
+            throw IOException(mensajeHttp(e, "No se pudo cargar el detalle de la alerta"), e)
         }
     }
 

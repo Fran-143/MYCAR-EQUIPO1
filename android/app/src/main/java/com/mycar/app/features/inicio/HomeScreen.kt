@@ -137,8 +137,10 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
                         TextButton(onClick=onAlertas) { Text("Ver alertas") }
                     }
                     TarjetaInicio {
-                        Text("Próximamente",color=TintaInicio,fontWeight=FontWeight.SemiBold)
-                        Text("Aquí podrás consultar las alertas de mantenimiento de tu vehículo.",color=Color(0xFF6881A5))
+                        Text("Alertas de mantenimiento",color=TintaInicio,fontWeight=FontWeight.SemiBold)
+                        Text("Consulta, atiende o anula alertas desde la pestaña Alertas.",color=Color(0xFF6881A5))
+                        Spacer(Modifier.height(8.dp))
+                        Button(onClick=onAlertas, shape=RoundedCornerShape(12.dp)) { Text("Ir a Alertas") }
                     }
                     TarjetaInicio {
                         Text("Último mantenimiento realizado",color=TintaInicio,fontWeight=FontWeight.Bold,modifier=Modifier.semantics { heading() })

@@ -47,6 +47,21 @@ class AlertasControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.alertasSincronizadas").value(1));
     }
 
+    @Test void detalleAlertaRf24() throws Exception {
+        var detalle = new ContratoRf22.DetalleAlertaDto(
+                12L, "MANTENIMIENTO", "CAMBIO_ACEITE", "Cambio de aceite", "POR_KILOMETRAJE",
+                "DESDE_HOY", "PROXIMA", "2026-11-05T00:00:00.000Z", null, 25000, 20000, 5000,
+                null, null, null, null, 1L, null, null, 1,
+                new ContratoRf22.VehiculoResumenDto(3L, "A1B345", "Toyota", "Corolla", "ACTIVO"),
+                new ContratoRf22.AccionesDetalleDto(true, true));
+        when(sincronizar.consultarDetalle(9L, 3L, 12L)).thenReturn(detalle);
+        mvc.perform(get("/api/v1/rf22/vehiculos/3/alertas/12").principal(auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idAlerta").value(12))
+                .andExpect(jsonPath("$.acciones.atender").value(true))
+                .andExpect(jsonPath("$.vehiculo.placa").value("A1B345"));
+    }
+
     @Test void programarDevuelve201() throws Exception {
         UUID op = UUID.randomUUID();
         when(programar.programar(eq(9L), eq(3L), any())).thenReturn(new ContratoRf22.ProgramarResponse(op, 12L, "PROGRAMADA"));

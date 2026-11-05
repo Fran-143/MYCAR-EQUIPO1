@@ -20,6 +20,7 @@ import com.mycar.app.features.historial.domain.HistorialRepository
 import com.mycar.app.features.historial.viewmodel.HistorialViewModel
 import com.mycar.app.features.mantenimiento.domain.MantenimientoRepository
 import com.mycar.app.features.mantenimiento.ui.EntradaRegistroMantenimiento
+import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
 
 /** Host de producción. El equipo inyecta ambos repositorios autenticados y la clave opaca de cuenta. */
 @Composable
@@ -35,7 +36,8 @@ fun FlujoHistorialMantenimiento(
     archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
     estadoEnSistema: Boolean = true,
     onRegistroAbierto: (Boolean) -> Unit = {},
-    recargaRegistroToken: Int = 0
+    recargaRegistroToken: Int = 0,
+    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null
 ) {
     key(claveCuenta) {
         var registrando by rememberSaveable { mutableStateOf(false) }
@@ -47,7 +49,11 @@ fun FlujoHistorialMantenimiento(
                     repository = mantenimientoRepository, claveCuentaBorrador = claveCuenta,
                     idVehiculoInicial = vehiculoElegido, onActualizarKm = onActualizarKm,
                     onSesionRequerida = onIniciarSesion, archivoPendiente = archivoPendiente,
-                    estadoEnSistema = estadoEnSistema, recargaToken = recargaRegistroToken)
+                    estadoEnSistema = estadoEnSistema, recargaToken = recargaRegistroToken,
+                    onProgramarAlerta = { oferta ->
+                        registrando = false
+                        onProgramarAlerta?.invoke(oferta)
+                    })
             }
         } else {
             AmbitoHistorial {

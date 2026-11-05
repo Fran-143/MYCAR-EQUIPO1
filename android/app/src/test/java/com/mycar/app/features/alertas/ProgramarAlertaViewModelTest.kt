@@ -59,6 +59,7 @@ class ProgramarAlertaViewModelTest {
             referencias, true
         )
         override suspend fun listar(idVehiculo: Long) = 0 to emptyList<DatosAlerta>()
+        override suspend fun detalle(idVehiculo: Long, idAlerta: Long) = error("no usado")
         override suspend fun programar(idVehiculo: Long, solicitud: ProgramarAlertaDto): Long {
             idsOperacion += solicitud.idOperacion
             ultimaSolicitud = solicitud

@@ -131,8 +131,15 @@ class RemoteHistorialRepository(private val api: HistorialApi) : HistorialReposi
                 err?.mensaje ?: "Hay una alerta activa que referencia este mantenimiento",
                 err?.idAlerta
             )
+            403 -> ErrorHistorial(
+                CodigoErrorHistorial.CONEXION,
+                err?.mensaje ?: "Acceso denegado al historial (revisa RF18 en el backend)."
+            )
             503 -> ErrorHistorial(CodigoErrorHistorial.CONEXION, err?.mensaje ?: "Historial no disponible")
-            else -> ErrorHistorial(CodigoErrorHistorial.CONEXION, err?.mensaje ?: "No se pudo consultar el historial")
+            else -> ErrorHistorial(
+                CodigoErrorHistorial.CONEXION,
+                err?.mensaje ?: "No se pudo consultar el historial (HTTP ${r.code()})"
+            )
         }
     }
 

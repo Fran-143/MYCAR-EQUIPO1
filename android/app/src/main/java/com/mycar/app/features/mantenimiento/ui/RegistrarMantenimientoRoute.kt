@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente
 import com.mycar.app.features.mantenimiento.domain.MantenimientoRepository
 import com.mycar.app.features.mantenimiento.viewmodel.MantenimientoViewModel
+import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
 
 /**
  * Entrada propia de RF17. El host proporciona repositorio autenticado, clave de cuenta
@@ -33,7 +34,8 @@ fun RegistrarMantenimientoRoute(
     onSesionRequerida: (() -> Unit)? = null,
     archivoPendiente: ArchivoRegistroPendiente? = null,
     estadoEnSistema: Boolean = true,
-    recargaToken: Int = 0
+    recargaToken: Int = 0,
+    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null
 ) {
     val context = LocalContext.current.applicationContext
     val factory = remember(repository, claveCuentaBorrador, idVehiculoInicial, archivoPendiente, estadoEnSistema) {
@@ -67,5 +69,9 @@ fun RegistrarMantenimientoRoute(
         }
     }
     RegistrarMantenimientoScreen(state, vm, modifier, onCerrar,
-        cerrarConfirmado, onActualizarKm, onSesionRequerida)
+        cerrarConfirmado, onActualizarKm, onSesionRequerida,
+        onProgramarAlerta = { oferta ->
+            vm.finalizarConfirmacion()
+            onProgramarAlerta?.invoke(oferta) ?: onCerrar()
+        })
 }

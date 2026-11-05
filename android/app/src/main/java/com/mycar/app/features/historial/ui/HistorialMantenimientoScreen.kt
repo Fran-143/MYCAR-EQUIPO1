@@ -60,15 +60,16 @@ fun HistorialMantenimientoScreen(
             item { PestanasHistorial(pestana) { pestana = it } }
             estado.aviso?.let { item { MensajeHistorial("Vehículo no disponible", it) } }
             when (pestana) {
+                // RF25: pestañas del shell de historial; listado real de km/talleres llega con RF15/RF36.
                 PestanaHistorial.KILOMETRAJE -> item {
                     MensajeHistorial("Historial de kilometraje",
                         if (estado.seleccionado == null) "Elige un vehículo para ver lecturas."
-                        else "Todavía no hay lecturas para mostrar en esta pestaña.")
+                        else "Las lecturas de kilometraje se mostrarán aquí (RF15). Mientras tanto usa Actualizar kilometraje desde el vehículo.")
                 }
                 PestanaHistorial.TALLERES -> item {
                     MensajeHistorial("Talleres del vehículo",
                         if (estado.seleccionado == null) "Elige un vehículo para ver talleres."
-                        else "Todavía no hay talleres asociados a este vehículo.")
+                        else "El catálogo de talleres llegará con RF36. Puedes anotar el taller al registrar o editar un mantenimiento.")
                 }
                 PestanaHistorial.MANTENIMIENTOS -> when (estado.fase) {
                     FaseHistorial.SESION_REQUERIDA -> item {
