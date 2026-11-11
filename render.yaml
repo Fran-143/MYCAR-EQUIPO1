@@ -1,0 +1,36 @@
+# Blueprint Render — MyCar backend (Free) + Neon externo
+# Región virginia ≈ AWS us-east-1 (Neon). Plan free = US$0.
+# Secretos: SOLO Dashboard (sync: false). No poner passwords aquí.
+
+services:
+  - type: web
+    name: mycar-backend
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: neon,render
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: MYCAR_AUTH_JWT_SECRET_BASE64
+        sync: false
+      # Público: no exponer codigoDesarrollo (modo desarrollo).
+      # SMTP real no funciona en Render Free (465/587 bloqueados) — ver application-render.properties.
+      - key: MYCAR_VERIFICACION_MAIL_MODO
+        value: smtp
+      - key: MYCAR_RECUPERACION_DESARROLLO
+        value: "false"
+      - key: MYCAR_RF23_EVALUACION_DIARIA_HABILITADA
+        value: "false"
+      - key: SPRING_FLYWAY_ENABLED
+        value: "false"
+      - key: JAVA_TOOL_OPTIONS
+        value: "-XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError"
