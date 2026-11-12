@@ -4,6 +4,7 @@ import backend.registro.RegistrationCommand;
 import backend.registro.RegistrationException;
 import backend.registro.web.RegistrationRequest;
 import backend.registro.verificacion.DevMailGateway;
+import backend.registro.verificacion.MailModo;
 import backend.registro.verificacion.VerificationDispatcher;
 import backend.registro.verificacion.VerificationOriginService;
 import backend.registro.verificacion.VerificationService;
@@ -42,7 +43,7 @@ public class VerificationController {
         this.dispatcher = dispatcher;
         this.origins = origins;
         this.devMail = devMail;
-        this.desarrollo = !"smtp".equalsIgnoreCase(modo);
+        this.desarrollo = !MailModo.ocultaCodigoDesarrollo(modo);
     }
 
     @PostMapping(path = "/origen", produces = "application/json")

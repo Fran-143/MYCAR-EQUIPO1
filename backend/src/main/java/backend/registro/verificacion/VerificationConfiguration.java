@@ -9,9 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
 
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
@@ -64,6 +66,39 @@ public class VerificationConfiguration {
                     "SMTP activo: configura spring.mail.username y spring.mail.password en .env");
         }
         return new SmtpMailGateway(mailSender, resolvedFrom);
+    }
+
+    /**
+     * Brevo Free vía HTTPS (Render Free bloquea SMTP 465/587).
+     * Activar con {@code mycar.verificacion.mail.modo=brevo} + API key en entorno.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "mycar.verificacion.mail.modo", havingValue = "brevo")
+    BrevoMailGateway brevoMailGateway(
+            @Value("${mycar.verificacion.brevo.api-key:}") String apiKey,
+            @Value("${mycar.verificacion.mail.from:}") String from,
+            @Value("${mycar.verificacion.brevo.from-name:MyCar}") String fromName,
+            @Value("${mycar.verificacion.brevo.base-url:" + BrevoMailGateway.DEFAULT_BASE_URL + "}") String baseUrl) {
+        if (!StringUtils.hasText(apiKey)) {
+            throw new IllegalStateException(
+                    "Brevo activo: configura mycar.verificacion.brevo.api-key (o MYCAR_VERIFICACION_BREVO_API_KEY)");
+        }
+        if (!StringUtils.hasText(from)) {
+            throw new IllegalStateException(
+                    "Brevo activo: configura mycar.verificacion.mail.from con un remitente verificado en Brevo");
+        }
+        String base = StringUtils.hasText(baseUrl) ? baseUrl.trim().replaceAll("/+$", "")
+                : BrevoMailGateway.DEFAULT_BASE_URL;
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+        requestFactory.setReadTimeout(java.time.Duration.ofSeconds(20));
+        RestClient client = RestClient.builder()
+                .baseUrl(base)
+                .requestFactory(requestFactory)
+                .defaultHeader("api-key", apiKey.trim())
+                .defaultHeader("accept", "application/json")
+                .build();
+        String name = StringUtils.hasText(fromName) ? fromName.trim() : "MyCar";
+        return new BrevoMailGateway(client, from.trim(), name);
     }
 
     @Bean

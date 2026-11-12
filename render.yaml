@@ -26,9 +26,14 @@ services:
         value: PT2H
       - key: MYCAR_AUTH_SESSION_TTL
         value: P1D
-      # Público: no exponer codigoDesarrollo. Correo OTP no operativo en Free (SMTP bloqueado).
+      # Correo: smtp=placeholder (SMTP bloqueado en Free). Activar Brevo vía Dashboard:
+      # MYCAR_VERIFICACION_MAIL_MODO=brevo + MYCAR_VERIFICACION_BREVO_API_KEY + MYCAR_VERIFICACION_MAIL_FROM
       - key: MYCAR_VERIFICACION_MAIL_MODO
         value: smtp
+      - key: MYCAR_VERIFICACION_BREVO_API_KEY
+        sync: false
+      - key: MYCAR_VERIFICACION_MAIL_FROM
+        sync: false
       - key: MYCAR_RECUPERACION_DESARROLLO
         value: "false"
       - key: MYCAR_RF23_EVALUACION_DIARIA_HABILITADA
