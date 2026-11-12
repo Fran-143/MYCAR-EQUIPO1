@@ -13,7 +13,7 @@ public record DatosDetalleVehiculo(
         String combustible,
         String estadoVehiculo,
         boolean principal,
-        Integer kilometrajeActual,
+        java.math.BigDecimal kilometrajeActual,
         /** ISO-8601 UTC; String para que Gson/Android no falle con Instant numérico. */
         String fechaUltimaLecturaKm,
         String numeroVin,

@@ -10,6 +10,6 @@ public record DatosListadoVehiculos(
     public record VehiculoResumen(
             long idVehiculo, String placa, String marca, String modelo, int anioFabricacion,
             String usoVehiculo, String color, String tipoMotor, String combustible,
-            String estadoVehiculo, boolean principal, Integer kilometrajeActual
+            String estadoVehiculo, boolean principal, java.math.BigDecimal kilometrajeActual
     ) {}
 }
