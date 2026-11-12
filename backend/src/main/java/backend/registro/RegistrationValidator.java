@@ -31,22 +31,15 @@ public class RegistrationValidator {
     public RegistrationData validate(RegistrationCommand command) {
         if (command == null) throw RegistrationException.invalid(Map.of("registro", "Datos obligatorios."));
         Map<String, String> errors = new LinkedHashMap<>();
-        String nombre = name(command.nombre(), "nombre", errors);
-        String apellido = name(command.apellido(), "apellido", errors);
+        PersonalData personal = validatePersonalFields(command.nombre(), command.apellido(),
+                command.fechaNacimiento(), errors);
         String correo = command.correo() == null ? "" : command.correo().strip().toLowerCase(Locale.ROOT);
         if (length(correo) < 5 || length(correo) > 254 || correo.indexOf('@') < 1
                 || !validator.validate(new EmailValue(correo)).isEmpty()) {
             errors.put("correo", "Ingresa un correo válido de hasta 254 caracteres.");
         }
-        LocalDate birth = command.fechaNacimiento();
-        LocalDate today = LocalDate.now(clock.withZone(REGISTRATION_ZONE));
-        if (birth == null || birth.isAfter(today)
-                || Period.between(birth, today).getYears() < 18
-                || Period.between(birth, today).getYears() > 85) {
-            errors.put("fechaNacimiento", "La edad debe estar entre 18 y 85 años cumplidos.");
-        }
         String password = command.contrasena();
-        if (!validPassword(password)) {
+        if (!isValidPassword(password)) {
             errors.put("contrasena", "Usa 8–64 caracteres con mayúscula, minúscula, dígito y especial, sin espacios.");
         }
         if (password == null || command.confirmacionContrasena() == null
@@ -61,19 +54,18 @@ public class RegistrationValidator {
             errors.put("versionPrivacidad", "Indica la versión aceptada de la política de privacidad.");
         }
         if (!errors.isEmpty()) throw RegistrationException.invalid(errors);
-        return new RegistrationData(nombre, apellido, correo, birth, version);
+        return new RegistrationData(personal.nombre(), personal.apellido(), correo, personal.fechaNacimiento(), version);
     }
 
-    private static String name(String input, String field, Map<String, String> errors) {
-        String normalized = input == null ? "" : SPACES.matcher(input).replaceAll(" ").strip();
-        if (length(normalized) < 2 || length(normalized) > 100 || !NAME.matcher(normalized).matches()) {
-            errors.put(field, "Usa 2–100 caracteres: letras, espacios y guion o apóstrofo entre letras.");
-        }
-        // CC-RF01-01: no semantic checks or restricted-word catalog.
-        return normalized;
+    /** RF04: nombre, apellido y fecha con las mismas reglas de RF01 (sin correo ni contraseña). */
+    public PersonalData validatePersonalData(String nombre, String apellido, LocalDate fechaNacimiento) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        PersonalData data = validatePersonalFields(nombre, apellido, fechaNacimiento, errors);
+        if (!errors.isEmpty()) throw RegistrationException.invalid(errors);
+        return data;
     }
 
-    private static boolean validPassword(String value) {
+    public static boolean isValidPassword(String value) {
         if (value == null || length(value) < 8 || length(value) > 64) return false;
         boolean upper = false, lower = false, digit = false, special = false;
         for (int c : value.codePoints().toArray()) {
@@ -91,6 +83,30 @@ public class RegistrationValidator {
         }
         return upper && lower && digit && special;
     }
+
+    private PersonalData validatePersonalFields(String nombreInput, String apellidoInput, LocalDate birth,
+            Map<String, String> errors) {
+        String nombre = name(nombreInput, "nombre", errors);
+        String apellido = name(apellidoInput, "apellido", errors);
+        LocalDate today = LocalDate.now(clock.withZone(REGISTRATION_ZONE));
+        if (birth == null || birth.isAfter(today)
+                || Period.between(birth, today).getYears() < 18
+                || Period.between(birth, today).getYears() > 85) {
+            errors.put("fechaNacimiento", "La edad debe estar entre 18 y 85 años cumplidos.");
+        }
+        return new PersonalData(nombre, apellido, birth);
+    }
+
+    private static String name(String input, String field, Map<String, String> errors) {
+        String normalized = input == null ? "" : SPACES.matcher(input).replaceAll(" ").strip();
+        if (length(normalized) < 2 || length(normalized) > 100 || !NAME.matcher(normalized).matches()) {
+            errors.put(field, "Usa 2–100 caracteres: letras, espacios y guion o apóstrofo entre letras.");
+        }
+        // CC-RF01-01: no semantic checks or restricted-word catalog.
+        return normalized;
+    }
+
+    public record PersonalData(String nombre, String apellido, LocalDate fechaNacimiento) { }
 
     private static int length(String value) { return value.codePointCount(0, value.length()); }
     private record EmailValue(@Email String value) { }
