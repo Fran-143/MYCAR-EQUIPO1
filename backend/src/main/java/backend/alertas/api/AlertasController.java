@@ -35,8 +35,12 @@ public class AlertasController {
     }
 
     @GetMapping("/contexto")
-    public ContratoRf22.ContextoResponse contexto(Authentication auth, @RequestParam long idVehiculo) {
-        return programar.contexto(usuario(auth), idVehiculo);
+    public ContratoRf22.ContextoResponse contexto(
+            Authentication auth,
+            @RequestParam long idVehiculo,
+            @RequestParam(required = false) String codigoTipo,
+            @RequestParam(required = false) String servicioOtro) {
+        return programar.contexto(usuario(auth), idVehiculo, codigoTipo, servicioOtro);
     }
 
     @GetMapping("/vehiculos/{idVehiculo}/alertas")
@@ -74,8 +78,9 @@ public class AlertasController {
     /** RF24-EA08 — anulación manual; no anula el mantenimiento histórico. */
     @PostMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}/anular")
     public ContratoRf22.AnularAlertaResponse anularAlerta(
-            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta) {
-        return atender.anular(usuario(auth), idVehiculo, idAlerta);
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta,
+            @Valid @RequestBody ContratoRf22.AnularRequest body) {
+        return atender.anular(usuario(auth), idVehiculo, idAlerta, body);
     }
 
     private long usuario(Authentication auth) {

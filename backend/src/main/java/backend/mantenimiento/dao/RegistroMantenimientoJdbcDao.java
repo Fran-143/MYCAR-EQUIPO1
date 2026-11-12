@@ -45,11 +45,13 @@ public class RegistroMantenimientoJdbcDao
                     estado,
                     descripcion,
                     proxima_fecha_sugerida,
-                    proximo_km_sugerido
+                    proximo_km_sugerido,
+                    id_taller,
+                    nombre_taller
                 )
                 VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?,
-                    'REALIZADO', ?, ?, ?
+                    'REALIZADO', ?, ?, ?, ?, ?
                 )
                 RETURNING id_mantenimiento
                 """,
@@ -64,7 +66,9 @@ public class RegistroMantenimientoJdbcDao
                 datos.servicioOtro(),
                 solicitud.observaciones(),
                 datos.proximaFechaSugerida(),
-                datos.proximoKmSugerido()
+                datos.proximoKmSugerido(),
+                solicitud.idTaller(),
+                solicitud.nombreTallerSnapshot()
         );
 
         if (idMantenimiento == null) {

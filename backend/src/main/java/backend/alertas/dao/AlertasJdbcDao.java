@@ -192,19 +192,46 @@ public class AlertasJdbcDao {
                 """, (rs, n) -> new ContratoRf22.TipoDto(rs.getLong(1), rs.getString(2), rs.getString(3)));
     }
 
-    public List<ContratoRf22.ReferenciaDto> referenciasRealizadas(long vehiculo) {
+    /**
+     * RF22 DESDE_MANTENIMIENTO: hasta 3 REALIZADO del vehículo con el mismo tipo
+     * (y servicio OTRO normalizado cuando aplica). Sin tipo → lista vacía.
+     */
+    public List<ContratoRf22.ReferenciaDto> referenciasRealizadas(
+            long vehiculo, String codigoTipo, String servicioOtro) {
+        if (codigoTipo == null || codigoTipo.isBlank()) {
+            return List.of();
+        }
+        if ("OTRO".equals(codigoTipo)) {
+            if (servicioOtro == null || servicioOtro.isBlank()) {
+                return List.of();
+            }
+            return jdbc.query("""
+                    SELECT m.id_mantenimiento, tm.codigo, m.fecha_servicio, m.km_servicio, m.servicio_otro
+                    FROM mycar.mantenimiento m
+                    JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = m.id_tipo_mantenimiento
+                    WHERE m.id_vehiculo = ? AND m.estado = 'REALIZADO' AND tm.codigo = 'OTRO'
+                      AND mycar.normalizar_servicio_otro(COALESCE(m.servicio_otro, ''))
+                        = mycar.normalizar_servicio_otro(?)
+                    ORDER BY m.fecha_servicio DESC, m.id_mantenimiento DESC
+                    LIMIT 3
+                    """, (rs, n) -> new ContratoRf22.ReferenciaDto(
+                    rs.getLong(1), rs.getString(2),
+                    rs.getObject(3, LocalDate.class),
+                    rs.getObject(4, Integer.class),
+                    rs.getString(5)), vehiculo, servicioOtro);
+        }
         return jdbc.query("""
                 SELECT m.id_mantenimiento, tm.codigo, m.fecha_servicio, m.km_servicio, m.servicio_otro
                 FROM mycar.mantenimiento m
                 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = m.id_tipo_mantenimiento
-                WHERE m.id_vehiculo = ? AND m.estado = 'REALIZADO'
+                WHERE m.id_vehiculo = ? AND m.estado = 'REALIZADO' AND tm.codigo = ?
                 ORDER BY m.fecha_servicio DESC, m.id_mantenimiento DESC
-                LIMIT 30
+                LIMIT 3
                 """, (rs, n) -> new ContratoRf22.ReferenciaDto(
                 rs.getLong(1), rs.getString(2),
                 rs.getObject(3, LocalDate.class),
                 rs.getObject(4, Integer.class),
-                rs.getString(5)), vehiculo);
+                rs.getString(5)), vehiculo, codigoTipo);
     }
 
     public Optional<MantenimientoBase> mantenimientoRealizado(long vehiculo, long idMantenimiento) {
@@ -237,7 +264,7 @@ public class AlertasJdbcDao {
         exigirTx();
         return jdbc.query("""
                 SELECT a.id_alerta, a.id_vehiculo, a.estado, a.version_fila, tm.codigo, a.servicio_otro,
-                       a.fecha_vencida_verificable, a.id_lectura_vencida_evidencia
+                       a.fecha_vencida_verificable, a.id_lectura_vencida_evidencia, a.id_mantenimiento_atencion
                 FROM mycar.alerta a
                 JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
                 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
@@ -248,7 +275,8 @@ public class AlertasJdbcDao {
                 rs.getLong("id_alerta"), rs.getLong("id_vehiculo"), rs.getString("estado"),
                 rs.getInt("version_fila"), rs.getString("codigo"), rs.getString("servicio_otro"),
                 rs.getObject("fecha_vencida_verificable", LocalDate.class),
-                rs.getObject("id_lectura_vencida_evidencia", Long.class)), idAlerta, vehiculo, usuario)
+                rs.getObject("id_lectura_vencida_evidencia", Long.class),
+                rs.getObject("id_mantenimiento_atencion", Long.class)), idAlerta, vehiculo, usuario)
                 .stream().findFirst();
     }
 
@@ -272,7 +300,13 @@ public class AlertasJdbcDao {
     }
 
     public void marcarAnuladaManual(long idAlerta, String estadoAnterior, int versionEsperada) {
+        marcarAnuladaManual(idAlerta, estadoAnterior, versionEsperada, "ANULACION_MANUAL_RF24");
+    }
+
+    public void marcarAnuladaManual(long idAlerta, String estadoAnterior, int versionEsperada, String motivo) {
         exigirTx();
+        String motivoHist = (motivo == null || motivo.isBlank()) ? "ANULACION_MANUAL_RF24" : motivo.trim();
+        if (motivoHist.length() > 48) motivoHist = motivoHist.substring(0, 48);
         int filas = jdbc.update("""
                 UPDATE mycar.alerta
                 SET estado = 'ANULADA', version_fila = version_fila + 1,
@@ -284,8 +318,8 @@ public class AlertasJdbcDao {
         jdbc.update("""
                 INSERT INTO mycar.historial_alerta
                   (id_alerta, estado_anterior, estado_nuevo, motivo, version_destino)
-                VALUES (?, ?, 'ANULADA', 'ANULACION_MANUAL_RF24', ?)
-                """, idAlerta, estadoAnterior, versionEsperada + 1);
+                VALUES (?, ?, 'ANULADA', ?, ?)
+                """, idAlerta, estadoAnterior, motivoHist, versionEsperada + 1);
     }
 
     private void exigirTx() {
@@ -297,7 +331,8 @@ public class AlertasJdbcDao {
     public record AlertaOperable(
             long idAlerta, long idVehiculo, String estado, int versionFila,
             String codigoTipo, String servicioOtro,
-            LocalDate fechaVencidaVerificable, Long idLecturaVencidaEvidencia
+            LocalDate fechaVencidaVerificable, Long idLecturaVencidaEvidencia,
+            Long idMantenimientoAtencion
     ) { }
 
     public record LecturaActual(long idLecturaKm, int valorKm) { }

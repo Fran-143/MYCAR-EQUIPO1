@@ -17,8 +17,9 @@ public class ErroresAlertasController {
     ResponseEntity<ContratoRf22.ErrorResponse> error(ErrorAlertas ex) {
         HttpStatus status = switch (ex.codigo()) {
             case "VEHICULO_NO_ENCONTRADO", "KILOMETRAJE_NO_DISPONIBLE",
-                 "ALERTA_NO_ENCONTRADA" -> HttpStatus.NOT_FOUND;
-            case "ALERTA_EQUIVALENTE", "CONFLICTO_IDEMPOTENCIA", "BASES_CAMBIARON" -> HttpStatus.CONFLICT;
+                 "ALERTA_NO_ENCONTRADA", "TALLER_NO_DISPONIBLE" -> HttpStatus.NOT_FOUND;
+            case "ALERTA_EQUIVALENTE", "CONFLICTO_IDEMPOTENCIA", "BASES_CAMBIARON",
+                 "CONFLICTO_VERSION" -> HttpStatus.CONFLICT;
             case "DATOS_INVALIDOS", "OBJETIVO_NO_FUTURO",
                  "ALERTA_NO_ATENDIBLE", "ALERTA_NO_ANULABLE" -> HttpStatus.BAD_REQUEST;
             case "OPERACION_EN_PROCESO" -> HttpStatus.ACCEPTED;

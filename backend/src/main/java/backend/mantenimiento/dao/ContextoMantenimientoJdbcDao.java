@@ -28,7 +28,7 @@ public class ContextoMantenimientoJdbcDao {
                 FROM mycar.vehiculo v
                 LEFT JOIN mycar.tipo_aceite a ON a.id_tipo_aceite = v.id_tipo_aceite
                 LEFT JOIN LATERAL (
-                    SELECT id_lectura_km, valor_km, fecha_lectura_utc
+                    SELECT id_lectura_km, round(valor_km)::integer AS valor_km, fecha_lectura_utc
                     FROM mycar.lectura_kilometraje
                     WHERE id_vehiculo = v.id_vehiculo
                       AND origen IN ('INICIAL','ACTUALIZACION')
@@ -39,18 +39,25 @@ public class ContextoMantenimientoJdbcDao {
                 """, (rs,n) -> new VehiculoDto(
                 rs.getLong("id_vehiculo"), rs.getString("placa"), rs.getString("marca"),
                 rs.getString("modelo"), rs.getBoolean("es_principal"),
-                rs.getObject("id_lectura_km",Long.class), rs.getObject("valor_km",Integer.class),
+                rs.getObject("id_lectura_km", Long.class), enteroKm(rs.getObject("valor_km")),
                 rs.getObject("fecha_lectura_utc", OffsetDateTime.class), rs.getString("aceite")), usuario);
     }
 
     public List<LecturaDto> lecturas(long vehiculo, LocalDate fecha) {
         return jdbc.query("""
-                SELECT id_lectura_km, valor_km, fecha_lectura_utc
+                SELECT id_lectura_km, round(valor_km)::integer AS valor_km, fecha_lectura_utc
                 FROM mycar.lectura_kilometraje
                 WHERE id_vehiculo = ? AND origen IN ('INICIAL','ACTUALIZACION')
                   AND (fecha_lectura_utc AT TIME ZONE 'America/Lima')::date <= ?
                 ORDER BY fecha_lectura_utc DESC, id_lectura_km DESC
-                """, (rs,n) -> new LecturaDto(rs.getLong(1),rs.getInt(2),
-                rs.getObject(3,OffsetDateTime.class)), vehiculo,fecha);
+                """, (rs,n) -> new LecturaDto(rs.getLong(1), rs.getInt(2),
+                rs.getObject(3, OffsetDateTime.class)), vehiculo, fecha);
+    }
+
+    /** valor_km es NUMERIC en BD; getObject(..., Integer.class) falla en el driver PG. */
+    private static Integer enteroKm(Object raw) {
+        if (raw == null) return null;
+        if (raw instanceof Number n) return n.intValue();
+        throw new IllegalStateException("valor_km inesperado: " + raw.getClass().getName());
     }
 }

@@ -19,44 +19,60 @@ public class OperacionAlertaJdbcDao {
     }
 
     public boolean intentarCrear(UUID id, long usuario, String huella) {
+        return intentarCrear(id, usuario, "PROGRAMAR_ALERTA", huella);
+    }
+
+    public boolean intentarCrear(UUID id, long usuario, String tipo, String huella) {
         exigirTx();
         return jdbc.update("""
                 INSERT INTO mycar.operacion_idempotente
                     (id_operacion, id_usuario, tipo_operacion, hash_solicitud)
-                VALUES (?, ?, 'PROGRAMAR_ALERTA', ?)
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT (id_operacion) DO NOTHING
-                """, id, usuario, huella) == 1;
+                """, id, usuario, tipo, huella) == 1;
     }
 
     public Optional<OperacionAlerta> buscar(UUID id) {
+        return buscar(id, "PROGRAMAR_ALERTA");
+    }
+
+    public Optional<OperacionAlerta> buscar(UUID id, String tipo) {
         return jdbc.query("""
                 SELECT id_operacion, id_usuario, hash_solicitud, estado, respuesta_json::text
                 FROM mycar.operacion_idempotente
-                WHERE id_operacion = ? AND tipo_operacion = 'PROGRAMAR_ALERTA'
+                WHERE id_operacion = ? AND tipo_operacion = ?
                 """, (rs, n) -> new OperacionAlerta(
                 rs.getObject("id_operacion", UUID.class),
                 rs.getLong("id_usuario"),
                 rs.getString("hash_solicitud"),
                 rs.getString("estado"),
-                rs.getString("respuesta_json")), id).stream().findFirst();
+                rs.getString("respuesta_json")), id, tipo).stream().findFirst();
     }
 
     public Optional<OperacionAlerta> buscarYBloquear(UUID id) {
+        return buscarYBloquear(id, "PROGRAMAR_ALERTA");
+    }
+
+    public Optional<OperacionAlerta> buscarYBloquear(UUID id, String tipo) {
         exigirTx();
         return jdbc.query("""
                 SELECT id_operacion, id_usuario, hash_solicitud, estado, respuesta_json::text
                 FROM mycar.operacion_idempotente
-                WHERE id_operacion = ? AND tipo_operacion = 'PROGRAMAR_ALERTA'
+                WHERE id_operacion = ? AND tipo_operacion = ?
                 FOR UPDATE
                 """, (rs, n) -> new OperacionAlerta(
                 rs.getObject("id_operacion", UUID.class),
                 rs.getLong("id_usuario"),
                 rs.getString("hash_solicitud"),
                 rs.getString("estado"),
-                rs.getString("respuesta_json")), id).stream().findFirst();
+                rs.getString("respuesta_json")), id, tipo).stream().findFirst();
     }
 
     public void confirmar(UUID id, long usuario, long idAlerta, String estado) {
+        confirmar(id, usuario, idAlerta, estado, "PROGRAMAR_ALERTA");
+    }
+
+    public void confirmar(UUID id, long usuario, long idAlerta, String estado, String tipo) {
         exigirTx();
         String payload;
         try {
@@ -70,8 +86,9 @@ public class OperacionAlertaJdbcDao {
                 UPDATE mycar.operacion_idempotente
                 SET estado = 'CONFIRMADA', respuesta_json = CAST(? AS jsonb)
                 WHERE id_operacion = ? AND id_usuario = ? AND estado = 'EN_PROCESO'
-                """, payload, id, usuario);
-        if (filas != 1) throw new IllegalStateException("No se pudo confirmar PROGRAMAR_ALERTA");
+                  AND tipo_operacion = ?
+                """, payload, id, usuario, tipo);
+        if (filas != 1) throw new IllegalStateException("No se pudo confirmar " + tipo);
     }
 
     private void exigirTx() {

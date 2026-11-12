@@ -15,6 +15,7 @@ import backend.mantenimiento.model.DatosRegistroMantenimiento;
 import backend.mantenimiento.model.DatosRepuesto;
 import backend.mantenimiento.model.SolicitudRegistroMantenimiento;
 import backend.mantenimiento.model.TipoMantenimiento;
+import backend.talleres.service.TallerService;
 import org.springframework.transaction.annotation.Transactional;
 public class RegistroMantenimientoService {
 
@@ -25,6 +26,7 @@ public class RegistroMantenimientoService {
     private final LecturaKmMantenimientoService lecturas;
     private final RegistroMantenimientoDao dao;
     private final OperacionMantenimientoDao operaciones;
+    private final TallerService talleres;
 
     public RegistroMantenimientoService(
             ValidadorRegistroMantenimiento validador,
@@ -33,7 +35,8 @@ public class RegistroMantenimientoService {
             TipoMantenimientoService tipos,
             LecturaKmMantenimientoService lecturas,
             RegistroMantenimientoDao dao,
-            OperacionMantenimientoDao operaciones
+            OperacionMantenimientoDao operaciones,
+            TallerService talleres
     ) {
         this.validador = validador;
         this.validadorRepuesto = validadorRepuesto;
@@ -42,6 +45,7 @@ public class RegistroMantenimientoService {
         this.lecturas = lecturas;
         this.dao = dao;
         this.operaciones = operaciones;
+        this.talleres = talleres;
     }
 
     @Transactional
@@ -78,11 +82,15 @@ public class RegistroMantenimientoService {
         if (solicitud.idOperacion() == null) {
             throw new IllegalArgumentException("idOperacion: es obligatoria");
         }
+        var taller = talleres.exigirActivoPropioSiPresente(idUsuario, datos.idTaller());
+        Long idTaller = taller == null ? null : taller.idTaller();
+        String nombreTaller = taller == null ? null : taller.nombre();
         // Una copia fija evita que la lista cambie entre la huella y la escritura.
         solicitud = new SolicitudRegistroMantenimiento(solicitud.idOperacion(),
                 solicitud.idVehiculo(), datos, solicitud.observaciones(),
                 solicitud.repuestos() == null ? null
-                        : Collections.unmodifiableList(new ArrayList<>(solicitud.repuestos())));
+                        : Collections.unmodifiableList(new ArrayList<>(solicitud.repuestos())),
+                idTaller, nombreTaller);
         String huella = JsonOperacionMantenimiento.huella(solicitud);
         boolean nueva = operaciones.intentarCrear(solicitud.idOperacion(), idUsuario, huella);
         var operacion = operaciones.buscarYBloquear(solicitud.idOperacion())

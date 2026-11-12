@@ -8,6 +8,16 @@ public record SolicitudRegistroMantenimiento(
         Long idVehiculo,
         DatosRegistroMantenimiento datos,
         String observaciones,
-        List<DatosRepuesto> repuestos
+        List<DatosRepuesto> repuestos,
+        Long idTaller,
+        String nombreTallerSnapshot
 ) {
+    public SolicitudRegistroMantenimiento(
+            UUID idOperacion,
+            Long idVehiculo,
+            DatosRegistroMantenimiento datos,
+            String observaciones,
+            List<DatosRepuesto> repuestos) {
+        this(idOperacion, idVehiculo, datos, observaciones, repuestos, null, null);
+    }
 }

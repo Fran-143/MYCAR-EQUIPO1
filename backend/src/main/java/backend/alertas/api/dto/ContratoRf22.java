@@ -35,6 +35,7 @@ public final class ContratoRf22 {
     public record ReferenciaDto(
             Long idMantenimiento,
             String codigoTipo,
+            @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
             LocalDate fechaServicio,
             Integer kmServicio,
             String servicioOtro
@@ -109,8 +110,18 @@ public final class ContratoRf22 {
             @Positive Long idLecturaKmReferencia,
             @DecimalMin("0") java.math.BigDecimal costoTotal,
             String observaciones,
-            java.util.List<AtenderRepuesto> repuestos
-    ) { }
+            java.util.List<AtenderRepuesto> repuestos,
+            @Positive Long idTaller
+    ) {
+        /** Compatibilidad: sin taller opcional. */
+        public AtenderRequest(
+                UUID idOperacion, LocalDate fechaServicio, Integer kmServicio, String origenKmServicio,
+                Long idLecturaKmReferencia, java.math.BigDecimal costoTotal, String observaciones,
+                java.util.List<AtenderRepuesto> repuestos) {
+            this(idOperacion, fechaServicio, kmServicio, origenKmServicio, idLecturaKmReferencia,
+                    costoTotal, observaciones, repuestos, null);
+        }
+    }
 
     public record AtenderRepuesto(
             @NotBlank String nombre,
@@ -123,7 +134,18 @@ public final class ContratoRf22 {
             Long idAlerta, String estadoAlerta, Long idMantenimientoAtencion, UUID idOperacion
     ) { }
 
-    public record AnularAlertaResponse(Long idAlerta, String estado) { }
+    /** RF24-EA08: anulación manual con motivo e idempotencia por idOperacion. */
+    public record AnularRequest(
+            @NotNull UUID idOperacion,
+            @NotBlank @Size(max = 48) String motivo
+    ) { }
+
+    public record AnularAlertaResponse(Long idAlerta, String estado, UUID idOperacion) {
+        /** Compatibilidad con respuestas previas sin idOperacion. */
+        public AnularAlertaResponse(Long idAlerta, String estado) {
+            this(idAlerta, estado, null);
+        }
+    }
 
     public record ErrorResponse(String codigo, String mensaje, Map<String, String> campos, boolean resultadoIncierto) { }
 }

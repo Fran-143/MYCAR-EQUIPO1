@@ -4,6 +4,7 @@ import backend.mantenimiento.api.dto.ContratoRf17.ErrorResponse;
 import backend.mantenimiento.model.MantenimientoNoDisponibleException;
 import backend.mantenimiento.model.ConflictoOperacionMantenimientoException;
 import backend.mantenimiento.seguridad.SesionMantenimientoNoValidada;
+import backend.talleres.model.TallerNoDisponible;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
@@ -49,6 +50,10 @@ public class ErroresMantenimientoController {
     public ResponseEntity<ErrorResponse> vehiculo(MantenimientoNoDisponibleException ex) {
         return respuesta(404,"VEHICULO_NO_DISPONIBLE",ex.getMessage(),Map.of(),false);
     }
+    @ExceptionHandler(TallerNoDisponible.class)
+    public ResponseEntity<ErrorResponse> taller(TallerNoDisponible ex) {
+        return respuesta(404,"TALLER_NO_DISPONIBLE","El taller no está disponible",Map.of(),false);
+    }
     @ExceptionHandler(ConflictoOperacionMantenimientoException.class)
     public ResponseEntity<ErrorResponse> operacion(ConflictoOperacionMantenimientoException ex) {
         return respuesta(409,"OPERACION_NO_REUTILIZABLE",ex.getMessage(),Map.of(),false);
@@ -60,11 +65,15 @@ public class ErroresMantenimientoController {
     }
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> conflicto(DataIntegrityViolationException ex) {
+        org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                "RF17 DataIntegrityViolation: {}", ex.getMostSpecificCause().getMessage(), ex);
         return respuesta(409,"CONTEXTO_DESACTUALIZADO",
                 "Los datos cambiaron. Actualiza las referencias antes de guardar",Map.of(),false);
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> desconocido(Exception ex) {
+        org.slf4j.LoggerFactory.getLogger(getClass()).error(
+                "RF17 error no controlado: {}", ex.toString(), ex);
         // Nunca exponer SQL, credenciales ni stack trace. Un fallo al confirmar puede ser incierto.
         return respuesta(500,"RESULTADO_DESCONOCIDO",
                 "No se pudo confirmar el resultado. Verifica la operación antes de volver a guardar",Map.of(),true);
