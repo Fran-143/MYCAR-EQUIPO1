@@ -4,9 +4,7 @@ import backend.vehiculos.domain.ErrorRegistroVehiculo;
 import backend.vehiculos.dto.*;
 import backend.vehiculos.seguridad.IdentidadVehiculos;
 import backend.vehiculos.seguridad.SesionVehiculosNoValidada;
-import backend.vehiculos.service.ActualizacionVehiculoService;
 import backend.vehiculos.service.ConsultaRegistroVehiculoService;
-import backend.vehiculos.service.EstadoOperativoVehiculoService;
 import backend.vehiculos.service.RegistroVehiculoService;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,8 +62,7 @@ class VehiculosControllerTest {
         autenticacion = UsernamePasswordAuthenticationToken.authenticated("fixture-solo-test", null, List.of());
         when(proveedores.getIfAvailable()).thenReturn(identidad);
         when(identidad.exigirUsuarioAutenticado(any())).thenReturn(17L);
-        mvc = MockMvcBuilders.standaloneSetup(new VehiculosController(proveedores, registro, consultas,
-                        mock(ActualizacionVehiculoService.class), mock(EstadoOperativoVehiculoService.class)))
+        mvc = MockMvcBuilders.standaloneSetup(new VehiculosController(proveedores, registro, consultas))
                 .setControllerAdvice(new ErroresVehiculosController())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(json)).build();
     }
@@ -288,11 +285,11 @@ class VehiculosControllerTest {
 
     private DatosRegistroVehiculo datos() {
         return new DatosRegistroVehiculo(OP, "Toyota", "Corolla", "PARTICULAR", "A1B234", 2020,
-                "Azul", 1L, 1L, java.math.BigDecimal.valueOf(50000), null, null, null, null, null, null, null);
+                "Azul", 1L, 1L, 50000, null, null, null, null, null, null, null);
     }
 
     private ResultadoRegistroVehiculo resultado() {
-        return new ResultadoRegistroVehiculo(OP, 81, "A1B234", true, java.math.BigDecimal.valueOf(50000),
+        return new ResultadoRegistroVehiculo(OP, 81, "A1B234", true, 50000,
                 300, Instant.parse("2026-10-27T12:00:00Z"), 0);
     }
 }
