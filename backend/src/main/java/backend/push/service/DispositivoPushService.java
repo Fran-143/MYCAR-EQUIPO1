@@ -6,6 +6,7 @@ import backend.push.PushNotificationSender.ResultadoEnvio;
 import backend.push.api.dto.ContratoPush;
 import backend.push.dao.DispositivoPushJdbcDao;
 import java.util.UUID;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -15,7 +16,7 @@ public class DispositivoPushService {
     private final DispositivoPushJdbcDao dao;
     private final PushNotificationSender sender;
 
-    public DispositivoPushService(DispositivoPushJdbcDao dao, PushNotificationSender sender) {
+    public DispositivoPushService(DispositivoPushJdbcDao dao, @Lazy PushNotificationSender sender) {
         this.dao = dao;
         this.sender = sender;
     }

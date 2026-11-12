@@ -26,10 +26,9 @@ services:
         value: PT2H
       - key: MYCAR_AUTH_SESSION_TTL
         value: P1D
-      # Correo: smtp=placeholder (SMTP bloqueado en Free). Activar Brevo vía Dashboard:
-      # MYCAR_VERIFICACION_MAIL_MODO=brevo + MYCAR_VERIFICACION_BREVO_API_KEY + MYCAR_VERIFICACION_MAIL_FROM
+      # Correo producción: Brevo HTTPS (no SMTP). Secretos solo Dashboard.
       - key: MYCAR_VERIFICACION_MAIL_MODO
-        value: smtp
+        value: brevo
       - key: MYCAR_VERIFICACION_BREVO_API_KEY
         sync: false
       - key: MYCAR_VERIFICACION_MAIL_FROM
