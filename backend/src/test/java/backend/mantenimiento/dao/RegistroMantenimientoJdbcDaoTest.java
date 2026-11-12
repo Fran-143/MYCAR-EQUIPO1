@@ -610,7 +610,10 @@ class RegistroMantenimientoJdbcDaoTest {
                 new LecturaKmMantenimientoService(
                         new LecturaKmMantenimientoJdbcDao(jdbc)
                 ),
-                daoRegistro, new OperacionMantenimientoJdbcDao(jdbc)
+                daoRegistro, new OperacionMantenimientoJdbcDao(jdbc),
+                new backend.talleres.service.TallerService(
+                        new backend.talleres.dao.TallerJdbcDao(jdbc),
+                        new backend.talleres.service.ValidadorTaller())
         );
 
         // Aplicamos el control transaccional de Spring al servicio.
