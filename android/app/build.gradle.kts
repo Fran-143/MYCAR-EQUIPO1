@@ -42,12 +42,12 @@ android {
         }
 
         release {
-            // HTTPS público vía -Pmycar.apiBaseUrl=https://....onrender.com/
+            // HTTPS público (Render). Override: -Pmycar.apiBaseUrl=https://otro-host/
             // Debug local sigue en 10.0.2.2:8081 (no se altera).
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"${providers.gradleProperty("mycar.apiBaseUrl").getOrElse("https://api.example.invalid/")}\""
+                "\"${providers.gradleProperty("mycar.apiBaseUrl").getOrElse("https://mycar-backend-1dxi.onrender.com/")}\""
             )
 
             optimization {
