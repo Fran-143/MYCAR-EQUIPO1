@@ -74,6 +74,13 @@
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
+		<!-- Push: Admin SDK (adaptador FCM; opcional en runtime si no hay SA) -->
+		<dependency>
+			<groupId>com.google.firebase</groupId>
+			<artifactId>firebase-admin</artifactId>
+			<version>9.4.3</version>
+		</dependency>
+
 		<!-- Controlador PostgreSQL -->
 		<dependency>
 			<groupId>org.postgresql</groupId>

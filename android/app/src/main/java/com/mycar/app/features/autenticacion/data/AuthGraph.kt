@@ -25,13 +25,25 @@ object AuthGraph {
                 .readTimeout(20, TimeUnit.SECONDS)
                 .callTimeout(30, TimeUnit.SECONDS)
                 .build()
-            val api = Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL)
+            val retrofit = Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL)
                 .client(client).addConverterFactory(GsonConverterFactory.create()).build()
-                .create(AuthApi::class.java)
+            val api = retrofit.create(AuthApi::class.java)
             AuthRepository(api, KeystoreCredentialStore(app, BuildConfig.API_BASE_URL),
                 registrationPolicy = privacyPolicy(),
-                clearPrivateData = { com.mycar.app.features.sesion.data.DatosPrivadosSesion.limpiar(app) })
-                .also { instance = it }
+                clearPrivateData = { com.mycar.app.features.sesion.data.DatosPrivadosSesion.limpiar(app) },
+                onSessionReady = { access, installation ->
+                    com.mycar.app.features.push.data.PushTokenSync.registrarTrasSesion(access, installation)
+                },
+                onSessionClosing = { access, installation ->
+                    com.mycar.app.features.push.data.PushTokenSync.desvincularAlCerrar(access, installation)
+                })
+                .also { instance = it; recoveryInstance = RecoveryRepository(retrofit.create(RecoveryApi::class.java)) }
         }
+    }
+
+    @Volatile private var recoveryInstance: RecoveryRepository? = null
+    fun recovery(context: Context): RecoveryRepository {
+        repository(context)
+        return recoveryInstance!!
     }
 }

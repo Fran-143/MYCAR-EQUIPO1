@@ -45,7 +45,9 @@ class AuthRepository(
     private val store: CredentialStore,
     private val clock: Clock = Clock.systemUTC(),
     private val registrationPolicy: PrivacyPolicyConfiguration = PrivacyPolicyConfiguration(),
-    private val clearPrivateData: () -> Unit = {}
+    private val clearPrivateData: () -> Unit = {},
+    private val onSessionReady: suspend (accessToken: String, installation: String) -> Unit = { _, _ -> },
+    private val onSessionClosing: suspend (accessToken: String?, installation: String) -> Unit = { _, _ -> }
 ) : RegistrationService {
     private val registrationMutex = Mutex()
 
@@ -273,7 +275,8 @@ class AuthRepository(
             throw SessionRequired()
         when (mutableSession.value.phase) {
             SessionPhase.AUTHENTICATED -> Unit
-            SessionPhase.RETRY -> throw IOException("No se pudo validar la sesión; vuelve a intentarlo.")
+            // RETRY: forzar revalidación vía 401 sintético, no confundir con fallo de red del API.
+            SessionPhase.RETRY -> throw SessionRequired()
             else -> throw SessionRequired()
         }
     }
@@ -295,8 +298,10 @@ class AuthRepository(
                         })
                     }
                     val tokens = response.body().toStored()
+                    val installation = load().installation
                     withContext(NonCancellable) { persist(tokens, expected) }
                     publish(expected, SessionState(SessionPhase.AUTHENTICATED))
+                    runCatching { onSessionReady(tokens.accessToken, installation) }
                 } catch (cancelled: CancellationException) { throw cancelled
                 } catch (known: AuthProblem) { throw known
                 } catch (_: IOException) { throw AuthProblem("No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.")
@@ -331,6 +336,7 @@ class AuthRepository(
                         check(body?.vigente == true && body.idSesion == tokens.idSesion &&
                             Instant.parse(body.sesionExpiraUtc) == Instant.parse(tokens.sesionExpiraUtc))
                         publish(expected, SessionState(SessionPhase.AUTHENTICATED))
+                        runCatching { onSessionReady(tokens.accessToken, load().installation) }
                     } else {
                         response.errorBody()?.close()
                         retry(expected)
@@ -379,6 +385,7 @@ class AuthRepository(
      */
     suspend fun logout() = withContext(Dispatchers.IO + NonCancellable) {
         var proof: String? = null
+        var installation = ""
         val closedVersion = synchronized(localLock) {
             val existing = load()
             if (existing.tokens == null && !cleanupBlocked) return@withContext
@@ -386,6 +393,7 @@ class AuthRepository(
             cleanupBlocked = true // Invalida inmediatamente las operaciones iniciadas antes del cierre.
             try {
                 proof = existing.tokens?.accessToken
+                installation = existing.installation
                 // Primero cerrar escritores y limpiar RF08/RF17; un fallo bloquea el cambio de cuenta.
                 clearPrivateData()
                 store.clearSession(existing.installation)
@@ -404,6 +412,7 @@ class AuthRepository(
         try {
             val captured = proof
             if (captured != null) {
+                runCatching { onSessionClosing(captured, installation) }
                 val response = api.logout("Bearer $captured")
                 response.errorBody()?.close()
                 synchronized(localLock) {

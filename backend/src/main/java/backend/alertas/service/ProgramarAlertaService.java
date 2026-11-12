@@ -4,12 +4,15 @@ import backend.alertas.api.dto.ContratoRf22;
 import backend.alertas.dao.AlertasJdbcDao;
 import backend.alertas.dao.OperacionAlertaJdbcDao;
 import backend.alertas.model.ErrorAlertas;
+import backend.notificaciones.service.NotificacionInternaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,14 +22,28 @@ public class ProgramarAlertaService {
     private final AlertasJdbcDao alertas;
     private final OperacionAlertaJdbcDao operaciones;
     private final ObjectMapper json;
+    private final ObjectProvider<NotificacionInternaService> notificaciones;
 
     public ProgramarAlertaService(AlertasJdbcDao alertas, OperacionAlertaJdbcDao operaciones, ObjectMapper json) {
+        this(alertas, operaciones, json, null);
+    }
+
+    @Autowired
+    public ProgramarAlertaService(
+            AlertasJdbcDao alertas, OperacionAlertaJdbcDao operaciones, ObjectMapper json,
+            ObjectProvider<NotificacionInternaService> notificaciones) {
         this.alertas = alertas;
         this.operaciones = operaciones;
         this.json = json;
+        this.notificaciones = notificaciones;
     }
 
     public ContratoRf22.ContextoResponse contexto(long usuario, long vehiculo) {
+        return contexto(usuario, vehiculo, null, null);
+    }
+
+    public ContratoRf22.ContextoResponse contexto(
+            long usuario, long vehiculo, String codigoTipo, String servicioOtro) {
         if (vehiculo <= 0) throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no encontrado.");
         try {
             alertas.verificarVehiculoPropioActivo(usuario, vehiculo);
@@ -39,7 +56,9 @@ public class ProgramarAlertaService {
                 alertas.hoyLima(), "America/Lima",
                 hayKm ? lectura.valorKm() : null,
                 hayKm ? lectura.idLecturaKm() : null,
-                alertas.tiposActivos(), alertas.referenciasRealizadas(vehiculo), true);
+                alertas.tiposActivos(),
+                alertas.referenciasRealizadas(vehiculo, codigoTipo, servicioOtro),
+                true);
     }
 
     @Transactional
@@ -167,6 +186,13 @@ public class ProgramarAlertaService {
                     kmBase, intervaloKm, kmObjetivo, estado, firma,
                     desdeMant ? req.idMantenimientoReferencia() : null));
             alertas.historialInicial(idAlerta, estado);
+            // RF22 pasos 89–93: aviso interno en la misma TX (PROGRAMADA puede no generar activo).
+            if (notificaciones != null) {
+                var n = notificaciones.getIfAvailable();
+                if (n != null) {
+                    n.crearOActualizarSegunEstadoAlerta(idAlerta);
+                }
+            }
             operaciones.confirmar(req.idOperacion(), usuario, idAlerta, estado);
             return new ContratoRf22.ProgramarResponse(req.idOperacion(), idAlerta, estado);
         } catch (DataIntegrityViolationException ex) {

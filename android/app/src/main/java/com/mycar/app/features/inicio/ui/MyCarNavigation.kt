@@ -1,4 +1,4 @@
-package com.mycar.app.features.inicio.ui
+﻿package com.mycar.app.features.inicio.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -30,7 +30,13 @@ import com.mycar.app.features.vehiculos.ui.VehiculosRoute
 
 /** Navegación única, siguiendo el patrón de estado Compose existente. No necesita otra biblioteca. */
 @Composable
-fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=viewModel()) {
+fun MyCarNavigation(
+    solicitudVehiculos: Int = 0,
+    sesion: SesionVehiculosViewModel = viewModel(),
+    solicitudesNotificaciones: Int = 0,
+    pushIdVehiculo: Long? = null,
+    pushIdAlerta: Long? = null
+) {
     val acceso by sesion.estado.collectAsStateWithLifecycle()
     val cuenta=acceso.cuenta
     var seccionNombre by rememberSaveable { mutableStateOf(SeccionMyCar.INICIO.name) }
@@ -54,6 +60,16 @@ fun MyCarNavigation(solicitudVehiculos: Int=0, sesion: SesionVehiculosViewModel=
     val navegacion=NavegacionInicio(SeccionMyCar.valueOf(seccionNombre),secundariaNombre?.let(SecundariaMyCar::valueOf))
     fun navegar(n: NavegacionInicio) { seccionNombre=n.seccion.name; secundariaNombre=n.secundaria?.name; formularioAbierto=false }
     LaunchedEffect(solicitudVehiculos) { if(solicitudVehiculos>0) navegar(navegacion.abrir(SeccionMyCar.VEHICULOS)) }
+    // Deep link FCM: abre alertas del vehículo o la secundaria Notificaciones (placeholder en esta rama).
+    LaunchedEffect(solicitudesNotificaciones, pushIdVehiculo, pushIdAlerta, cuenta?.ciclo) {
+        if (solicitudesNotificaciones <= 0 || cuenta == null) return@LaunchedEffect
+        if (pushIdVehiculo != null) {
+            vehiculoAlertas = pushIdVehiculo
+            navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
+        } else {
+            navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES))
+        }
+    }
     fun abrirDetalle(id: Long) { vehiculoDetalleId = id; navegar(navegacion.abrir(SecundariaMyCar.DETALLE)) }
     fun abrirKilometraje(id: Long, desdeDetalle: Boolean = false) {
         kmSesion++
