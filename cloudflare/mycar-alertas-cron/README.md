@@ -1,41 +1,42 @@
 # mycar-alertas-cron
 
-Worker Cloudflare Free → RF23 en Render. **Reutilizar** el Worker existente
-`mycar-alertas-cron` (cuenta `mycargrupo1`). No crear otro.
+Worker Cloudflare Free → RF23 + despacho push en Render. **Reutilizar** el Worker
+`mycar-alertas-cron` (cuenta `mycargrupo1`). No crear otro. Presupuesto US$0.
 
-## Primera publicación (estado actual)
+## Estado seguro actual
 
 | Ajuste | Valor |
 |--------|--------|
 | `EVAL_MODO` | `SIMULAR` |
 | `[triggers] crons` | `[]` (sin programación) |
-| `POST /run` | **fuerza SIMULAR** (ignora body/query/`EVAL_MODO`) |
-| Job Spring RF23 en Render | `false` |
+| `POST /run` | eval **SIMULAR** forzado |
+| `POST /run-push` | dispara despacho (backend aplica ventana Lima) |
+| Tick FCM 15s en Render | **apagado** (`worker-habilitado=false`) |
 
-`SIMULAR` en backend solo lista vehículos evaluables: **no** llama `sincronizar`,
-**no** escribe Neon, **no** crea alertas/avisos, **no** encola FCM.
+## Fases (activación futura, solo con aprobación)
 
-## Endpoint backend
+| Cron UTC | Lima | Acción |
+|----------|------|--------|
+| `10 5 * * *` | 00:10 | `POST .../alertas/evaluar-programadas` |
+| `0 10 * * *` | 05:00 | `POST .../push/despachar-recordatorios` |
 
-```
-POST .../api/v1/interno/alertas/evaluar-programadas
-Header: X-MyCar-Cron-Secret: <secreto>
-Body: {"modo":"SIMULAR"} | {"modo":"COMPLETO"}
-```
+El Worker usa `event.cron` para ramificar. Mismo secreto `X-MyCar-Cron-Secret`.
 
-## Secretos + deploy
+## Frecuencias push (mantenimiento)
+
+- PROGRAMADA: sin push
+- PROXIMA: 1× al entrar
+- PENDIENTE: 1× + cada 3 días
+- VENCIDA: 1× + diario (varias → 1 resumen/usuario)
+- REALIZADA/ANULADA: detiene
+- Máx. 1 push/alerta/día Lima; RF48 revalidado al enviar
+
+Recordatorios de actualizar km (**categoría KILOMETRAJE**): no implementados; esquema extensible.
+
+## Deploy sin activar horarios
 
 ```powershell
 cd cloudflare\mycar-alertas-cron
-npx wrangler secret put CRON_SECRET   # = MYCAR_CRON_SECRET en Render
-npx wrangler deploy                   # actualiza mycar-alertas-cron; cron sigue vacío
+npx wrangler secret put CRON_SECRET
+npx wrangler deploy   # crons siguen []
 ```
-
-## Activación futura (solo con aprobación explícita)
-
-1. En `wrangler.toml`: `EVAL_MODO = "COMPLETO"`
-2. En `wrangler.toml`: `crons = ["0 13 * * *"]`  # 08:00 America/Lima
-3. `npx wrangler deploy`
-
-`POST /run` permanece en **SIMULAR** a propósito (pruebas manuales seguras).
-El Cron programado usará `EVAL_MODO` (`COMPLETO` tras el paso 1).

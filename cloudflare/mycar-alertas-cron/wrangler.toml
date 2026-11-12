@@ -14,7 +14,8 @@ MAX_ATTEMPTS = "4"
 RETRY_BASE_MS = "8000"
 FETCH_TIMEOUT_MS = "25000"
 
-# Sin programación. Activación futura 08:00 Lima: crons = ["0 13 * * *"]
+# Sin programación hasta autorización.
+# Futuro: crons = ["10 5 * * *", "0 10 * * *"]  # 00:10 eval + 05:00 push (America/Lima = UTC-5)
 [triggers]
 crons = []
 

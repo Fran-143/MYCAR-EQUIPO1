@@ -1,6 +1,7 @@
 package backend.push.dao;
 
 import java.util.List;
+import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -12,23 +13,51 @@ public class OutboxPushJdbcDao {
         this.jdbc = jdbc;
     }
 
-    /** Idempotente: no duplica (usuario, alerta, categoria, destino). */
-    public int encolarSiNuevo(
+    /**
+     * Idempotente por {@code clave_idempotencia}.
+     * @return id_outbox si insertó; empty si conflicto (reintento duplicado del mismo ciclo).
+     */
+    public Optional<Long> encolarSiNuevo(
             long usuario, Long idAlerta, Long idNotificacion,
-            String categoria, String titulo, String cuerpo, String destino) {
-        return jdbc.update("""
+            String categoria, String titulo, String cuerpo, String destino,
+            String claveIdempotencia) {
+        Long id = jdbc.query("""
                 INSERT INTO mycar.outbox_push (
                     id_usuario, id_alerta, id_notificacion, categoria,
-                    titulo, cuerpo, destino, estado, intentos, creado_utc, actualizado_utc)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', 0, clock_timestamp(), clock_timestamp())
-                ON CONFLICT (id_usuario, id_alerta, categoria, destino) DO NOTHING
-                """, usuario, idAlerta, idNotificacion, categoria, titulo, cuerpo, destino);
+                    titulo, cuerpo, destino, estado, intentos,
+                    clave_idempotencia, creado_utc, actualizado_utc)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', 0, ?, clock_timestamp(), clock_timestamp())
+                ON CONFLICT (clave_idempotencia) DO NOTHING
+                RETURNING id_outbox
+                """, rs -> rs.next() ? rs.getLong(1) : null,
+                usuario, idAlerta, idNotificacion, categoria, titulo, cuerpo, destino, claveIdempotencia);
+        return Optional.ofNullable(id);
+    }
+
+    public void vincularAlertas(long idOutbox, List<Long> idAlertas) {
+        for (Long idAlerta : idAlertas) {
+            if (idAlerta == null) {
+                continue;
+            }
+            jdbc.update("""
+                    INSERT INTO mycar.outbox_push_alerta(id_outbox, id_alerta)
+                    VALUES (?, ?)
+                    ON CONFLICT DO NOTHING
+                    """, idOutbox, idAlerta);
+        }
+    }
+
+    public List<Long> alertasDeOutbox(long idOutbox) {
+        return jdbc.queryForList("""
+                SELECT id_alerta FROM mycar.outbox_push_alerta WHERE id_outbox = ?
+                ORDER BY id_alerta
+                """, Long.class, idOutbox);
     }
 
     public List<OutboxFila> reclamarPendientes(int limite) {
         return jdbc.query("""
                 SELECT id_outbox, id_usuario, id_alerta, id_notificacion, categoria,
-                       titulo, cuerpo, destino, intentos
+                       titulo, cuerpo, destino, intentos, clave_idempotencia
                 FROM mycar.outbox_push
                 WHERE estado IN ('PENDIENTE', 'ERROR') AND intentos < 8
                 ORDER BY creado_utc
@@ -43,7 +72,8 @@ public class OutboxPushJdbcDao {
                 rs.getString("titulo"),
                 rs.getString("cuerpo"),
                 rs.getString("destino"),
-                rs.getInt("intentos")), limite);
+                rs.getInt("intentos"),
+                rs.getString("clave_idempotencia")), limite);
     }
 
     public void marcar(long id, String estado, String error) {
@@ -66,6 +96,7 @@ public class OutboxPushJdbcDao {
             String titulo,
             String cuerpo,
             String destino,
-            int intentos) {
+            int intentos,
+            String claveIdempotencia) {
     }
 }

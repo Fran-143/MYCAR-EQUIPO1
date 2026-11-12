@@ -31,6 +31,8 @@ public class CronInternoSecurityConfiguration {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.POST, "/api/v1/interno/alertas/evaluar-programadas")
                         .authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/interno/push/despachar-recordatorios")
+                        .authenticated()
                         .anyRequest()
                         .denyAll())
                 .addFilterBefore(new CronSecretFilter(authenticator), AnonymousAuthenticationFilter.class)

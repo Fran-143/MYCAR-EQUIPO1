@@ -2,9 +2,8 @@ package backend.notificaciones.service;
 
 import backend.notificaciones.api.dto.ContratoNotificaciones;
 import backend.notificaciones.dao.NotificacionJdbcDao;
-import backend.notificaciones.dao.PreferenciaNotificacionJdbcDao;
 import backend.notificaciones.model.ErrorNotificaciones;
-import backend.push.service.OutboxPushService;
+import backend.push.dao.AlertaPushControlJdbcDao;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,12 +20,10 @@ class NotificacionInternaServiceTest {
     @BeforeEach
     void preparar() {
         dao = mock(NotificacionJdbcDao.class);
-        PreferenciaNotificacionJdbcDao preferencias = mock(PreferenciaNotificacionJdbcDao.class);
-        when(preferencias.consultar(anyLong())).thenReturn(Optional.empty());
         @SuppressWarnings("unchecked")
-        ObjectProvider<OutboxPushService> outbox = mock(ObjectProvider.class);
-        when(outbox.getIfAvailable()).thenReturn(null);
-        servicio = new NotificacionInternaService(dao, preferencias, outbox);
+        ObjectProvider<AlertaPushControlJdbcDao> pushControl = mock(ObjectProvider.class);
+        when(pushControl.getIfAvailable()).thenReturn(null);
+        servicio = new NotificacionInternaService(dao, pushControl);
     }
 
     @Test

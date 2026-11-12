@@ -2,9 +2,8 @@ package backend.notificaciones.service;
 
 import backend.notificaciones.api.dto.ContratoNotificaciones;
 import backend.notificaciones.dao.NotificacionJdbcDao;
-import backend.notificaciones.dao.PreferenciaNotificacionJdbcDao;
 import backend.notificaciones.model.ErrorNotificaciones;
-import backend.push.service.OutboxPushService;
+import backend.push.dao.AlertaPushControlJdbcDao;
 import java.util.Locale;
 import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
@@ -14,8 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * RF46 consulta/filtro + RF47 marcar leída + sync interno desde RF22/23/24.
  * LEÍDA ≠ ATENDIDA. Preferencias externas (RF48) no silencian avisos internos.
- * Maestra 08/11: filtroLectura + contadores independientes de gestión/lectura.
- * Push externo (FCM): solo tras upsert PENDIENTE y si RF48 categoría ON + permiso CONCEDIDO.
+ * Push FCM ya no se encola aquí: lo hace {@code RecordatorioPushService} (cron ≥05:00 / km).
  */
 @Service
 public class NotificacionInternaService {
@@ -26,16 +24,12 @@ public class NotificacionInternaService {
     private static final Set<String> ACTIVAS = Set.of("PROXIMA", "PENDIENTE", "VENCIDA");
 
     private final NotificacionJdbcDao dao;
-    private final PreferenciaNotificacionJdbcDao preferencias;
-    private final ObjectProvider<OutboxPushService> outboxPush;
+    private final ObjectProvider<AlertaPushControlJdbcDao> pushControl;
 
     public NotificacionInternaService(
-            NotificacionJdbcDao dao,
-            PreferenciaNotificacionJdbcDao preferencias,
-            ObjectProvider<OutboxPushService> outboxPush) {
+            NotificacionJdbcDao dao, ObjectProvider<AlertaPushControlJdbcDao> pushControl) {
         this.dao = dao;
-        this.preferencias = preferencias;
-        this.outboxPush = outboxPush;
+        this.pushControl = pushControl;
     }
 
     /** RF22 / RF23 / reconciliación RF24: crea o actualiza aviso según estado de alerta. */
@@ -60,12 +54,14 @@ public class NotificacionInternaService {
     @Transactional
     public void marcarAtendidaPorAlerta(long idAlerta) {
         dao.marcarGestionSiActiva(idAlerta, "ATENDIDA");
+        detenerPush(idAlerta);
     }
 
     /** RF24-EA08 A08.13: desactiva avisos pendientes al anular. */
     @Transactional
     public void desactivarAvisosPendientesAlertaAnulada(long idAlerta) {
         dao.desactivarPendientesDeAlerta(idAlerta);
+        detenerPush(idAlerta);
     }
 
     @Transactional
@@ -99,7 +95,6 @@ public class NotificacionInternaService {
         var refresco = dao.obtenerPropia(usuario, idNotificacion)
                 .orElseThrow(() -> new ErrorNotificaciones(
                         "NOTIFICACION_NO_ENCONTRADA", "No se pudo cargar esta notificación."));
-        // Destino no vigente: se puede leer igual; el cliente decide Historial/mensaje (RF47 EA).
         return new ContratoNotificaciones.LeerResponse(
                 refresco.idNotificacion(),
                 refresco.leida(),
@@ -112,44 +107,32 @@ public class NotificacionInternaService {
     private void sincronizarContexto(NotificacionJdbcDao.AlertaContexto ctx) {
         String estado = ctx.estado();
         if ("PROGRAMADA".equals(estado)) {
-            // Maestra: PROGRAMADA puede no generar aviso activo.
             return;
         }
         if (ACTIVAS.contains(estado)) {
-            // RF48: preferencias ON/OFF solo afectan envío externo futuro, no la bandeja.
             String titulo = tituloActivo(estado, ctx.etiquetaServicio());
             String cuerpo = cuerpoActivo(estado, ctx.placa(), ctx.etiquetaServicio());
-            // Upsert no reinicia leida (RF46-EA13).
             dao.upsertPorAlerta(ctx.idUsuario(), ctx.idAlerta(), ctx.idVehiculo(),
                     "PENDIENTE", titulo, cuerpo);
-            encolarPushSiPreferencias(ctx.idUsuario(), ctx.idAlerta(), titulo, cuerpo);
+            // Push externo: solo RecordatorioPushService (cron / km). Evita duplicados con listado.
             return;
         }
         if ("REALIZADA".equals(estado)) {
-            // Si no había aviso, no inventamos uno solo para ATENDIDA.
             dao.marcarGestionSiActiva(ctx.idAlerta(), "ATENDIDA");
+            detenerPush(ctx.idAlerta());
             return;
         }
         if ("ANULADA".equals(estado)) {
             dao.desactivarPendientesDeAlerta(ctx.idAlerta());
+            detenerPush(ctx.idAlerta());
         }
     }
 
-    private void encolarPushSiPreferencias(long usuario, long idAlerta, String titulo, String cuerpo) {
-        OutboxPushService push = outboxPush.getIfAvailable();
-        if (push == null) {
-            return;
+    private void detenerPush(long idAlerta) {
+        var c = pushControl.getIfAvailable();
+        if (c != null) {
+            c.detener(idAlerta);
         }
-        preferencias.asegurarFila(usuario);
-        var pref = preferencias.consultar(usuario).orElse(null);
-        if (pref == null || !pref.mantenimiento()) {
-            return;
-        }
-        if (!"CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo())) {
-            return;
-        }
-        push.encolarTrasCommit(
-                usuario, idAlerta, "MANTENIMIENTO", titulo, cuerpo, "DETALLE_ALERTA");
     }
 
     private static String tituloActivo(String estado, String servicio) {
