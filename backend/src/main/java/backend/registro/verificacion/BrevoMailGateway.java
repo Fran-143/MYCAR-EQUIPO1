@@ -1,6 +1,8 @@
 package backend.registro.verificacion;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -17,6 +19,7 @@ import java.util.UUID;
  * Evita SMTP saliente (bloqueado en Render Free). Credenciales solo por configuración.
  */
 public final class BrevoMailGateway implements MailGateway {
+    private static final Logger log = LoggerFactory.getLogger(BrevoMailGateway.class);
     static final String DEFAULT_BASE_URL = "https://api.brevo.com";
     private static final String SEND_PATH = "/v3/smtp/email";
     private static final int MAX_ATTEMPTS = 2;
@@ -30,6 +33,8 @@ public final class BrevoMailGateway implements MailGateway {
         this.client = client;
         this.fromEmail = fromEmail;
         this.fromName = fromName;
+        log.info("MailGateway Brevo activo fromConfigured={} fromNameLen={}",
+                StringUtils.hasText(fromEmail), fromName == null ? 0 : fromName.length());
     }
 
     @Override
@@ -47,9 +52,14 @@ public final class BrevoMailGateway implements MailGateway {
                         .body(body)
                         .retrieve()
                         .body(JsonNode.class);
-                return acceptedFrom(response);
+                Accepted accepted = acceptedFrom(response);
+                log.info("brevo.send ok attempt={} providerIdLen={}",
+                        attempt, accepted.providerId() == null ? 0 : accepted.providerId().length());
+                return accepted;
             } catch (RestClientResponseException ex) {
                 int status = ex.getStatusCode().value();
+                // No loguear body (puede reflejar remitente/OTP). Solo status HTTP.
+                log.warn("brevo.send http_status={} attempt={}", status, attempt);
                 if (isDefinitiveClientFailure(status)) {
                     return new Rejected(true);
                 }
@@ -60,6 +70,8 @@ public final class BrevoMailGateway implements MailGateway {
                 }
                 return last;
             } catch (RestClientException ex) {
+                log.warn("brevo.send transport_error attempt={} type={}",
+                        attempt, ex.getClass().getSimpleName());
                 last = new Uncertain();
                 if (attempt < MAX_ATTEMPTS) {
                     sleepQuietly();

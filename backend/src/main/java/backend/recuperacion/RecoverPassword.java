@@ -3,6 +3,8 @@ package backend.recuperacion;
 import backend.registro.RegistrationValidator;
 import backend.registro.verificacion.DevMailGateway;
 import backend.registro.verificacion.MailGateway;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class RecoverPassword {
+    private static final Logger log = LoggerFactory.getLogger(RecoverPassword.class);
     private static final Duration TTL = Duration.ofMinutes(15);
     private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
     private static final int MAX_FAILURES = 5;
@@ -70,8 +73,24 @@ public class RecoverPassword {
         }
         store.invalidateActive(account.get().userId());
         String code = generateCode();
-        store.insertCode(account.get().userId(), hash(code), now.plus(TTL), now);
-        mail.send(new MailGateway.Message(correo, code, "rf03/" + account.get().userId() + "/" + now.toEpochMilli()));
+        long codeId = store.insertCode(account.get().userId(), hash(code), now.plus(TTL), now);
+        MailGateway.Outcome outcome;
+        try {
+            outcome = mail.send(new MailGateway.Message(
+                    correo, code, "rf03/" + account.get().userId() + "/" + now.toEpochMilli()));
+            if (outcome == null) {
+                outcome = new MailGateway.Uncertain();
+            }
+        } catch (RuntimeException ex) {
+            outcome = new MailGateway.Uncertain();
+        }
+        if (!(outcome instanceof MailGateway.Accepted accepted)) {
+            store.markInvalidated(codeId);
+            log.warn("recuperacion.emit mail_no_aceptado outcome={}", outcome.getClass().getSimpleName());
+            throw RecoveryException.mailUnavailable();
+        }
+        log.info("recuperacion.emit mail_aceptado providerIdLen={}",
+                accepted.providerId() == null ? 0 : accepted.providerId().length());
         String debug = null;
         if (desarrollo) {
             lastDevCodes.put(correo, code);

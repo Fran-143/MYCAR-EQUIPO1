@@ -27,6 +27,13 @@ public final class RecoveryException extends RuntimeException {
                 Map.of("codigo", "El código expiró."));
     }
 
+    /** Fallo de entrega de correo (Brevo/SMTP). No revela OTP ni detalles del proveedor. */
+    public static RecoveryException mailUnavailable() {
+        return new RecoveryException(Reason.UNAVAILABLE,
+                "No pudimos enviar el correo de recuperación. Intenta de nuevo en unos minutos.",
+                Map.of());
+    }
+
     public Reason reason() { return reason; }
     public Map<String, String> fieldErrors() { return fieldErrors; }
 }

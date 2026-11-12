@@ -65,6 +65,8 @@ public class VerificationConfiguration {
             throw new IllegalStateException(
                     "SMTP activo: configura spring.mail.username y spring.mail.password en .env");
         }
+        org.slf4j.LoggerFactory.getLogger(VerificationConfiguration.class)
+                .warn("MailGateway modo=smtp activo (no Brevo HTTPS). En Render Free el SMTP a localhost no entrega correo.");
         return new SmtpMailGateway(mailSender, resolvedFrom);
     }
 

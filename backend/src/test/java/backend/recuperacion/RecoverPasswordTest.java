@@ -106,6 +106,22 @@ class RecoverPasswordTest {
     }
 
     @Test
+    void emitFailsWhenMailRejectedWithoutExposingCode() {
+        ObjectProvider<DevMailGateway> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+        MailGateway failing = message -> new MailGateway.Rejected(true);
+        service = new RecoverPassword(store, encoder, failing, provider, false);
+        when(store.findByEmail("ana@example.com"))
+                .thenReturn(Optional.of(new RecoveryStore.Account(7L, "ana@example.com", "ACTIVA",
+                        encoder.encode("ViejaClave1!"))));
+        when(store.insertCode(eq(7L), anyString(), any(), any())).thenReturn(42L);
+
+        RecoveryException ex = assertThrows(RecoveryException.class, () -> service.emit("ana@example.com"));
+        assertEquals(RecoveryException.Reason.UNAVAILABLE, ex.reason());
+        verify(store).markInvalidated(42L);
+    }
+
+    @Test
     void resetConsumesCodeAndUpdatesHash() {
         when(store.findByEmail("ana@example.com"))
                 .thenReturn(Optional.of(new RecoveryStore.Account(7L, "ana@example.com", "ACTIVA",
