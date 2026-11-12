@@ -6,7 +6,8 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY backend/pom.xml ./
 COPY backend/src ./src
-RUN mvn -B -DskipTests package \
+# maven.test.skip: no compila tests (skipTests solo evita ejecutarlos).
+RUN mvn -B -Dmaven.test.skip=true package \
     && cp target/backend-0.0.1-SNAPSHOT.jar /workspace/app.jar
 
 FROM eclipse-temurin:21-jre-jammy
