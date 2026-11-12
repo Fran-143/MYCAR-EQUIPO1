@@ -2,16 +2,20 @@ package backend.push.config;
 
 import backend.push.NoOpPushSender;
 import backend.push.PushNotificationSender;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Garantiza un {@link PushNotificationSender} si FCM está deshabilitado por propiedad. */
+/**
+ * NoOp solo cuando FCM está explícitamente deshabilitado.
+ * Mutuamente excluyente con {@code FcmConfiguration} (habilitado=true).
+ * Así nunca hay dos beans {@link PushNotificationSender}.
+ */
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnProperty(prefix = "mycar.fcm", name = "habilitado", havingValue = "false")
 public class PushFallbackConfiguration {
 
     @Bean
-    @ConditionalOnMissingBean(PushNotificationSender.class)
     PushNotificationSender noOpPushSender() {
         return new NoOpPushSender();
     }
