@@ -1,0 +1,28 @@
+# Worker existente: mycar-alertas-cron (NO crear otro).
+# Cron Trigger: DESACTIVADO hasta prueba controlada + aprobación explícita.
+name = "mycar-alertas-cron"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+workers_dev = true
+
+# Variables no secretas (OK en repo).
+[vars]
+BACKEND_URL = "https://mycar-backend-1dxi.onrender.com"
+# Modo por defecto del cron cuando se active: COMPLETO.
+# Para prueba manual segura usar body {"modo":"SIMULAR"} desde el dashboard/curl.
+EVAL_MODO = "COMPLETO"
+# Intentos totales tras cold start de Render Free (1 inicial + reintentos).
+MAX_ATTEMPTS = "4"
+# Espera base entre reintentos (ms); crece linealmente.
+RETRY_BASE_MS = "8000"
+# Timeout por intento fetch (ms) — Workers Free ~30s wall; dejamos margen.
+FETCH_TIMEOUT_MS = "25000"
+
+# Cron 08:00 America/Lima = 13:00 UTC (Perú sin DST).
+# NO descomentar hasta autorización explícita tras prueba controlada.
+# [triggers]
+# crons = ["0 13 * * *"]
+
+# Secretos (NO en este archivo):
+#   wrangler secret put CRON_SECRET
+# Debe coincidir con MYCAR_CRON_SECRET en Render.

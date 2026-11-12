@@ -1,22 +1,20 @@
 package backend.alertas.service;
 
-import backend.alertas.dao.AlertasJdbcDao;
-import backend.alertas.dao.AlertasJdbcDao.VehiculoActivo;
-import java.util.List;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import backend.alertas.service.EvaluacionProgramadaAlertasService.Modo;
 import org.junit.jupiter.api.Test;
-import static org.mockito.Mockito.*;
 
 class EvaluacionDiariaAlertasJobTest {
 
-    @Test void errorEnUnVehiculoNoDetieneElLote() {
-        AlertasJdbcDao dao = mock(AlertasJdbcDao.class);
-        when(dao.listarVehiculosActivosConAlertasEvaluables()).thenReturn(List.of(
-                new VehiculoActivo(1L, 10L),
-                new VehiculoActivo(2L, 20L)));
-        when(dao.sincronizar(1L, 10L)).thenThrow(new RuntimeException("fallo puntual"));
-        when(dao.sincronizar(2L, 20L)).thenReturn(3);
-        new EvaluacionDiariaAlertasJob(dao).evaluarDiario();
-        verify(dao).sincronizar(1L, 10L);
-        verify(dao).sincronizar(2L, 20L);
+    @Test
+    void delegaEnServicioCompleto() {
+        EvaluacionProgramadaAlertasService servicio = mock(EvaluacionProgramadaAlertasService.class);
+        when(servicio.evaluar(Modo.COMPLETO))
+                .thenReturn(new EvaluacionProgramadaAlertasService.Resultado(false, "COMPLETO", 1, 0, 0));
+        new EvaluacionDiariaAlertasJob(servicio).evaluarDiario();
+        verify(servicio).evaluar(Modo.COMPLETO);
     }
 }
