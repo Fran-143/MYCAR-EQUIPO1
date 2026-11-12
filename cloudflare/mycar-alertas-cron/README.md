@@ -1,55 +1,41 @@
 # mycar-alertas-cron
 
-Worker Cloudflare Free que dispara la evaluación RF23 del backend MyCar en Render.
+Worker Cloudflare Free → RF23 en Render. **Reutilizar** el Worker existente
+`mycar-alertas-cron` (cuenta `mycargrupo1`). No crear otro.
 
-**No crear otro Worker.** Reutilizar el ya existente `mycar-alertas-cron`.
+## Primera publicación (estado actual)
+
+| Ajuste | Valor |
+|--------|--------|
+| `EVAL_MODO` | `SIMULAR` |
+| `[triggers] crons` | `[]` (sin programación) |
+| `POST /run` | **fuerza SIMULAR** (ignora body/query/`EVAL_MODO`) |
+| Job Spring RF23 en Render | `false` |
+
+`SIMULAR` en backend solo lista vehículos evaluables: **no** llama `sincronizar`,
+**no** escribe Neon, **no** crea alertas/avisos, **no** encola FCM.
 
 ## Endpoint backend
 
 ```
-POST https://mycar-backend-1dxi.onrender.com/api/v1/interno/alertas/evaluar-programadas
-Header: X-MyCar-Cron-Secret: <MYCAR_CRON_SECRET>
+POST .../api/v1/interno/alertas/evaluar-programadas
+Header: X-MyCar-Cron-Secret: <secreto>
 Body: {"modo":"SIMULAR"} | {"modo":"COMPLETO"}
 ```
 
-- `SIMULAR`: solo cuenta vehículos; no escribe.
-- `COMPLETO`: misma lógica que el job RF23 (idempotente).
+## Secretos + deploy
 
-El job Spring `evaluacion-diaria-habilitada` permanece **false** en perfiles neon/render.
-
-## Secretos
-
-| Dónde | Nombre |
-|-------|--------|
-| Render Environment | `MYCAR_CRON_SECRET` |
-| Cloudflare Worker | `CRON_SECRET` (mismo valor) |
-
-Nunca commitear el valor.
-
-## Despliegue del código (cuando el backend ya esté en Live)
-
-```bash
-cd cloudflare/mycar-alertas-cron
-npx wrangler secret put CRON_SECRET
-npx wrangler deploy
+```powershell
+cd cloudflare\mycar-alertas-cron
+npx wrangler secret put CRON_SECRET   # = MYCAR_CRON_SECRET en Render
+npx wrangler deploy                   # actualiza mycar-alertas-cron; cron sigue vacío
 ```
 
-## Cron Trigger (08:00 Lima = 13:00 UTC)
+## Activación futura (solo con aprobación explícita)
 
-**Desactivado** en `wrangler.toml` hasta prueba controlada + aprobación.
+1. En `wrangler.toml`: `EVAL_MODO = "COMPLETO"`
+2. En `wrangler.toml`: `crons = ["0 13 * * *"]`  # 08:00 America/Lima
+3. `npx wrangler deploy`
 
-Para activar después de aprobación:
-
-1. Descomentar `[triggers]` / `crons = ["0 13 * * *"]` en `wrangler.toml`, **o**
-2. En Cloudflare Dashboard → Worker → Triggers → Add Cron Trigger → `0 13 * * *`
-
-## Prueba manual del Worker (sin cron)
-
-```bash
-curl -X POST https://mycar-alertas-cron.mycargrupo1.workers.dev/run \
-  -H "X-MyCar-Cron-Secret: <secreto>"
-```
-
-## Extensión futura (SOAT / licencia)
-
-Añadir reglas en `EvaluacionProgramadaAlertasService` (Spring). Este Worker no se reconstruye.
+`POST /run` permanece en **SIMULAR** a propósito (pruebas manuales seguras).
+El Cron programado usará `EVAL_MODO` (`COMPLETO` tras el paso 1).

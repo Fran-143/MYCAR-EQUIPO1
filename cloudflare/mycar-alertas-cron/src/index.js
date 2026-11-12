@@ -1,17 +1,18 @@
 /**
  * mycar-alertas-cron — dispara RF23 en Spring Boot.
- * Reutiliza el Worker ya creado; no crea otro.
+ * Worker existente (mycargrupo1); no crear otro.
  *
- * Flujo:
- * 1) Despierta Render Free (GET /actuator/health) con reintentos.
- * 2) POST /api/v1/interno/alertas/evaluar-programadas con secreto.
- * 3) Si 5xx o red: reintenta con backoff (sin duplicar lógica de negocio;
- *    el backend es idempotente y omite concurrencia).
+ * Primera publicación: EVAL_MODO=SIMULAR; POST /run fuerza SIMULAR siempre
+ * (ignora body/query) para no activar COMPLETO por accidente.
  *
- * Futuras reglas SOAT/licencia viven en el backend; este Worker no cambia.
+ * Activación futura (solo con aprobación):
+ *  - wrangler.toml: EVAL_MODO = "COMPLETO"
+ *  - wrangler.toml: crons = ["0 13 * * *"]  # 08:00 America/Lima
+ *  - npx wrangler deploy
  */
 
 const ENDPOINT = "/api/v1/interno/alertas/evaluar-programadas";
+const WORKER_NAME = "mycar-alertas-cron";
 
 function num(env, key, fallback) {
   const n = Number.parseInt(String(env[key] ?? ""), 10);
@@ -52,9 +53,13 @@ async function wakeBackend(base, timeoutMs, attempts, baseDelay) {
   return { ok: false, error: lastErr };
 }
 
-async function evaluar(base, env, timeoutMs) {
+/**
+ * @param {string} modoForzado si se pasa, prevalece sobre EVAL_MODO (p. ej. /run → SIMULAR).
+ */
+async function evaluar(base, env, timeoutMs, modoForzado) {
   const url = `${base}${ENDPOINT}`;
-  const modo = String(env.EVAL_MODO || "COMPLETO").toUpperCase();
+  const desdeEnv = String(env.EVAL_MODO || "SIMULAR").toUpperCase();
+  const modo = String(modoForzado || desdeEnv).toUpperCase() === "COMPLETO" ? "COMPLETO" : "SIMULAR";
   return fetchWithTimeout(
     url,
     {
@@ -69,81 +74,92 @@ async function evaluar(base, env, timeoutMs) {
   );
 }
 
-async function runCron(env) {
+async function runEval(env, { modoForzado, origen }) {
   if (!env.CRON_SECRET) {
-    console.log("cron abort: CRON_SECRET ausente");
+    console.log(`${origen} abort: CRON_SECRET ausente`);
     return { ok: false, reason: "NO_SECRET" };
   }
   const base = String(env.BACKEND_URL || "").replace(/\/+$/, "");
   if (!base) {
-    console.log("cron abort: BACKEND_URL ausente");
+    console.log(`${origen} abort: BACKEND_URL ausente`);
     return { ok: false, reason: "NO_BACKEND" };
   }
 
   const attempts = num(env, "MAX_ATTEMPTS", 4);
   const baseDelay = num(env, "RETRY_BASE_MS", 8000);
   const timeoutMs = num(env, "FETCH_TIMEOUT_MS", 25000);
+  const modoEfectivo =
+    modoForzado != null
+      ? String(modoForzado).toUpperCase() === "COMPLETO"
+        ? "COMPLETO"
+        : "SIMULAR"
+      : String(env.EVAL_MODO || "SIMULAR").toUpperCase() === "COMPLETO"
+        ? "COMPLETO"
+        : "SIMULAR";
 
   const wake = await wakeBackend(base, timeoutMs, attempts, baseDelay);
   if (!wake.ok) {
-    console.log(`cron wake FAIL: ${wake.error}`);
-    return { ok: false, reason: "WAKE_FAIL", detail: wake.error };
+    console.log(`${origen} wake FAIL: ${wake.error}`);
+    return { ok: false, reason: "WAKE_FAIL", detail: wake.error, modo: modoEfectivo };
   }
-  console.log(`cron wake OK attempt=${wake.attempt}`);
+  console.log(`${origen} wake OK attempt=${wake.attempt} modo=${modoEfectivo}`);
 
   let lastStatus = 0;
   let lastBody = "";
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await evaluar(base, env, timeoutMs);
+      const res = await evaluar(base, env, timeoutMs, modoEfectivo);
       lastStatus = res.status;
       lastBody = await res.text();
       if (res.status === 401 || res.status === 403) {
-        console.log(`cron auth FAIL HTTP ${res.status}`);
-        return { ok: false, reason: "AUTH", status: res.status };
+        console.log(`${origen} auth FAIL HTTP ${res.status}`);
+        return { ok: false, reason: "AUTH", status: res.status, modo: modoEfectivo };
       }
       if (res.ok) {
-        console.log(`cron OK HTTP ${res.status} body=${lastBody.slice(0, 300)}`);
-        return { ok: true, status: res.status, body: lastBody };
+        console.log(`${origen} OK HTTP ${res.status} body=${lastBody.slice(0, 300)}`);
+        return { ok: true, status: res.status, body: lastBody, modo: modoEfectivo };
       }
-      // 409/429/5xx → reintento controlado
-      console.log(`cron retryable HTTP ${res.status} attempt=${i + 1}`);
+      console.log(`${origen} retryable HTTP ${res.status} attempt=${i + 1}`);
     } catch (e) {
       lastStatus = 0;
       lastBody = String(e);
-      console.log(`cron fetch error attempt=${i + 1}: ${e}`);
+      console.log(`${origen} fetch error attempt=${i + 1}: ${e}`);
     }
     if (i + 1 < attempts) {
       await sleep(baseDelay * (i + 1));
     }
   }
-  console.log(`cron FAIL status=${lastStatus}`);
-  return { ok: false, reason: "EVAL_FAIL", status: lastStatus, body: lastBody };
+  console.log(`${origen} FAIL status=${lastStatus}`);
+  return { ok: false, reason: "EVAL_FAIL", status: lastStatus, body: lastBody, modo: modoEfectivo };
 }
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runCron(env));
+    // Usa EVAL_MODO del wrangler (hoy SIMULAR). COMPLETO solo tras cambio explícito + deploy.
+    ctx.waitUntil(runEval(env, { origen: "scheduled" }));
   },
 
-  // GET / → estado (sin secretos). POST /run → disparo manual de prueba (requiere secreto en env).
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/") {
       return Response.json({
-        service: "mycar-alertas-cron",
+        service: WORKER_NAME,
+        worker: WORKER_NAME,
+        accountHint: "mycargrupo1.workers.dev",
         backend: env.BACKEND_URL || null,
-        cronConfigured: false,
-        hint: "Cron Trigger desactivado hasta aprobación. Use POST /run tras configurar CRON_SECRET.",
+        evalModoVars: String(env.EVAL_MODO || "SIMULAR"),
+        cronTriggers: [],
+        runManualFuerza: "SIMULAR",
+        hint: "POST /run siempre usa SIMULAR. Cron vacío. COMPLETO solo tras cambio de vars + crons y aprobación.",
       });
     }
     if (request.method === "POST" && url.pathname === "/run") {
-      // Protege el disparo manual con el mismo secreto (header), sin exponerlo en logs.
       const provided = request.headers.get("X-MyCar-Cron-Secret") || "";
       if (!env.CRON_SECRET || provided !== env.CRON_SECRET) {
         return Response.json({ ok: false, codigo: "CRON_NO_AUTORIZADO" }, { status: 401 });
       }
-      const result = await runCron(env);
+      // Seguridad pruebas: /run NUNCA ejecuta COMPLETO (ignora body, query y EVAL_MODO).
+      const result = await runEval(env, { modoForzado: "SIMULAR", origen: "run" });
       return Response.json(result, { status: result.ok ? 200 : 502 });
     }
     return new Response("Not Found", { status: 404 });
