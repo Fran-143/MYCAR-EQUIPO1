@@ -6,13 +6,17 @@ import com.mycar.app.BuildConfig
 import com.mycar.app.features.sesion.data.ClientesSesion
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Registro / baja de token FCM ante el backend autenticado.
  * No usa Firestore ni Realtime Database.
+ * Nunca debe ejecutarse bajo el mutex de AuthRepository: es opcional y con timeout.
  */
 object PushTokenSync {
     private const val TAG = "PushTokenSync"
+    /** Evita colgar la sincronización push si Firebase no responde. */
+    const val FCM_TOKEN_TIMEOUT_MS = 5_000L
 
     suspend fun registrarTrasSesion(accessToken: String, installation: String) {
         try {
@@ -45,13 +49,16 @@ object PushTokenSync {
         }
     }
 
-    private suspend fun obtenerTokenFcm(): String? = suspendCancellableCoroutine { cont ->
-        FirebaseMessaging.getInstance().token
-            .addOnSuccessListener { token ->
-                if (cont.isActive) cont.resume(token?.takeIf { it.isNotBlank() })
+    private suspend fun obtenerTokenFcm(): String? =
+        withTimeoutOrNull(FCM_TOKEN_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                FirebaseMessaging.getInstance().token
+                    .addOnSuccessListener { token ->
+                        if (cont.isActive) cont.resume(token?.takeIf { it.isNotBlank() })
+                    }
+                    .addOnFailureListener {
+                        if (cont.isActive) cont.resume(null)
+                    }
             }
-            .addOnFailureListener {
-                if (cont.isActive) cont.resume(null)
-            }
-    }
+        }
 }

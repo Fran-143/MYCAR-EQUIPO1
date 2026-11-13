@@ -262,7 +262,15 @@ class AuthRepository(
             if (!clock.instant().isBefore(Instant.parse(previous.accessTokenExpiraUtc).minusSeconds(10))) {
                 try { renew(previous, context.version) }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { retry(context.version) }
+                catch (_: Exception) {
+                    retry(context.version)
+                    // Temporal: no SessionRequired (evita 401 sintético / “sesión inválida”).
+                    throw IOException("No se pudo renovar la sesión. Revisa la conexión.")
+                }
+                // renew() ante HTTP 5xx → RETRY sin lanzar; 401/403 → SIGNED_OUT (SessionRequired abajo).
+                if (synchronized(localLock) { mutableSession.value.phase == SessionPhase.RETRY }) {
+                    throw IOException("No se pudo renovar la sesión. Revisa la conexión.")
+                }
             }
             synchronized(localLock) {
                 ensureContext(context)
@@ -283,6 +291,7 @@ class AuthRepository(
 
     suspend fun login(email: String, password: String) {
         val expected = version()
+        var pushSync: Pair<String, String>? = null
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 try {
@@ -301,21 +310,27 @@ class AuthRepository(
                     val installation = load().installation
                     withContext(NonCancellable) { persist(tokens, expected) }
                     publish(expected, SessionState(SessionPhase.AUTHENTICATED))
-                    runCatching { onSessionReady(tokens.accessToken, installation) }
+                    // FCM/push solo tras liberar el mutex: no bloquear authorization()/cuenta.
+                    pushSync = tokens.accessToken to installation
                 } catch (cancelled: CancellationException) { throw cancelled
                 } catch (known: AuthProblem) { throw known
                 } catch (_: IOException) { throw AuthProblem("No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.")
                 } catch (_: Exception) { throw AuthProblem("No se pudo completar el inicio de sesión de forma segura.") }
             }
+            notifySessionReadyOutsideMutex(pushSync)
         }
     }
 
     suspend fun validateSession() {
         val expected = version()
+        var pushSync: Pair<String, String>? = null
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 try {
-                    synchronized(localLock) { ensureCurrent(expected) }
+                    val previousPhase = synchronized(localLock) {
+                        ensureCurrent(expected)
+                        mutableSession.value.phase
+                    }
                     val tokens = load().tokens
                     if (tokens == null) {
                         // Conserva el aviso RF06 mientras no se haya iniciado otra sesión.
@@ -331,12 +346,21 @@ class AuthRepository(
                         response.errorBody()?.close()
                         synchronized(localLock) { ensureCurrent(expected) }
                         renew(tokens, expected)
+                        // Tras renovación: sync push opcional con access nuevo (fuera del mutex).
+                        pushSync = synchronized(localLock) {
+                            if (mutableSession.value.phase == SessionPhase.AUTHENTICATED)
+                                vault?.tokens?.let { it.accessToken to load().installation }
+                            else null
+                        }
                     } else if (response.isSuccessful) {
                         val body = response.body()
                         check(body?.vigente == true && body.idSesion == tokens.idSesion &&
                             Instant.parse(body.sesionExpiraUtc) == Instant.parse(tokens.sesionExpiraUtc))
                         publish(expected, SessionState(SessionPhase.AUTHENTICATED))
-                        runCatching { onSessionReady(tokens.accessToken, load().installation) }
+                        // Solo al entrar a AUTHENTICATED (arranque/reintento), no en cada tick de maintainSession.
+                        if (previousPhase != SessionPhase.AUTHENTICATED) {
+                            pushSync = tokens.accessToken to load().installation
+                        }
                     } else {
                         response.errorBody()?.close()
                         retry(expected)
@@ -347,7 +371,14 @@ class AuthRepository(
                     throw cancelled
                 } catch (_: Exception) { retry(expected) }
             }
+            notifySessionReadyOutsideMutex(pushSync)
         }
+    }
+
+    /** Push/FCM es opcional: fallos o demoras no retienen el mutex ni invalidan la sesión. */
+    private suspend fun notifySessionReadyOutsideMutex(pushSync: Pair<String, String>?) {
+        val ready = pushSync ?: return
+        runCatching { onSessionReady(ready.first, ready.second) }
     }
 
     private suspend fun renew(previous: StoredTokens, expected: Long) {
