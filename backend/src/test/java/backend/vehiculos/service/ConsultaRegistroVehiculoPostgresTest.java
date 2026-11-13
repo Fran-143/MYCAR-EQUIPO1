@@ -172,7 +172,7 @@ class ConsultaRegistroVehiculoPostgresTest {
                 String.format(Locale.ROOT, "K2B%03d", PLACAS.incrementAndGet()), 2020, "Azul",
                 jdbc.queryForObject("SELECT id_tipo_motor FROM mycar.tipo_motor WHERE codigo='COMBUSTION'", Long.class),
                 jdbc.queryForObject("SELECT id_combustible FROM mycar.combustible WHERE codigo='GASOLINA'", Long.class),
-                50000, null, "SERIE123", "MOTOR123", null, null, null, null);
+                java.math.BigDecimal.valueOf(50000), null, "SERIE123", "MOTOR123", null, null, null, null);
     }
 
     private long numero(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }

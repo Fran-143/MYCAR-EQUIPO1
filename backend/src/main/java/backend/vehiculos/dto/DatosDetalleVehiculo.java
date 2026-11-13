@@ -1,6 +1,6 @@
 package backend.vehiculos.dto;
 
-/** Contrato técnico RF10: lectura completa de un vehículo propio. */
+/** Contrato técnico RF10: lectura completa de un vehículo propio (incluye códigos para RF11). */
 public record DatosDetalleVehiculo(
         long idVehiculo,
         String placa,
@@ -20,6 +20,15 @@ public record DatosDetalleVehiculo(
         String numeroSerie,
         String numeroMotor,
         String tipoAceite,
-        boolean motorElectrico
+        boolean motorElectrico,
+        String usoVehiculoCodigo,
+        Long idTipoMotor,
+        Long idCombustible,
+        Long idTipoAceite,
+        String tipoMotorOtro,
+        String combustibleOtro,
+        String tipoAceiteOtro,
+        /** MVP: siempre false hasta RF54. */
+        boolean tieneTive
 ) {
 }

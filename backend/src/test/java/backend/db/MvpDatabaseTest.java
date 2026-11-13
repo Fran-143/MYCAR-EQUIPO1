@@ -4,6 +4,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.*;
@@ -47,7 +48,7 @@ class MvpDatabaseTest {
             exec(db, "CREATE TABLE public.evidencia_preservada(valor TEXT PRIMARY KEY)");
             exec(db, "INSERT INTO public.evidencia_preservada VALUES ('no modificar')");
         }
-        assertEquals(4, flyway(url, null).migrate().migrationsExecuted);
+        assertEquals(24, flyway(url, null).migrate().migrationsExecuted);
         flyway(url, null).validate();
     }
 
@@ -175,7 +176,7 @@ class MvpDatabaseTest {
                 "Blanco",
                 idMotor,
                 idCombustible,
-                50000,
+                new BigDecimal("50000"),
                 "1HGCM82633A004352",
                 "SERIE123",
                 "MOTOR123",

@@ -25,7 +25,8 @@ public class ConsultaRegistroVehiculoDao {
 
     public DatosCupoRegistro consultarCupo(long idUsuario) {
         var resultados = jdbc.query("""
-                SELECT p.max_vehiculos_registrados AS limite,
+                SELECT p.codigo AS plan,
+                       p.max_vehiculos_registrados AS limite,
                        (SELECT count(*) FROM mycar.vehiculo v
                         WHERE v.id_usuario = s.id_usuario) AS registrados
                 FROM mycar.suscripcion s
@@ -34,13 +35,13 @@ public class ConsultaRegistroVehiculoDao {
                   AND s.estado = 'ACTIVA'
                   AND s.inicio_utc <= clock_timestamp()
                   AND s.fin_utc IS NULL
-                  AND p.codigo = 'FREE'
+                  AND p.codigo IN ('FREE', 'PREMIUM')
                   AND p.activo
                 """, (rs, fila) -> new DatosCupoRegistro(
-                        "FREE", rs.getInt("limite"), rs.getLong("registrados"),
+                        rs.getString("plan"), rs.getInt("limite"), rs.getLong("registrados"),
                         rs.getLong("registrados") < rs.getInt("limite")
                 ), idUsuario);
-        if (resultados.size() != 1 || resultados.getFirst().limite() != 1) {
+        if (resultados.size() != 1 || resultados.getFirst().limite() <= 0) {
             throw new ErrorRegistroVehiculo("PLAN_FREE_NO_DISPONIBLE");
         }
         return resultados.getFirst();
@@ -96,15 +97,17 @@ public class ConsultaRegistroVehiculoDao {
     public Optional<DatosDetalleVehiculo> obtenerDetallePropio(long idUsuario, long idVehiculo) {
         return jdbc.query("""
                 SELECT v.id_vehiculo, v.placa, v.marca, v.modelo, v.anio_fabricacion,
-                       u.nombre AS uso, v.color,
+                       u.nombre AS uso, v.uso_vehiculo_codigo, v.color,
                        CASE WHEN m.codigo='OTRO' THEN v.tipo_motor_otro ELSE m.nombre END AS motor,
-                       m.es_electrico,
+                       m.es_electrico, v.id_tipo_motor, v.tipo_motor_otro,
                        CASE WHEN m.es_electrico THEN NULL
                             WHEN c.codigo='OTRO' THEN v.combustible_otro ELSE c.nombre END AS combustible,
+                       v.id_combustible, v.combustible_otro,
                        v.estado_vehiculo, v.es_principal,
                        v.numero_vin, v.numero_serie, v.numero_motor,
                        CASE WHEN a.codigo='OTRO' THEN v.tipo_aceite_otro
                             WHEN a.id_tipo_aceite IS NOT NULL THEN a.nombre ELSE NULL END AS aceite,
+                       v.id_tipo_aceite, v.tipo_aceite_otro,
                        km.valor_km, km.fecha_lectura_utc
                 FROM mycar.vehiculo v
                 JOIN mycar.uso_vehiculo u ON u.codigo=v.uso_vehiculo_codigo
@@ -124,7 +127,15 @@ public class ConsultaRegistroVehiculoDao {
                 rs.getString("estado_vehiculo"), rs.getBoolean("es_principal"),
                 rs.getBigDecimal("valor_km"), isoUtc(rs.getTimestamp("fecha_lectura_utc")),
                 rs.getString("numero_vin"), rs.getString("numero_serie"), rs.getString("numero_motor"),
-                rs.getString("aceite"), rs.getBoolean("es_electrico")
+                rs.getString("aceite"), rs.getBoolean("es_electrico"),
+                rs.getString("uso_vehiculo_codigo"),
+                rs.getObject("id_tipo_motor", Long.class),
+                rs.getObject("id_combustible", Long.class),
+                rs.getObject("id_tipo_aceite", Long.class),
+                rs.getString("tipo_motor_otro"),
+                rs.getString("combustible_otro"),
+                rs.getString("tipo_aceite_otro"),
+                false
         ), idUsuario, idVehiculo).stream().findFirst();
     }
 

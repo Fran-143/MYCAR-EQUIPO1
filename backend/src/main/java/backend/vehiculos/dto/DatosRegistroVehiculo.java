@@ -1,5 +1,6 @@
 package backend.vehiculos.dto;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -16,8 +17,8 @@ public record DatosRegistroVehiculo(
         Long idTipoMotor,
         @JsonDeserialize(using = NumerosEnterosRegistroJson.Identificador.class)
         Long idCombustible,
-        @JsonDeserialize(using = NumerosEnterosRegistroJson.Entero.class)
-        Integer kilometrajeInicial,
+        @JsonDeserialize(using = NumerosEnterosRegistroJson.Kilometraje.class)
+        BigDecimal kilometrajeInicial,
         String numeroVin,
         String numeroSerie,
         String numeroMotor,

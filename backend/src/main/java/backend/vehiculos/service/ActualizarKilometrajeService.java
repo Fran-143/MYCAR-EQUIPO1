@@ -8,9 +8,12 @@ import backend.vehiculos.domain.ErrorRegistroVehiculo;
 import backend.vehiculos.dto.ContextoKilometrajeActual;
 import backend.vehiculos.dto.DatosActualizarKilometraje;
 import backend.vehiculos.dto.DatosEstadoOperacionKilometraje;
+import backend.vehiculos.dto.LecturaKilometrajeHistorialDto;
 import backend.vehiculos.dto.ResultadoActualizarKilometraje;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -54,10 +57,22 @@ public class ActualizarKilometrajeService {
         }
         var contexto = kilometraje.consultarContextoPropio(idUsuario, idVehiculo)
                 .orElseThrow(() -> new ErrorRegistroVehiculo("VEHICULO_NO_ENCONTRADO"));
-        if (contexto.idLectura() <= 0 || contexto.kmActual() <= 0) {
+        if (contexto.idLectura() <= 0
+                || contexto.kmActual() == null
+                || contexto.kmActual().compareTo(BigDecimal.ZERO) <= 0) {
             throw new ErrorRegistroVehiculo("KILOMETRAJE_NO_DISPONIBLE");
         }
         return contexto;
+    }
+
+    /** RF15: historial de lecturas del vehículo propio. */
+    @Transactional(readOnly = true)
+    public List<LecturaKilometrajeHistorialDto> listarLecturas(long idUsuario, long idVehiculo) {
+        condiciones.exigirCuentaActiva(idUsuario);
+        if (idVehiculo <= 0 || !kilometraje.vehiculoPropioConsultable(idUsuario, idVehiculo)) {
+            throw new ErrorRegistroVehiculo("VEHICULO_NO_ENCONTRADO");
+        }
+        return kilometraje.listarLecturasPropias(idUsuario, idVehiculo);
     }
 
     @Transactional(readOnly = true)
@@ -113,7 +128,7 @@ public class ActualizarKilometrajeService {
         if (vigente.idLectura() != datos.idLecturaBase()) {
             throw new ErrorRegistroVehiculo("KM_OBSOLETO", Set.of("idLecturaBase"));
         }
-        if (datos.kmNuevo() <= vigente.kmActual()) {
+        if (datos.kmNuevo().compareTo(vigente.kmActual()) <= 0) {
             throw new ErrorRegistroVehiculo("KM_NO_SUPERIOR", Set.of("kmNuevo"));
         }
 
@@ -137,7 +152,7 @@ public class ActualizarKilometrajeService {
 
     private Set<String> validarEntrada(DatosActualizarKilometraje datos) {
         var errores = new java.util.HashSet<String>();
-        if (datos.kmNuevo() == null || datos.kmNuevo() <= 0) {
+        if (datos.kmNuevo() == null || datos.kmNuevo().compareTo(BigDecimal.ZERO) <= 0) {
             errores.add("kmNuevo");
         }
         if (datos.idLecturaBase() == null || datos.idLecturaBase() <= 0) {

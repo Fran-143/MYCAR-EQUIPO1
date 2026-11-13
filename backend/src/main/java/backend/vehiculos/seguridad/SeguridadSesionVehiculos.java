@@ -26,10 +26,20 @@ public class SeguridadSesionVehiculos {
                         .requestMatchers(HttpMethod.GET, "/api/v1/vehiculos", "/api/v1/vehiculos/catalogos",
                                 "/api/v1/vehiculos/cupo-registro", "/api/v1/vehiculos/identidad",
                                 "/api/v1/vehiculos/operaciones/*", "/api/v1/vehiculos/kilometraje/operaciones/*",
+                                "/api/v1/vehiculos/kilometraje/correcciones/operaciones/*",
                                 "/api/v1/vehiculos/{idVehiculo:[0-9]+}",
-                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/actual").authenticated()
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/actual",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas/{idLectura:[0-9]+}/correccion"
+                        ).authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/vehiculos",
-                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas").authenticated()
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas/{idLectura:[0-9]+}/correcciones"
+                        ).authenticated()
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/principal",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/estado").authenticated()
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(sesiones, json), AnonymousAuthenticationFilter.class)
                 .build();

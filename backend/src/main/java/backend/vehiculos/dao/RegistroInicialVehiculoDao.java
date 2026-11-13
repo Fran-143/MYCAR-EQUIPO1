@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -19,7 +20,7 @@ public class RegistroInicialVehiculoDao {
         this.jdbc = jdbc;
     }
 
-    public LecturaInicial registrar(long idVehiculo, int kilometraje, UUID idOperacion) {
+    public LecturaInicial registrar(long idVehiculo, BigDecimal kilometraje, UUID idOperacion) {
         LecturaInicial lectura = Objects.requireNonNull(jdbc.queryForObject("""
                 INSERT INTO mycar.lectura_kilometraje (
                     id_vehiculo, valor_km, origen, id_operacion

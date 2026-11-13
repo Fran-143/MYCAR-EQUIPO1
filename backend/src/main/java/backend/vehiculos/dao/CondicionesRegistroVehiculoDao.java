@@ -28,7 +28,10 @@ public class CondicionesRegistroVehiculoDao {
         }
     }
 
-    /** Solo para una operación nueva. Serializa altas de la misma cuenta. */
+    /**
+     * Solo para una operación nueva. Serializa altas de la misma cuenta.
+     * Usa el plan activo (FREE o PREMIUM) y su {@code max_vehiculos_registrados}.
+     */
     public int bloquearYConsultarLimiteFree(long idUsuario) {
         var usuarios = jdbc.query("""
                 SELECT id_usuario FROM mycar.usuario
@@ -47,11 +50,11 @@ public class CondicionesRegistroVehiculoDao {
                   AND s.estado = 'ACTIVA'
                   AND s.inicio_utc <= clock_timestamp()
                   AND s.fin_utc IS NULL
-                  AND p.codigo = 'FREE'
+                  AND p.codigo IN ('FREE', 'PREMIUM')
                   AND p.activo
                 FOR SHARE OF s, p
                 """, (rs, fila) -> rs.getInt(1), idUsuario);
-        if (limites.size() != 1 || limites.getFirst() != 1) {
+        if (limites.size() != 1 || limites.getFirst() <= 0) {
             throw new ErrorRegistroVehiculo("PLAN_FREE_NO_DISPONIBLE");
         }
         return limites.getFirst();

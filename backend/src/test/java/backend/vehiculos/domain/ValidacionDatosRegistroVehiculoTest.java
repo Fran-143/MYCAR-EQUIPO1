@@ -100,7 +100,7 @@ class ValidacionDatosRegistroVehiculoTest {
                 color,
                 1L,
                 1L,
-                kilometraje,
+                kilometraje == null ? null : java.math.BigDecimal.valueOf(kilometraje),
                 null,
                 null,
                 null,

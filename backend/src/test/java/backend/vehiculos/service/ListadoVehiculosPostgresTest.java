@@ -133,7 +133,7 @@ class ListadoVehiculosPostgresTest {
     @Test void principalPrimeroSinSaltarseFiltroYContadoresIndependientes() {
         long usuario = cuenta(true);
         var primero = registro.registrar(usuario, datos());
-        // Fixture de historial con varios vehículos: no utiliza el alta pública Free para el segundo.
+        // Fixture de historial con varios vehiculos: no utiliza el alta publica Free para el segundo.
         long segundo = new TransactionTemplate(transacciones).execute(s ->
             new backend.vehiculos.dao.VehiculoDao(jdbc).insertarVehiculo(usuario, datos(), false));
         var todos = consultas.listarVehiculos(usuario, "TODOS", "");
@@ -184,8 +184,7 @@ class ListadoVehiculosPostgresTest {
         return new DatosRegistroVehiculo(UUID.randomUUID(), "Toyota", "Corolla", "PARTICULAR",
                 String.format(Locale.ROOT, "L3C%03d", PLACAS.incrementAndGet()), 2020, "Azul",
                 jdbc.queryForObject("SELECT id_tipo_motor FROM mycar.tipo_motor WHERE codigo='COMBUSTION'", Long.class),
-                jdbc.queryForObject("SELECT id_combustible FROM mycar.combustible WHERE codigo='GASOLINA'", Long.class),
-                50000, null, "SERIE123", "MOTOR123", null, null, null, null);
+                jdbc.queryForObject("SELECT id_combustible FROM mycar.combustible WHERE codigo='GASOLINA'", Long.class), java.math.BigDecimal.valueOf(50000), null, "SERIE123", "MOTOR123", null, null, null, null);
     }
 
     private long numero(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }
