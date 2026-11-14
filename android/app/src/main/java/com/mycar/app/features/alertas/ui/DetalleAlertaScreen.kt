@@ -26,6 +26,7 @@ import com.mycar.app.features.alertas.domain.DetalleAlerta
 import com.mycar.app.features.alertas.domain.etiquetaServicioAlerta
 import com.mycar.app.features.talleres.domain.Taller
 import com.mycar.app.features.talleres.domain.TalleresRepository
+import com.mycar.app.features.talleres.domain.PoliticaContactoTaller
 import com.mycar.app.features.talleres.domain.WhatsAppEnlace
 import com.mycar.app.ui.theme.MyCarStatusPendiente
 import com.mycar.app.ui.theme.MyCarStatusProgramada
@@ -433,12 +434,21 @@ private fun ContactoTallerAlertaCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF6881A5)
                 )
-                if (contacto.sinContactoDisponible || contacto.telefono.isNullOrBlank()) {
-                    Text("Sin contacto disponible", color = RojoAnular, modifier = Modifier.testTag("rf24.contacto.sin"))
+                val puedeWa = PoliticaContactoTaller.puedeWhatsApp(contacto)
+                val puedeLlamar = PoliticaContactoTaller.puedeLlamar(contacto)
+                if (!puedeWa && !puedeLlamar) {
+                    val motivo = when {
+                        !contacto.origen.equals("ASOCIADO", ignoreCase = true) ->
+                            "Contacto WhatsApp/llamada solo para talleres asociados autorizados."
+                        !contacto.contactoAutorizado ->
+                            "Este taller asociado no tiene contacto autorizado."
+                        else -> "Sin contacto disponible"
+                    }
+                    Text(motivo, color = RojoAnular, modifier = Modifier.testTag("rf24.contacto.sin"))
                 } else {
-                    val tel = contacto.telefono
+                    val tel = contacto.telefono.orEmpty()
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (contacto.tieneWhatsapp) {
+                        if (puedeWa) {
                             Button(
                                 onClick = { onWhatsApp(tel) },
                                 enabled = !ocupado,
@@ -446,20 +456,14 @@ private fun ContactoTallerAlertaCard(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.testTag("rf24.contacto.whatsapp")
                             ) { Text("WhatsApp") }
+                        }
+                        if (puedeLlamar) {
                             OutlinedButton(
                                 onClick = { onLlamar(tel) },
                                 enabled = !ocupado,
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.testTag("rf24.contacto.llamar")
                             ) { Text("Llamar") }
-                        } else {
-                            Button(
-                                onClick = { onLlamar(tel) },
-                                enabled = !ocupado,
-                                colors = ButtonDefaults.buttonColors(containerColor = Azul),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("rf24.contacto.llamar")
-                            ) { Text("Llamar al taller") }
                         }
                     }
                 }

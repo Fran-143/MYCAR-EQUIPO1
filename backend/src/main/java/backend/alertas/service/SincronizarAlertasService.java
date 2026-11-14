@@ -99,16 +99,24 @@ public class SincronizarAlertasService {
         return new ContratoRf22.ContactoTallerDto(null, null, null, false, false, null, "NINGUNO", true);
     }
 
-    private static ContratoRf22.ContactoTallerDto aContacto(
+    /**
+     * Contacto accionable (teléfono / WA) solo si ASOCIADO activo + autorización explícita.
+     * Si no, se redacts el teléfono para que el cliente no pueda eludir la UI.
+     * (El DAO ya filtra estado ACTIVO.)
+     */
+    static ContratoRf22.ContactoTallerDto aContacto(
             AlertasJdbcDao.TallerContactoFila t, String origenSugerencia) {
         String tel = t.telefono() == null || t.telefono().isBlank() ? null : t.telefono().trim();
-        boolean sin = tel == null;
-        boolean wa = !sin && t.tieneWhatsapp();
-        // Semántica V26: contactoAutorizado solo si flag DB + WA + teléfono.
-        boolean autorizado = !sin && wa && t.contactoAutorizado();
+        boolean asociado = "ASOCIADO".equalsIgnoreCase(t.origen());
+        boolean autorizado = asociado && t.contactoAutorizado() && tel != null && t.tieneWhatsapp();
+        if (!autorizado) {
+            return new ContratoRf22.ContactoTallerDto(
+                    t.idTaller(), t.nombre(), null, false, false,
+                    t.origen(), origenSugerencia, true);
+        }
         return new ContratoRf22.ContactoTallerDto(
-                t.idTaller(), t.nombre(), tel, wa, autorizado,
-                t.origen(), origenSugerencia, sin);
+                t.idTaller(), t.nombre(), tel, true, true,
+                t.origen(), origenSugerencia, false);
     }
 
     private void exigirVehiculo(long usuario, long vehiculo) {
