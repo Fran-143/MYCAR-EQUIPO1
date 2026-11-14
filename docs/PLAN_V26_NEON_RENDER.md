@@ -49,14 +49,37 @@ Credenciales en este worktree: copiar `.env.neon` desde el repo principal o `scr
 - [ ] Cualquier seed piloto / `CONTACTO_AUTORIZADO=true`
 - [ ] Push remoto / merge a rama de deploy
 
-## 5. Procedimiento propuesto (NO ejecutado)
+## 5. Procedimiento propuesto
 
-### A. Respaldo DB
+### A. Respaldo DB — **HECHO (2026-11-13)**
+
+`fcm_neon_backup_schema.ps1` = **solo esquema** (sin datos).  
+Usado en su lugar: `scripts/neon_backup_full.ps1` → schema + **datos** del schema `mycar`.
+
+| Artefacto | Ubicación (fuera de Git) |
+|-----------|--------------------------|
+| Schema | `%LOCALAPPDATA%\MyCar\neon-backups\neon_mycar_schema_20261113_222550.sql` (133 890 B) |
+| Full | `%LOCALAPPDATA%\MyCar\neon-backups\neon_mycar_full_20261113_222550.sql` (244 925 B) |
+| Meta | `...\neon_mycar_full_20261113_222550.meta.txt` |
+
+Full incluye COPY de: usuario, vehiculo, taller, mantenimiento, alerta, preferencia_notificacion, flyway_schema_history, etc. (34 bloques COPY).
+
+**Restauración aislada verificada:** dump → PostgreSQL 17 Docker desechable → conteos usuario=14, taller=3, flyway_max=25. **No** se restauró sobre Neon.
+
+**Neon Free (capacidades reales):**
+- Instant restore / PITR: ventana **hasta 6 h**, tope **1 GB** history — no sustituye dump a largo plazo.
+- Snapshots manuales: **1** en Free (consola Backup & restore).
+- Schedules automáticos: **no** en Free.
+
+Restaurar dump local (aislada):
 ```powershell
-# En repo con .env.neon (p.ej. C:\Proyectos\MyCarEquipo1 o copia al worktree)
-.\scripts\fcm_neon_backup_schema.ps1
+# Nunca contra Neon prod. Ejemplo Docker:
+# docker run ... postgres:17
+# docker cp full.sql <ctr>:/tmp/full.sql
+# docker exec ... psql -U mycar -d <db> -v ON_ERROR_STOP=1 -f /tmp/full.sql
 ```
-Además: snapshot / PITR en consola Neon (punto de recuperación).
+
+Neon prod post-backup: Flyway sigue en **25** (RO confirmado).
 
 ### B. Migración V26 (controlada)
 ```powershell
