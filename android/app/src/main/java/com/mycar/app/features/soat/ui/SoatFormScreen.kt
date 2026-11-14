@@ -246,6 +246,7 @@ private fun SoatPasoRevisionPdf(
             Text("Sin documento adjunto", color = MyCarMuted)
             SoatSeccionAdjunto(null, estado.errorAdjunto, !estado.ocupado, onAdjunto, estiloPdf = false)
         }
+        val vencido = SoatFormulario.vencimientoYaPasado(c.fechaVencimiento)
         Card(
             Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -253,27 +254,36 @@ private fun SoatPasoRevisionPdf(
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Recordatorio de vencimiento", fontWeight = FontWeight.Bold, color = MyCarNavy)
-                Text(
-                    "Te avisaremos 30 días antes del vencimiento del SOAT.",
-                    color = MyCarMuted,
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Activar recordatorio", fontWeight = FontWeight.Medium)
-                    Switch(
-                        checked = estado.recordarAlRegistrar,
-                        onCheckedChange = onRecordarChange,
-                        enabled = !estado.ocupado
+                if (vencido) {
+                    // RF30-EA06: no ofrecer activación inicial si el vencimiento ya pasó.
+                    Text(
+                        "El vencimiento ya pasó. Puedes registrar el SOAT y configurar el recordatorio después desde Configurar SOAT.",
+                        color = MyCarMuted,
+                        style = MaterialTheme.typography.bodySmall
                     )
+                } else {
+                    Text(
+                        "Te avisaremos 30 días antes del vencimiento del SOAT.",
+                        color = MyCarMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Activar recordatorio", fontWeight = FontWeight.Medium)
+                        Switch(
+                            checked = estado.recordarAlRegistrar,
+                            onCheckedChange = onRecordarChange,
+                            enabled = !estado.ocupado
+                        )
+                    }
+                    SoatFormulario.fechaPrimerAviso(c.fechaVencimiento)?.let {
+                        FilaSoat("Primer aviso", it)
+                    }
                 }
                 FilaSoat("Fecha de vencimiento", SoatFormulario.formatearFecha(c.fechaVencimiento))
-                SoatFormulario.fechaPrimerAviso(c.fechaVencimiento)?.let {
-                    FilaSoat("Primer aviso", it)
-                }
             }
         }
         SoatBotonPrincipal("Registrar", onRegistrar, !estado.ocupado)

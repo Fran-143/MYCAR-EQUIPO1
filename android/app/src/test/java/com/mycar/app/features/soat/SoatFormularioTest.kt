@@ -48,6 +48,12 @@ class SoatFormularioTest {
     }
 
     @Test
+    fun rf30Ea06_vencimientoPasado() {
+        assertTrue(SoatFormulario.vencimientoYaPasado("2020-01-01", java.time.LocalDate.of(2026, 11, 14)))
+        assertFalse(SoatFormulario.vencimientoYaPasado("2030-01-01", java.time.LocalDate.of(2026, 11, 14)))
+    }
+
+    @Test
     fun rf31Ea01Ea04_renovacion() {
         val solape = SoatFormulario.validarFechasRenovacion(
             "2025-12-01", "2027-01-01", "2025-01-01", "2026-01-01"

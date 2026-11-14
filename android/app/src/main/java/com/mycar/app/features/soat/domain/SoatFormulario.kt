@@ -115,6 +115,12 @@ object SoatFormulario {
         LocalDate.parse(texto.trim(), iso)
     }.getOrNull()
 
+    /** RF30-EA06: vencimiento ya pasado → no ofrecer activación inicial de recordatorio. */
+    fun vencimientoYaPasado(fechaVencimientoIso: String, hoy: LocalDate = LocalDate.now()): Boolean {
+        val venc = parsearFecha(fechaVencimientoIso) ?: return false
+        return hoy.isAfter(venc)
+    }
+
     fun desdeSoat(soat: SoatDto): CamposSoat = CamposSoat(
         aseguradora = soat.aseguradora,
         numeroPoliza = soat.numeroPoliza,

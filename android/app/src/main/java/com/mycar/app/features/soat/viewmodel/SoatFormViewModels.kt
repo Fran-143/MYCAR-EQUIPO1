@@ -179,7 +179,16 @@ abstract class SoatFormViewModelBase(
             return
         }
         when (modo) {
-            TipoFormSoat.REGISTRAR -> _estado.value = _estado.value.copy(paso = PasoSoatForm.ADJUNTO, errores = emptyMap())
+            TipoFormSoat.REGISTRAR -> {
+                // RF30-EA06: si el vencimiento ya pasó, no ofrecer ni activar recordatorio en el alta.
+                val vencido = SoatFormulario.vencimientoYaPasado(campos.fechaVencimiento)
+                _estado.value = _estado.value.copy(
+                    paso = PasoSoatForm.ADJUNTO,
+                    errores = emptyMap(),
+                    recordarAlRegistrar = if (vencido) false else _estado.value.recordarAlRegistrar,
+                    ofrecerRecordatorio = !vencido
+                )
+            }
             TipoFormSoat.CORREGIR -> {
                 if (!puedeGuardarCorregir()) {
                     _estado.value = _estado.value.copy(mensaje = "No hay cambios para guardar.")
@@ -196,7 +205,14 @@ abstract class SoatFormViewModelBase(
     }
 
     fun avanzarDesdeAdjunto() {
-        _estado.value = _estado.value.copy(paso = PasoSoatForm.REVISION, errorAdjunto = null)
+        val vencido = modo == TipoFormSoat.REGISTRAR &&
+            SoatFormulario.vencimientoYaPasado(_estado.value.campos.fechaVencimiento)
+        _estado.value = _estado.value.copy(
+            paso = PasoSoatForm.REVISION,
+            errorAdjunto = null,
+            recordarAlRegistrar = if (vencido) false else _estado.value.recordarAlRegistrar,
+            ofrecerRecordatorio = if (modo == TipoFormSoat.REGISTRAR) !vencido else _estado.value.ofrecerRecordatorio
+        )
     }
 
     fun retrocederPaso() {
@@ -225,7 +241,14 @@ abstract class SoatFormViewModelBase(
                 // 1) Persistir SOAT (RF30 / renovar). 2) Recordatorio = operación aparte.
                 var resultado = enviar(solicitud)
                 var recordatorioOk: Boolean? = false
-                if ((modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR) && s.recordarAlRegistrar) {
+                // RF30-EA06: registro con vencimiento pasado → no activar recordatorio en el mismo flujo.
+                val permitirRecordatorioAlta = when (modo) {
+                    TipoFormSoat.REGISTRAR ->
+                        s.recordarAlRegistrar && !SoatFormulario.vencimientoYaPasado(s.campos.fechaVencimiento)
+                    TipoFormSoat.RENOVAR -> s.recordarAlRegistrar
+                    TipoFormSoat.CORREGIR -> false
+                }
+                if (permitirRecordatorioAlta) {
                     try {
                         resultado = repository.recordatorio(idVehiculo, resultado.idSoat, true)
                         recordatorioOk = resultado.recordatorioActivo
