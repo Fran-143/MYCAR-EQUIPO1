@@ -86,18 +86,24 @@ fun ConsultarSoatScreen(
                     if (actual == null) {
                         Text("No hay SOAT vigente registrado.", color = MyCarMuted)
                     } else {
-                        Text("Vigencia actual", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
                         SoatTarjetaDatos(actual)
+                        Text(
+                            if (actual.recordatorioActivo) "Recordatorio: Activo" else "Recordatorio: Inactivo",
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (actual.recordatorioActivo) Color(0xFF2E7D32) else MyCarMuted
+                        )
                         if (actual.conDocumento) {
                             Text("Documento", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
                             SoatVistaDocumento(estado.docBytes, estado.docEsPdf, estado.docCargando, estado.docError)
+                        } else {
+                            Text("Sin documento adjunto", color = MyCarMuted)
                         }
-                        if (actual.vigencia == "ACTUAL") {
-                            SoatBotonSecundario("Configurar SOAT", onConfigurar)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SoatBotonSecundario("Corregir", onCorregir, modifier = Modifier.weight(1f))
-                                SoatBotonPrincipal("Renovar", onRenovar, modifier = Modifier.weight(1f))
-                            }
+                        // PDF: acciones de gestión desde Configurar; botones directos como atajo.
+                        SoatBotonPrincipal("Configurar SOAT", onConfigurar)
+                        SoatBotonSecundario("Volver", onVolver)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SoatBotonSecundario("Editar", onCorregir, modifier = Modifier.weight(1f))
+                            SoatBotonSecundario("Renovar", onRenovar, modifier = Modifier.weight(1f))
                         }
                     }
                     val historial = consulta?.historial.orEmpty().filter { it.vigencia != "ACTUAL" }

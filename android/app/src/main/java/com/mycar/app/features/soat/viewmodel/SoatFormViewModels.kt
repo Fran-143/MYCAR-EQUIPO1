@@ -19,6 +19,9 @@ import kotlinx.coroutines.launch
 
 enum class ModoDocSoat { NINGUNO, MANTENER, REEMPLAZAR, ELIMINAR }
 
+/** Pasos visuales del PDF RF30 (registrar). Corregir/Renovar usan FORM + ÉXITO. */
+enum class PasoSoatForm { FORMULARIO, ADJUNTO, REVISION, EXITO }
+
 data class AdjuntoSoatUi(
     val uri: Uri,
     val nombre: String,
@@ -39,9 +42,13 @@ data class EstadoSoatForm(
     val adjunto: AdjuntoSoatUi? = null,
     val errorAdjunto: String? = null,
     val ofrecerRecordatorio: Boolean = false,
+    /** Preferencia UI del PDF en la pantalla de revisión (RF30); se aplica con PUT recordatorio tras el alta. */
+    val recordarAlRegistrar: Boolean = true,
+    val recordatorioAplicado: Boolean? = null,
     val modoDocumento: ModoDocSoat = ModoDocSoat.NINGUNO,
     val tieneDocumentoActual: Boolean = false,
-    val confirmarVisible: Boolean = false
+    val confirmarVisible: Boolean = false,
+    val paso: PasoSoatForm = PasoSoatForm.FORMULARIO
 )
 
 enum class TipoFormSoat { REGISTRAR, CORREGIR, RENOVAR }
@@ -92,7 +99,11 @@ abstract class SoatFormViewModelBase(
         )
     }
 
-    fun mostrarConfirmacion() {
+    fun setRecordarAlRegistrar(activo: Boolean) {
+        _estado.value = _estado.value.copy(recordarAlRegistrar = activo)
+    }
+
+    fun avanzarDesdeFormulario() {
         val campos = _estado.value.campos
         val errores = SoatFormulario.validarCampos(
             campos.aseguradora, campos.numeroPoliza, campos.fechaInicio, campos.fechaVencimiento,
@@ -102,14 +113,33 @@ abstract class SoatFormViewModelBase(
             _estado.value = _estado.value.copy(errores = errores)
             return
         }
-        if (_estado.value.modo == TipoFormSoat.CORREGIR &&
-            _estado.value.modoDocumento == ModoDocSoat.REEMPLAZAR && _estado.value.adjunto == null
-        ) {
-            _estado.value = _estado.value.copy(errorAdjunto = "Selecciona el nuevo documento.")
-            return
+        when (modo) {
+            TipoFormSoat.REGISTRAR -> _estado.value = _estado.value.copy(paso = PasoSoatForm.ADJUNTO, errores = emptyMap())
+            TipoFormSoat.CORREGIR -> {
+                if (_estado.value.modoDocumento == ModoDocSoat.REEMPLAZAR && _estado.value.adjunto == null) {
+                    _estado.value = _estado.value.copy(errorAdjunto = "Selecciona el nuevo documento.")
+                    return
+                }
+                _estado.value = _estado.value.copy(confirmarVisible = true)
+            }
+            TipoFormSoat.RENOVAR -> _estado.value = _estado.value.copy(confirmarVisible = true)
         }
-        _estado.value = _estado.value.copy(confirmarVisible = true)
     }
+
+    fun avanzarDesdeAdjunto() {
+        _estado.value = _estado.value.copy(paso = PasoSoatForm.REVISION, errorAdjunto = null)
+    }
+
+    fun retrocederPaso() {
+        val s = _estado.value
+        when (s.paso) {
+            PasoSoatForm.ADJUNTO -> _estado.value = s.copy(paso = PasoSoatForm.FORMULARIO)
+            PasoSoatForm.REVISION -> _estado.value = s.copy(paso = PasoSoatForm.ADJUNTO)
+            else -> Unit
+        }
+    }
+
+    fun mostrarConfirmacion() = avanzarDesdeFormulario()
 
     fun ocultarConfirmacion() {
         _estado.value = _estado.value.copy(confirmarVisible = false)
@@ -123,11 +153,22 @@ abstract class SoatFormViewModelBase(
             try {
                 val doc = prepararDocumento(s)
                 val solicitud = construirSolicitud(s, doc)
-                val resultado = enviar(solicitud)
+                var resultado = enviar(solicitud)
+                var recordatorioOk: Boolean? = null
+                if ((modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR) && s.recordarAlRegistrar) {
+                    try {
+                        resultado = repository.recordatorio(idVehiculo, resultado.idSoat, true)
+                        recordatorioOk = true
+                    } catch (_: Exception) {
+                        recordatorioOk = false
+                    }
+                }
                 _estado.value = _estado.value.copy(
                     ocupado = false,
                     exito = resultado,
-                    ofrecerRecordatorio = modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR
+                    paso = PasoSoatForm.EXITO,
+                    ofrecerRecordatorio = false,
+                    recordatorioAplicado = recordatorioOk ?: resultado.recordatorioActivo
                 )
             } catch (cancelada: CancellationException) {
                 throw cancelada

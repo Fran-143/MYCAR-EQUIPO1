@@ -24,8 +24,14 @@ object SoatFormulario {
 
     fun formatearFecha(isoFecha: String?): String = runCatching {
         val d = LocalDate.parse(isoFecha)
-        d.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("es", "PE")))
+        d.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale("es", "PE")))
     }.getOrDefault(isoFecha ?: "—")
+
+    /** Primer aviso RF32: 30 días antes del vencimiento. */
+    fun fechaPrimerAviso(fechaVencimientoIso: String?): String? = runCatching {
+        val v = LocalDate.parse(fechaVencimientoIso!!.trim(), iso)
+        formatearFecha(v.minusDays(30).toString())
+    }.getOrNull()
 
     fun validarCampos(
         aseguradora: String,

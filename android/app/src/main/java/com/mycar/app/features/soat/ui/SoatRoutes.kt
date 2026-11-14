@@ -40,13 +40,16 @@ fun RegistrarSoatRoute(
         onActualizar = vm::actualizarCampos,
         onAdjunto = vm::setAdjunto,
         onModoDoc = vm::setModoDocumento,
-        onContinuar = vm::mostrarConfirmacion,
+        onContinuar = vm::avanzarDesdeFormulario,
         onConfirmar = vm::confirmar,
         onOcultarConfirmacion = vm::ocultarConfirmacion,
         onIniciarSesion = onIniciarSesion,
         onExitoContinuar = { estado.exito?.let(onExito) },
         onConfigurarRecordatorio = { estado.exito?.let(onRecordatorio) },
-        textoConfirmar = "Registrar SOAT",
+        onAvanzarAdjunto = vm::avanzarDesdeAdjunto,
+        onRetrocederPaso = vm::retrocederPaso,
+        onRecordarChange = vm::setRecordarAlRegistrar,
+        textoConfirmar = "Continuar",
         modifier = modifier
     )
 }
@@ -75,18 +78,18 @@ fun CorregirSoatRoute(
     val estado by vm.estado.collectAsStateWithLifecycle()
     SoatFormScreen(
         estado = estado,
-        titulo = "Corregir SOAT",
+        titulo = "Editar SOAT",
         onVolver = onVolver,
         onActualizar = vm::actualizarCampos,
         onAdjunto = vm::setAdjunto,
         onModoDoc = vm::setModoDocumento,
-        onContinuar = vm::mostrarConfirmacion,
+        onContinuar = vm::avanzarDesdeFormulario,
         onConfirmar = vm::confirmar,
         onOcultarConfirmacion = vm::ocultarConfirmacion,
         onIniciarSesion = onIniciarSesion,
         onExitoContinuar = onExito,
         onConfigurarRecordatorio = onExito,
-        textoConfirmar = "Guardar corrección",
+        textoConfirmar = "Guardar cambios",
         modifier = modifier
     )
 }
@@ -121,13 +124,14 @@ fun RenovarSoatRoute(
         onActualizar = vm::actualizarCampos,
         onAdjunto = vm::setAdjunto,
         onModoDoc = vm::setModoDocumento,
-        onContinuar = vm::mostrarConfirmacion,
+        onContinuar = vm::avanzarDesdeFormulario,
         onConfirmar = vm::confirmar,
         onOcultarConfirmacion = vm::ocultarConfirmacion,
         onIniciarSesion = onIniciarSesion,
         onExitoContinuar = { estado.exito?.let(onExito) },
         onConfigurarRecordatorio = { estado.exito?.let(onRecordatorio) },
-        textoConfirmar = "Renovar SOAT",
+        onRecordarChange = vm::setRecordarAlRegistrar,
+        textoConfirmar = "Registrar renovación",
         modifier = modifier
     )
 }

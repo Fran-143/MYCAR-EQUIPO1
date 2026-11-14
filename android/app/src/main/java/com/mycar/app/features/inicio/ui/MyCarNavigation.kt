@@ -58,6 +58,7 @@ fun MyCarNavigation(
     var recargaSoat by rememberSaveable { mutableIntStateOf(0) }
     var soatRecordatorioActivo by rememberSaveable { mutableStateOf(false) }
     var soatIdRecordatorio by rememberSaveable { mutableStateOf<Long?>(null) }
+    var soatFechaVencimiento by rememberSaveable { mutableStateOf<String?>(null) }
     var recargaMantenimiento by rememberSaveable { mutableIntStateOf(0) }
     var kmOrigenDetalle by rememberSaveable { mutableStateOf(false) }
     var kmOverlayMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -282,6 +283,7 @@ fun MyCarNavigation(
                                     onRecordatorio = { dto ->
                                         soatIdRecordatorio = dto.idSoat
                                         soatRecordatorioActivo = dto.recordatorioActivo
+                                        soatFechaVencimiento = dto.fechaVencimiento
                                         navegar(navegacion.abrir(SecundariaMyCar.SOAT_RECORDATORIO))
                                     },
                                     modifier = Modifier.statusBarsPadding()
@@ -310,11 +312,13 @@ fun MyCarNavigation(
                             val idSoat = vehiculoSoatId
                             var recordatorio by remember(recargaSoat, idSoat) { mutableStateOf<Boolean?>(null) }
                             var idPolizaSoat by remember(recargaSoat, idSoat) { mutableStateOf<Long?>(null) }
+                            var fechaVenceSoat by remember(recargaSoat, idSoat) { mutableStateOf<String?>(null) }
                             LaunchedEffect(idSoat, cuenta.soat, recargaSoat) {
                                 if (idSoat != null) {
                                     val actual = runCatching { cuenta.soat.consultar(idSoat).actual }.getOrNull()
                                     recordatorio = actual?.recordatorioActivo
                                     idPolizaSoat = actual?.idSoat
+                                    fechaVenceSoat = actual?.fechaVencimiento
                                 }
                             }
                             if (idSoat == null || idSoat <= 0) {
@@ -327,6 +331,7 @@ fun MyCarNavigation(
                                     onRecordatorio = {
                                         soatIdRecordatorio = idPolizaSoat
                                         soatRecordatorioActivo = recordatorio == true
+                                        soatFechaVencimiento = fechaVenceSoat
                                         navegar(navegacion.abrir(SecundariaMyCar.SOAT_RECORDATORIO))
                                     },
                                     recordatorioActivo = recordatorio,
@@ -378,14 +383,15 @@ fun MyCarNavigation(
                                         navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR))
                                     })
                                 } else {
-                                    fun trasRenovar(dto: SoatDto) {
-                                        recargaSoat++
-                                        recargaDetalle++
-                                        soatIdRecordatorio = dto.idSoat
-                                        soatRecordatorioActivo = dto.recordatorioActivo
-                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONSULTAR))
-                                    }
-                                    RenovarSoatRoute(
+                                fun trasRenovar(dto: SoatDto) {
+                                    recargaSoat++
+                                    recargaDetalle++
+                                    soatIdRecordatorio = dto.idSoat
+                                    soatRecordatorioActivo = dto.recordatorioActivo
+                                    soatFechaVencimiento = dto.fechaVencimiento
+                                    navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONSULTAR))
+                                }
+                                RenovarSoatRoute(
                                         "${cuenta.ciclo}|soat-ren-$idVehiculoSoat-$idAnterior|s$soatSesion",
                                         idVehiculoSoat,
                                         idAnterior,
@@ -396,6 +402,7 @@ fun MyCarNavigation(
                                         onRecordatorio = { dto ->
                                             soatIdRecordatorio = dto.idSoat
                                             soatRecordatorioActivo = dto.recordatorioActivo
+                                            soatFechaVencimiento = dto.fechaVencimiento
                                             navegar(navegacion.abrir(SecundariaMyCar.SOAT_RECORDATORIO))
                                         },
                                         modifier = Modifier.statusBarsPadding()
@@ -422,6 +429,7 @@ fun MyCarNavigation(
                                         recargaDetalle++
                                         navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR))
                                     },
+                                    fechaVencimiento = soatFechaVencimiento,
                                     modifier = Modifier.statusBarsPadding()
                                 )
                             }

@@ -465,7 +465,7 @@ private fun SeccionDocumentos(
                     Text("Consultando SOAT…", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
                 }
                 soatActual == null -> {
-                    Text("Sin SOAT registrado.", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+                    Text("Sin SOAT registrado", style = MaterialTheme.typography.bodyMedium, color = MyCarMuted)
                     if (vehiculoActivo && onRegistrarSoat != null) {
                         Button(
                             onClick = onRegistrarSoat,
@@ -477,8 +477,31 @@ private fun SeccionDocumentos(
                     }
                 }
                 else -> {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Estado", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(SoatFormulario.colorCobertura(soatActual.estadoCobertura.orEmpty())).copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                SoatFormulario.etiquetaCobertura(soatActual.estadoCobertura.orEmpty()),
+                                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                color = Color(SoatFormulario.colorCobertura(soatActual.estadoCobertura.orEmpty())),
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
                     Text(
-                        "${SoatFormulario.etiquetaCobertura(soatActual.estadoCobertura.orEmpty())} · vence ${SoatFormulario.formatearFecha(soatActual.fechaVencimiento)}",
+                        "Inicio: ${SoatFormulario.formatearFecha(soatActual.fechaInicio)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MyCarMuted
+                    )
+                    Text(
+                        "Vencimiento: ${SoatFormulario.formatearFecha(soatActual.fechaVencimiento)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MyCarMuted
                     )
@@ -497,7 +520,7 @@ private fun SeccionDocumentos(
                             enabled = !ocupado,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = CelesteDetalle)
+                            colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
                         ) { Text("Configurar SOAT") }
                     }
                 }

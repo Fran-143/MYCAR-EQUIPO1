@@ -29,7 +29,8 @@ fun SoatSeccionAdjunto(
     adjunto: AdjuntoSoatUi?,
     error: String?,
     enabled: Boolean,
-    onAdjunto: (AdjuntoSoatUi?) -> Unit
+    onAdjunto: (AdjuntoSoatUi?) -> Unit,
+    estiloPdf: Boolean = false
 ) {
     val context = LocalContext.current
     var uriFoto by remember { mutableStateOf<Uri?>(null) }
@@ -52,39 +53,53 @@ fun SoatSeccionAdjunto(
     }
     val pdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
-            context.contentResolver.takePersistableUriPermission(it, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    it, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
             metaAdjunto(context, it)?.let(onAdjunto)
         }
     }
+    fun lanzarCamara() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            val u = archivoCaptura(context)
+            uriFoto = FileProvider.getUriForFile(context, authority, u)
+            tomarFoto.launch(uriFoto)
+        } else permisoCamara.launch(Manifest.permission.CAMERA)
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Documento (opcional)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-        Text("Imagen JPG/PNG hasta 5 MB o PDF hasta 10 MB.", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                        val u = archivoCaptura(context)
-                        uriFoto = FileProvider.getUriForFile(context, authority, u)
-                        tomarFoto.launch(uriFoto)
-                    } else permisoCamara.launch(Manifest.permission.CAMERA)
-                },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("Cámara") }
-            OutlinedButton(
-                onClick = { galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("Galería") }
-            OutlinedButton(
-                onClick = { pdf.launch(arrayOf("application/pdf")) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text("PDF") }
+        if (!estiloPdf) {
+            Text("Documento (opcional)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+        }
+        Text(
+            if (estiloPdf) "JPG, PNG o PDF · máximo 10 MB (imagen hasta 5 MB)."
+            else "Imagen JPG/PNG hasta 5 MB o PDF hasta 10 MB.",
+            color = MyCarMuted,
+            style = MaterialTheme.typography.bodySmall
+        )
+        if (estiloPdf) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SoatBotonSecundario("Tomar foto", { lanzarCamara() }, enabled)
+                SoatBotonSecundario(
+                    "Elegir de galería",
+                    { galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    enabled
+                )
+                SoatBotonSecundario("Seleccionar PDF", { pdf.launch(arrayOf("application/pdf")) }, enabled)
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { lanzarCamara() }, enabled = enabled, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("Cámara") }
+                OutlinedButton(
+                    onClick = { galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Galería") }
+                OutlinedButton(onClick = { pdf.launch(arrayOf("application/pdf")) }, enabled = enabled, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) { Text("PDF") }
+            }
         }
         adjunto?.let {
             Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFE8F5E9)) {
