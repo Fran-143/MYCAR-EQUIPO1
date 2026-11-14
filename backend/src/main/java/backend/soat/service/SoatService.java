@@ -3,14 +3,17 @@ package backend.soat.service;
 import backend.documentos.AlmacenamientoDocumentos;
 import backend.documentos.ErrorAlmacenamiento;
 import backend.documentos.RutasDocumentoSoat;
+import backend.notificaciones.service.NotificacionInternaService;
 import backend.soat.api.dto.ContratoSoat;
 import backend.soat.dao.SoatJdbcDao;
 import backend.soat.model.ErrorSoat;
 import backend.vehiculos.dao.OperacionVehiculoDao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +27,16 @@ public class SoatService {
     private final OperacionVehiculoDao operaciones;
     private final AlmacenamientoDocumentos almacenamiento;
     private final ObjectMapper json;
+    private final ObjectProvider<NotificacionInternaService> notificaciones;
 
     public SoatService(SoatJdbcDao dao, OperacionVehiculoDao operaciones,
-            AlmacenamientoDocumentos almacenamiento, ObjectMapper json) {
+            AlmacenamientoDocumentos almacenamiento, ObjectMapper json,
+            ObjectProvider<NotificacionInternaService> notificaciones) {
         this.dao = dao;
         this.operaciones = operaciones;
         this.almacenamiento = almacenamiento;
         this.json = json;
+        this.notificaciones = notificaciones;
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +124,8 @@ public class SoatService {
                 blancoANull(req.nombreContratante()), req.importePrima(),
                 doc.objectKey(), doc.contentType(), doc.tamanoBytes(), doc.nombreOriginal()));
         if (filas != 1) throw new ErrorSoat("CONFLICTO_VERSION", "El SOAT cambió. Vuelve a cargar.");
+        // Solo tras COMMIT lógico de la fila: limpiar objeto sustituido/quitado (conservar si falla).
+        limpiarDocumentoAnteriorSiCorresponde(actual.storageObjectKey(), doc.objectKey(), req.accionDocumento());
         var actualizado = dao.obtenerPropio(usuario, vehiculo, idSoat).orElseThrow();
         dao.insertarCambio(idSoat, usuario, antes, serializar(actualizado));
         if (actual.recordatorioActivo()) {
@@ -159,7 +167,7 @@ public class SoatService {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
         }
         boolean recordatorio = anterior.recordatorioActivo();
-        desactivarAlertaSiActiva(anterior.idSoat());
+        cerrarAlertaPorRenovacion(anterior.idSoat());
         int hist = dao.marcarHistorico(anterior.idSoat(), vehiculo, anterior.versionFila());
         if (hist != 1) throw new ErrorSoat("CONFLICTO_VERSION", "No se pudo archivar el SOAT anterior.");
         var doc = resolverDocumentoNuevo(usuario, vehiculo, null, req.documento());
@@ -171,7 +179,8 @@ public class SoatService {
                 doc == null ? null : doc.objectKey(), doc == null ? null : doc.contentType(),
                 doc == null ? null : doc.tamanoBytes(), doc == null ? null : doc.nombreOriginal()));
         if (recordatorio) {
-            activarAlerta(idNuevo, vehiculo, req.fechaVencimiento());
+            long idAlerta = activarAlerta(idNuevo, vehiculo, req.fechaVencimiento());
+            sincronizarNotificacion(idAlerta);
         }
         LocalDate hoy = dao.hoyLima();
         var resp = new ContratoSoat.RenovarResponse(
@@ -204,8 +213,12 @@ public class SoatService {
         if (req.activo()) {
             idAlerta = activarAlerta(idSoat, vehiculo, fila.fechaVencimiento());
             estadoAlerta = dao.alertaActivaPorSoat(idSoat).map(SoatJdbcDao.AlertaSoat::estado).orElse(null);
+            sincronizarNotificacion(idAlerta);
         } else {
-            desactivarAlertaSiActiva(idSoat);
+            Long idAnulada = desactivarAlertaSiActiva(idSoat);
+            if (idAnulada != null) {
+                cerrarNotificacion(idAnulada);
+            }
         }
         return new ContratoSoat.RecordatorioResponse(idSoat, req.activo(), idAlerta, estadoAlerta);
     }
@@ -237,7 +250,8 @@ public class SoatService {
         try {
             long max = ValidadorSoat.maximoPermitido(req.contentType());
             var presign = almacenamiento.generarPresignUpload(key, req.contentType(), max);
-            return new ContratoSoat.PresignUploadResponse(key, presign.url(), presign.expiresAt());
+            Map<String, String> headers = presign.headers() == null ? Map.of() : presign.headers();
+            return new ContratoSoat.PresignUploadResponse(key, presign.url(), presign.expiresAt(), headers);
         } catch (ErrorAlmacenamiento ex) {
             throw new ErrorSoat(ex.codigo(), ex.getMessage());
         }
@@ -284,28 +298,9 @@ public class SoatService {
         return switch (req.accionDocumento()) {
             case MANTENER -> new DocumentoResuelto(
                     actual.storageObjectKey(), actual.contentType(), actual.tamanoBytes(), actual.nombreOriginal());
-            case QUITAR -> {
-                if (actual.storageObjectKey() != null) {
-                    try {
-                        almacenamiento.borrarLogicoHuerfano(actual.storageObjectKey());
-                    } catch (ErrorAlmacenamiento ex) {
-                        throw new ErrorSoat(ex.codigo(), ex.getMessage());
-                    }
-                }
-                yield new DocumentoResuelto(null, null, null, null);
-            }
+            case QUITAR -> new DocumentoResuelto(null, null, null, null);
             case REEMPLAZAR -> {
                 ContratoSoat.DocumentoDto nuevo = resolverDocumentoNuevo(usuario, vehiculo, actual.idSoat(), req.documento());
-                if (actual.storageObjectKey() != null && nuevo != null
-                        && !actual.storageObjectKey().equals(nuevo.objectKey())) {
-                    try {
-                        almacenamiento.borrarLogicoHuerfano(actual.storageObjectKey());
-                    } catch (ErrorAlmacenamiento ex) {
-                        // Conservar documento anterior si falla storage
-                        throw new ErrorSoat("STORAGE_NO_DISPONIBLE",
-                                "No se pudo reemplazar el documento; se conservó el anterior.");
-                    }
-                }
                 if (nuevo == null) {
                     yield new DocumentoResuelto(null, null, null, null);
                 }
@@ -313,6 +308,21 @@ public class SoatService {
                         nuevo.objectKey(), nuevo.contentType(), nuevo.tamanoBytes(), nuevo.nombreOriginal());
             }
         };
+    }
+
+    private void limpiarDocumentoAnteriorSiCorresponde(
+            String claveAnterior, String claveNueva, ContratoSoat.AccionDocumento accion) {
+        if (claveAnterior == null || claveAnterior.isBlank()) return;
+        if (accion == ContratoSoat.AccionDocumento.MANTENER) return;
+        if (accion == ContratoSoat.AccionDocumento.REEMPLAZAR
+                && claveAnterior.equals(claveNueva)) {
+            return;
+        }
+        try {
+            almacenamiento.borrarLogicoHuerfano(claveAnterior);
+        } catch (ErrorAlmacenamiento ex) {
+            // La fila ya apunta al documento nuevo o a null; no revertir SOAT por basura de storage.
+        }
     }
 
     private long activarAlerta(long idSoat, long vehiculo, LocalDate fechaVencimiento) {
@@ -330,10 +340,23 @@ public class SoatService {
         }
     }
 
-    private void desactivarAlertaSiActiva(long idSoat) {
-        dao.alertaActivaPorSoat(idSoat).ifPresent(alerta -> {
+    /** @return id alerta anulada, o null */
+    private Long desactivarAlertaSiActiva(long idSoat) {
+        return dao.alertaActivaPorSoat(idSoat).map(alerta -> {
             var version = dao.alertaVersion(alerta.idAlerta()).orElseThrow();
             dao.anularAlertaSoat(version.idAlerta(), version.estado(), version.versionFila());
+            return version.idAlerta();
+        }).orElse(null);
+    }
+
+    private void cerrarAlertaPorRenovacion(long idSoatAnterior) {
+        dao.alertaActivaPorSoat(idSoatAnterior).ifPresent(alerta -> {
+            var version = dao.alertaVersion(alerta.idAlerta()).orElseThrow();
+            dao.cerrarAlertaSoatPorRenovacion(version.idAlerta(), version.estado(), version.versionFila());
+            var n = notificaciones.getIfAvailable();
+            if (n != null) {
+                n.marcarAtendidaPorAlerta(version.idAlerta());
+            }
         });
     }
 
@@ -341,7 +364,22 @@ public class SoatService {
         if (dao.alertaActivaPorSoat(idSoat).isEmpty()) {
             return;
         }
-        activarAlerta(idSoat, vehiculo, fechaVencimiento);
+        long idAlerta = activarAlerta(idSoat, vehiculo, fechaVencimiento);
+        sincronizarNotificacion(idAlerta);
+    }
+
+    private void sincronizarNotificacion(long idAlerta) {
+        var n = notificaciones.getIfAvailable();
+        if (n != null) {
+            n.crearOActualizarSegunEstadoAlerta(idAlerta);
+        }
+    }
+
+    private void cerrarNotificacion(long idAlerta) {
+        var n = notificaciones.getIfAvailable();
+        if (n != null) {
+            n.desactivarAvisosPendientesAlertaAnulada(idAlerta);
+        }
     }
 
     private void confirmarOperacion(UUID idOperacion, long usuario, String tipo, String huella, Object respuesta) {

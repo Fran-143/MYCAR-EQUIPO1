@@ -16,29 +16,33 @@ public class NotificacionJdbcDao {
 
     public Optional<AlertaContexto> cargarAlerta(long idAlerta) {
         return jdbc.query("""
-                SELECT a.id_alerta, a.id_vehiculo, v.id_usuario, a.estado, tm.nombre, v.placa,
-                       COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre) AS etiqueta
+                SELECT a.id_alerta, a.id_vehiculo, v.id_usuario, a.estado, a.categoria, v.placa,
+                       CASE WHEN a.categoria = 'SOAT' THEN 'SOAT'
+                            ELSE COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre, 'Mantenimiento')
+                       END AS etiqueta
                 FROM mycar.alerta a
                 JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
-                JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
+                LEFT JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
                 WHERE a.id_alerta = ?
                 """, (rs, n) -> new AlertaContexto(
                 rs.getLong("id_alerta"),
                 rs.getLong("id_vehiculo"),
                 rs.getLong("id_usuario"),
                 rs.getString("estado"),
-                rs.getString("nombre"),
+                rs.getString("categoria"),
                 rs.getString("placa"),
                 rs.getString("etiqueta")), idAlerta).stream().findFirst();
     }
 
     public List<AlertaContexto> listarAlertasVehiculoParaAvisos(long vehiculo) {
         return jdbc.query("""
-                SELECT a.id_alerta, a.id_vehiculo, v.id_usuario, a.estado, tm.nombre, v.placa,
-                       COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre) AS etiqueta
+                SELECT a.id_alerta, a.id_vehiculo, v.id_usuario, a.estado, a.categoria, v.placa,
+                       CASE WHEN a.categoria = 'SOAT' THEN 'SOAT'
+                            ELSE COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre, 'Mantenimiento')
+                       END AS etiqueta
                 FROM mycar.alerta a
                 JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
-                JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
+                LEFT JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
                 WHERE a.id_vehiculo = ?
                   AND a.estado IN ('PROGRAMADA','PROXIMA','PENDIENTE','VENCIDA','REALIZADA','ANULADA')
                 ORDER BY a.id_alerta
@@ -47,7 +51,7 @@ public class NotificacionJdbcDao {
                 rs.getLong("id_vehiculo"),
                 rs.getLong("id_usuario"),
                 rs.getString("estado"),
-                rs.getString("nombre"),
+                rs.getString("categoria"),
                 rs.getString("placa"),
                 rs.getString("etiqueta")), vehiculo);
     }
@@ -58,16 +62,18 @@ public class NotificacionJdbcDao {
      */
     public void upsertPorAlerta(
             long usuario, long idAlerta, long idVehiculo,
-            String estadoGestion, String titulo, String cuerpo) {
+            String categoria, String estadoGestion, String titulo, String cuerpo) {
+        String cat = (categoria == null || categoria.isBlank()) ? "MANTENIMIENTO" : categoria;
         jdbc.update("""
                 INSERT INTO mycar.notificacion(
                     id_usuario, categoria, id_alerta, id_vehiculo,
                     estado_gestion, leida, titulo, cuerpo, destino,
                     fecha_emision_utc, fecha_actualizacion_utc)
-                VALUES (?, 'MANTENIMIENTO', ?, ?, ?, FALSE, ?, ?, 'DETALLE_ALERTA',
+                VALUES (?, ?, ?, ?, ?, FALSE, ?, ?, 'DETALLE_ALERTA',
                         clock_timestamp(), clock_timestamp())
                 ON CONFLICT (id_usuario, id_alerta) WHERE id_alerta IS NOT NULL
                 DO UPDATE SET
+                    categoria = EXCLUDED.categoria,
                     estado_gestion = EXCLUDED.estado_gestion,
                     titulo = EXCLUDED.titulo,
                     cuerpo = EXCLUDED.cuerpo,
@@ -82,7 +88,7 @@ public class NotificacionJdbcDao {
                         ELSE mycar.notificacion.fecha_emision_utc
                     END,
                     fecha_actualizacion_utc = clock_timestamp()
-                """, usuario, idAlerta, idVehiculo, estadoGestion, titulo, cuerpo);
+                """, usuario, cat, idAlerta, idVehiculo, estadoGestion, titulo, cuerpo);
     }
 
     public int marcarGestionSiActiva(long idAlerta, String estadoGestion) {
@@ -216,6 +222,6 @@ public class NotificacionJdbcDao {
 
     public record AlertaContexto(
             long idAlerta, long idVehiculo, long idUsuario, String estado,
-            String nombreTipo, String placa, String etiquetaServicio
+            String categoria, String placa, String etiquetaServicio
     ) { }
 }

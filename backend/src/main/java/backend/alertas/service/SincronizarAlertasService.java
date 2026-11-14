@@ -48,6 +48,23 @@ public class SincronizarAlertasService {
         }
         exigirVehiculo(usuario, vehiculo);
         sincronizarSeguro(vehiculo, usuario);
+        var soat = alertas.obtenerDetalleSoatPropio(usuario, vehiculo, idAlerta);
+        if (soat.isPresent()) {
+            var base = soat.get();
+            // SOAT: sin Atender RF24 ni anulación de mantenimiento; gestión vía Configurar SOAT.
+            var acciones = new ContratoRf22.AccionesDetalleDto(false, false);
+            return new ContratoRf22.DetalleAlertaDto(
+                    base.idAlerta(), "SOAT", base.codigoTipo(), base.nombreTipo(),
+                    base.criterio(), base.origenCalculo(), base.estado(), base.fechaEstadoUtc(),
+                    base.fechaObjetivo(), base.kmObjetivo(), base.kmBase(), base.intervaloKm(),
+                    base.unidadTiempo(), base.cantidadTiempo(), base.fechaBase(), base.servicioOtro(),
+                    null, null, null,
+                    base.versionFila(),
+                    new ContratoRf22.VehiculoResumenDto(
+                            base.idVehiculo(), base.placa(), base.marca(), base.modelo(), base.estadoVehiculo()),
+                    acciones,
+                    new ContratoRf22.ContactoTallerDto(null, null, null, false, false, null, "NINGUNO", true));
+        }
         var base = alertas.obtenerDetallePropio(usuario, vehiculo, idAlerta)
                 .orElseThrow(() -> new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible."));
         var acciones = new ContratoRf22.AccionesDetalleDto(

@@ -110,10 +110,15 @@ public class NotificacionInternaService {
             return;
         }
         if (ACTIVAS.contains(estado)) {
-            String titulo = tituloActivo(estado, ctx.etiquetaServicio());
-            String cuerpo = cuerpoActivo(estado, ctx.placa(), ctx.etiquetaServicio());
+            boolean soat = "SOAT".equalsIgnoreCase(ctx.categoria());
+            String titulo = soat
+                    ? tituloSoat(estado)
+                    : tituloActivo(estado, ctx.etiquetaServicio());
+            String cuerpo = soat
+                    ? cuerpoSoat(estado, ctx.placa())
+                    : cuerpoActivo(estado, ctx.placa(), ctx.etiquetaServicio());
             dao.upsertPorAlerta(ctx.idUsuario(), ctx.idAlerta(), ctx.idVehiculo(),
-                    "PENDIENTE", titulo, cuerpo);
+                    soat ? "SOAT" : "MANTENIMIENTO", "PENDIENTE", titulo, cuerpo);
             // Push externo: solo RecordatorioPushService (cron / km). Evita duplicados con listado.
             return;
         }
@@ -151,6 +156,25 @@ public class NotificacionInternaService {
             case "PENDIENTE" -> "Corresponde realizar el servicio. " + base;
             case "VENCIDA" -> "El servicio está atrasado. " + base;
             default -> base;
+        };
+    }
+
+    private static String tituloSoat(String estado) {
+        return switch (estado) {
+            case "PROXIMA" -> "Próximo vencimiento del SOAT";
+            case "PENDIENTE" -> "SOAT por vencer";
+            case "VENCIDA" -> "SOAT vencido";
+            default -> "Aviso SOAT";
+        };
+    }
+
+    private static String cuerpoSoat(String estado, String placa) {
+        String p = placa == null || placa.isBlank() ? "tu vehículo" : placa;
+        return switch (estado) {
+            case "PROXIMA" -> "Faltan 30 días o menos para el vencimiento del SOAT de " + p + ".";
+            case "PENDIENTE" -> "Corresponde renovar el SOAT de " + p + ".";
+            case "VENCIDA" -> "El SOAT de " + p + " está vencido.";
+            default -> "Revisa el SOAT de " + p + ".";
         };
     }
 

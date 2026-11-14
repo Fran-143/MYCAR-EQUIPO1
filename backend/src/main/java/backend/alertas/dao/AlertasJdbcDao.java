@@ -150,6 +150,30 @@ public class AlertasJdbcDao {
                 rs.getInt("version_fila")), vehiculo);
     }
 
+    /** Detalle SOAT (sin tipo mantenimiento; no habilita Atender RF24). */
+    public Optional<DetalleAlertaFila> obtenerDetalleSoatPropio(long usuario, long vehiculo, long idAlerta) {
+        return jdbc.query("""
+                SELECT a.id_alerta, a.id_vehiculo, a.criterio, a.origen_calculo, a.estado,
+                       to_char(a.fecha_estado_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS fecha_estado,
+                       a.fecha_objetivo, a.unidad_tiempo, a.cantidad_tiempo, a.fecha_base, a.version_fila,
+                       v.placa, v.marca, v.modelo, v.estado_vehiculo
+                FROM mycar.alerta a
+                JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
+                WHERE a.id_alerta = ? AND a.id_vehiculo = ? AND v.id_usuario = ?
+                  AND a.categoria = 'SOAT' AND a.estado <> 'ANULADA'
+                """, (rs, n) -> new DetalleAlertaFila(
+                rs.getLong("id_alerta"), rs.getLong("id_vehiculo"), 0L,
+                "SOAT", "SOAT", rs.getString("criterio"),
+                rs.getString("origen_calculo"), rs.getString("estado"), rs.getString("fecha_estado"),
+                rs.getObject("fecha_objetivo", LocalDate.class), null, null, null,
+                rs.getString("unidad_tiempo"), rs.getObject("cantidad_tiempo", Integer.class),
+                rs.getObject("fecha_base", LocalDate.class), null,
+                null, null, rs.getInt("version_fila"),
+                null,
+                rs.getString("placa"), rs.getString("marca"), rs.getString("modelo"),
+                rs.getString("estado_vehiculo")), idAlerta, vehiculo, usuario).stream().findFirst();
+    }
+
     /** RF24: detalle propio (categoria=MANTENIMIENTO) con ficha de vehículo. */
     public Optional<DetalleAlertaFila> obtenerDetallePropio(long usuario, long vehiculo, long idAlerta) {
         return jdbc.query("""

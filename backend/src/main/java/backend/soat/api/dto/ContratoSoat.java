@@ -101,7 +101,8 @@ public final class ContratoSoat {
     public record PresignUploadResponse(
             String objectKey,
             String uploadUrl,
-            java.time.Instant expiresAt
+            java.time.Instant expiresAt,
+            java.util.Map<String, String> headers
     ) { }
 
     public record DocumentoDescargaResponse(String downloadUrl, java.time.Instant expiresAt, String nombreOriginal) { }

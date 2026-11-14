@@ -212,6 +212,27 @@ public class SoatJdbcDao {
         return filas;
     }
 
+    /** Renovación RF31: cierra seguimiento anterior como REALIZADA (no es Atender RF24). */
+    public int cerrarAlertaSoatPorRenovacion(long idAlerta, String estadoAnterior, int versionEsperada) {
+        if ("ANULADA".equals(estadoAnterior) || "REALIZADA".equals(estadoAnterior)) {
+            return 0;
+        }
+        int filas = jdbc.update("""
+                UPDATE mycar.alerta SET estado = 'REALIZADA', version_fila = version_fila + 1,
+                    fecha_estado_utc = clock_timestamp()
+                WHERE id_alerta = ? AND version_fila = ?
+                  AND categoria = 'SOAT'
+                  AND estado IN ('PROGRAMADA','PROXIMA','PENDIENTE','VENCIDA')
+                """, idAlerta, versionEsperada);
+        if (filas == 1) {
+            jdbc.update("""
+                    INSERT INTO mycar.historial_alerta(id_alerta, estado_anterior, estado_nuevo, motivo, version_destino)
+                    VALUES (?, ?, 'REALIZADA', 'RENOVACION_SOAT', ?)
+                    """, idAlerta, estadoAnterior, versionEsperada + 1);
+        }
+        return filas;
+    }
+
     public Optional<AlertaVersion> alertaVersion(long idAlerta) {
         try {
             return Optional.of(jdbc.queryForObject(

@@ -104,6 +104,10 @@ fun AlertasRoute(
         }
     }
     fun abrirRegistro(idAlerta: Long, idVehiculo: Long, codigoTipo: String, servicioOtro: String?) {
+        if (codigoTipo.equals("SOAT", ignoreCase = true)) {
+            detalleId = idAlerta
+            return // SOAT no usa Atender RF24; ver detalle / Configurar SOAT.
+        }
         if (mantenimientoRepository == null || claveCuentaBorrador.isNullOrBlank()) return
         if (codigoTipo.isBlank()) {
             detalleId = idAlerta
@@ -480,8 +484,9 @@ private fun TarjetaAlerta(
     onVerDetalle: (Long) -> Unit = {}
 ) {
     val badge = colorEstado(a.estado)
-    val atendible = a.estado in setOf("PROXIMA", "PENDIENTE", "VENCIDA")
-    val anulable = a.estado in setOf("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA")
+    val esSoat = a.codigoTipo.equals("SOAT", ignoreCase = true)
+    val atendible = !esSoat && a.estado in setOf("PROXIMA", "PENDIENTE", "VENCIDA")
+    val anulable = !esSoat && a.estado in setOf("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA")
     var dialogAnular by remember { mutableStateOf(false) }
     var motivoAnular by remember { mutableStateOf("") }
     Card(

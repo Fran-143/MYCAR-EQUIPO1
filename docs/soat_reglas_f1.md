@@ -29,6 +29,10 @@ Sin “póliza verificada”. Anticipación recordatorio: **30 días** (PROXIMA)
 | Maestra RF31/RF32 | Desde **Consultar SOAT (RF64)**; botones Renovar/Corregir en la misma pantalla; sin hub intermedio. |
 | Plan aprobado (APK) | Detalle → **Configurar SOAT** (hub) → Corregir / Renovar / Recordatorio; también Consultar desde Detalle. |
 
-**Decisión de implementación:** seguir el **plan aprobado** (hub Configurar). En Consultar se mantienen accesos a Configurar / Renovar / Corregir para no pelear con la maestra.
+**Decisión de implementación (negocio no cambia):** seguir el **plan aprobado** y `SOAT.pdf`:
 
-No hay otras contradicciones de negocio que bloqueen esquema/API; solape, idempotencia (`idOperacion`), un ACTUAL y documento opcional están alineados PDF↔Excel.
+`Detalle vehículo → Configurar SOAT → Corregir / Renovar / Configurar recordatorio`.
+
+**Consultar SOAT (RF64) es solo lectura** (+ acceso a Configurar). La maestra colocaba Corregir/Renovar dentro de Consultar; se documenta la diferencia y no se altera el resto del BCE.
+
+Registro + recordatorio: el toggle de revisión es preferencia UI; **primero** se confirma RF30/RF31 Renovar; **después** PUT recordatorio independiente. Si falla el recordatorio, el SOAT permanece y la confirmación muestra el estado real.

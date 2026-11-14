@@ -153,14 +153,17 @@ abstract class SoatFormViewModelBase(
             try {
                 val doc = prepararDocumento(s)
                 val solicitud = construirSolicitud(s, doc)
+                // 1) Persistir SOAT (RF30 / renovar). 2) Recordatorio = operación aparte.
                 var resultado = enviar(solicitud)
-                var recordatorioOk: Boolean? = null
+                var recordatorioOk: Boolean? = false
                 if ((modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR) && s.recordarAlRegistrar) {
                     try {
                         resultado = repository.recordatorio(idVehiculo, resultado.idSoat, true)
-                        recordatorioOk = true
+                        recordatorioOk = resultado.recordatorioActivo
                     } catch (_: Exception) {
+                        // Conservar SOAT; confirmación muestra recordatorio inactivo.
                         recordatorioOk = false
+                        resultado = repository.consultar(idVehiculo).actual ?: resultado
                     }
                 }
                 _estado.value = _estado.value.copy(
@@ -168,7 +171,7 @@ abstract class SoatFormViewModelBase(
                     exito = resultado,
                     paso = PasoSoatForm.EXITO,
                     ofrecerRecordatorio = false,
-                    recordatorioAplicado = recordatorioOk ?: resultado.recordatorioActivo
+                    recordatorioAplicado = recordatorioOk
                 )
             } catch (cancelada: CancellationException) {
                 throw cancelada

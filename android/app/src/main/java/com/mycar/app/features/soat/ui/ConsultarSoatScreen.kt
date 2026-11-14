@@ -98,13 +98,9 @@ fun ConsultarSoatScreen(
                         } else {
                             Text("Sin documento adjunto", color = MyCarMuted)
                         }
-                        // PDF: acciones de gestión desde Configurar; botones directos como atajo.
+                        // Solo lectura (RF64). Gestión: Detalle → Configurar SOAT.
                         SoatBotonPrincipal("Configurar SOAT", onConfigurar)
                         SoatBotonSecundario("Volver", onVolver)
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SoatBotonSecundario("Editar", onCorregir, modifier = Modifier.weight(1f))
-                            SoatBotonSecundario("Renovar", onRenovar, modifier = Modifier.weight(1f))
-                        }
                     }
                     val historial = consulta?.historial.orEmpty().filter { it.vigencia != "ACTUAL" }
                     if (historial.isNotEmpty()) {
