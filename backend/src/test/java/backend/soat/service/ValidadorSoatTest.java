@@ -30,10 +30,38 @@ class ValidadorSoatTest {
     }
 
     @Test
+    void rnRechazaVencimientoPasadoEnAlta() {
+        ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(
+                registro(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1))));
+        assertEquals("No puedes registrar un SOAT con fecha de vencimiento pasada", e.getMessage());
+    }
+
+    @Test
+    void rechazaAseguradoraFueraDeCatalogo() {
+        var req = new ContratoSoat.RegistrarRequest(
+                UUID.randomUUID(), "ASEGURADORA FANTASMA", "012-4589",
+                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                null, null, null, null);
+        ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(req));
+        assertTrue(e.getMessage().contains("aseguradora") || e.getMessage().contains("catálogo")
+                || e.getMessage().toLowerCase().contains("selecciona"));
+    }
+
+    @Test
+    void rechazaPolizaConLetras() {
+        var req = new ContratoSoat.RegistrarRequest(
+                UUID.randomUUID(), "RIMAC SEGUROS", "ABC-123",
+                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                null, null, null, null);
+        ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(req));
+        assertTrue(e.getMessage().toLowerCase().contains("póliza") || e.getMessage().toLowerCase().contains("poliza"));
+    }
+
+    @Test
     void rf30Ea07RechazaPrimaNegativa() {
         var req = new ContratoSoat.RegistrarRequest(
-                UUID.randomUUID(), "Rimac", "POL-1",
-                LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1),
+                UUID.randomUUID(), "RIMAC SEGUROS", "012-4589",
+                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
                 null, null, new BigDecimal("-1"), null);
         ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(req));
         assertEquals("El importe de la prima no es válido", e.getMessage());
@@ -61,16 +89,14 @@ class ValidadorSoatTest {
     }
 
     @Test
-    void coberturaNoRechazaVencimientoPasadoPorSiSolo() {
+    void coberturaDerivaVencidaSinImpedirConsulta() {
         LocalDate hoy = LocalDate.of(2026, 6, 1);
         assertEquals("VENCIDA", ValidadorSoat.estadoCobertura(
                 LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1), hoy));
-        assertDoesNotThrow(() -> ValidadorSoat.exigirRegistro(
-                registro(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1))));
     }
 
     private static ContratoSoat.RegistrarRequest registro(LocalDate inicio, LocalDate venc) {
         return new ContratoSoat.RegistrarRequest(
-                UUID.randomUUID(), "Rimac", "POL-1", inicio, venc, null, null, null, null);
+                UUID.randomUUID(), "RIMAC SEGUROS", "012-4589", inicio, venc, null, null, null, null);
     }
 }

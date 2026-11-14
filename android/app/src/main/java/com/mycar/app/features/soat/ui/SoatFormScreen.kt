@@ -5,15 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,7 +27,9 @@ import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.features.soat.viewmodel.*
 import com.mycar.app.ui.theme.MyCarMuted
 import com.mycar.app.ui.theme.MyCarNavy
+import com.mycar.app.ui.theme.MyCarOutlineSoft
 import com.mycar.app.ui.theme.MyCarTeal
+import com.mycar.app.ui.theme.MyCarTile
 
 @Composable
 fun SoatFormScreen(
@@ -134,37 +134,124 @@ private fun FormularioCamposSoat(
     onRecordarChange: (Boolean) -> Unit
 ) {
     Column(
-        Modifier.verticalScroll(rememberScrollState()),
+        Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Datos obligatorios", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
         val c = estado.campos
-        SoatCampoTexto("Aseguradora *", c.aseguradora, { t -> onActualizar { it.copy(aseguradora = t) } }, estado.errores["aseguradora"], !estado.ocupado)
-        SoatCampoTexto("Número de póliza *", c.numeroPoliza, { t -> onActualizar { it.copy(numeroPoliza = t) } }, estado.errores["numeroPoliza"], !estado.ocupado)
-        SoatCampoTexto("Fecha de inicio *", c.fechaInicio, { t -> onActualizar { it.copy(fechaInicio = t) } }, estado.errores["fechaInicio"], !estado.ocupado)
-        SoatCampoTexto("Fecha de vencimiento *", c.fechaVencimiento, { t -> onActualizar { it.copy(fechaVencimiento = t) } }, estado.errores["fechaVencimiento"], !estado.ocupado)
+        SoatSelectorAseguradora(
+            valor = c.aseguradora,
+            onChange = { t -> onActualizar { it.copy(aseguradora = t) } },
+            error = estado.errores["aseguradora"],
+            enabled = !estado.ocupado
+        )
+        SoatCampoPlaceholder(
+            etiqueta = "Número de póliza *",
+            valor = c.numeroPoliza,
+            onChange = { t -> onActualizar { it.copy(numeroPoliza = t.filter { ch -> ch.isDigit() || ch == '-' }) } },
+            placeholder = "Ej. 012-4589",
+            error = estado.errores["numeroPoliza"],
+            enabled = !estado.ocupado,
+            keyboard = KeyboardType.Number
+        )
+        SoatCampoFecha(
+            etiqueta = "Fecha de inicio *",
+            valorUi = c.fechaInicio,
+            onChange = { t -> onActualizar { it.copy(fechaInicio = t) } },
+            error = estado.errores["fechaInicio"],
+            enabled = !estado.ocupado
+        )
+        SoatCampoFecha(
+            etiqueta = "Fecha de vencimiento *",
+            valorUi = c.fechaVencimiento,
+            onChange = { t -> onActualizar { it.copy(fechaVencimiento = t) } },
+            error = estado.errores["fechaVencimiento"],
+            enabled = !estado.ocupado
+        )
         Text("Información adicional", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-        SoatCampoTexto("Nombre del contratante", c.nombreContratante, { t -> onActualizar { it.copy(nombreContratante = t) } }, null, !estado.ocupado)
-        SoatCampoTexto(
-            "Importe de prima (S/)", c.importePrima,
-            { t -> onActualizar { it.copy(importePrima = t) } },
-            estado.errores["importePrima"],
-            !estado.ocupado,
+        SoatCampoPlaceholder(
+            etiqueta = "Nombre del contratante",
+            valor = c.nombreContratante,
+            onChange = { t -> onActualizar { it.copy(nombreContratante = t) } },
+            placeholder = "Ej. JUAN PÉREZ GARCÍA",
+            enabled = !estado.ocupado,
+            mayusculas = true
+        )
+        SoatCampoPlaceholder(
+            etiqueta = "Prima (S/)",
+            valor = c.importePrima,
+            onChange = { t -> onActualizar { it.copy(importePrima = t) } },
+            placeholder = "Ej. 150.00",
+            error = estado.errores["importePrima"],
+            enabled = !estado.ocupado,
             keyboard = KeyboardType.Decimal
         )
-        SoatCampoTexto("Fecha de emisión", c.fechaEmision, { t -> onActualizar { it.copy(fechaEmision = t) } }, estado.errores["fechaEmision"], !estado.ocupado)
-        Text("Fechas en formato AAAA-MM-DD.", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
+        SoatCampoFecha(
+            etiqueta = "Fecha de emisión",
+            valorUi = c.fechaEmision,
+            onChange = { t -> onActualizar { it.copy(fechaEmision = t) } },
+            error = estado.errores["fechaEmision"],
+            enabled = !estado.ocupado
+        )
         if (estado.modo == TipoFormSoat.CORREGIR) {
             Text("Documento", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-            if (estado.tieneDocumentoActual) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = estado.modoDocumento == ModoDocSoat.MANTENER, onClick = { onModoDoc(ModoDocSoat.MANTENER) }, label = { Text("Mantener") })
-                    FilterChip(selected = estado.modoDocumento == ModoDocSoat.REEMPLAZAR, onClick = { onModoDoc(ModoDocSoat.REEMPLAZAR) }, label = { Text("Reemplazar archivo") })
-                    FilterChip(selected = estado.modoDocumento == ModoDocSoat.ELIMINAR, onClick = { onModoDoc(ModoDocSoat.ELIMINAR) }, label = { Text("Quitar archivo") })
+            when {
+                estado.modoDocumento == ModoDocSoat.ELIMINAR -> {
+                    Surface(
+                        Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MyCarTile,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MyCarOutlineSoft)
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("El documento actual se quitará al guardar.", color = MyCarMuted)
+                            TextButton(
+                                onClick = { onModoDoc(ModoDocSoat.MANTENER) },
+                                enabled = !estado.ocupado
+                            ) { Text("Conservar documento actual") }
+                        }
+                    }
                 }
-            }
-            if (!estado.tieneDocumentoActual || estado.modoDocumento == ModoDocSoat.REEMPLAZAR) {
-                SoatSeccionAdjunto(estado.adjunto, estado.errorAdjunto, !estado.ocupado, onAdjunto, estiloPdf = true)
+                estado.tieneDocumentoActual && estado.modoDocumento == ModoDocSoat.MANTENER && estado.adjunto == null -> {
+                    Surface(
+                        Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MyCarOutlineSoft)
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Documento actual conservado", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+                            Text("Puedes reemplazarlo con una foto/PDF o quitarlo.", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(
+                                    onClick = { onModoDoc(ModoDocSoat.REEMPLAZAR) },
+                                    enabled = !estado.ocupado
+                                ) { Text("Reemplazar") }
+                                TextButton(
+                                    onClick = { onModoDoc(ModoDocSoat.ELIMINAR) },
+                                    enabled = !estado.ocupado
+                                ) { Text("Quitar") }
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    SoatSeccionAdjunto(
+                        adjunto = estado.adjunto,
+                        error = estado.errorAdjunto,
+                        enabled = !estado.ocupado,
+                        onAdjunto = onAdjunto,
+                        estiloPdf = true,
+                        etiqueta = "Documento del SOAT (opcional)",
+                        subtituloVacio = "Foto, captura o PDF del SOAT"
+                    )
+                    if (estado.tieneDocumentoActual) {
+                        TextButton(
+                            onClick = { onModoDoc(ModoDocSoat.MANTENER) },
+                            enabled = !estado.ocupado
+                        ) { Text("Volver al documento actual") }
+                    }
+                }
             }
         }
         if (estado.modo == TipoFormSoat.RENOVAR) {
@@ -201,15 +288,20 @@ private fun SoatPasoAdjuntoPdf(
     onAdjunto: (AdjuntoSoatUi?) -> Unit,
     onContinuar: () -> Unit
 ) {
-    Column(
-        Modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
             "Adjunta una foto o PDF del SOAT. Es opcional; puedes continuar sin documento.",
             color = MyCarMuted
         )
-        SoatSeccionAdjunto(estado.adjunto, estado.errorAdjunto, !estado.ocupado, onAdjunto, estiloPdf = true)
+        SoatSeccionAdjunto(
+            adjunto = estado.adjunto,
+            error = estado.errorAdjunto,
+            enabled = !estado.ocupado,
+            onAdjunto = onAdjunto,
+            estiloPdf = true,
+            etiqueta = "Documento del SOAT (opcional)",
+            subtituloVacio = "Adjuntar fotografía o PDF (opcional)"
+        )
         SoatBotonPrincipal("Continuar", onContinuar, !estado.ocupado)
     }
 }
@@ -222,30 +314,16 @@ private fun SoatPasoRevisionPdf(
     onRegistrar: () -> Unit
 ) {
     val c = estado.campos
-    Column(
-        Modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text("Documento", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-        if (estado.adjunto != null) {
-            Card(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(estado.adjunto.nombre, Modifier.weight(1f).padding(12.dp), color = MyCarNavy)
-                    TextButton(onClick = { onAdjunto(null) }, enabled = !estado.ocupado) { Text("Quitar") }
-                }
-            }
-        } else {
-            Text("Sin documento adjunto", color = MyCarMuted)
-            SoatSeccionAdjunto(null, estado.errorAdjunto, !estado.ocupado, onAdjunto, estiloPdf = false)
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        SoatSeccionAdjunto(
+            adjunto = estado.adjunto,
+            error = estado.errorAdjunto,
+            enabled = !estado.ocupado,
+            onAdjunto = onAdjunto,
+            estiloPdf = true,
+            etiqueta = "Documento del SOAT (opcional)",
+            subtituloVacio = "Foto, captura o PDF del SOAT"
+        )
         val vencido = SoatFormulario.vencimientoYaPasado(c.fechaVencimiento)
         Card(
             Modifier.fillMaxWidth(),

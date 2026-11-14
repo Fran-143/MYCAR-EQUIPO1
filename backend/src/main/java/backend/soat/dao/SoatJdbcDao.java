@@ -175,16 +175,17 @@ public class SoatJdbcDao {
     }
 
     public long insertarAlertaSoat(long vehiculo, long idSoat, LocalDate fechaBase, LocalDate fechaObjetivo,
-            String estado, String firma) {
+            String estado, String firma, LocalDate fechaVencidaVerificable) {
         return jdbc.queryForObject("""
                 INSERT INTO mycar.alerta(
                     id_vehiculo, categoria, id_soat, criterio, origen, origen_calculo,
                     unidad_tiempo, cantidad_tiempo, fecha_base, fecha_objetivo,
-                    estado, firma_equivalencia)
+                    estado, firma_equivalencia, fecha_vencida_verificable)
                 VALUES (?, 'SOAT', ?, 'POR_TIEMPO', 'MANUAL', 'DESDE_HOY',
-                        'DIAS', 30, ?, ?, ?, ?)
+                        'DIAS', 30, ?, ?, ?, ?, ?)
                 RETURNING id_alerta
-                """, Long.class, vehiculo, idSoat, fechaBase, fechaObjetivo, estado, firma);
+                """, Long.class, vehiculo, idSoat, fechaBase, fechaObjetivo, estado, firma,
+                fechaVencidaVerificable);
     }
 
     public void historialAlertaInicial(long idAlerta, String estado) {

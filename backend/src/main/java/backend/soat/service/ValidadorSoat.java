@@ -71,7 +71,8 @@ public final class ValidadorSoat {
         }
         texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true);
         texto("numeroPoliza", req.numeroPoliza(), MAX_POLIZA, true);
-        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision());
+        // CORREGIR: no rechazar vencimientos pasados de SOAT ya registrados.
+        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(), false);
         textoOpcional("nombreContratante", req.nombreContratante(), MAX_CONTRATANTE);
         prima(req.importePrima());
         if (req.accionDocumento() == ContratoSoat.AccionDocumento.REEMPLAZAR) {
@@ -112,6 +113,15 @@ public final class ValidadorSoat {
     }
 
     private static void fechas(LocalDate inicio, LocalDate vencimiento, LocalDate emision) {
+        fechas(inicio, vencimiento, emision, true);
+    }
+
+    /**
+     * @param exigirVencimientoFuturo REGISTRO/RENOVACIÓN: rechaza vencimiento &lt; hoy Lima.
+     *                                CORREGIR: false para permitir editar históricos ya vencidos.
+     */
+    private static void fechas(LocalDate inicio, LocalDate vencimiento, LocalDate emision,
+            boolean exigirVencimientoFuturo) {
         if (inicio == null) throw new ErrorSoat("DATOS_INVALIDOS", "fechaInicio obligatoria.", Set.of("fechaInicio"));
         if (vencimiento == null) {
             throw new ErrorSoat("DATOS_INVALIDOS", "fechaVencimiento obligatoria.", Set.of("fechaVencimiento"));
@@ -121,10 +131,46 @@ public final class ValidadorSoat {
                     "La fecha de vencimiento debe ser posterior a la fecha de inicio",
                     Set.of("fechaVencimiento"));
         }
+        if (exigirVencimientoFuturo) {
+            LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
+            if (vencimiento.isBefore(hoy)) {
+                throw new ErrorSoat("DATOS_INVALIDOS",
+                        "No puedes registrar un SOAT con fecha de vencimiento pasada",
+                        Set.of("fechaVencimiento"));
+            }
+        }
         if (emision != null && emision.isAfter(vencimiento)) {
             throw new ErrorSoat("DATOS_INVALIDOS", "fechaEmision no puede ser posterior al vencimiento.",
                     Set.of("fechaEmision"));
         }
+    }
+
+    private static final Set<String> ASEGURADORAS = Set.of(
+            "RIMAC SEGUROS",
+            "PACIFICO SEGUROS",
+            "MAPFRE PERU",
+            "LA POSITIVA SEGUROS",
+            "INTERSEGURO",
+            "PROTECTA SECURITY",
+            "QUALITAS",
+            "HDI SEGUROS",
+            "CRECER SEGUROS",
+            "CHUBB PERU",
+            "BNP PARIBAS CARDIF"
+    );
+
+    static String normalizarAseguradora(String valor) {
+        if (valor == null) return null;
+        String n = java.text.Normalizer.normalize(valor.strip(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("\\s+", " ");
+        return ASEGURADORAS.contains(n) ? n : null;
+    }
+
+    static String normalizarPoliza(String valor) {
+        if (valor == null) return null;
+        return valor.strip();
     }
 
     private static void texto(String campo, String valor, int max, boolean obligatorio) {
@@ -135,6 +181,17 @@ public final class ValidadorSoat {
         String limpio = valor.strip();
         if (limpio.isEmpty() || limpio.codePointCount(0, limpio.length()) > max) {
             throw new ErrorSoat("DATOS_INVALIDOS", campo + " inválido.", Set.of(campo));
+        }
+        if ("aseguradora".equals(campo)) {
+            if (normalizarAseguradora(limpio) == null) {
+                throw new ErrorSoat("DATOS_INVALIDOS", "Selecciona una aseguradora del catálogo", Set.of(campo));
+            }
+        }
+        if ("numeroPoliza".equals(campo)) {
+            if (!limpio.matches("^[0-9]+(-[0-9]+)*$") || limpio.length() < 4 || limpio.length() > 40) {
+                throw new ErrorSoat("DATOS_INVALIDOS",
+                        "Ingresa un número de póliza válido (ej. 012-4589)", Set.of(campo));
+            }
         }
     }
 

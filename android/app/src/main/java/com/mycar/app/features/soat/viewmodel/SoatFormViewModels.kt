@@ -11,6 +11,7 @@ import com.mycar.app.features.soat.data.SoatMutacionDto
 import com.mycar.app.features.soat.data.SoatPresignSolicitudDto
 import com.mycar.app.features.soat.domain.*
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,19 +74,23 @@ abstract class SoatFormViewModelBase(
     )
     val estado = _estado.asStateFlow()
 
+    private fun exigirVencimientoFuturo(): Boolean =
+        modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR
+
     fun actualizarCampos(transform: (CamposSoat) -> CamposSoat) {
         val nuevos = transform(_estado.value.campos)
         // Validación en vivo solo de incoherencias (fechas/prima); obligatorios vacíos se bloquean al continuar.
         val errores = SoatFormulario.validarCampos(
             nuevos.aseguradora.ifBlank { "_" },
-            nuevos.numeroPoliza.ifBlank { "_" },
+            nuevos.numeroPoliza.ifBlank { "0000" },
             nuevos.fechaInicio,
             nuevos.fechaVencimiento,
             nuevos.fechaEmision,
-            nuevos.importePrima
+            nuevos.importePrima,
+            exigirVencimientoFuturo = exigirVencimientoFuturo()
         ).toMutableMap()
-        errores.remove("aseguradora")
-        errores.remove("numeroPoliza")
+        if (nuevos.aseguradora.isBlank()) errores.remove("aseguradora")
+        if (nuevos.numeroPoliza.isBlank()) errores.remove("numeroPoliza")
         if (nuevos.fechaInicio.isBlank()) errores.remove("fechaInicio")
         if (nuevos.fechaVencimiento.isBlank()) errores.remove("fechaVencimiento")
         camposBaseRenovacion()?.let { base ->
@@ -108,7 +113,8 @@ abstract class SoatFormViewModelBase(
         val c = _estado.value.campos
         val errores = SoatFormulario.validarCampos(
             c.aseguradora, c.numeroPoliza, c.fechaInicio, c.fechaVencimiento,
-            c.fechaEmision, c.importePrima
+            c.fechaEmision, c.importePrima,
+            exigirVencimientoFuturo = exigirVencimientoFuturo()
         ).toMutableMap()
         camposBaseRenovacion()?.let { base ->
             errores.putAll(
@@ -165,7 +171,8 @@ abstract class SoatFormViewModelBase(
         val campos = _estado.value.campos
         val errores = SoatFormulario.validarCampos(
             campos.aseguradora, campos.numeroPoliza, campos.fechaInicio, campos.fechaVencimiento,
-            campos.fechaEmision, campos.importePrima
+            campos.fechaEmision, campos.importePrima,
+            exigirVencimientoFuturo = exigirVencimientoFuturo()
         ).toMutableMap()
         camposBaseRenovacion()?.let { base ->
             errores.putAll(
@@ -180,13 +187,11 @@ abstract class SoatFormViewModelBase(
         }
         when (modo) {
             TipoFormSoat.REGISTRAR -> {
-                // RF30-EA06: si el vencimiento ya pasó, no ofrecer ni activar recordatorio en el alta.
-                val vencido = SoatFormulario.vencimientoYaPasado(campos.fechaVencimiento)
+                // RN actualizada: alta/renovación rechazan vencimiento pasado; el recordatorio se ofrece si aplica.
                 _estado.value = _estado.value.copy(
                     paso = PasoSoatForm.ADJUNTO,
                     errores = emptyMap(),
-                    recordarAlRegistrar = if (vencido) false else _estado.value.recordarAlRegistrar,
-                    ofrecerRecordatorio = !vencido
+                    ofrecerRecordatorio = true
                 )
             }
             TipoFormSoat.CORREGIR -> {
@@ -198,9 +203,21 @@ abstract class SoatFormViewModelBase(
                     _estado.value = _estado.value.copy(errorAdjunto = "Selecciona el nuevo documento.")
                     return
                 }
+                _estado.value = _estado.value.copy(confirmarVisible = true, mensaje = null, errores = emptyMap())
+            }
+            TipoFormSoat.RENOVAR -> {
+                if (!formularioValido()) {
+                    val c = _estado.value.campos
+                    _estado.value = _estado.value.copy(
+                        errores = SoatFormulario.validarCampos(
+                            c.aseguradora, c.numeroPoliza, c.fechaInicio, c.fechaVencimiento,
+                            c.fechaEmision, c.importePrima, exigirVencimientoFuturo = true
+                        )
+                    )
+                    return
+                }
                 _estado.value = _estado.value.copy(confirmarVisible = true, mensaje = null)
             }
-            TipoFormSoat.RENOVAR -> _estado.value = _estado.value.copy(confirmarVisible = true)
         }
     }
 
@@ -306,15 +323,16 @@ abstract class SoatFormViewModelBase(
             }
             else -> null
         }
+        val aseg = AseguradoraSoat.normalizarParaGuardar(c.aseguradora) ?: c.aseguradora.trim()
         return SoatMutacionDto(
             idOperacion = if (s.modo == TipoFormSoat.CORREGIR) null else UUID.randomUUID().toString(),
             idSoatAnterior = if (s.modo == TipoFormSoat.RENOVAR) s.idSoat else null,
-            aseguradora = c.aseguradora.trim(),
-            numeroPoliza = c.numeroPoliza.trim(),
-            fechaInicio = c.fechaInicio.trim(),
-            fechaVencimiento = c.fechaVencimiento.trim(),
-            fechaEmision = c.fechaEmision.trim().takeIf { it.isNotEmpty() },
-            nombreContratante = c.nombreContratante.trim().takeIf { it.isNotEmpty() },
+            aseguradora = aseg,
+            numeroPoliza = SoatFormulario.normalizarPoliza(c.numeroPoliza),
+            fechaInicio = SoatFormulario.fechaUiAIso(c.fechaInicio) ?: c.fechaInicio.trim(),
+            fechaVencimiento = SoatFormulario.fechaUiAIso(c.fechaVencimiento) ?: c.fechaVencimiento.trim(),
+            fechaEmision = SoatFormulario.fechaUiAIso(c.fechaEmision),
+            nombreContratante = c.nombreContratante.trim().uppercase(Locale("es", "PE")).takeIf { it.isNotEmpty() },
             importePrima = prima,
             documento = doc,
             accionDocumento = accion
@@ -389,7 +407,24 @@ class RenovarSoatViewModel(
     repository: SoatRepository,
     soatAnterior: SoatDto?,
     private val lectorUri: suspend (Uri) -> ByteArray
-) : SoatFormViewModelBase(idVehiculo, repository, TipoFormSoat.RENOVAR, idSoatAnterior) {
+) : SoatFormViewModelBase(
+    idVehiculo,
+    repository,
+    TipoFormSoat.RENOVAR,
+    idSoatAnterior,
+    camposIniciales = soatAnterior?.let {
+        val prev = SoatFormulario.desdeSoat(it)
+        CamposSoat(
+            aseguradora = prev.aseguradora,
+            numeroPoliza = "",
+            fechaInicio = "",
+            fechaVencimiento = "",
+            fechaEmision = "",
+            nombreContratante = prev.nombreContratante,
+            importePrima = ""
+        )
+    } ?: CamposSoat()
+) {
     private val base = soatAnterior?.let { SoatFormulario.desdeSoat(it) }
     override fun camposBaseRenovacion(): CamposSoat? = base
     override suspend fun leerBytes(uri: Uri) = lectorUri(uri)

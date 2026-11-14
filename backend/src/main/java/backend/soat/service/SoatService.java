@@ -224,7 +224,11 @@ public class SoatService {
         if (req.activo()) {
             idAlerta = activarAlerta(idSoat, vehiculo, fila.fechaVencimiento());
             estadoAlerta = dao.alertaActivaPorSoat(idSoat).map(SoatJdbcDao.AlertaSoat::estado).orElse(null);
-            sincronizarNotificacion(idAlerta);
+            // RF32-EA02: SOAT ya vencido → alerta VENCIDA para seguimiento en Alertas,
+            // sin crear notificación nueva en Pendientes (PROXIMA/PENDIENTE sí sincronizan).
+            if (!"VENCIDA".equals(estadoAlerta)) {
+                sincronizarNotificacion(idAlerta);
+            }
         } else {
             Long idAnulada = desactivarAlertaSiActiva(idSoat);
             if (idAnulada != null) {
@@ -342,12 +346,23 @@ public class SoatService {
         LocalDate fechaBase = fechaVencimiento.minusDays(30);
         String firma = FirmaAlertaSoat.calcular(idSoat);
         String estado = dao.calcularEstadoInicial(fechaVencimiento, hoy);
+        // ck_alerta_vencida_evidencia: VENCIDA exige fecha_vencida_verificable.
+        // En alta inicial RF32 usamos hoy (primera evidencia del sistema), no objetivo+15
+        // histórico, para no anular de inmediato el seguimiento de un SOAT ya vencido.
+        LocalDate fechaVencidaVerificable = "VENCIDA".equals(estado) ? hoy : null;
         try {
-            long idAlerta = dao.insertarAlertaSoat(vehiculo, idSoat, fechaBase, fechaVencimiento, estado, firma);
+            long idAlerta = dao.insertarAlertaSoat(
+                    vehiculo, idSoat, fechaBase, fechaVencimiento, estado, firma, fechaVencidaVerificable);
             dao.historialAlertaInicial(idAlerta, estado);
             return idAlerta;
         } catch (DataIntegrityViolationException ex) {
-            throw new ErrorSoat("ALERTA_SOAT_DUPLICADA", "Ya existe un recordatorio activo para este SOAT.");
+            String detail = ex.getMostSpecificCause() != null
+                    ? ex.getMostSpecificCause().getMessage() : "";
+            if (detail != null && (detail.contains("uq_alerta_soat_activa")
+                    || detail.contains("uq_alerta_equivalente_activa"))) {
+                throw new ErrorSoat("ALERTA_SOAT_DUPLICADA", "Ya existe un recordatorio activo para este SOAT.");
+            }
+            throw new ErrorSoat("SOAT_GUARDAR_FALLIDO", "No se pudo activar el recordatorio del SOAT.");
         }
     }
 

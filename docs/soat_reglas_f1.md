@@ -56,6 +56,8 @@ Renovación (RF31-EA01 / EA04):
 - «La nueva vigencia debe vencer después de la actual»
 - «La nueva vigencia no puede empezar antes de que termine la actual»
 
-**RF30-EA06:** vencimiento ya pasado **no rechaza** el alta; solo omite oferta/creación de recordatorio en el mismo commit (el recordatorio sigue siendo PUT separado).
+**RF30-EA06 (histórico / BCE):** vencimiento ya pasado no rechazaba el alta; solo omitía oferta/creación de recordatorio en el mismo commit.
+
+**Cambio RN (2026-11-14, decisión de producto en prueba USB):** en **REGISTRO y RENOVACIÓN** nuevos se **rechaza** `fechaVencimiento` anterior a hoy (`America/Lima`) con el mensaje «No puedes registrar un SOAT con fecha de vencimiento pasada». La **consulta** de SOAT históricos vencidos sigue permitida. **CORREGIR** no aplica este rechazo (permite editar datos de un ACTUAL ya vencido). **RF32-EA02** sigue coherente: activar seguimiento sobre un SOAT ya vencido (histórico/actual vencido) sin crear notificación nueva en Pendientes.
 
 **Navegación vs maestra RF31/RF32:** hub Configurar SOAT (plan APK / PDF) se conserva; Consultar RF64 permanece solo lectura.

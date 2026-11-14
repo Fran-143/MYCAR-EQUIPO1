@@ -1,8 +1,10 @@
 package com.mycar.app.features.soat.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -44,11 +46,15 @@ fun SoatScaffold(
             }
         }
     ) { padding ->
+        // Scroll en el contenedor acotado del Scaffold (evita crash por altura infinita).
         Column(
             Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp),
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
             content = contenido
         )
