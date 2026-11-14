@@ -74,69 +74,101 @@ fun PerfilRoute(
 
 @Composable
 private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onVolver) { Text("Volver", color = PerfilColors.Navy) }
-            Text("MyCar", Modifier.weight(1f), color = PerfilColors.Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp,
-                textAlign = TextAlign.Center)
-            Spacer(Modifier.width(64.dp))
-        }
-        Spacer(Modifier.height(12.dp))
-        if (estado.cargando && estado.perfil == null) {
-            Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = PerfilColors.Navy)
+    Column(Modifier.fillMaxSize()) {
+        com.mycar.app.ui.MycarCabeceraApp(conStatusBars = true)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onVolver) { Text("Volver", color = PerfilColors.Navy) }
+                Text(
+                    "Perfil",
+                    Modifier.weight(1f),
+                    color = PerfilColors.Navy,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(64.dp))
             }
-            Seccion("SESIÓN") {
-                FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
-            }
-            return
-        }
-        if (estado.perfil == null) {
-            estado.mensaje?.let { Text(it, color = PerfilColors.Danger) }
-            TextButton(onClick = vm::cargar) { Text("Reintentar") }
-            Spacer(Modifier.height(16.dp))
-            Seccion("SESIÓN") {
-                FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
-            }
-            return
-        }
-        val perfil = estado.perfil
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = PerfilColors.Card, shadowElevation = 1.dp) {
-            Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(72.dp).clip(CircleShape).background(PerfilColors.Teal), contentAlignment = Alignment.Center) {
-                    Text(perfil.iniciales, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Spacer(Modifier.height(12.dp))
+            when {
+                estado.cargando && estado.perfil == null -> {
+                    Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = PerfilColors.Navy)
+                    }
+                    Seccion("SESIÓN") {
+                        FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
+                    }
                 }
-                Spacer(Modifier.height(12.dp))
-                Text(perfil.nombreCompleto, color = PerfilColors.Navy, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                Text(perfil.correo, color = PerfilColors.Mute, fontSize = 14.sp)
-                Spacer(Modifier.height(16.dp))
-                OutlinedButton(
-                    onClick = vm::abrirDatos,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PerfilColors.Navy)
-                ) { Text("Datos personales") }
+                estado.perfil == null -> {
+                    estado.mensaje?.let { Text(it, color = PerfilColors.Danger) }
+                    TextButton(onClick = vm::cargar) { Text("Reintentar") }
+                    Spacer(Modifier.height(16.dp))
+                    Seccion("SESIÓN") {
+                        FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
+                    }
+                }
+                else -> {
+                    val perfil = estado.perfil!!
+                    Surface(
+                        Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        color = PerfilColors.Card,
+                        shadowElevation = 1.dp
+                    ) {
+                        Column(
+                            Modifier.padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                Modifier.size(72.dp).clip(CircleShape).background(PerfilColors.Teal),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    perfil.iniciales,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                perfil.nombreCompleto,
+                                color = PerfilColors.Navy,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 18.sp
+                            )
+                            Text(perfil.correo, color = PerfilColors.Mute, fontSize = 14.sp)
+                            Spacer(Modifier.height(16.dp))
+                            OutlinedButton(
+                                onClick = vm::abrirDatos,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PerfilColors.Navy)
+                            ) { Text("Datos personales") }
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Seccion("CUENTA") {
+                        FilaAccion("Cambiar contraseña", onClick = vm::abrirCambiarContrasena)
+                        FilaDeshabilitada("Planes y suscripción")
+                    }
+                    Seccion("NOTIFICACIONES") {
+                        FilaAccion("Notificaciones externas", onClick = vm::abrirNotificacionesExternas)
+                        FilaDeshabilitada("Recordatorios de km")
+                    }
+                    Seccion("APARIENCIA") {
+                        FilaDeshabilitada("Modo claro")
+                    }
+                    Seccion("SESIÓN") {
+                        FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
+                    }
+                    Seccion("ZONA DE PELIGRO") {
+                        FilaDeshabilitada("Eliminar cuenta", peligro = true)
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
             }
         }
-        Spacer(Modifier.height(20.dp))
-        Seccion("CUENTA") {
-            FilaAccion("Cambiar contraseña", onClick = vm::abrirCambiarContrasena)
-            FilaDeshabilitada("Planes y suscripción")
-        }
-        Seccion("NOTIFICACIONES") {
-            FilaAccion("Notificaciones externas", onClick = vm::abrirNotificacionesExternas)
-            FilaDeshabilitada("Recordatorios de km")
-        }
-        Seccion("APARIENCIA") {
-            FilaDeshabilitada("Modo claro")
-        }
-        Seccion("SESIÓN") {
-            FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
-        }
-        Seccion("ZONA DE PELIGRO") {
-            FilaDeshabilitada("Eliminar cuenta", peligro = true)
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }
 

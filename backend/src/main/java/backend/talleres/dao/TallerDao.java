@@ -25,6 +25,10 @@ public interface TallerDao {
     /** Catálogo global; filas es_demo solo visibles para {@code idUsuarioPilotoDemo}. */
     List<TallerGlobal> listarGlobalesActivos(long idUsuario, String busqueda, long idUsuarioPilotoDemo);
 
+    /** Alta administrativa de ficha oficial (taller_global). */
+    TallerGlobal insertarGlobal(String nombre, String telefono, String correo, String direccion,
+                                boolean tieneWhatsapp, boolean contactoAutorizado, boolean esDemo);
+
     boolean existeVinculoAsociadoActivo(long idUsuario, long idTallerGlobal);
 
     Taller insertarAsociado(long idUsuario, long idTallerGlobal, String nombre, String telefono,

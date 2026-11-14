@@ -3,10 +3,15 @@ package com.mycar.app.features.alertas.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,8 +46,6 @@ private val Fondo = Color(0xFFF0F5FA)
 private val Azul = Color(0xFF12285F)
 private val Celeste = Color(0xFF007E98)
 private val RojoAnular = Color(0xFFC62828)
-private val CampoLectura = Color(0xFFE8F4FA)
-
 enum class FaseDetalleAlerta { CARGANDO, LISTO, ERROR }
 
 data class EstadoDetalleAlerta(
@@ -259,26 +262,24 @@ fun DetalleAlertaScreen(
                                 modifier = Modifier.testTag("rf24.aviso.vencida")
                             )
                         }
-                        if (d.puedeAtender || d.puedeAnular) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (d.puedeAtender) {
-                                    Button(
-                                        onClick = { onRegistrarComoRealizado(d) },
-                                        enabled = !estado.ocupado,
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Azul),
-                                        modifier = Modifier.testTag("rf24.registrar")
-                                    ) { Text("Registrar como realizado") }
-                                }
-                                if (d.puedeAnular) {
-                                    OutlinedButton(
-                                        onClick = { dialogAnular = true },
-                                        enabled = !estado.ocupado,
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = RojoAnular)
-                                    ) { Text("Anular") }
-                                }
-                            }
+                        if (d.puedeAtender) {
+                            Button(
+                                onClick = { onRegistrarComoRealizado(d) },
+                                enabled = !estado.ocupado,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Azul),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("rf24.registrar")
+                            ) { Text("Registrar como realizado", fontWeight = FontWeight.SemiBold) }
+                        }
+                        if (d.puedeAnular) {
+                            OutlinedButton(
+                                onClick = { dialogAnular = true },
+                                enabled = !estado.ocupado,
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, Azul),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Azul),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("rf24.anular")
+                            ) { Text("Anular alerta", fontWeight = FontWeight.SemiBold) }
                         }
                     }
                 }
@@ -396,6 +397,7 @@ fun DetalleAlertaScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ContactoTallerAlertaCard(
     contacto: ContactoTallerAlerta?,
@@ -404,6 +406,11 @@ private fun ContactoTallerAlertaCard(
     onLlamar: (String) -> Unit,
     onCambiarTaller: () -> Unit
 ) {
+    var sheetOpen by remember { mutableStateOf(false) }
+    val puedeWa = PoliticaContactoTaller.puedeWhatsApp(contacto)
+    val puedeLlamar = PoliticaContactoTaller.puedeLlamar(contacto)
+    val puedeContactar = puedeWa || puedeLlamar
+
     Card(
         modifier = Modifier.fillMaxWidth().testTag("rf24.contacto"),
         shape = RoundedCornerShape(16.dp),
@@ -411,7 +418,7 @@ private fun ContactoTallerAlertaCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Contactar taller", fontWeight = FontWeight.Bold, color = Celeste)
+            Text("Taller sugerido", fontWeight = FontWeight.Bold, color = Celeste)
             Text(
                 "Contacto voluntario: no marca la alerta como atendida ni envía datos al taller.",
                 style = MaterialTheme.typography.bodySmall,
@@ -423,20 +430,34 @@ private fun ContactoTallerAlertaCard(
                     Text("Elegir taller")
                 }
             } else {
-                Text(contacto.nombre ?: "Taller", fontWeight = FontWeight.SemiBold, color = Azul)
-                Text(
-                    when (contacto.origenSugerencia) {
-                        "EXPLICITO" -> "Elegido para esta alerta"
-                        "MANTENIMIENTO_REF" -> "Del mantenimiento de origen"
-                        "FAVORITO" -> "Tu taller favorito"
-                        else -> contacto.origenSugerencia
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF6881A5)
-                )
-                val puedeWa = PoliticaContactoTaller.puedeWhatsApp(contacto)
-                val puedeLlamar = PoliticaContactoTaller.puedeLlamar(contacto)
-                if (!puedeWa && !puedeLlamar) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Build, null, tint = Azul, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(contacto.nombre ?: "Taller", fontWeight = FontWeight.SemiBold, color = Azul)
+                        Text(
+                            when (contacto.origenSugerencia) {
+                                "EXPLICITO" -> "Elegido para esta alerta"
+                                "MANTENIMIENTO_REF" -> "Taller del último mantenimiento"
+                                "FAVORITO" -> "Tu taller favorito"
+                                else -> contacto.origenSugerencia
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF6881A5)
+                        )
+                    }
+                }
+                // Seguridad V26: no mostrar teléfono accionable si no está autorizado.
+                if (puedeContactar && !contacto.telefono.isNullOrBlank()) {
+                    Text(contacto.telefono, color = Color(0xFF6881A5))
+                    if (puedeWa) {
+                        Text(
+                            "Este número también tiene WhatsApp",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF128C7E)
+                        )
+                    }
+                } else {
                     val motivo = when {
                         !contacto.origen.equals("ASOCIADO", ignoreCase = true) ->
                             "Contacto WhatsApp/llamada solo para talleres asociados autorizados."
@@ -445,35 +466,86 @@ private fun ContactoTallerAlertaCard(
                         else -> "Sin contacto disponible"
                     }
                     Text(motivo, color = RojoAnular, modifier = Modifier.testTag("rf24.contacto.sin"))
-                } else {
-                    val tel = contacto.telefono.orEmpty()
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (puedeWa) {
-                            Button(
-                                onClick = { onWhatsApp(tel) },
-                                enabled = !ocupado,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF128C7E)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("rf24.contacto.whatsapp")
-                            ) { Text("WhatsApp") }
-                        }
-                        if (puedeLlamar) {
-                            OutlinedButton(
-                                onClick = { onLlamar(tel) },
-                                enabled = !ocupado,
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.testTag("rf24.contacto.llamar")
-                            ) { Text("Llamar") }
-                        }
+                }
+                TextButton(
+                    onClick = onCambiarTaller,
+                    enabled = !ocupado,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.testTag("rf24.contacto.cambiar")
+                ) { Text("Cambiar taller", color = Celeste, fontWeight = FontWeight.SemiBold) }
+            }
+        }
+    }
+
+    if (puedeContactar) {
+        Button(
+            onClick = { sheetOpen = true },
+            enabled = !ocupado,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("rf24.contacto.abrir"),
+            colors = ButtonDefaults.buttonColors(containerColor = Azul),
+            shape = RoundedCornerShape(12.dp)
+        ) { Text("Contactar taller", fontWeight = FontWeight.SemiBold) }
+    }
+
+    if (sheetOpen && contacto != null && puedeContactar) {
+        ModalBottomSheet(
+            onDismissRequest = { sheetOpen = false },
+            containerColor = Color.White
+        ) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Contactar taller",
+                        Modifier.weight(1f),
+                        fontWeight = FontWeight.Bold,
+                        color = Azul,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    IconButton(onClick = { sheetOpen = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar")
                     }
                 }
-                TextButton(onClick = onCambiarTaller, enabled = !ocupado, modifier = Modifier.testTag("rf24.contacto.cambiar")) {
-                    Text("Cambiar taller")
+                if (puedeWa) {
+                    ListItem(
+                        headlineContent = { Text("WhatsApp", fontWeight = FontWeight.Medium) },
+                        leadingContent = {
+                            Text("WA", color = Color(0xFF128C7E), fontWeight = FontWeight.Bold)
+                        },
+                        trailingContent = { Text("›", color = Color(0xFF6881A5)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("rf24.contacto.whatsapp")
+                            .clickableSafe {
+                                sheetOpen = false
+                                onWhatsApp(contacto.telefono.orEmpty())
+                            }
+                    )
                 }
+                if (puedeLlamar) {
+                    ListItem(
+                        headlineContent = { Text("Llamar", fontWeight = FontWeight.Medium) },
+                        leadingContent = { Icon(Icons.Default.Phone, null, tint = Azul) },
+                        trailingContent = { Text("›", color = Color(0xFF6881A5)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("rf24.contacto.llamar")
+                            .clickableSafe {
+                                sheetOpen = false
+                                onLlamar(contacto.telefono.orEmpty())
+                            }
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
 }
+
+private fun Modifier.clickableSafe(onClick: () -> Unit): Modifier =
+    this.padding(vertical = 4.dp).clickable(onClick = onClick)
 
 @Composable
 private fun ContenidoDetalleAlerta(d: DetalleAlerta) {
@@ -485,75 +557,86 @@ private fun ContenidoDetalleAlerta(d: DetalleAlerta) {
         "REALIZADA" -> MyCarStatusRealizada
         else -> MyCarStatusRealizada
     }
+    val etiquetaEstado = when (d.estado) {
+        "PROGRAMADA" -> "Programada"
+        "PROXIMA" -> "Próxima"
+        "PENDIENTE" -> "Pendiente"
+        "VENCIDA" -> "Vencida"
+        "REALIZADA" -> "Realizada"
+        "ANULADA" -> "Anulada"
+        else -> d.estado
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    etiquetaServicioAlerta(d.codigoTipo, d.tipo, d.servicioOtro),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Azul,
-                    modifier = Modifier.weight(1f)
-                )
-                Surface(shape = RoundedCornerShape(50), color = badge.copy(alpha = 0.15f)) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        d.estado,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
+                        etiquetaServicioAlerta(d.codigoTipo, d.tipo, d.servicioOtro),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Azul
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(d.vehiculoEtiqueta, color = Color(0xFF6881A5), style = MaterialTheme.typography.bodyMedium)
+                }
+                Surface(shape = RoundedCornerShape(50), color = badge.copy(alpha = 0.18f)) {
+                    Text(
+                        etiquetaEstado,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = badge
                     )
                 }
             }
-            Text(d.vehiculoEtiqueta, color = Color(0xFF6881A5))
-            Text("Categoría: ${d.categoria}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
-        }
-    }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Objetivos e intervalos", fontWeight = FontWeight.Bold, color = Celeste)
-            Fila("Criterio", etiquetaCriterioDetalle(d.criterio))
-            Fila("Origen de cálculo", etiquetaOrigenDetalle(d))
-            d.fechaObjetivo?.let { Fila("Fecha objetivo", it) }
-            d.kmObjetivo?.let { Fila("Km objetivo", "%,d km".format(it).replace(',', ' ')) }
-            d.kmBase?.let { Fila("Km base", "%,d km".format(it).replace(',', ' ')) }
-            d.intervaloKm?.let { Fila("Intervalo km", "%,d km".format(it).replace(',', ' ')) }
+            HorizontalDivider(color = Color(0xFFE3ECF5))
+
+            FilaCompacta("Criterio", etiquetaCriterioDetalle(d.criterio))
+            d.fechaObjetivo?.let { FilaCompacta("Fecha objetivo", it) }
+            d.kmObjetivo?.let { FilaCompacta("Kilometraje objetivo", "%,d km".format(it).replace(',', ' ')) }
+            etiquetaMantenimientoReferencia(d)?.let { FilaCompacta("Último servicio", it) }
             if (d.unidadTiempo != null && d.cantidadTiempo != null) {
-                Fila("Intervalo tiempo", "${d.cantidadTiempo} ${d.unidadTiempo.lowercase()}")
+                FilaCompacta("Intervalo temporal", "${d.cantidadTiempo} ${d.unidadTiempo.lowercase()}")
             }
-            d.fechaBase?.let { Fila("Fecha base", it) }
+            d.intervaloKm?.let { FilaCompacta("Intervalo km", "%,d km".format(it).replace(',', ' ')) }
+            FilaCompacta("Origen de cálculo", etiquetaOrigenDetalle(d))
             if (d.codigoTipo == "OTRO") {
-                d.servicioOtro?.takeIf { it.isNotBlank() }?.let { Fila("Servicio (otro)", it) }
+                d.servicioOtro?.takeIf { it.isNotBlank() }?.let { FilaCompacta("Servicio (otro)", it) }
             }
-            d.fechaEstadoUtc?.let { Fila("Último cambio de estado", it) }
-            etiquetaMantenimientoReferencia(d)?.let { Fila("Mantenimiento de referencia", it) }
-            d.idMantenimientoAtencion?.let { Fila("Mantenimiento de atención", "#$it") }
         }
     }
 }
 
 @Composable
-private fun Fila(etiqueta: String, valor: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(etiqueta, style = MaterialTheme.typography.labelMedium, color = Color(0xFF6881A5))
-        Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = CampoLectura) {
-            Text(valor, Modifier.padding(horizontal = 12.dp, vertical = 10.dp), color = Azul)
-        }
+private fun FilaCompacta(etiqueta: String, valor: String) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            etiqueta,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF6881A5),
+            modifier = Modifier.weight(0.42f)
+        )
+        Text(
+            valor,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Azul,
+            modifier = Modifier.weight(0.58f)
+        )
     }
 }
 

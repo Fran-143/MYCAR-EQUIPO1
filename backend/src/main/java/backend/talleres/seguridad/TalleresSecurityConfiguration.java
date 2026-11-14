@@ -24,9 +24,13 @@ public class TalleresSecurityConfiguration {
             throws Exception {
         return http.securityMatcher("/api/v1/rf34/**")
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/api/v1/rf34/talleres", "/api/v1/rf34/talleres/*")
+                        .requestMatchers("/api/v1/rf34/admin/**").denyAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rf34/talleres",
+                                "/api/v1/rf34/talleres/catalogo-global",
+                                "/api/v1/rf34/talleres/*")
                         .authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/rf34/talleres",
+                                "/api/v1/rf34/talleres/asociados",
                                 "/api/v1/rf34/talleres/*/retirar",
                                 "/api/v1/rf34/talleres/*/favorito").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/rf34/talleres/*").authenticated()

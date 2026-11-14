@@ -64,6 +64,8 @@ fun AlertasRoute(
     reiniciarFiltroTodas: Boolean = false,
     onReinicioFiltroConsumido: () -> Unit = {},
     talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
+    onNotificaciones: (() -> Unit)? = null,
+    onPerfil: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val vm: AlertasViewModel = viewModel(key = "rf23-lista-${vehiculos.map { it.first }.joinToString()}-$idVehiculoInicial") {
@@ -168,6 +170,8 @@ fun AlertasRoute(
                 },
                 onAnular = vm::anular,
                 onVerDetalle = { detalleId = it },
+                onNotificaciones = onNotificaciones,
+                onPerfil = onPerfil,
                 modifier = modifier
             )
         }
@@ -186,13 +190,17 @@ fun AlertasScreen(
     onAtenderDesdeFormulario: (Long, String, String?) -> Unit = { _, _, _ -> },
     onAnular: (Long, String) -> Unit = { _, _ -> },
     onVerDetalle: (Long) -> Unit = {},
+    onNotificaciones: (() -> Unit)? = null,
+    onPerfil: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val enVehiculos = estado.ambito == AmbitoAlertas.VEHICULOS
-    Column(
-        modifier.fillMaxSize().background(Fondo).statusBarsPadding().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Column(modifier.fillMaxSize().background(Fondo)) {
+        com.mycar.app.ui.MycarCabeceraApp(onNotificaciones = onNotificaciones, onPerfil = onPerfil)
+        Column(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -233,6 +241,7 @@ fun AlertasScreen(
             )
         } else {
             ContenidoLicencia(estado = estado, onRecargar = onRecargar)
+        }
         }
     }
 }

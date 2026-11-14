@@ -67,6 +67,7 @@ fun NotificacionesRoute(
     repository: NotificacionesRepository,
     onVolver: () -> Unit,
     onAbrirDetalleAlerta: (idVehiculo: Long, idAlerta: Long) -> Unit,
+    onPerfil: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val vm: NotificacionesViewModel = viewModel(key = "rf46-bandeja") {
@@ -103,6 +104,7 @@ fun NotificacionesRoute(
             )
         },
         onCerrarAviso = { avisoDestino = null },
+        onPerfil = onPerfil,
         modifier = modifier
     )
 }
@@ -118,15 +120,17 @@ fun NotificacionesScreen(
     onRecargar: () -> Unit,
     onAbrir: (NotificacionItem) -> Unit,
     onCerrarAviso: () -> Unit,
+    onPerfil: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Fondo)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Column(modifier.fillMaxSize().background(Fondo)) {
+        com.mycar.app.ui.MycarCabeceraApp(onPerfil = onPerfil, conStatusBars = true)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onVolver, modifier = Modifier.testTag("rf46.volver")) {
                 Text("← Volver", color = Azul)
@@ -256,6 +260,7 @@ fun NotificacionesScreen(
                     }
                 }
             }
+        }
         }
     }
 }

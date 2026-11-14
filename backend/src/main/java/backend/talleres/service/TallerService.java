@@ -38,21 +38,49 @@ public class TallerService {
     public ListaTalleres listar(long idUsuario, String filtroOrigen) {
         exigirUsuario(idUsuario);
         String f = normalizarFiltro(filtroOrigen);
-        return new ListaTalleres(dao.listarActivos(idUsuario, f));
+        return new ListaTalleres(dao.listarActivos(idUsuario, f).stream().map(this::sanitizarTaller).toList());
     }
 
     @Transactional(readOnly = true)
     public Taller detalle(long idUsuario, long idTaller) {
         exigirUsuario(idUsuario);
         if (idTaller <= 0) throw new IllegalArgumentException("idTaller inválido");
-        return dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new);
+        return sanitizarTaller(dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new));
     }
 
     @Transactional(readOnly = true)
     public ListaTalleresGlobales listarCatalogoGlobal(long idUsuario, String busqueda) {
         exigirUsuario(idUsuario);
         return new ListaTalleresGlobales(
-                dao.listarGlobalesActivos(idUsuario, busqueda, idUsuarioPilotoDemo));
+                dao.listarGlobalesActivos(idUsuario, busqueda, idUsuarioPilotoDemo).stream()
+                        .map(this::sanitizarGlobal).toList());
+    }
+
+    /**
+     * Alta de ficha oficial en {@code taller_global}. Solo vía endpoint admin (secreto).
+     * {@code contactoAutorizado} default false; no activa contactos sin flag explícito.
+     */
+    @Transactional
+    public TallerGlobal registrarGlobalAdmin(RegistrarTallerGlobalRequest body) {
+        if (body == null) throw new IllegalArgumentException("Solicitud obligatoria");
+        String nombre = validador.nombreObligatorio(body.nombre());
+        String telefono = validador.telefonoOpcional(body.telefono());
+        boolean wa = validador.whatsappCoherente(telefono, body.tieneWhatsapp());
+        boolean autorizado = Boolean.TRUE.equals(body.contactoAutorizado());
+        if (autorizado && (telefono == null || !wa)) {
+            throw new IllegalArgumentException(
+                    "contactoAutorizado requiere teléfono válido y tieneWhatsapp=true");
+        }
+        boolean esDemo = Boolean.TRUE.equals(body.esDemo());
+        try {
+            return dao.insertarGlobal(
+                    nombre, telefono,
+                    validador.correoOpcional(body.correo()),
+                    validador.direccionOpcional(body.direccion()),
+                    wa, autorizado, esDemo);
+        } catch (DataIntegrityViolationException ex) {
+            throw new TallerNombreDuplicado();
+        }
     }
 
     /** RF33 — registrar taller MANUAL (formulario por defecto). */
@@ -93,10 +121,10 @@ public class TallerService {
             throw new TallerYaVinculado();
         }
         try {
-            return dao.insertarAsociado(
+            return sanitizarTaller(dao.insertarAsociado(
                     idUsuario, global.idTallerGlobal(), global.nombre(), global.telefono(),
                     global.correo(), global.direccion(), global.tieneWhatsapp(),
-                    global.contactoAutorizado());
+                    global.contactoAutorizado()));
         } catch (DataIntegrityViolationException ex) {
             if (dao.existeVinculoAsociadoActivo(idUsuario, global.idTallerGlobal())) {
                 throw new TallerYaVinculado();
@@ -133,7 +161,7 @@ public class TallerService {
         } catch (DataIntegrityViolationException ex) {
             throw mapIntegridadAlta(ex);
         }
-        return dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new);
+        return sanitizarTaller(dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new));
     }
 
     /** RF35 — retirar MANUAL o vínculo ASOCIADO (no borra ficha global). */
@@ -147,7 +175,7 @@ public class TallerService {
         if (!dao.retirar(idUsuario, idTaller, body.versionFila())) {
             throw new TallerVersionConflicto();
         }
-        return dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new);
+        return sanitizarTaller(dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new));
     }
 
     @Transactional
@@ -155,11 +183,11 @@ public class TallerService {
         exigirUsuario(idUsuario);
         if (idTaller <= 0) throw new IllegalArgumentException("idTaller inválido");
         var actual = dao.propioActivo(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new);
-        if (actual.favorito()) return actual;
+        if (actual.favorito()) return sanitizarTaller(actual);
         if (!dao.marcarFavoritoAtomico(idUsuario, idTaller)) {
             throw new TallerFavoritoFallido();
         }
-        return dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new);
+        return sanitizarTaller(dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new));
     }
 
     @Transactional
@@ -170,7 +198,7 @@ public class TallerService {
         if (!dao.desmarcarFavorito(idUsuario, idTaller)) {
             throw new TallerFavoritoFallido();
         }
-        return dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new);
+        return sanitizarTaller(dao.propio(idUsuario, idTaller).orElseThrow(TallerNoDisponible::new));
     }
 
     /** RF17/RF20/RF24: valida taller ACTIVO propio; null = Sin taller. */
@@ -217,5 +245,21 @@ public class TallerService {
 
     private static void exigirUsuario(long idUsuario) {
         if (idUsuario <= 0) throw new IllegalArgumentException("Usuario inválido");
+    }
+
+    /** ASOCIADO sin autorización: no devolver teléfono accionable. MANUAL conserva su teléfono. */
+    private Taller sanitizarTaller(Taller t) {
+        if (!"ASOCIADO".equalsIgnoreCase(t.origen()) || t.contactoAutorizado()) return t;
+        return new Taller(
+                t.idTaller(), t.nombre(), null, t.correo(), t.direccion(), t.notas(),
+                t.estado(), t.favorito(), t.versionFila(), t.creadoUtc(),
+                t.origen(), false, false, t.idTallerGlobal(), t.editable());
+    }
+
+    private TallerGlobal sanitizarGlobal(TallerGlobal g) {
+        if (g.contactoAutorizado()) return g;
+        return new TallerGlobal(
+                g.idTallerGlobal(), g.nombre(), null, g.correo(), g.direccion(),
+                false, false, g.estado(), g.esDemo());
     }
 }

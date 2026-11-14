@@ -39,5 +39,8 @@ services:
         value: "false"
       - key: SPRING_FLYWAY_ENABLED
         value: "false"
+      # Secreto admin catálogo oficial (Dashboard only; nunca en Git).
+      - key: MYCAR_TALLER_ADMIN_SECRET
+        sync: false
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError"

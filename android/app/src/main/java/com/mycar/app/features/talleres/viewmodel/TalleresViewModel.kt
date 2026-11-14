@@ -12,17 +12,31 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class FaseTalleres { CARGANDO, LISTO, FORMULARIO, CATALOGO_ASOCIADO, ERROR }
+enum class FaseTalleres { CARGANDO, LISTO, FORMULARIO, CATALOGO_ASOCIADO, DETALLE, ERROR }
 
 data class EstadoTalleres(
     val fase: FaseTalleres = FaseTalleres.CARGANDO,
     val talleres: List<Taller> = emptyList(),
     val filtro: FiltroOrigenTaller = FiltroOrigenTaller.TODOS,
+    val busqueda: String = "",
     val catalogo: List<TallerGlobal> = emptyList(),
+    val catalogoBusqueda: String = "",
     val editando: Taller? = null,
+    val detalle: Taller? = null,
     val mensaje: String? = null,
     val ocupado: Boolean = false
-)
+) {
+    val talleresFiltrados: List<Taller>
+        get() {
+            val q = busqueda.trim()
+            if (q.isEmpty()) return talleres
+            return talleres.filter {
+                it.nombre.contains(q, ignoreCase = true) ||
+                    (it.telefono?.contains(q) == true) ||
+                    (it.direccion?.contains(q, ignoreCase = true) == true)
+            }
+        }
+}
 
 class TalleresViewModel(private val repository: TalleresRepository) : ViewModel() {
     private val mutable = MutableStateFlow(EstadoTalleres())
@@ -31,18 +45,21 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
     init { cargar() }
 
     fun cargar() {
-        val filtro = mutable.value.filtro
-        mutable.value = mutable.value.copy(fase = FaseTalleres.CARGANDO, mensaje = null)
+        val prev = mutable.value
+        mutable.value = prev.copy(fase = FaseTalleres.CARGANDO, mensaje = null)
         viewModelScope.launch {
             try {
-                val lista = repository.listarActivos(filtro)
-                mutable.value = EstadoTalleres(
+                val lista = repository.listarActivos(prev.filtro)
+                mutable.value = prev.copy(
                     fase = FaseTalleres.LISTO,
                     talleres = lista,
-                    filtro = filtro
+                    mensaje = null,
+                    ocupado = false,
+                    editando = null,
+                    detalle = null
                 )
             } catch (e: Exception) {
-                mutable.value = mutable.value.copy(
+                mutable.value = prev.copy(
                     fase = FaseTalleres.ERROR,
                     mensaje = e.message ?: "No se pudieron cargar los talleres"
                 )
@@ -56,15 +73,28 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
         cargar()
     }
 
+    fun cambiarBusqueda(q: String) {
+        mutable.value = mutable.value.copy(busqueda = q)
+    }
+
     fun abrirAlta() {
         mutable.value = mutable.value.copy(fase = FaseTalleres.FORMULARIO, editando = null, mensaje = null)
     }
 
-    fun abrirCatalogoAsociado() {
-        mutable.value = mutable.value.copy(fase = FaseTalleres.CATALOGO_ASOCIADO, ocupado = true, mensaje = null)
+    fun abrirDetalle(t: Taller) {
+        mutable.value = mutable.value.copy(fase = FaseTalleres.DETALLE, detalle = t, mensaje = null)
+    }
+
+    fun abrirCatalogoAsociado(q: String? = null) {
+        mutable.value = mutable.value.copy(
+            fase = FaseTalleres.CATALOGO_ASOCIADO,
+            ocupado = true,
+            mensaje = null,
+            catalogoBusqueda = q.orEmpty()
+        )
         viewModelScope.launch {
             try {
-                val cat = repository.catalogoGlobal(null)
+                val cat = repository.catalogoGlobal(q?.takeIf { it.isNotBlank() })
                 mutable.value = mutable.value.copy(
                     fase = FaseTalleres.CATALOGO_ASOCIADO,
                     catalogo = cat,
@@ -75,6 +105,21 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
                     fase = FaseTalleres.LISTO,
                     ocupado = false,
                     mensaje = e.message ?: "No se pudo cargar el catálogo asociado"
+                )
+            }
+        }
+    }
+
+    fun buscarEnCatalogo(q: String) {
+        mutable.value = mutable.value.copy(catalogoBusqueda = q, ocupado = true)
+        viewModelScope.launch {
+            try {
+                val cat = repository.catalogoGlobal(q.takeIf { it.isNotBlank() })
+                mutable.value = mutable.value.copy(catalogo = cat, ocupado = false)
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    ocupado = false,
+                    mensaje = e.message ?: "No se pudo buscar en el catálogo"
                 )
             }
         }
@@ -91,6 +136,7 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
                     fase = FaseTalleres.LISTO,
                     talleres = lista,
                     filtro = mutable.value.filtro,
+                    busqueda = mutable.value.busqueda,
                     mensaje = "Taller asociado agregado"
                 )
             } catch (e: ErrorTalleres) {
@@ -110,7 +156,7 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
     }
 
     fun cancelarFormulario() {
-        mutable.value = mutable.value.copy(fase = FaseTalleres.LISTO, editando = null, mensaje = null)
+        mutable.value = mutable.value.copy(fase = FaseTalleres.LISTO, editando = null, detalle = null, mensaje = null)
     }
 
     fun guardar(datos: DatosTallerFormulario) {
@@ -126,6 +172,7 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
                     fase = FaseTalleres.LISTO,
                     talleres = lista,
                     filtro = mutable.value.filtro,
+                    busqueda = mutable.value.busqueda,
                     mensaje = "Taller guardado"
                 )
             } catch (e: ErrorTalleres) {
@@ -135,6 +182,7 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
                         fase = FaseTalleres.LISTO,
                         talleres = lista,
                         filtro = mutable.value.filtro,
+                        busqueda = mutable.value.busqueda,
                         mensaje = mensajeApi(e)
                     )
                 } else {
@@ -164,6 +212,7 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
                     fase = FaseTalleres.LISTO,
                     talleres = lista,
                     filtro = mutable.value.filtro,
+                    busqueda = mutable.value.busqueda,
                     mensaje = msg
                 )
             } catch (e: ErrorTalleres) {
@@ -181,25 +230,17 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
         mutable.value = mutable.value.copy(ocupado = true, mensaje = null)
         viewModelScope.launch {
             try {
-                if (t.favorito) {
-                    repository.desmarcarFavorito(t.id)
-                    val lista = repository.listarActivos(mutable.value.filtro)
-                    mutable.value = EstadoTalleres(
-                        fase = FaseTalleres.LISTO,
-                        talleres = lista,
-                        filtro = mutable.value.filtro,
-                        mensaje = if (lista.none { it.favorito })
-                            "Ya no tienes un taller favorito seleccionado" else null
-                    )
-                } else {
-                    repository.marcarFavorito(t.id)
-                    val lista = repository.listarActivos(mutable.value.filtro)
-                    mutable.value = EstadoTalleres(
-                        fase = FaseTalleres.LISTO,
-                        talleres = lista,
-                        filtro = mutable.value.filtro
-                    )
-                }
+                if (t.favorito) repository.desmarcarFavorito(t.id) else repository.marcarFavorito(t.id)
+                val lista = repository.listarActivos(mutable.value.filtro)
+                val actualizado = lista.find { it.id == t.id }
+                mutable.value = mutable.value.copy(
+                    fase = if (mutable.value.fase == FaseTalleres.DETALLE) FaseTalleres.DETALLE else FaseTalleres.LISTO,
+                    talleres = lista,
+                    detalle = actualizado ?: mutable.value.detalle,
+                    ocupado = false,
+                    mensaje = if (!t.favorito) null else if (lista.none { it.favorito })
+                        "Ya no tienes un taller favorito seleccionado" else null
+                )
             } catch (e: ErrorTalleres) {
                 mutable.value = mutable.value.copy(ocupado = false, mensaje = mensajeApi(e))
                 if (e.codigo == "TALLER_NO_DISPONIBLE" || e.codigo == "FAVORITO_NO_ACTUALIZADO") cargar()

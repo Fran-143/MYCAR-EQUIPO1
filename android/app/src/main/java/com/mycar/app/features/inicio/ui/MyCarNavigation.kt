@@ -213,7 +213,7 @@ fun MyCarNavigation(
                                 onVolver = { navegar(navegacion.atras()) },
                                 onSesionInvalida = { sesion.sesionRequerida(cuenta.ciclo) },
                                 onCerrarSesion = { cerrarSesion?.invoke() },
-                                modifier = Modifier.fillMaxSize().statusBarsPadding()
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                         secundaria==SecundariaMyCar.NOTIFICACIONES && cuenta!=null -> {
@@ -225,7 +225,8 @@ fun MyCarNavigation(
                                     detalleAlertaTrasAtencion = idAlerta
                                     navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
                                 },
-                                modifier = Modifier.fillMaxSize().statusBarsPadding()
+                                onPerfil = { navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                         else -> PantallaProximamente(secundaria.titulo,onVolver={ navegar(navegacion.atras()) })
@@ -272,7 +273,9 @@ fun MyCarNavigation(
                                 VehiculosRoute(cuenta.ciclo,cuenta.registro,cuenta.listado,cuenta.pendientes,
                                     onIrInicio={ navegar(navegacion.atras()) },onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     onVerDetalle={ abrirDetalle(it) },
-                                    estadoEnSistema=false,modifier=Modifier.weight(1f),onFormularioAbierto={ formularioAbierto=it })
+                                    estadoEnSistema=false,modifier=Modifier.weight(1f),onFormularioAbierto={ formularioAbierto=it },
+                                    onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
+                                    onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) })
                             }
                             SeccionMyCar.MANTENIMIENTOS -> {
                                 val idKmOverlay = kmOverlayMantenimiento
@@ -287,7 +290,9 @@ fun MyCarNavigation(
                                         estadoEnSistema=false, onRegistroAbierto={ formularioAbierto=it },
                                         recargaRegistroToken = recargaMantenimiento,
                                         onProgramarAlerta = { abrirProgramarDesdeRf17(it) },
-                                        talleresRepository = cuenta.talleres)
+                                        talleresRepository = cuenta.talleres,
+                                        onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
+                                        onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) })
                                     if (idKmOverlay != null) {
                                         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                                             ActualizarKilometrajeRoute(
@@ -355,7 +360,9 @@ fun MyCarNavigation(
                                         reiniciarFiltroTodas = alertasFiltroTodasTrasExito,
                                         onReinicioFiltroConsumido = { alertasFiltroTodasTrasExito = false },
                                         talleresRepository = cuenta.talleres,
-                                        modifier=Modifier.statusBarsPadding())
+                                        onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
+                                        onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
+                                        modifier=Modifier)
                                 }
                             }
                         }

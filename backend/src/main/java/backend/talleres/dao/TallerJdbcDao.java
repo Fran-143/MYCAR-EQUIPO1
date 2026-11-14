@@ -126,6 +126,20 @@ public class TallerJdbcDao implements TallerDao {
     }
 
     @Override
+    public TallerGlobal insertarGlobal(String nombre, String telefono, String correo, String direccion,
+                                       boolean tieneWhatsapp, boolean contactoAutorizado, boolean esDemo) {
+        return jdbc.queryForObject("""
+                INSERT INTO mycar.taller_global
+                    (nombre, telefono, correo, direccion, tiene_whatsapp, contacto_autorizado, es_demo, estado)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVO')
+                RETURNING id_taller_global, nombre, telefono, correo, direccion, tiene_whatsapp,
+                          COALESCE(contacto_autorizado, false) AS contacto_autorizado, estado,
+                          COALESCE(es_demo, false) AS es_demo
+                """, this::mapGlobal,
+                nombre, telefono, correo, direccion, tieneWhatsapp, contactoAutorizado, esDemo);
+    }
+
+    @Override
     public boolean existeVinculoAsociadoActivo(long idUsuario, long idTallerGlobal) {
         Integer n = jdbc.queryForObject("""
                 SELECT count(*)::int FROM mycar.taller

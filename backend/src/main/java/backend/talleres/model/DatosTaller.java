@@ -82,6 +82,17 @@ public final class DatosTaller {
 
     public record VincularAsociadoRequest(long idTallerGlobal) { }
 
+    /** Alta admin de taller oficial en catálogo global (no es taller del usuario). */
+    public record RegistrarTallerGlobalRequest(
+            String nombre,
+            String telefono,
+            String correo,
+            String direccion,
+            Boolean tieneWhatsapp,
+            Boolean contactoAutorizado,
+            Boolean esDemo
+    ) { }
+
     public record ActualizarTallerRequest(
             String nombre,
             String telefono,

@@ -27,7 +27,9 @@ fun VehiculosRoute(
     modifier: Modifier = Modifier,
     onVerDetalle: ((Long) -> Unit)? = null,
     estadoEnSistema: Boolean = true,
-    onFormularioAbierto: (Boolean) -> Unit = {}
+    onFormularioAbierto: (Boolean) -> Unit = {},
+    onNotificaciones: (() -> Unit)? = null,
+    onPerfil: (() -> Unit)? = null
 ) {
     key(claveCuenta) {
         var pantalla by rememberSaveable(claveCuenta) { mutableStateOf("lista") }
@@ -63,7 +65,8 @@ fun VehiculosRoute(
                 if (comprobando) LinearProgressIndicator(Modifier.fillMaxWidth())
                 ListadoVehiculosRoute(claveCuenta, listadoRepository, onVolver = onIrInicio,
                     onAgregar = agregar, onIniciarSesion = onIniciarSesion,
-                    onVerDetalle = onVerDetalle, modifier = Modifier.weight(1f), estadoEnSistema = estadoEnSistema)
+                    onVerDetalle = onVerDetalle, modifier = Modifier.weight(1f), estadoEnSistema = estadoEnSistema,
+                    onNotificaciones = onNotificaciones, onPerfil = onPerfil)
             }
         }
         mensaje?.let { texto ->

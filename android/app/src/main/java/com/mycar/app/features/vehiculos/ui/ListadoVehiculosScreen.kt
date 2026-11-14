@@ -25,13 +25,15 @@ import com.mycar.app.ui.theme.MyCarStatusActivo
 @Composable
 fun ListadoVehiculosRoute(claveCuenta: String, repository: ListadoVehiculosRepository,
                          onVolver: () -> Unit, onAgregar: () -> Unit, onIniciarSesion: () -> Unit,
-                         modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null, estadoEnSistema: Boolean = true) {
+                         modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null, estadoEnSistema: Boolean = true,
+                         onNotificaciones: (() -> Unit)? = null, onPerfil: (() -> Unit)? = null) {
     val vm: ListadoVehiculosViewModel = viewModel(key = "rf09-$claveCuenta",
         factory = remember(repository, claveCuenta) { ListadoVehiculosViewModel.factory(repository, estadoEnSistema) })
     val estado by vm.estado.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.cargar() }
     ListadoVehiculosScreen(estado, vm::cambiarBusqueda, vm::filtrar, vm::cargar,
-        onVolver, onAgregar, onIniciarSesion, modifier = modifier, onVerDetalle = onVerDetalle)
+        onVolver, onAgregar, onIniciarSesion, modifier = modifier, onVerDetalle = onVerDetalle,
+        onNotificaciones = onNotificaciones, onPerfil = onPerfil)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -39,25 +41,32 @@ fun ListadoVehiculosRoute(claveCuenta: String, repository: ListadoVehiculosRepos
 fun ListadoVehiculosScreen(estado: EstadoListadoVehiculos, onBusqueda: (String) -> Unit,
                           onFiltro: (String) -> Unit, onBuscar: () -> Unit,
                           onVolver: () -> Unit, onAgregar: () -> Unit, onIniciarSesion: () -> Unit,
-                          modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null) {
+                          modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null,
+                          onNotificaciones: (() -> Unit)? = null, onPerfil: (() -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
     Scaffold(
         modifier = modifier.fillMaxSize().imePadding(),
         containerColor = colors.background,
         topBar = {
-            Surface(color = colors.surface, shadowElevation = 1.dp) {
-                Row(
-                    Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onVolver) { Text("Volver") }
-                    Text(
-                        "Mis vehículos",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.onPrimaryContainer,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
+            Column {
+                com.mycar.app.ui.MycarCabeceraApp(
+                    onNotificaciones = onNotificaciones,
+                    onPerfil = onPerfil
+                )
+                Surface(color = colors.surface, shadowElevation = 1.dp) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = onVolver) { Text("Volver") }
+                        Text(
+                            "Mis vehículos",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.onPrimaryContainer,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
                 }
             }
         }

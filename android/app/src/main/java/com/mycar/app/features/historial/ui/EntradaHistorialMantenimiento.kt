@@ -38,7 +38,9 @@ fun FlujoHistorialMantenimiento(
     onRegistroAbierto: (Boolean) -> Unit = {},
     recargaRegistroToken: Int = 0,
     onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null,
-    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
+    onNotificaciones: (() -> Unit)? = null,
+    onPerfil: (() -> Unit)? = null
 ) {
     key(claveCuenta) {
         var registrando by rememberSaveable { mutableStateOf(false) }
@@ -64,7 +66,9 @@ fun FlujoHistorialMantenimiento(
                     onVolver = onVolverInicio, modifier = modifier,
                     registroDisponible = mantenimientoRepository != null && !claveCuenta.isNullOrBlank(),
                     onRegistrar = { vehiculoElegido = it; registrando = true }, onIniciarSesion = onIniciarSesion,
-                    talleresRepository = talleresRepository)
+                    talleresRepository = talleresRepository,
+                    onNotificaciones = onNotificaciones,
+                    onPerfil = onPerfil)
             }
         }
     }
@@ -93,15 +97,20 @@ fun EntradaHistorialMantenimiento(
     onSeleccionConfirmada: (Long) -> Unit, onVolver: () -> Unit, onRegistrar: (Long) -> Unit,
     modifier: Modifier = Modifier, registroDisponible: Boolean = false,
     onIniciarSesion: (() -> Unit)? = null,
-    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
+    onNotificaciones: (() -> Unit)? = null,
+    onPerfil: (() -> Unit)? = null
 ) {
     var detalleId by rememberSaveable { mutableStateOf<Long?>(null) }
     BackHandler(onBack = {
         if (detalleId != null) detalleId = null else onVolver()
     })
     if (repository == null || claveCuenta.isNullOrBlank()) {
-        HistorialMantenimientoScreen(EstadoHistorial(), onVolver, {}, {}, {}, {}, modifier,
-            registroDisponible = false, onIniciarSesion = onIniciarSesion)
+        HistorialMantenimientoScreen(
+            EstadoHistorial(), onVolver, {}, {}, {}, {}, modifier,
+            registroDisponible = false, onIniciarSesion = onIniciarSesion,
+            onNotificaciones = onNotificaciones, onPerfil = onPerfil
+        )
         return
     }
     val factory = remember(repository, claveCuenta, idInicial) {
@@ -145,7 +154,9 @@ fun EntradaHistorialMantenimiento(
             estado, onVolver, vm::seleccionar, vm::reintentar, vm::recargar,
             onRegistrar, modifier, registroDisponible, onIniciarSesion,
             onVerDetalle = { detalleId = it },
-            talleresRepository = talleresRepository
+            talleresRepository = talleresRepository,
+            onNotificaciones = onNotificaciones,
+            onPerfil = onPerfil
         )
     }
 }
