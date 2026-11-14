@@ -36,6 +36,7 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
     onVehiculos: ()->Unit, onMantenimientos: (Long?)->Unit, onAlertas: ()->Unit,
     onPerfil: ()->Unit, onNotificaciones: ()->Unit, onRecargar: ()->Unit,
     onVerVehiculo: (Long)->Unit, onActualizarKm: (Long)->Unit,
+    onTalleres: (Long?)->Unit = {},
     modifier: Modifier=Modifier) {
     var desplegado by remember { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFEAF8FF),Color(0xFFF7FCFF))))
@@ -74,6 +75,9 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
                 Text(estado.mensaje ?: "No se pudo cargar el resumen.")
                 Button(onClick=onRecargar) { Text("Reintentar") }
                 TextButton(onClick=onVehiculos) { Text("Ver mis vehículos") }
+                if (estado.mensaje?.contains("inactivo", ignoreCase = true) == true) {
+                    TextButton(onClick={ onMantenimientos(null) }) { Text("Ir a Historial") }
+                }
             }
             FaseInicio.SIN_VEHICULOS -> TarjetaInicio {
                 Text("Aún no tienes vehículos activos",fontWeight=FontWeight.Bold,color=TintaInicio)
@@ -141,6 +145,16 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
                         Text("Consulta, atiende o anula alertas desde la pestaña Alertas.",color=Color(0xFF6881A5))
                         Spacer(Modifier.height(8.dp))
                         Button(onClick=onAlertas, shape=RoundedCornerShape(12.dp)) { Text("Ir a Alertas") }
+                    }
+                    TarjetaInicio {
+                        Text("Mis talleres",color=TintaInicio,fontWeight=FontWeight.Bold)
+                        Text("Gestiona talleres manuales y asocia talleres oficiales MyCar.",color=Color(0xFF6881A5))
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick={ onTalleres(v.idVehiculo) },
+                            shape=RoundedCornerShape(12.dp),
+                            colors=ButtonDefaults.buttonColors(containerColor=TintaInicio)
+                        ) { Text("Ir a Talleres") }
                     }
                     TarjetaInicio {
                         Text("Último mantenimiento realizado",color=TintaInicio,fontWeight=FontWeight.Bold,modifier=Modifier.semantics { heading() })

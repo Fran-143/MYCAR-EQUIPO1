@@ -6,7 +6,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mycar.app.features.historial.domain.*
 import com.mycar.app.ui.MycarCabeceraApp
+import androidx.compose.runtime.mutableIntStateOf
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -38,15 +41,36 @@ fun HistorialMantenimientoScreen(
     registroDisponible: Boolean = false,
     onIniciarSesion: (() -> Unit)? = null,
     onVerDetalle: ((Long) -> Unit)? = null,
+    onOrdenar: (Boolean) -> Unit = {},
+    onRecargarKm: () -> Unit = {},
+    onActualizarKm: ((Long) -> Unit)? = null,
+    onCorregirKm: ((Long) -> Unit)? = null,
+    vehiculoActivo: Boolean = false,
     talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
     onNotificaciones: (() -> Unit)? = null,
-    onPerfil: (() -> Unit)? = null
+    onPerfil: (() -> Unit)? = null,
+    abrirEnTalleres: Boolean = false,
+    onAbrirEnTalleresConsumido: () -> Unit = {}
 ) {
-    var pestana by remember { mutableStateOf(PestanaHistorial.MANTENIMIENTOS) }
-    val tituloSeccion = when (pestana) {
-        PestanaHistorial.TALLERES -> "Talleres"
-        PestanaHistorial.KILOMETRAJE -> "Kilometraje"
-        PestanaHistorial.MANTENIMIENTOS -> "Mantenimientos"
+    var pestana by rememberSaveable {
+        mutableStateOf(
+            if (abrirEnTalleres) PestanaHistorial.TALLERES else PestanaHistorial.MANTENIMIENTOS
+        )
+    }
+    var talleresSubpantalla by remember { mutableStateOf(false) }
+    var solicitarAltaTalleres by remember { mutableIntStateOf(0) }
+    var solicitarVolverTalleres by remember { mutableIntStateOf(0) }
+    LaunchedEffect(abrirEnTalleres) {
+        if (abrirEnTalleres) {
+            pestana = PestanaHistorial.TALLERES
+            onAbrirEnTalleresConsumido()
+        }
+    }
+    val tituloSeccion = when {
+        pestana == PestanaHistorial.TALLERES && talleresSubpantalla -> "Detalle taller"
+        pestana == PestanaHistorial.TALLERES -> "Talleres"
+        pestana == PestanaHistorial.KILOMETRAJE -> "Kilometraje"
+        else -> "Mantenimientos"
     }
 
     Column(modifier.fillMaxSize().background(FondoHistorial).testTag("rf18.pantalla")) {
@@ -57,7 +81,14 @@ fun HistorialMantenimientoScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onVolver, modifier = Modifier.testTag("rf18.volver")) { Text("Volver") }
+                TextButton(
+                    onClick = {
+                        if (pestana == PestanaHistorial.TALLERES && talleresSubpantalla) {
+                            solicitarVolverTalleres += 1
+                        } else onVolver()
+                    },
+                    modifier = Modifier.testTag("rf18.volver")
+                ) { Text("Volver") }
                 Text(
                     tituloSeccion,
                     Modifier.weight(1f),
@@ -74,48 +105,84 @@ fun HistorialMantenimientoScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = CelesteHistorial)
                     ) { Text("Registrar") }
                 }
+                if (pestana == PestanaHistorial.KILOMETRAJE && onActualizarKm != null) {
+                    Button(
+                        onClick = { estado.seleccionado?.id?.let(onActualizarKm) },
+                        enabled = estado.seleccionado?.activo == true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("rf14.desdeHistorial"),
+                        colors = ButtonDefaults.buttonColors(containerColor = CelesteHistorial)
+                    ) { Text("Actualizar") }
+                }
+                if (pestana == PestanaHistorial.TALLERES && !talleresSubpantalla) {
+                    com.mycar.app.features.talleres.ui.BotonAgregarTaller(
+                        onAgregar = { solicitarAltaTalleres += 1 },
+                        enabled = true
+                    )
+                }
             }
         }
 
-        // Barra siempre debajo del título de sección (Talleres / Mantenimientos / Km).
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-            PestanasHistorial(pestana) { pestana = it }
+        // Tabs del historial: ocultas en detalle/formulario de talleres.
+        if (!(pestana == PestanaHistorial.TALLERES && talleresSubpantalla)) {
+            Surface(color = Color.White, shadowElevation = 0.dp) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text(
+                        "Historial integral",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF6881A5),
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    PestanasHistorial(pestana) { pestana = it }
+                }
+            }
         }
 
-        if (pestana == PestanaHistorial.TALLERES && talleresRepository != null) {
-            com.mycar.app.features.talleres.ui.TalleresRoute(
-                repository = talleresRepository,
-                onVolver = onVolver,
-                embebidoEnHistorial = true,
-                modifier = Modifier.weight(1f)
-            )
-            return
-        }
-
-        LazyColumn(
+        when {
+            pestana == PestanaHistorial.TALLERES && talleresRepository != null -> {
+                com.mycar.app.features.talleres.ui.TalleresRoute(
+                    repository = talleresRepository,
+                    onVolver = onVolver,
+                    embebidoEnHistorial = true,
+                    onFormularioAbierto = { talleresSubpantalla = it },
+                    solicitarAltaTick = solicitarAltaTalleres,
+                    solicitarVolverTick = solicitarVolverTalleres,
+                    modifier = Modifier.weight(1f).testTag("rf34.enHistorial")
+                )
+            }
+            pestana == PestanaHistorial.TALLERES -> {
+                Column(
+                    Modifier.weight(1f).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MensajeHistorial(
+                        "Talleres no disponibles",
+                        "No se pudo conectar el módulo de talleres. Cierra sesión, vuelve a entrar o reintenta."
+                    )
+                    onIniciarSesion?.let { Button(onClick = it) { Text("Reintentar sesión") } }
+                }
+            }
+            else -> LazyColumn(
             Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            if (estado.vehiculos.isNotEmpty() && pestana != PestanaHistorial.TALLERES) {
+            if (estado.vehiculos.isNotEmpty()) {
                 item { SelectorVehiculoHistorial(estado, onSeleccionar) }
             }
             estado.aviso?.let { item { MensajeHistorial("Vehículo no disponible", it) } }
             when (pestana) {
                 PestanaHistorial.KILOMETRAJE -> item {
-                    MensajeHistorial(
-                        "Historial de kilometraje",
-                        if (estado.seleccionado == null) "Elige un vehículo para ver lecturas."
-                        else "Las lecturas de kilometraje se mostrarán aquí (RF15). Mientras tanto usa Actualizar kilometraje desde el vehículo."
+                    ContenidoKilometrajeHistorial(
+                        estado = estado,
+                        onRecargarKm = onRecargarKm,
+                        onReintentar = onReintentar,
+                        onOrdenar = onOrdenar,
+                        onCorregirKm = onCorregirKm,
+                        vehiculoActivo = vehiculoActivo
                     )
                 }
-                PestanaHistorial.TALLERES -> item {
-                    MensajeHistorial(
-                        "Talleres del vehículo",
-                        if (estado.seleccionado == null) "Elige un vehículo para ver talleres."
-                        else "El catálogo de talleres llegará con RF36. Puedes anotar el taller al registrar o editar un mantenimiento."
-                    )
-                }
+                PestanaHistorial.TALLERES -> { /* manejado arriba */ }
                 PestanaHistorial.MANTENIMIENTOS -> when (estado.fase) {
                     FaseHistorial.SESION_REQUERIDA -> item {
                         MensajeHistorial(
@@ -203,6 +270,7 @@ fun HistorialMantenimientoScreen(
                 }
             }
         }
+        }
     }
 }
 
@@ -263,27 +331,45 @@ private fun PestanasHistorial(activa: PestanaHistorial, onCambiar: (PestanaHisto
             PestanaHistorial.TALLERES to ("Talleres" to "rf18.tab.talleres")
         ).forEach { (pestana, etiqueta) ->
             val seleccionada = pestana == activa
-            OutlinedButton(
-                onClick = { onCambiar(pestana) },
-                enabled = true,
-                modifier = Modifier.weight(1f).testTag(etiqueta.second),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 3.dp, vertical = 10.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (seleccionada) CelesteHistorial else AzulHistorial.copy(alpha = 0.25f)
-                ),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (seleccionada) Color.White else Color.Transparent,
-                    contentColor = if (seleccionada) CelesteHistorial else AzulHistorial
-                )
-            ) {
-                Text(
-                    etiqueta.first,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Normal,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
+            if (seleccionada) {
+                Button(
+                    onClick = { onCambiar(pestana) },
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp).testTag(etiqueta.second),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AzulHistorial,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        etiqueta.first,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { onCambiar(pestana) },
+                    modifier = Modifier.weight(1f).heightIn(min = 44.dp).testTag(etiqueta.second),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
+                    border = BorderStroke(1.dp, AzulHistorial.copy(alpha = 0.35f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White,
+                        contentColor = AzulHistorial
+                    )
+                ) {
+                    Text(
+                        etiqueta.first,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
@@ -345,10 +431,158 @@ private fun TarjetaMantenimientoHistorial(
     }
 }
 
-private fun kilometrajeHistorial(km: Int): String = DecimalFormat(
-    "#,##0",
+@Composable
+private fun ContenidoKilometrajeHistorial(
+    estado: EstadoHistorial,
+    onRecargarKm: () -> Unit,
+    onReintentar: () -> Unit,
+    onOrdenar: (Boolean) -> Unit,
+    onCorregirKm: ((Long) -> Unit)? = null,
+    vehiculoActivo: Boolean = false
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "Historial de kilometraje",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = AzulHistorial
+        )
+        if (estado.seleccionado == null) {
+            MensajeHistorial("Elige un vehículo", "Selecciona un vehículo para ver sus lecturas de kilometraje.")
+            return
+        }
+        if (estado.seleccionado?.activo == false) {
+            MensajeHistorial(
+                "Vehículo inactivo",
+                "Puedes consultar sus lecturas. Actualizar kilometraje está disponible solo para vehículos activos."
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = estado.ordenRecientes,
+                onClick = { onOrdenar(true) },
+                label = { Text("Más reciente") }
+            )
+            FilterChip(
+                selected = !estado.ordenRecientes,
+                onClick = { onOrdenar(false) },
+                label = { Text("Más antiguo") }
+            )
+        }
+        when (estado.faseKm) {
+            FaseKilometrajeHistorial.IDLE, FaseKilometrajeHistorial.CARGANDO -> {
+                LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteHistorial)
+                Text("Cargando lecturas…", color = AzulHistorial)
+            }
+            FaseKilometrajeHistorial.ERROR -> {
+                MensajeHistorial("No se pudo cargar el kilometraje", estado.mensajeKm ?: "Inténtalo de nuevo") {
+                    Button(onClick = onReintentar) { Text("Reintentar") }
+                }
+            }
+            FaseKilometrajeHistorial.VACIO -> {
+                MensajeHistorial(
+                    "Sin registros",
+                    estado.mensajeKm ?: "Todavía no hay lecturas para este vehículo."
+                )
+            }
+            FaseKilometrajeHistorial.LISTO -> {
+                val idUltima = estado.lecturasKm.maxWithOrNull(
+                    compareBy<LecturaKilometrajeHistorial>({ it.fechaUtc.orEmpty() }, { it.id })
+                )?.id
+                estado.lecturasKm.forEach { l ->
+                    var menuAbierto by remember(l.id) { mutableStateOf(false) }
+                    val esUltima = l.id == idUltima
+                    val yaCorregida = l.kmAnteriorCorreccion != null
+                    val puedeCorregir = esUltima && !yaCorregida && vehiculoActivo &&
+                        onCorregirKm != null && estado.lecturasKm.size >= 2
+                    Card(
+                        Modifier.fillMaxWidth().testTag("rf15.lectura.${l.id}"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        "${kilometrajeHistorial(l.km)} km",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AzulHistorial
+                                    )
+                                    if (esUltima) {
+                                        Text(
+                                            if (yaCorregida) "Última lectura · Ya corregida" else "Última lectura",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = CelesteHistorial
+                                        )
+                                    }
+                                }
+                                if (puedeCorregir) {
+                                    Box {
+                                        TextButton(
+                                            onClick = { menuAbierto = true },
+                                            modifier = Modifier.testTag("rf16.menu.${l.id}")
+                                        ) { Text("⋯") }
+                                        DropdownMenu(
+                                            expanded = menuAbierto,
+                                            onDismissRequest = { menuAbierto = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Corregir kilometraje") },
+                                                onClick = {
+                                                    menuAbierto = false
+                                                    onCorregirKm?.invoke(l.id)
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Text(
+                                "Origen: ${etiquetaOrigenKm(l.origen)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF6881A5)
+                            )
+                            l.fechaUtc?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
+                            }
+                            if (l.kmAnteriorCorreccion != null) {
+                                Text(
+                                    "Corregido desde ${kilometrajeHistorial(l.kmAnteriorCorreccion)} km",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF6881A5)
+                                )
+                                l.motivoCorreccion?.let {
+                                    Text(
+                                        "Motivo: $it",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF6881A5)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                TextButton(onClick = onRecargarKm, modifier = Modifier.fillMaxWidth().testTag("rf15.actualizar")) {
+                    Text("Actualizar lecturas")
+                }
+            }
+        }
+    }
+}
+
+private fun kilometrajeHistorial(km: Number): String = DecimalFormat(
+    "#,##0.##",
     DecimalFormatSymbols(Locale.ROOT).apply { groupingSeparator = ' ' }
 ).format(km)
+
+private fun etiquetaOrigenKm(origen: String): String = when (origen) {
+    "INICIAL" -> "Registro inicial"
+    "ACTUALIZACION" -> "Actualización"
+    else -> origen
+}
 
 @Composable
 private fun MensajeHistorial(titulo: String, texto: String, acciones: @Composable () -> Unit = {}) {

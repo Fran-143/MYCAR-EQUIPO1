@@ -10,6 +10,12 @@ class RemoteActualizarKilometrajeRepository(private val api: KilometrajeApi) : A
     override suspend fun contexto(idVehiculo: Long): ContextoKilometrajeDto =
         exitoso(api.contexto(idVehiculo), idVehiculo) { it.idVehiculo == idVehiculo && it.kmActual > 0 && it.idLectura > 0 }
 
+    override suspend fun listarLecturas(idVehiculo: Long): List<LecturaKilometrajeDto> {
+        val r = api.listarLecturas(idVehiculo)
+        if (!r.isSuccessful) throw fallo(r)
+        return r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
+    }
+
     override suspend fun registrar(idVehiculo: Long, solicitud: SolicitudActualizarKmDto): ResultadoActualizarKmDto =
         exitoso(api.registrar(idVehiculo, solicitud), idVehiculo) {
             it.idVehiculo == idVehiculo && it.kmActual == solicitud.kmNuevo && it.estadoOperacion == "CONFIRMADA"
@@ -17,6 +23,26 @@ class RemoteActualizarKilometrajeRepository(private val api: KilometrajeApi) : A
 
     override suspend fun operacion(idOperacion: UUID): EstadoOperacionKmDto {
         val r = api.operacion(idOperacion)
+        if (!r.isSuccessful) throw fallo(r)
+        return r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
+    }
+
+    override suspend fun contextoCorreccion(idVehiculo: Long, idLectura: Long): ContextoCorreccionKmDto =
+        exitoso(api.contextoCorreccion(idVehiculo, idLectura), idVehiculo) {
+            it.idVehiculo == idVehiculo && it.idLectura == idLectura
+        }
+
+    override suspend fun corregir(
+        idVehiculo: Long,
+        idLectura: Long,
+        solicitud: SolicitudCorregirKmDto
+    ): ResultadoCorregirKmDto =
+        exitoso(api.corregir(idVehiculo, idLectura, solicitud), idVehiculo) {
+            it.idVehiculo == idVehiculo && it.idLectura == idLectura && it.estadoOperacion == "CONFIRMADA"
+        }
+
+    override suspend fun operacionCorreccion(idOperacion: UUID): EstadoOperacionCorreccionKmDto {
+        val r = api.operacionCorreccion(idOperacion)
         if (!r.isSuccessful) throw fallo(r)
         return r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
     }

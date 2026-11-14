@@ -41,6 +41,15 @@ class ActualizarKilometrajeReaperturaTest {
     ) : ActualizarKilometrajeRepository {
         override suspend fun contexto(idVehiculo: Long) =
             ContextoKilometrajeDto(idVehiculo, 11L, km, "2026-10-28T12:00:00Z", 1, "ACTIVO")
+        override suspend fun listarLecturas(idVehiculo: Long) = emptyList<com.mycar.app.features.vehiculos.data.LecturaKilometrajeDto>()
+        override suspend fun contextoCorreccion(idVehiculo: Long, idLectura: Long) =
+            error("no usado en esta prueba")
+        override suspend fun corregir(
+            idVehiculo: Long,
+            idLectura: Long,
+            solicitud: com.mycar.app.features.vehiculos.data.SolicitudCorregirKmDto
+        ) = error("no usado en esta prueba")
+        override suspend fun operacionCorreccion(idOperacion: UUID) = error("no usado en esta prueba")
         override suspend fun registrar(idVehiculo: Long, solicitud: SolicitudActualizarKmDto): ResultadoActualizarKmDto {
             ultimoIdRegistrado = solicitud.idOperacion
             if (fallar) throw IllegalStateException("Fallo de red")

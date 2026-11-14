@@ -1,5 +1,9 @@
 package com.mycar.app.features.talleres.domain
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -26,7 +30,8 @@ object WhatsAppEnlace {
     fun uriWhatsApp(telefono: String?, mensaje: String = MENSAJE_CONSULTA_DEFAULT): String? {
         val e164 = normalizarPeruE164(telefono) ?: return null
         val texto = mensaje.trim().ifEmpty { MENSAJE_CONSULTA_DEFAULT }
-        val encoded = URLEncoder.encode(texto, StandardCharsets.UTF_8)
+        // wa.me espera %20; URLEncoder usa '+' para espacios y a veces falla en apps.
+        val encoded = URLEncoder.encode(texto, StandardCharsets.UTF_8).replace("+", "%20")
         return "https://wa.me/$e164?text=$encoded"
     }
 
@@ -37,5 +42,32 @@ object WhatsAppEnlace {
         val num = e164 ?: telefono.filter { it.isDigit() || it == '+' }
         if (num.isBlank()) return null
         return if (num.startsWith("+")) "tel:$num" else "tel:+$num"
+    }
+
+    /**
+     * Abre WhatsApp sin depender de [Intent.resolveActivity] (en Android 11+ falla
+     * sin `<queries>` y bloqueaba el botón aunque WhatsApp estuviera instalado).
+     * @return null si OK; mensaje de error si no se pudo abrir.
+     */
+    fun abrir(context: Context, telefono: String?, mensaje: String = MENSAJE_CONSULTA_DEFAULT): String? {
+        val wa = uriWhatsApp(telefono, mensaje) ?: return "Número de WhatsApp no válido para Perú."
+        val uri = Uri.parse(wa)
+        val intents = listOf(
+            Intent(Intent.ACTION_VIEW, uri).setPackage("com.whatsapp"),
+            Intent(Intent.ACTION_VIEW, uri).setPackage("com.whatsapp.w4b"),
+            Intent(Intent.ACTION_VIEW, uri)
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                return null
+            } catch (_: ActivityNotFoundException) {
+                // probar siguiente
+            } catch (_: Exception) {
+                // probar siguiente
+            }
+        }
+        return "No se pudo abrir WhatsApp. Prueba llamar o instala WhatsApp."
     }
 }

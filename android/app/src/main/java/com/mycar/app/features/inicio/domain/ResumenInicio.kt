@@ -22,6 +22,8 @@ data class EstadoResumenInicio(
 }
 interface ResumenInicioRepository {
     suspend fun vehiculosActivos(): List<VehiculoResumenDto>
+    /** Incluye inactivos para detectar principal inactivo (RF50 + historial). */
+    suspend fun vehiculosTodos(): List<VehiculoResumenDto> = emptyList()
     suspend fun bloques(vehiculo: VehiculoResumenDto): BloquesInicio
 }
 class ErrorResumenInicio(val sesion: Boolean = false, val inconsistente: Boolean = false) : Exception()

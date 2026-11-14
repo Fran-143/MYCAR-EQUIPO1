@@ -59,6 +59,10 @@ fun TalleresRoute(
     onVolver: (() -> Unit)? = null,
     embebidoEnHistorial: Boolean = false,
     onFormularioAbierto: (Boolean) -> Unit = {},
+    /** Incrementar desde el padre (p. ej. botón Agregar junto al título) para abrir el alta. */
+    solicitarAltaTick: Int = 0,
+    /** Incrementar desde el padre para cerrar detalle/formulario embebido. */
+    solicitarVolverTick: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val factory = remember(repository) {
@@ -77,6 +81,12 @@ fun TalleresRoute(
                 estado.fase == FaseTalleres.DETALLE
         )
     }
+    LaunchedEffect(solicitarAltaTick) {
+        if (solicitarAltaTick > 0) vm.abrirAlta()
+    }
+    LaunchedEffect(solicitarVolverTick) {
+        if (solicitarVolverTick > 0) vm.cancelarFormulario()
+    }
     when (estado.fase) {
         FaseTalleres.FORMULARIO -> FormularioTallerScreen(
             editando = estado.editando,
@@ -84,7 +94,7 @@ fun TalleresRoute(
             mensaje = estado.mensaje,
             onCancelar = vm::cancelarFormulario,
             onGuardar = vm::guardar,
-            onIrAsociado = { vm.abrirCatalogoAsociado() },
+            onIrAsociado = { vm.abrirCatalogoAsociado("PRUEBA") },
             modifier = modifier
         )
         FaseTalleres.CATALOGO_ASOCIADO -> CatalogoAsociadoScreen(
@@ -106,11 +116,12 @@ fun TalleresRoute(
                 onEditar = { vm.abrirEdicion(d) },
                 onFavorito = { vm.alternarFavorito(d) },
                 onRetirar = { vm.retirar(d) },
+                embebidoEnHistorial = embebidoEnHistorial,
                 modifier = modifier
             )
         } ?: TalleresListScreen(
             estado = estado, onVolver = onVolver, embebidoEnHistorial = embebidoEnHistorial,
-            onAgregar = vm::abrirAlta, onBuscarAsociado = { vm.abrirCatalogoAsociado() },
+            onAgregar = vm::abrirAlta,
             onFiltro = vm::cambiarFiltro, onBusqueda = vm::cambiarBusqueda,
             onAbrirDetalle = vm::abrirDetalle, onFavorito = vm::alternarFavorito,
             onReintentar = vm::cargar, modifier = modifier
@@ -120,7 +131,6 @@ fun TalleresRoute(
             onVolver = onVolver,
             embebidoEnHistorial = embebidoEnHistorial,
             onAgregar = vm::abrirAlta,
-            onBuscarAsociado = { vm.abrirCatalogoAsociado() },
             onFiltro = vm::cambiarFiltro,
             onBusqueda = vm::cambiarBusqueda,
             onAbrirDetalle = vm::abrirDetalle,
@@ -136,7 +146,6 @@ fun TalleresListScreen(
     estado: EstadoTalleres,
     onVolver: (() -> Unit)?,
     onAgregar: () -> Unit,
-    onBuscarAsociado: () -> Unit = {},
     onFiltro: (FiltroOrigenTaller) -> Unit = {},
     onBusqueda: (String) -> Unit = {},
     onAbrirDetalle: (Taller) -> Unit,
@@ -186,11 +195,6 @@ fun TalleresListScreen(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (embebidoEnHistorial) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        BotonAgregarTaller(onAgregar = onAgregar, enabled = !estado.ocupado)
-                    }
-                }
                 OutlinedTextField(
                     value = estado.busqueda,
                     onValueChange = onBusqueda,
@@ -221,22 +225,19 @@ fun TalleresListScreen(
                         )
                     }
                 }
-                OutlinedButton(
-                    onClick = onBuscarAsociado,
-                    modifier = Modifier.fillMaxWidth().testTag("rf33.buscar.asociado"),
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = !estado.ocupado
-                ) { Text("Buscar taller asociado a MyCar") }
                 estado.mensaje?.let { Text(it, color = Celeste, modifier = Modifier.testTag("rf34.mensaje")) }
                 val lista = estado.talleresFiltrados
                 if (lista.isEmpty()) {
                     Text(
-                        "Aún no tienes talleres registrados",
+                        "Aún no tienes talleres en Mis talleres",
                         color = Azul,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.testTag("rf34.vacio")
                     )
-                    Text("Agrega un taller manual o busca un asociado MyCar.", color = Color(0xFF6881A5))
+                    Text(
+                        "El taller oficial MyCar se vincula solo. Usa Agregar para registrar uno manual.",
+                        color = Color(0xFF6881A5)
+                    )
                 } else {
                     lista.forEach { t ->
                         TarjetaTaller(
@@ -321,19 +322,23 @@ fun DetalleTallerScreen(
     onEditar: () -> Unit,
     onFavorito: () -> Unit,
     onRetirar: () -> Unit,
+    embebidoEnHistorial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var confirmar by remember { mutableStateOf(false) }
-    Column(modifier.fillMaxSize().background(Fondo).testTag("rf34.detalle")) {
-        Surface(color = Color.White, shadowElevation = 1.dp) {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onVolver) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Azul)
+    Column(modifier.fillMaxSize().background(if (embebidoEnHistorial) Color.Transparent else Fondo).testTag("rf34.detalle")) {
+        // Embebido: el padre ya muestra «Detalle taller» + Volver (sin tarjeta duplicada).
+        if (!embebidoEnHistorial) {
+            Surface(color = Color.White, shadowElevation = 1.dp) {
+                Row(
+                    Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onVolver) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Azul)
+                    }
+                    Text("Detalle taller", fontWeight = FontWeight.Bold, color = Azul, style = MaterialTheme.typography.titleLarge)
                 }
-                Text("Taller", fontWeight = FontWeight.Bold, color = Azul, style = MaterialTheme.typography.titleLarge)
             }
         }
         Column(
@@ -690,21 +695,34 @@ fun CatalogoAsociadoScreen(
                 value = q,
                 onValueChange = { q = it },
                 modifier = Modifier.fillMaxWidth().testTag("rf33.catalogo.buscar"),
-                placeholder = { Text("Buscar en catálogo MyCar") },
+                placeholder = { Text("Ej. PRUEBA o MyCar") },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Celeste) },
-                trailingIcon = {
-                    TextButton(onClick = { onBuscar(q) }, enabled = !ocupado) { Text("Buscar") }
-                },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
-            mensaje?.let { Text(it, color = Color(0xFFC62828)) }
-            if (catalogo.isEmpty()) {
-                Text("No hay talleres asociados disponibles.", color = Azul)
-                Text(
-                    "Un administrador MyCar debe registrar talleres oficiales en el catálogo.",
-                    color = Color(0xFF6881A5)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onSearch = { onBuscar(q) }
                 )
+            )
+            Button(
+                onClick = { onBuscar(q) },
+                enabled = !ocupado,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Azul),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text(if (ocupado) "Buscando…" else "Buscar en catálogo") }
+            TextButton(
+                onClick = { q = ""; onBuscar("") },
+                enabled = !ocupado,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Ver todos los oficiales") }
+            mensaje?.let { Text(it, color = Color(0xFFC62828)) }
+            if (ocupado && catalogo.isEmpty()) {
+                LinearProgressIndicator(Modifier.fillMaxWidth(), color = Celeste)
+                Text("Cargando catálogo oficial…", color = Azul)
+            } else if (catalogo.isEmpty()) {
+                Text("No hay talleres en esta búsqueda.", color = Azul)
+                Text("Prueba «Ver todos» o escribe PRUEBA.", color = Color(0xFF6881A5))
             } else {
                 catalogo.forEach { g ->
                     Surface(
@@ -724,6 +742,14 @@ fun CatalogoAsociadoScreen(
                                 Column(Modifier.weight(1f)) {
                                     Text(g.nombre, fontWeight = FontWeight.SemiBold, color = Azul)
                                     BadgeOrigen(asociado = true)
+                                    if (g.contactoAutorizado) {
+                                        Text(
+                                            "WhatsApp autorizado",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF128C7E),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                             g.telefono?.let { Text(it, color = Color(0xFF6881A5)) }
@@ -751,7 +777,7 @@ fun CatalogoAsociadoScreen(
 }
 
 @Composable
-private fun BotonAgregarTaller(onAgregar: () -> Unit, enabled: Boolean) {
+fun BotonAgregarTaller(onAgregar: () -> Unit, enabled: Boolean) {
     Button(
         onClick = onAgregar,
         enabled = enabled,

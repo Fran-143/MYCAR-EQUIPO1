@@ -17,7 +17,38 @@ class CoordinadorInicio(private val repository: ResumenInicioRepository, private
         return scope.launch {
             try {
                 val lista=repository.vehiculosActivos()
-                val elegido=ReglasResumenInicio.validarYSeleccionar(lista,anterior)
+                if (lista.isEmpty()) {
+                    val todos = runCatching { repository.vehiculosTodos() }.getOrElse { emptyList() }
+                    val principalInactivo = todos.any {
+                        it.principal && it.estadoVehiculo.equals("INACTIVO", ignoreCase = true)
+                    }
+                    if (turno != revision) return@launch
+                    if (principalInactivo) {
+                        mutable.value = EstadoResumenInicio(
+                            fase = FaseInicio.INCONSISTENTE,
+                            mensaje = "Tu vehículo principal está inactivo. Consúltalo en Historial o actívalo en Vehículos."
+                        )
+                        return@launch
+                    }
+                    mutable.value = EstadoResumenInicio(fase = FaseInicio.SIN_VEHICULOS)
+                    return@launch
+                }
+                val elegido=try {
+                    ReglasResumenInicio.validarYSeleccionar(lista,anterior)
+                } catch (e: ErrorResumenInicio) {
+                    if (e.inconsistente) {
+                        val todos = runCatching { repository.vehiculosTodos() }.getOrElse { emptyList() }
+                        if (todos.any { it.principal && it.estadoVehiculo.equals("INACTIVO", ignoreCase = true) }) {
+                            if (turno != revision) return@launch
+                            mutable.value = EstadoResumenInicio(
+                                fase = FaseInicio.INCONSISTENTE,
+                                mensaje = "Tu vehículo principal está inactivo. Consúltalo en Historial o actívalo en Vehículos."
+                            )
+                            return@launch
+                        }
+                    }
+                    throw e
+                }
                 if(turno!=revision) return@launch
                 mutable.value=EstadoResumenInicio(if(elegido==null) FaseInicio.SIN_VEHICULOS else FaseInicio.LISTO,lista,elegido)
                 if(elegido!=null) cargarBloques(turno,lista.single { it.idVehiculo==elegido })

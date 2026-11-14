@@ -150,6 +150,31 @@ fun DetalleAlertaRoute(
         DetalleAlertaViewModel(repository, idVehiculo, idAlerta)
     }
     val estado by vm.estado.collectAsStateWithLifecycle()
+    var preferenciaContactoAplicada by remember(idAlerta) { mutableStateOf(false) }
+    // Prioridad: favorito del usuario (cualquiera) → si no hay, taller de sistema (Prueba).
+    LaunchedEffect(estado.fase, estado.detalle?.contactoTaller, talleresRepository) {
+        if (preferenciaContactoAplicada) return@LaunchedEffect
+        if (estado.fase != FaseDetalleAlerta.LISTO) return@LaunchedEffect
+        val repo = talleresRepository ?: return@LaunchedEffect
+        val c = estado.detalle?.contactoTaller
+        preferenciaContactoAplicada = true
+        val lista = runCatching {
+            repo.listarActivos(com.mycar.app.features.talleres.domain.FiltroOrigenTaller.TODOS)
+        }.getOrElse { emptyList() }
+        val favorito = lista.firstOrNull { it.favorito }
+        if (favorito != null) {
+            if (c?.idTaller != favorito.id) vm.elegirContacto(favorito.id)
+            return@LaunchedEffect
+        }
+        if (PoliticaContactoTaller.puedeContactar(c)) return@LaunchedEffect
+        val prueba = lista.firstOrNull {
+            it.esAsociado && it.contactoAutorizado &&
+                it.nombre.contains("PRUEBA", ignoreCase = true)
+        } ?: lista.firstOrNull { it.esAsociado && it.contactoAutorizado }
+        if (prueba != null && prueba.id != c?.idTaller) {
+            vm.elegirContacto(prueba.id)
+        }
+    }
     DetalleAlertaScreen(
         estado = estado,
         onVolver = onVolver,
@@ -226,16 +251,9 @@ fun DetalleAlertaScreen(
                             contacto = d.contactoTaller,
                             ocupado = estado.ocupado,
                             onWhatsApp = { tel ->
-                                val wa = WhatsAppEnlace.uriWhatsApp(tel)
-                                if (wa == null) {
-                                    avisoContacto = "Número de WhatsApp no válido para Perú."
-                                    return@ContactoTallerAlertaCard
-                                }
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(wa))
-                                if (intent.resolveActivity(context.packageManager) != null) {
-                                    context.startActivity(intent)
-                                } else {
-                                    avisoContacto = "WhatsApp no está disponible. Puedes llamar o copiar el número."
+                                val error = WhatsAppEnlace.abrir(context, tel)
+                                if (error != null) {
+                                    avisoContacto = error
                                     telefonoFallback = WhatsAppEnlace.normalizarPeruE164(tel)
                                 }
                             },
@@ -440,6 +458,7 @@ private fun ContactoTallerAlertaCard(
                                 "EXPLICITO" -> "Elegido para esta alerta"
                                 "MANTENIMIENTO_REF" -> "Taller del último mantenimiento"
                                 "FAVORITO" -> "Tu taller favorito"
+                                "SISTEMA" -> "Taller MyCar de prueba"
                                 else -> contacto.origenSugerencia
                             },
                             style = MaterialTheme.typography.labelSmall,

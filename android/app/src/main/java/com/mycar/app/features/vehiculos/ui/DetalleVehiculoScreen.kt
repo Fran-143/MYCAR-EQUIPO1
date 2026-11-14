@@ -1,6 +1,8 @@
 package com.mycar.app.features.vehiculos.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,8 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -18,11 +23,15 @@ import com.mycar.app.R
 import com.mycar.app.features.vehiculos.data.DetalleVehiculoDto
 import com.mycar.app.features.vehiculos.domain.DetalleVehiculosRepository
 import com.mycar.app.features.vehiculos.viewmodel.*
-import com.mycar.app.ui.theme.MyCarStatusActivo
+import com.mycar.app.ui.theme.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val FondoDetalle = MyCarBg
+private val AzulDetalle = MyCarNavy
+private val CelesteDetalle = MyCarTeal
 
 @Composable
 fun DetalleVehiculoRoute(
@@ -32,6 +41,8 @@ fun DetalleVehiculoRoute(
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onActualizarKm: (() -> Unit)? = null,
+    onEditarDatos: (() -> Unit)? = null,
+    onCambioOperativo: (() -> Unit)? = null,
     recargaToken: Int = 0,
     modifier: Modifier = Modifier
 ) {
@@ -40,8 +51,20 @@ fun DetalleVehiculoRoute(
         factory = remember(repository, idVehiculo) { DetalleVehiculoViewModel.factory(idVehiculo, repository) }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
+    LaunchedEffect(vm) { vm.cargar() }
     LaunchedEffect(recargaToken) { if (recargaToken > 0) vm.cargar() }
-    DetalleVehiculoScreen(estado, vm::cargar, onVolver, onIniciarSesion, onActualizarKm, modifier)
+    DetalleVehiculoScreen(
+        estado = estado,
+        onRecargar = vm::cargar,
+        onVolver = onVolver,
+        onIniciarSesion = onIniciarSesion,
+        onActualizarKm = onActualizarKm,
+        onEditarDatos = onEditarDatos,
+        onEstablecerPrincipal = { vm.establecerPrincipal { onCambioOperativo?.invoke() } },
+        onActivar = { vm.activar { onCambioOperativo?.invoke() } },
+        onDesactivar = { vm.desactivar { onCambioOperativo?.invoke() } },
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -51,57 +74,270 @@ fun DetalleVehiculoScreen(
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onActualizarKm: (() -> Unit)? = null,
+    onEditarDatos: (() -> Unit)? = null,
+    onEstablecerPrincipal: (() -> Unit)? = null,
+    onActivar: (() -> Unit)? = null,
+    onDesactivar: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val colors = MaterialTheme.colorScheme
+    var confirmarPrincipal by remember { mutableStateOf(false) }
+    var confirmarDesactivar by remember { mutableStateOf(false) }
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = colors.background,
+        containerColor = FondoDetalle,
         topBar = {
-            Surface(color = colors.surface, shadowElevation = 1.dp) {
+            Surface(color = Color.White, shadowElevation = 1.dp) {
                 Row(
-                    Modifier.fillMaxWidth().statusBarsPadding().padding(8.dp),
+                    Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onVolver) { Text("Volver") }
+                    TextButton(onClick = onVolver, enabled = !estado.ocupado) { Text("Volver") }
                     Text(
                         "Detalle del vehículo",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = colors.onPrimaryContainer,
-                        modifier = Modifier.padding(start = 4.dp)
+                        color = AzulDetalle,
+                        modifier = Modifier.weight(1f)
                     )
+                    estado.detalle?.let { BadgeEstado(it.estadoVehiculo) }
+                    Spacer(Modifier.width(8.dp))
                 }
             }
         }
     ) { padding ->
         Column(
-            Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (estado.ocupado) LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteDetalle)
+            estado.mensajeAccion?.let { texto ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (estado.accionError) Color(0xFFFFEBEE) else Color(0xFFE8F5E9),
+                    contentColor = if (estado.accionError) Color(0xFFC62828) else Color(0xFF2E7D32)
+                ) {
+                    Text(texto, Modifier.padding(12.dp), fontWeight = FontWeight.Medium)
+                }
+            }
             when (estado.fase) {
                 FaseDetalle.CARGANDO -> {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Text("Consultando vehículo…")
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteDetalle)
+                    Text("Consultando vehículo…", color = MyCarMuted)
                 }
                 FaseDetalle.SESION_REQUERIDA -> {
                     Text(estado.mensaje ?: "Inicia sesión para continuar.")
-                    Button(onClick = onIniciarSesion, shape = RoundedCornerShape(12.dp)) { Text("Iniciar sesión") }
+                    Button(
+                        onClick = onIniciarSesion,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                    ) { Text("Iniciar sesión") }
                 }
                 FaseDetalle.ERROR, FaseDetalle.NO_DISPONIBLE -> {
                     Text(estado.mensaje ?: "No se pudo cargar el detalle.")
                     if (estado.fase == FaseDetalle.ERROR) {
-                        OutlinedButton(onClick = onRecargar) { Text("Reintentar") }
+                        OutlinedButton(onClick = onRecargar, shape = RoundedCornerShape(12.dp)) {
+                            Text("Reintentar")
+                        }
                     }
                 }
                 FaseDetalle.LISTO -> estado.detalle?.let { det ->
-                    ContenidoDetalle(det)
-                    if (onActualizarKm != null && det.estadoVehiculo == "ACTIVO") {
-                        OutlinedButton(
-                            onClick = onActualizarKm,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        ) { Text("Actualizar kilometraje") }
+                    CabeceraDetalle(det)
+                    GridEspecificaciones(det)
+
+                    if (det.estadoVehiculo == "ACTIVO") {
+                        if (onActualizarKm != null) {
+                            OutlinedButton(
+                                onClick = onActualizarKm,
+                                enabled = !estado.ocupado,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = AzulDetalle)
+                            ) { Text("Actualizar kilometraje", fontWeight = FontWeight.SemiBold) }
+                        }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (onEditarDatos != null) {
+                                Button(
+                                    onClick = onEditarDatos,
+                                    enabled = !estado.ocupado,
+                                    modifier = Modifier.weight(1f).heightIn(min = 50.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                                ) { Text("Editar datos") }
+                            }
+                            if (!det.principal && onEstablecerPrincipal != null) {
+                                Button(
+                                    onClick = { confirmarPrincipal = true },
+                                    enabled = !estado.ocupado,
+                                    modifier = Modifier.weight(1f).heightIn(min = 50.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = CelesteDetalle)
+                                ) { Text("Hacer principal") }
+                            }
+                        }
+                        if (onDesactivar != null) {
+                            Button(
+                                onClick = { confirmarDesactivar = true },
+                                enabled = !estado.ocupado,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                            ) { Text("Desactivar vehículo", fontWeight = FontWeight.SemiBold) }
+                        }
+                    } else if (onActivar != null) {
+                        Button(
+                            onClick = onActivar,
+                            enabled = !estado.ocupado,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                        ) { Text("Activar vehículo", fontWeight = FontWeight.SemiBold) }
+                    }
+
+                    SeccionIdentificacion(det)
+                    DocumentosProximamente()
+                }
+            }
+        }
+    }
+
+    if (confirmarPrincipal) {
+        val det = estado.detalle
+        AlertDialog(
+            onDismissRequest = { if (!estado.ocupado) confirmarPrincipal = false },
+            title = { Text("Establecer como principal", fontWeight = FontWeight.Bold, color = AzulDetalle) },
+            text = {
+                Text(
+                    if (det == null) "¿Confirmas el cambio de vehículo principal?"
+                    else "${det.marca} ${det.modelo} será tu vehículo principal. El vehículo anterior perderá esa condición."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmarPrincipal = false
+                        onEstablecerPrincipal?.invoke()
+                    },
+                    enabled = !estado.ocupado,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                ) { Text("Confirmar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmarPrincipal = false }, enabled = !estado.ocupado) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+    if (confirmarDesactivar) {
+        val det = estado.detalle
+        AlertDialog(
+            onDismissRequest = { if (!estado.ocupado) confirmarDesactivar = false },
+            title = { Text("Desactivar vehículo", fontWeight = FontWeight.Bold, color = AzulDetalle) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (det == null) "¿Deseas desactivar este vehículo?"
+                        else "¿Deseas desactivar ${det.marca} ${det.modelo} (${det.placa})?"
+                    )
+                    Text(
+                        "Los datos se volverán solo de lectura. Conservaremos el historial. Debes mantener al menos un vehículo activo.",
+                        color = MyCarMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (det?.principal == true) {
+                        Text(
+                            "Si es el principal y tienes otros activos, primero establece otro como principal.",
+                            color = Color(0xFFC62828),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmarDesactivar = false
+                        onDesactivar?.invoke()
+                    },
+                    enabled = !estado.ocupado,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { confirmarDesactivar = false },
+                    enabled = !estado.ocupado,
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Cancelar") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BadgeEstado(estado: String) {
+    val activo = estado == "ACTIVO"
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (activo) MyCarStatusActivo.copy(alpha = 0.15f) else MyCarOutlineSoft
+    ) {
+        Text(
+            if (activo) "Activo" else "Inactivo",
+            Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (activo) MyCarStatusActivo else MyCarMuted
+        )
+    }
+}
+
+@Composable
+private fun CabeceraDetalle(v: DetalleVehiculoDto) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Image(
+                painterResource(R.drawable.ic_vehiculo_predeterminado_rf08),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MyCarTile)
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    "${v.marca} ${v.modelo}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = AzulDetalle
+                )
+                Text(v.placa, color = MyCarMuted, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BadgeEstado(v.estadoVehiculo)
+                    if (v.principal) {
+                        Surface(shape = RoundedCornerShape(50), color = MyCarSky.copy(alpha = 0.15f)) {
+                            Text(
+                                "★ Principal",
+                                Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MyCarBlue
+                            )
+                        }
                     }
                 }
             }
@@ -110,48 +346,14 @@ fun DetalleVehiculoScreen(
 }
 
 @Composable
-private fun ContenidoDetalle(v: DetalleVehiculoDto) {
-    val colors = MaterialTheme.colorScheme
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Image(painterResource(R.drawable.ic_vehiculo_predeterminado_rf08), null, Modifier.size(88.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    "${v.marca} ${v.modelo}",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.onPrimaryContainer
-                )
-                Text(v.placa, color = colors.onSurfaceVariant)
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (v.estadoVehiculo == "ACTIVO") MyCarStatusActivo.copy(alpha = 0.15f)
-                    else colors.surfaceVariant
-                ) {
-                    Text(
-                        if (v.estadoVehiculo == "ACTIVO") "Activo" else "Inactivo",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        color = if (v.estadoVehiculo == "ACTIVO") MyCarStatusActivo else colors.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-                if (v.principal) Text("Vehículo principal", color = colors.primary, fontWeight = FontWeight.Medium)
-            }
-        }
-    }
-
-    Text("Especificaciones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+private fun GridEspecificaciones(v: DetalleVehiculoDto) {
+    Text("Especificaciones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = AzulDetalle)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TileDetalle("Uso del vehículo", v.usoVehiculo, Modifier.weight(1f))
+        TileDetalle("Uso", v.usoVehiculo, Modifier.weight(1f))
         TileDetalle("Año", v.anioFabricacion.toString(), Modifier.weight(1f))
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TileDetalle("Tipo de motor", v.tipoMotor, Modifier.weight(1f))
+        TileDetalle("Motor", v.tipoMotor, Modifier.weight(1f))
         TileDetalle(
             "Combustible",
             if (v.motorElectrico) "Eléctrico" else (v.combustible ?: "—"),
@@ -160,23 +362,87 @@ private fun ContenidoDetalle(v: DetalleVehiculoDto) {
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TileDetalle(
-            "Tipo de aceite",
+            "Aceite",
             if (v.motorElectrico) "N/A" else (v.tipoAceite ?: "—"),
             Modifier.weight(1f)
         )
         TileDetalle(
-            "Kilometraje actual",
-            v.kilometrajeActual?.let { "%,d km".format(it).replace(',', ' ') } ?: "Sin lectura",
+            "Km actual",
+            v.kilometrajeActual?.let { "${com.mycar.app.features.vehiculos.domain.KilometrajeTexto.formatear(it)} km" } ?: "Sin lectura",
             Modifier.weight(1f)
         )
     }
     TileDetalle("Color", v.color, Modifier.fillMaxWidth())
+}
 
-    SeccionDetalle("Identificación adicional") {
-        FilaDetalle("VIN", v.numeroVin ?: "No registrado")
-        FilaDetalle("N.º de serie", v.numeroSerie ?: "No registrado")
-        FilaDetalle("N.º de motor", v.numeroMotor ?: "No registrado")
-        v.fechaUltimaLecturaKm?.let { FilaDetalle("Última lectura", formatearFecha(it)) }
+@Composable
+private fun SeccionIdentificacion(v: DetalleVehiculoDto) {
+    var expandido by remember { mutableStateOf(false) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expandido = !expandido }
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Identificación adicional",
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AzulDetalle
+                )
+                Text(
+                    if (expandido) "▲" else "▼",
+                    color = MyCarMuted,
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+            if (expandido) {
+                Column(
+                    Modifier.padding(bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    FilaDetalle("VIN", v.numeroVin ?: "No registrado")
+                    FilaDetalle("N.º de serie", v.numeroSerie ?: "No registrado")
+                    FilaDetalle("N.º de motor", v.numeroMotor ?: "No registrado")
+                    v.fechaUltimaLecturaKm?.let { FilaDetalle("Última lectura", formatearFecha(it)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DocumentosProximamente() {
+    Text("Documentos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = AzulDetalle)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Card(
+            Modifier.weight(1f),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("SOAT", fontWeight = FontWeight.Bold, color = AzulDetalle)
+                Text("Próximamente", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+            }
+        }
+        Card(
+            Modifier.weight(1f),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("TIVE", fontWeight = FontWeight.Bold, color = AzulDetalle)
+                Text("Próximamente", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+            }
+        }
     }
 }
 
@@ -185,39 +451,31 @@ private fun TileDetalle(etiqueta: String, valor: String, modifier: Modifier = Mo
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.primaryContainer
+        color = MyCarTile
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(etiqueta, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(valor, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
-        }
-    }
-}
-
-@Composable
-private fun SeccionDetalle(titulo: String, contenido: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            contenido()
+            Text(etiqueta, style = MaterialTheme.typography.labelMedium, color = MyCarMuted)
+            Text(
+                valor,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = AzulDetalle,
+                textAlign = TextAlign.Start
+            )
         }
     }
 }
 
 @Composable
 private fun FilaDetalle(etiqueta: String, valor: String) {
-    Column {
-        Text(etiqueta, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(valor, style = MaterialTheme.typography.bodyLarge)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(etiqueta, color = MyCarMuted)
+        Text(valor, fontWeight = FontWeight.Medium, color = AzulDetalle, modifier = Modifier.padding(start = 12.dp))
     }
 }
 
 private fun formatearFecha(iso: String): String = runCatching {
-    DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("es-PE"))
-        .withZone(ZoneId.of("America/Lima")).format(Instant.parse(iso))
+    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale("es", "PE"))
+        .withZone(ZoneId.of("America/Lima"))
+        .format(Instant.parse(iso))
 }.getOrDefault(iso)

@@ -41,6 +41,8 @@ data class EstadoTalleres(
 class TalleresViewModel(private val repository: TalleresRepository) : ViewModel() {
     private val mutable = MutableStateFlow(EstadoTalleres())
     val estado = mutable.asStateFlow()
+    /** Evita reintentos en bucle del vínculo automático al taller de sistema. */
+    private var autoVinculoIntentado = false
 
     init { cargar() }
 
@@ -49,6 +51,7 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
         mutable.value = prev.copy(fase = FaseTalleres.CARGANDO, mensaje = null)
         viewModelScope.launch {
             try {
+                // Todos = asociados + manuales; el filtro de chips se aplica en el API.
                 val lista = repository.listarActivos(prev.filtro)
                 mutable.value = prev.copy(
                     fase = FaseTalleres.LISTO,
@@ -58,6 +61,7 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
                     editando = null,
                     detalle = null
                 )
+                asegurarTallerSistema(lista)
             } catch (e: Exception) {
                 mutable.value = prev.copy(
                     fase = FaseTalleres.ERROR,
@@ -66,6 +70,59 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
             }
         }
     }
+
+    /**
+     * Vincula por defecto el taller oficial autorizado (Prueba MyCar) si falta,
+     * y lo marca favorito solo cuando no hay un favorito MANUAL.
+     */
+    private suspend fun asegurarTallerSistema(listaActual: List<Taller>) {
+        if (autoVinculoIntentado) return
+        val tieneFavorito = listaActual.any { it.favorito }
+        val prueba = listaActual.firstOrNull { esTallerPrueba(it) }
+        if (prueba != null) {
+            autoVinculoIntentado = true
+            // Solo marcar favorito el de sistema si el usuario aún no eligió ninguno.
+            if (!tieneFavorito) {
+                runCatching { repository.marcarFavorito(prueba.id) }
+                val refresco = repository.listarActivos(mutable.value.filtro)
+                mutable.value = mutable.value.copy(talleres = refresco)
+            }
+            return
+        }
+        try {
+            var cat = repository.catalogoGlobal("PRUEBA")
+            if (cat.isEmpty()) cat = repository.catalogoGlobal(null)
+            val objetivo = cat.firstOrNull { it.id == 3L }
+                ?: cat.firstOrNull { it.nombre.contains("PRUEBA MYCAR", ignoreCase = true) }
+                ?: cat.firstOrNull { it.nombre.contains("PRUEBA", ignoreCase = true) }
+            if (objetivo == null) {
+                autoVinculoIntentado = true
+                return
+            }
+            val vinculado = repository.vincularAsociado(objetivo.id)
+            if (!tieneFavorito) {
+                runCatching { repository.marcarFavorito(vinculado.id) }
+            }
+            val lista = repository.listarActivos(FiltroOrigenTaller.TODOS)
+            autoVinculoIntentado = true
+            mutable.value = mutable.value.copy(
+                fase = FaseTalleres.LISTO,
+                talleres = lista,
+                filtro = FiltroOrigenTaller.TODOS,
+                ocupado = false,
+                mensaje = null
+            )
+        } catch (_: Exception) {
+            // Reintentará en la próxima carga si el catálogo/API no respondió.
+        }
+    }
+
+    private fun esTallerPrueba(t: Taller): Boolean =
+        t.esAsociado && (
+            t.nombre.contains("PRUEBA MYCAR", ignoreCase = true) ||
+                t.nombre.contains("Taller Prueba", ignoreCase = true) ||
+                t.nombre.contains("PRUEBA", ignoreCase = true)
+            )
 
     fun cambiarFiltro(f: FiltroOrigenTaller) {
         if (mutable.value.filtro == f) return
@@ -85,24 +142,33 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
         mutable.value = mutable.value.copy(fase = FaseTalleres.DETALLE, detalle = t, mensaje = null)
     }
 
-    fun abrirCatalogoAsociado(q: String? = null) {
+    fun abrirCatalogoAsociado(q: String? = "PRUEBA") {
+        val consulta = q?.trim().orEmpty()
         mutable.value = mutable.value.copy(
             fase = FaseTalleres.CATALOGO_ASOCIADO,
             ocupado = true,
             mensaje = null,
-            catalogoBusqueda = q.orEmpty()
+            catalogoBusqueda = consulta,
+            catalogo = emptyList()
         )
         viewModelScope.launch {
             try {
-                val cat = repository.catalogoGlobal(q?.takeIf { it.isNotBlank() })
+                // Primero con filtro; si vacío, listar todo el catálogo oficial.
+                var cat = repository.catalogoGlobal(consulta.takeIf { it.isNotBlank() })
+                if (cat.isEmpty() && consulta.isNotBlank()) {
+                    cat = repository.catalogoGlobal(null)
+                }
                 mutable.value = mutable.value.copy(
                     fase = FaseTalleres.CATALOGO_ASOCIADO,
                     catalogo = cat,
-                    ocupado = false
+                    ocupado = false,
+                    mensaje = if (cat.isEmpty()) {
+                        "No hay talleres oficiales en el catálogo. Revisa tu conexión o sesión."
+                    } else null
                 )
             } catch (e: Exception) {
                 mutable.value = mutable.value.copy(
-                    fase = FaseTalleres.LISTO,
+                    fase = FaseTalleres.CATALOGO_ASOCIADO,
                     ocupado = false,
                     mensaje = e.message ?: "No se pudo cargar el catálogo asociado"
                 )
@@ -111,11 +177,15 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
     }
 
     fun buscarEnCatalogo(q: String) {
-        mutable.value = mutable.value.copy(catalogoBusqueda = q, ocupado = true)
+        mutable.value = mutable.value.copy(catalogoBusqueda = q, ocupado = true, mensaje = null)
         viewModelScope.launch {
             try {
                 val cat = repository.catalogoGlobal(q.takeIf { it.isNotBlank() })
-                mutable.value = mutable.value.copy(catalogo = cat, ocupado = false)
+                mutable.value = mutable.value.copy(
+                    catalogo = cat,
+                    ocupado = false,
+                    mensaje = if (cat.isEmpty()) "Sin resultados para \"$q\"." else null
+                )
             } catch (e: Exception) {
                 mutable.value = mutable.value.copy(
                     ocupado = false,
@@ -128,22 +198,58 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
     fun vincularAsociado(idGlobal: Long) {
         if (mutable.value.ocupado) return
         mutable.value = mutable.value.copy(ocupado = true, mensaje = null)
+        viewModelScope.launch { ejecutarVinculo(idGlobal) }
+    }
+
+    /** Atajo de prueba: busca y vincula Taller Prueba MyCar (id global 3 si está disponible). */
+    fun vincularTallerPruebaMyCar() {
+        if (mutable.value.ocupado) return
+        mutable.value = mutable.value.copy(ocupado = true, mensaje = null)
         viewModelScope.launch {
             try {
-                repository.vincularAsociado(idGlobal)
-                val lista = repository.listarActivos(mutable.value.filtro)
-                mutable.value = EstadoTalleres(
-                    fase = FaseTalleres.LISTO,
-                    talleres = lista,
-                    filtro = mutable.value.filtro,
-                    busqueda = mutable.value.busqueda,
-                    mensaje = "Taller asociado agregado"
-                )
-            } catch (e: ErrorTalleres) {
-                mutable.value = mutable.value.copy(ocupado = false, mensaje = mensajeApi(e))
+                var cat = repository.catalogoGlobal("PRUEBA")
+                if (cat.isEmpty()) cat = repository.catalogoGlobal(null)
+                val objetivo = cat.firstOrNull { it.id == 3L }
+                    ?: cat.firstOrNull { it.nombre.contains("PRUEBA MYCAR", ignoreCase = true) }
+                    ?: cat.firstOrNull { it.nombre.contains("PRUEBA", ignoreCase = true) }
+                if (objetivo == null) {
+                    mutable.value = mutable.value.copy(
+                        ocupado = false,
+                        fase = FaseTalleres.CATALOGO_ASOCIADO,
+                        catalogo = cat,
+                        mensaje = "No se encontró Taller Prueba MyCar en el catálogo."
+                    )
+                    return@launch
+                }
+                ejecutarVinculo(objetivo.id)
             } catch (e: Exception) {
-                mutable.value = mutable.value.copy(ocupado = false, mensaje = e.message ?: "No se pudo vincular")
+                mutable.value = mutable.value.copy(
+                    ocupado = false,
+                    mensaje = e.message ?: "No se pudo vincular el taller de prueba"
+                )
             }
+        }
+    }
+
+    private suspend fun ejecutarVinculo(idGlobal: Long) {
+        try {
+            val vinculado = repository.vincularAsociado(idGlobal)
+            val listaPre = repository.listarActivos(FiltroOrigenTaller.TODOS)
+            if (listaPre.none { it.favorito }) {
+                runCatching { repository.marcarFavorito(vinculado.id) }
+            }
+            val lista = repository.listarActivos(FiltroOrigenTaller.TODOS)
+            mutable.value = EstadoTalleres(
+                fase = FaseTalleres.LISTO,
+                talleres = lista,
+                filtro = FiltroOrigenTaller.TODOS,
+                busqueda = "",
+                mensaje = "Taller asociado vinculado."
+            )
+        } catch (e: ErrorTalleres) {
+            mutable.value = mutable.value.copy(ocupado = false, mensaje = mensajeApi(e))
+        } catch (e: Exception) {
+            mutable.value = mutable.value.copy(ocupado = false, mensaje = e.message ?: "No se pudo vincular")
         }
     }
 

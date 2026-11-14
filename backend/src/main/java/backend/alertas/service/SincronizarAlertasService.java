@@ -67,7 +67,8 @@ public class SincronizarAlertasService {
     }
 
     /**
-     * RF24 EA09–EA14: prioridad EXPLICITO → mantenimiento ref → favorito → NINGUNO.
+     * RF24 EA09–EA14: prioridad EXPLICITO → mantenimiento ref →
+     * favorito MANUAL → asociado autorizado (Prueba) → favorito → NINGUNO.
      * No marca la alerta como atendida ni muta el mantenimiento histórico.
      */
     @Transactional
@@ -90,12 +91,24 @@ public class SincronizarAlertasService {
     private ContratoRf22.ContactoTallerDto resolverContacto(long usuario, AlertasJdbcDao.DetalleAlertaFila base) {
         if (base.idTallerContacto() != null) {
             var t = alertas.tallerActivoPropio(usuario, base.idTallerContacto()).orElse(null);
-            if (t != null) return aContacto(t, "EXPLICITO");
+            if (t != null) {
+                var c = aContacto(t, "EXPLICITO");
+                if (!c.sinContactoDisponible()) return c;
+                // EXPLICITO no accionable: seguir cascada (p. ej. preferir Prueba).
+            }
         }
         var desdeMant = alertas.tallerDeMantenimientoReferencia(usuario, base.idMantenimientoReferencia()).orElse(null);
-        if (desdeMant != null) return aContacto(desdeMant, "MANTENIMIENTO_REF");
+        if (desdeMant != null) {
+            var c = aContacto(desdeMant, "MANTENIMIENTO_REF");
+            if (!c.sinContactoDisponible()) return c;
+            if ("MANUAL".equalsIgnoreCase(desdeMant.origen())) return c;
+        }
+        // Escenario alternativo: cualquier favorito (manual o asociado) tiene prioridad.
         var fav = alertas.tallerFavoritoActivo(usuario).orElse(null);
         if (fav != null) return aContacto(fav, "FAVORITO");
+        // Sin favorito → taller de sistema autorizado (Prueba MyCar primero).
+        var sistema = alertas.tallerAsociadoAutorizadoPreferido(usuario).orElse(null);
+        if (sistema != null) return aContacto(sistema, "SISTEMA");
         return new ContratoRf22.ContactoTallerDto(null, null, null, false, false, null, "NINGUNO", true);
     }
 

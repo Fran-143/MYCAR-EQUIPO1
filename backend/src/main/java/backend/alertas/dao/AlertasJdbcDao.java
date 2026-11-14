@@ -234,6 +234,30 @@ public class AlertasJdbcDao {
         ), usuario).stream().findFirst();
     }
 
+    /**
+     * Asociado autorizado para contacto: prioriza nombre con "PRUEBA" (taller de sistema).
+     */
+    public Optional<TallerContactoFila> tallerAsociadoAutorizadoPreferido(long usuario) {
+        return jdbc.query("""
+                SELECT id_taller, nombre, telefono, tiene_whatsapp,
+                       COALESCE(contacto_autorizado, false), origen
+                FROM mycar.taller
+                WHERE id_usuario = ? AND estado = 'ACTIVO'
+                  AND origen = 'ASOCIADO'
+                  AND COALESCE(contacto_autorizado, false) = true
+                  AND tiene_whatsapp = true
+                  AND telefono IS NOT NULL AND trim(telefono) <> ''
+                ORDER BY
+                  CASE WHEN upper(nombre) LIKE '%PRUEBA%' THEN 0 ELSE 1 END,
+                  favorito DESC,
+                  id_taller
+                LIMIT 1
+                """, (rs, n) -> new TallerContactoFila(
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4),
+                rs.getBoolean(5), rs.getString(6)
+        ), usuario).stream().findFirst();
+    }
+
     public boolean asignarTallerContacto(long usuario, long vehiculo, long idAlerta, Long idTaller) {
         return jdbc.update("""
                 UPDATE mycar.alerta a

@@ -16,6 +16,11 @@ class RemoteResumenInicioRepository(private val vehiculos: ListadoVehiculosRepos
     } catch(e: CancellationException) { throw e }
     catch(e: FalloRegistroVehiculo) { throw ErrorResumenInicio(sesion=e.estadoHttp==401) }
 
+    override suspend fun vehiculosTodos(): List<VehiculoResumenDto> = try {
+        vehiculos.listar("TODOS", "").vehiculos
+    } catch(e: CancellationException) { throw e }
+    catch(e: FalloRegistroVehiculo) { throw ErrorResumenInicio(sesion=e.estadoHttp==401) }
+
     override suspend fun bloques(vehiculo: VehiculoResumenDto): BloquesInicio = coroutineScope {
         val lectura=async {
             try {

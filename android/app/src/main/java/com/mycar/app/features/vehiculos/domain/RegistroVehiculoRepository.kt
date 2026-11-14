@@ -19,5 +19,6 @@ interface SolicitudRegistroPendienteStore {
 class FalloRegistroVehiculo(
     val codigo: String,
     val estadoHttp: Int? = null,
-    val campos: Set<String> = emptySet()
+    val campos: Set<String> = emptySet(),
+    val mensajeServidor: String? = null
 ) : RuntimeException(codigo)

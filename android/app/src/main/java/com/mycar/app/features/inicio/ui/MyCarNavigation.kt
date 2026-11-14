@@ -46,6 +46,7 @@ fun MyCarNavigation(
     var seccionNombre by rememberSaveable { mutableStateOf(SeccionMyCar.INICIO.name) }
     var secundariaNombre by rememberSaveable { mutableStateOf<String?>(null) }
     var vehiculoMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
+    var abrirHistorialEnTalleres by rememberSaveable { mutableStateOf(false) }
     var vehiculoDetalleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var vehiculoKmId by rememberSaveable { mutableStateOf<Long?>(null) }
     var recargaInicio by rememberSaveable { mutableIntStateOf(0) }
@@ -77,6 +78,7 @@ fun MyCarNavigation(
         }
     }
     fun abrirDetalle(id: Long) { vehiculoDetalleId = id; navegar(navegacion.abrir(SecundariaMyCar.DETALLE)) }
+    fun abrirEdicion(id: Long) { vehiculoDetalleId = id; navegar(navegacion.abrir(SecundariaMyCar.EDITAR_VEHICULO)) }
     fun abrirKilometraje(id: Long, desdeDetalle: Boolean = false) {
         kmSesion++
         vehiculoKmId = id
@@ -143,7 +145,10 @@ fun MyCarNavigation(
                         SeccionMyCar.MANTENIMIENTOS -> R.drawable.ic_inicio_llave
                         SeccionMyCar.ALERTAS -> R.drawable.ic_inicio_campana
                     }
-                    NavigationBarItem(selected=navegacion.seccion==destino,onClick={ navegar(navegacion.abrir(destino)) },
+                    NavigationBarItem(selected=navegacion.seccion==destino,onClick={
+                        if (destino==SeccionMyCar.MANTENIMIENTOS) abrirHistorialEnTalleres=false
+                        navegar(navegacion.abrir(destino))
+                    },
                         icon={ Icon(painterResource(icono),destino.titulo,modifier=Modifier.size(24.dp)) },
                         label={ Text(destino.titulo,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis) })
                 }
@@ -163,7 +168,29 @@ fun MyCarNavigation(
                                     onVolver={ navegar(navegacion.atras()) },
                                     onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     onActualizarKm={ abrirKilometraje(idDetalle, desdeDetalle = true) },
+                                    onEditarDatos={ abrirEdicion(idDetalle) },
+                                    onCambioOperativo={
+                                        recargaDetalle++
+                                        recargaInicio++
+                                    },
                                     recargaToken = recargaDetalle,
+                                    modifier=Modifier.statusBarsPadding())
+                            }
+                        }
+                        secundaria==SecundariaMyCar.EDITAR_VEHICULO && cuenta!=null -> {
+                            val idEdicion = vehiculoDetalleId
+                            if (idEdicion == null || idEdicion <= 0) {
+                                PantallaProximamente("Editar datos", onVolver={ navegar(navegacion.atras()) })
+                            } else {
+                                com.mycar.app.features.vehiculos.ui.EditarVehiculoRoute(
+                                    "${cuenta.ciclo}|$idEdicion", idEdicion, cuenta.edicion,
+                                    onVolver={ navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE)) },
+                                    onGuardado={
+                                        recargaDetalle++
+                                        recargaInicio++
+                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE))
+                                    },
+                                    onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     modifier=Modifier.statusBarsPadding())
                             }
                         }
@@ -262,12 +289,22 @@ fun MyCarNavigation(
                                 }
                                 HomeScreen(estado,vm::seleccionar,
                                     onVehiculos={ navegar(navegacion.abrir(SeccionMyCar.VEHICULOS)) },
-                                    onMantenimientos={ id -> vehiculoMantenimiento=id; navegar(navegacion.abrir(SeccionMyCar.MANTENIMIENTOS)) },
+                                    onMantenimientos={ id ->
+                                        vehiculoMantenimiento=id
+                                        abrirHistorialEnTalleres=false
+                                        navegar(navegacion.abrir(SeccionMyCar.MANTENIMIENTOS))
+                                    },
                                     onAlertas={ navegar(navegacion.abrir(SeccionMyCar.ALERTAS)) },
                                     onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
                                     onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },onRecargar=vm::cargar,
                                     onVerVehiculo={ abrirDetalle(it) },
-                                    onActualizarKm={ abrirKilometraje(it) },modifier=Modifier.statusBarsPadding())
+                                    onActualizarKm={ abrirKilometraje(it) },
+                                    onTalleres={ id ->
+                                        vehiculoMantenimiento=id
+                                        abrirHistorialEnTalleres=true
+                                        navegar(navegacion.abrir(SeccionMyCar.MANTENIMIENTOS))
+                                    },
+                                    modifier=Modifier.statusBarsPadding())
                             }
                             SeccionMyCar.VEHICULOS -> Column {
                                 VehiculosRoute(cuenta.ciclo,cuenta.registro,cuenta.listado,cuenta.pendientes,
@@ -281,8 +318,12 @@ fun MyCarNavigation(
                                 val idKmOverlay = kmOverlayMantenimiento
                                 Box(Modifier.fillMaxSize()) {
                                     FlujoHistorialMantenimiento(
-                                        onVolverInicio={ navegar(navegacion.atras()) }, historialRepository=cuenta.historial,
+                                        onVolverInicio={
+                                            abrirHistorialEnTalleres=false
+                                            navegar(navegacion.atras())
+                                        }, historialRepository=cuenta.historial,
                                         mantenimientoRepository=cuenta.mantenimiento,
+                                        kilometrajeRepository=cuenta.kilometraje,
                                         claveCuenta="${com.mycar.app.BuildConfig.API_BASE_URL}|${cuenta.usuario}",
                                         onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                         onActualizarKm={ abrirKmDesdeMantenimiento(it) },
@@ -292,7 +333,9 @@ fun MyCarNavigation(
                                         onProgramarAlerta = { abrirProgramarDesdeRf17(it) },
                                         talleresRepository = cuenta.talleres,
                                         onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
-                                        onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) })
+                                        onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
+                                        abrirEnTalleres = abrirHistorialEnTalleres,
+                                        onAbrirEnTalleresConsumido = { abrirHistorialEnTalleres = false })
                                     if (idKmOverlay != null) {
                                         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                                             ActualizarKilometrajeRoute(
