@@ -52,6 +52,7 @@ data class TallerDto(
     val creadoUtc: String? = null,
     val origen: String? = null,
     val tieneWhatsapp: Boolean? = null,
+    val contactoAutorizado: Boolean? = null,
     val idTallerGlobal: Long? = null,
     val editable: Boolean? = null
 )
@@ -62,6 +63,7 @@ data class TallerGlobalDto(
     val correo: String?,
     val direccion: String?,
     val tieneWhatsapp: Boolean?,
+    val contactoAutorizado: Boolean? = null,
     val estado: String?
 )
 data class RegistrarTallerDto(

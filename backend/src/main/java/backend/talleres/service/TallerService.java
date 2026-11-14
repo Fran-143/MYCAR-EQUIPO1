@@ -23,7 +23,7 @@ public class TallerService {
     public TallerService(
             TallerDao dao,
             ValidadorTaller validador,
-            @Value("${mycar.taller-piloto.usuario-id:12}") long idUsuarioPilotoDemo) {
+            @Value("${mycar.taller-piloto.usuario-id:0}") long idUsuarioPilotoDemo) {
         this.dao = dao;
         this.validador = validador;
         this.idUsuarioPilotoDemo = idUsuarioPilotoDemo;
@@ -95,7 +95,8 @@ public class TallerService {
         try {
             return dao.insertarAsociado(
                     idUsuario, global.idTallerGlobal(), global.nombre(), global.telefono(),
-                    global.correo(), global.direccion(), global.tieneWhatsapp());
+                    global.correo(), global.direccion(), global.tieneWhatsapp(),
+                    global.contactoAutorizado());
         } catch (DataIntegrityViolationException ex) {
             if (dao.existeVinculoAsociadoActivo(idUsuario, global.idTallerGlobal())) {
                 throw new TallerYaVinculado();

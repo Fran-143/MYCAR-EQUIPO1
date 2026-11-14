@@ -68,7 +68,7 @@ class TallerServiceTest {
         var g = new TallerGlobal(5, "DEMO", "999888777", null, "LIMA", true, "ACTIVO");
         when(dao.globalActivo(5)).thenReturn(Optional.of(g));
         when(dao.existeVinculoAsociadoActivo(7, 5)).thenReturn(false);
-        when(dao.insertarAsociado(7, 5, "DEMO", "999888777", null, "LIMA", true))
+        when(dao.insertarAsociado(7, 5, "DEMO", "999888777", null, "LIMA", true, false))
                 .thenReturn(asociado(20, 5));
         var r = servicio.vincularAsociado(7, new VincularAsociadoRequest(5));
         assertEquals("ASOCIADO", r.origen());

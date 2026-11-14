@@ -83,6 +83,8 @@ public final class ContratoRf22 {
             String nombre,
             String telefono,
             boolean tieneWhatsapp,
+            /** Autorización explícita de contacto (WA/llamada). No basta teléfono ni origen ASOCIADO. */
+            boolean contactoAutorizado,
             String origen,
             String origenSugerencia,
             boolean sinContactoDisponible

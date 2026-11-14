@@ -14,7 +14,8 @@ import org.springframework.stereotype.Repository;
 public class TallerJdbcDao implements TallerDao {
     private static final String COLS = """
             id_taller, nombre, telefono, correo, direccion, notas,
-            estado, favorito, version_fila, creado_utc, origen, tiene_whatsapp, id_taller_global
+            estado, favorito, version_fila, creado_utc, origen, tiene_whatsapp,
+            contacto_autorizado, id_taller_global
             """;
 
     private final JdbcTemplate jdbc;
@@ -78,8 +79,8 @@ public class TallerJdbcDao implements TallerDao {
         return jdbc.queryForObject("""
                 INSERT INTO mycar.taller (
                     id_usuario, nombre, telefono, correo, direccion, notas,
-                    estado, favorito, version_fila, origen, tiene_whatsapp, id_taller_global)
-                VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', false, 0, 'MANUAL', ?, NULL)
+                    estado, favorito, version_fila, origen, tiene_whatsapp, contacto_autorizado, id_taller_global)
+                VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', false, 0, 'MANUAL', ?, false, NULL)
                 RETURNING %s
                 """.formatted(COLS), this::map,
                 idUsuario, nombre, telefono, correo, direccion, notas, tieneWhatsapp);
@@ -88,7 +89,8 @@ public class TallerJdbcDao implements TallerDao {
     @Override
     public Optional<TallerGlobal> globalActivo(long idTallerGlobal) {
         return jdbc.query("""
-                SELECT id_taller_global, nombre, telefono, correo, direccion, tiene_whatsapp, estado,
+                SELECT id_taller_global, nombre, telefono, correo, direccion, tiene_whatsapp,
+                       COALESCE(contacto_autorizado, false) AS contacto_autorizado, estado,
                        COALESCE(es_demo, false) AS es_demo
                 FROM mycar.taller_global
                 WHERE id_taller_global = ? AND estado = 'ACTIVO'
@@ -101,7 +103,8 @@ public class TallerJdbcDao implements TallerDao {
         boolean verDemo = idUsuario > 0 && idUsuario == idUsuarioPilotoDemo;
         if (q.isEmpty()) {
             return jdbc.query("""
-                    SELECT id_taller_global, nombre, telefono, correo, direccion, tiene_whatsapp, estado,
+                    SELECT id_taller_global, nombre, telefono, correo, direccion, tiene_whatsapp,
+                           COALESCE(contacto_autorizado, false) AS contacto_autorizado, estado,
                            COALESCE(es_demo, false) AS es_demo
                     FROM mycar.taller_global
                     WHERE estado = 'ACTIVO'
@@ -111,7 +114,8 @@ public class TallerJdbcDao implements TallerDao {
         }
         String like = "%" + q.toUpperCase() + "%";
         return jdbc.query("""
-                SELECT id_taller_global, nombre, telefono, correo, direccion, tiene_whatsapp, estado,
+                SELECT id_taller_global, nombre, telefono, correo, direccion, tiene_whatsapp,
+                       COALESCE(contacto_autorizado, false) AS contacto_autorizado, estado,
                        COALESCE(es_demo, false) AS es_demo
                 FROM mycar.taller_global
                 WHERE estado = 'ACTIVO'
@@ -133,15 +137,16 @@ public class TallerJdbcDao implements TallerDao {
 
     @Override
     public Taller insertarAsociado(long idUsuario, long idTallerGlobal, String nombre, String telefono,
-                                   String correo, String direccion, boolean tieneWhatsapp) {
+                                   String correo, String direccion, boolean tieneWhatsapp,
+                                   boolean contactoAutorizado) {
         return jdbc.queryForObject("""
                 INSERT INTO mycar.taller (
                     id_usuario, nombre, telefono, correo, direccion, notas,
-                    estado, favorito, version_fila, origen, tiene_whatsapp, id_taller_global)
-                VALUES (?, ?, ?, ?, ?, NULL, 'ACTIVO', false, 0, 'ASOCIADO', ?, ?)
+                    estado, favorito, version_fila, origen, tiene_whatsapp, contacto_autorizado, id_taller_global)
+                VALUES (?, ?, ?, ?, ?, NULL, 'ACTIVO', false, 0, 'ASOCIADO', ?, ?, ?)
                 RETURNING %s
                 """.formatted(COLS), this::map,
-                idUsuario, nombre, telefono, correo, direccion, tieneWhatsapp, idTallerGlobal);
+                idUsuario, nombre, telefono, correo, direccion, tieneWhatsapp, contactoAutorizado, idTallerGlobal);
     }
 
     @Override
@@ -214,6 +219,12 @@ public class TallerJdbcDao implements TallerDao {
         if (origen == null || origen.isBlank()) origen = "MANUAL";
         boolean editable = "MANUAL".equals(origen);
         Long idGlobal = r.getObject("id_taller_global") == null ? null : r.getLong("id_taller_global");
+        boolean contactoAutorizado = false;
+        try {
+            contactoAutorizado = r.getBoolean("contacto_autorizado");
+        } catch (SQLException ignored) {
+            // Tests legacy sin columna.
+        }
         return new Taller(
                 r.getLong("id_taller"),
                 r.getString("nombre"),
@@ -227,16 +238,23 @@ public class TallerJdbcDao implements TallerDao {
                 ts == null ? null : ts.toInstant(),
                 origen,
                 r.getBoolean("tiene_whatsapp"),
+                contactoAutorizado,
                 idGlobal,
                 editable);
     }
 
     private TallerGlobal mapGlobal(ResultSet r, int n) throws SQLException {
         boolean esDemo = false;
+        boolean contactoAutorizado = false;
         try {
             esDemo = r.getBoolean("es_demo");
         } catch (SQLException ignored) {
             // Columnas legacy en tests sin es_demo.
+        }
+        try {
+            contactoAutorizado = r.getBoolean("contacto_autorizado");
+        } catch (SQLException ignored) {
+            // Columnas legacy en tests sin contacto_autorizado.
         }
         return new TallerGlobal(
                 r.getLong("id_taller_global"),
@@ -245,6 +263,7 @@ public class TallerJdbcDao implements TallerDao {
                 r.getString("correo"),
                 r.getString("direccion"),
                 r.getBoolean("tiene_whatsapp"),
+                contactoAutorizado,
                 r.getString("estado"),
                 esDemo);
     }

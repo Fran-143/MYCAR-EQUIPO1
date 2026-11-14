@@ -117,6 +117,7 @@ class RemoteAlertasRepository(private val api: AlertasApi) : AlertasRepository {
                     nombre = it.nombre,
                     telefono = it.telefono,
                     tieneWhatsapp = it.tieneWhatsapp == true,
+                    contactoAutorizado = it.contactoAutorizado == true,
                     origen = it.origen,
                     origenSugerencia = it.origenSugerencia.orEmpty().ifBlank { "NINGUNO" },
                     sinContactoDisponible = it.sinContactoDisponible == true

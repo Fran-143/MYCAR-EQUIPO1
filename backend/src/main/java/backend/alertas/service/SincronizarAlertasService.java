@@ -96,15 +96,18 @@ public class SincronizarAlertasService {
         if (desdeMant != null) return aContacto(desdeMant, "MANTENIMIENTO_REF");
         var fav = alertas.tallerFavoritoActivo(usuario).orElse(null);
         if (fav != null) return aContacto(fav, "FAVORITO");
-        return new ContratoRf22.ContactoTallerDto(null, null, null, false, null, "NINGUNO", true);
+        return new ContratoRf22.ContactoTallerDto(null, null, null, false, false, null, "NINGUNO", true);
     }
 
     private static ContratoRf22.ContactoTallerDto aContacto(
             AlertasJdbcDao.TallerContactoFila t, String origenSugerencia) {
         String tel = t.telefono() == null || t.telefono().isBlank() ? null : t.telefono().trim();
         boolean sin = tel == null;
+        boolean wa = !sin && t.tieneWhatsapp();
+        // Semántica V26: contactoAutorizado solo si flag DB + WA + teléfono.
+        boolean autorizado = !sin && wa && t.contactoAutorizado();
         return new ContratoRf22.ContactoTallerDto(
-                t.idTaller(), t.nombre(), tel, !sin && t.tieneWhatsapp(),
+                t.idTaller(), t.nombre(), tel, wa, autorizado,
                 t.origen(), origenSugerencia, sin);
     }
 

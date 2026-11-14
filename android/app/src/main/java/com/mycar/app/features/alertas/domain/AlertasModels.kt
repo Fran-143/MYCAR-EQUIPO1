@@ -26,6 +26,8 @@ data class ContactoTallerAlerta(
     val nombre: String?,
     val telefono: String?,
     val tieneWhatsapp: Boolean,
+    /** Autorización explícita de contacto; Agente 2 enciende botones solo si true + asociado activo. */
+    val contactoAutorizado: Boolean = false,
     val origen: String?,
     val origenSugerencia: String,
     val sinContactoDisponible: Boolean

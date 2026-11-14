@@ -46,11 +46,17 @@ class V26IsolatedMigrationTest {
         try (var c = DriverManager.getConnection(url, user, pass)) {
 
             try (var st = c.createStatement(); var r = st.executeQuery(
-                    "SELECT origen, id_taller_global, tiene_whatsapp FROM mycar.taller WHERE id_taller=" + t1)) {
+                    "SELECT origen, id_taller_global, tiene_whatsapp, contacto_autorizado FROM mycar.taller WHERE id_taller=" + t1)) {
                 assertTrue(r.next());
                 assertEquals("MANUAL", r.getString(1));
                 assertNull(r.getObject(2));
                 assertFalse(r.getBoolean(3));
+                assertFalse(r.getBoolean(4), "contacto_autorizado default false");
+            }
+            try (var st = c.createStatement(); var r = st.executeQuery(
+                    "SELECT count(*) FROM information_schema.columns WHERE table_schema='mycar' AND table_name='taller_global' AND column_name='contacto_autorizado'")) {
+                assertTrue(r.next());
+                assertEquals(1, r.getLong(1));
             }
             try (var st = c.createStatement(); var r = st.executeQuery(
                     "SELECT count(*) FROM mycar.taller_global WHERE es_demo")) {

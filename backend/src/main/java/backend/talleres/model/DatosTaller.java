@@ -19,15 +19,25 @@ public final class DatosTaller {
             Instant creadoUtc,
             String origen,
             boolean tieneWhatsapp,
+            boolean contactoAutorizado,
             Long idTallerGlobal,
             boolean editable
     ) {
-        /** Compatibilidad tests/legacy: MANUAL editable. */
+        /** Compatibilidad tests/legacy: MANUAL editable, sin autorización de contacto. */
         public Taller(
                 long idTaller, String nombre, String telefono, String correo, String direccion,
                 String notas, String estado, boolean favorito, int versionFila, Instant creadoUtc) {
             this(idTaller, nombre, telefono, correo, direccion, notas, estado, favorito, versionFila,
-                    creadoUtc, "MANUAL", false, null, true);
+                    creadoUtc, "MANUAL", false, false, null, true);
+        }
+
+        /** Compatibilidad tests con origen/WA sin contactoAutorizado. */
+        public Taller(
+                long idTaller, String nombre, String telefono, String correo, String direccion,
+                String notas, String estado, boolean favorito, int versionFila, Instant creadoUtc,
+                String origen, boolean tieneWhatsapp, Long idTallerGlobal, boolean editable) {
+            this(idTaller, nombre, telefono, correo, direccion, notas, estado, favorito, versionFila,
+                    creadoUtc, origen, tieneWhatsapp, false, idTallerGlobal, editable);
         }
     }
 
@@ -38,14 +48,21 @@ public final class DatosTaller {
             String correo,
             String direccion,
             boolean tieneWhatsapp,
+            boolean contactoAutorizado,
             String estado,
             boolean esDemo
     ) {
-        /** Compatibilidad tests legacy sin esDemo. */
+        /** Compatibilidad tests legacy sin esDemo / contactoAutorizado. */
         public TallerGlobal(
                 long idTallerGlobal, String nombre, String telefono, String correo,
                 String direccion, boolean tieneWhatsapp, String estado) {
-            this(idTallerGlobal, nombre, telefono, correo, direccion, tieneWhatsapp, estado, false);
+            this(idTallerGlobal, nombre, telefono, correo, direccion, tieneWhatsapp, false, estado, false);
+        }
+
+        public TallerGlobal(
+                long idTallerGlobal, String nombre, String telefono, String correo,
+                String direccion, boolean tieneWhatsapp, String estado, boolean esDemo) {
+            this(idTallerGlobal, nombre, telefono, correo, direccion, tieneWhatsapp, false, estado, esDemo);
         }
     }
 

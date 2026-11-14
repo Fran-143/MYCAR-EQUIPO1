@@ -54,7 +54,8 @@ class RemoteTalleresRepository(private val api: TalleresApi) : TalleresRepositor
                 telefono = dto.telefono?.takeIf { it.isNotBlank() },
                 correo = dto.correo?.takeIf { it.isNotBlank() },
                 direccion = dto.direccion?.takeIf { it.isNotBlank() },
-                tieneWhatsapp = dto.tieneWhatsapp == true
+                tieneWhatsapp = dto.tieneWhatsapp == true,
+                contactoAutorizado = dto.contactoAutorizado == true
             )
         }
     }
@@ -78,6 +79,7 @@ class RemoteTalleresRepository(private val api: TalleresApi) : TalleresRepositor
             versionFila = versionFila ?: 0,
             origen = origen,
             tieneWhatsapp = tieneWhatsapp == true,
+            contactoAutorizado = contactoAutorizado == true,
             idTallerGlobal = idTallerGlobal,
             editable = editable ?: origen.equals("MANUAL", ignoreCase = true)
         )

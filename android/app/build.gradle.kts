@@ -33,6 +33,12 @@ android {
 
     buildTypes {
         debug {
+            // Sufijo solo si -Pmycar.hotfixSidecar=true (coexistencia con Release en el mismo dispositivo).
+            // Por defecto (emulador) conserva com.mycar.app para no pelear con google-services.json.
+            // Nota: com.mycar.app.hotfix exige cliente en google-services.json (FCM puede fallar; sesión no).
+            if (providers.gradleProperty("mycar.hotfixSidecar").orNull == "true") {
+                applicationIdSuffix = ".hotfix"
+            }
             buildConfigField("String", "PRIVACY_SOURCE",
                 legalConfigString(providers.gradleProperty("mycar.privacy.source").getOrElse("local-academic")))
             buildConfigField(

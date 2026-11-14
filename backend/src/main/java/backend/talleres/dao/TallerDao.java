@@ -28,7 +28,8 @@ public interface TallerDao {
     boolean existeVinculoAsociadoActivo(long idUsuario, long idTallerGlobal);
 
     Taller insertarAsociado(long idUsuario, long idTallerGlobal, String nombre, String telefono,
-                            String correo, String direccion, boolean tieneWhatsapp);
+                            String correo, String direccion, boolean tieneWhatsapp,
+                            boolean contactoAutorizado);
 
     boolean actualizarManual(long idUsuario, long idTaller, int versionFila,
                              String nombre, String telefono, String correo,

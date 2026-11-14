@@ -96,6 +96,7 @@ data class ContactoTallerAlertaDto(
     val nombre: String?,
     val telefono: String?,
     val tieneWhatsapp: Boolean?,
+    val contactoAutorizado: Boolean? = false,
     val origen: String?,
     val origenSugerencia: String?,
     val sinContactoDisponible: Boolean?

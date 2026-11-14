@@ -12,6 +12,7 @@ data class Taller(
     val versionFila: Int = 0,
     val origen: String = "MANUAL",
     val tieneWhatsapp: Boolean = false,
+    val contactoAutorizado: Boolean = false,
     val idTallerGlobal: Long? = null,
     val editable: Boolean = true
 ) {
@@ -24,7 +25,8 @@ data class TallerGlobal(
     val telefono: String? = null,
     val correo: String? = null,
     val direccion: String? = null,
-    val tieneWhatsapp: Boolean = false
+    val tieneWhatsapp: Boolean = false,
+    val contactoAutorizado: Boolean = false
 )
 
 data class DatosTallerFormulario(

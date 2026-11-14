@@ -189,41 +189,48 @@ public class AlertasJdbcDao {
     ) { }
 
     public record TallerContactoFila(
-            long idTaller, String nombre, String telefono, boolean tieneWhatsapp, String origen
+            long idTaller, String nombre, String telefono, boolean tieneWhatsapp,
+            boolean contactoAutorizado, String origen
     ) { }
 
     public Optional<TallerContactoFila> tallerActivoPropio(long usuario, long idTaller) {
         return jdbc.query("""
-                SELECT id_taller, nombre, telefono, tiene_whatsapp, origen
+                SELECT id_taller, nombre, telefono, tiene_whatsapp,
+                       COALESCE(contacto_autorizado, false), origen
                 FROM mycar.taller
                 WHERE id_taller = ? AND id_usuario = ? AND estado = 'ACTIVO'
                 """, (rs, n) -> new TallerContactoFila(
-                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getString(5)
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4),
+                rs.getBoolean(5), rs.getString(6)
         ), idTaller, usuario).stream().findFirst();
     }
 
     public Optional<TallerContactoFila> tallerDeMantenimientoReferencia(long usuario, Long idMantenimiento) {
         if (idMantenimiento == null) return Optional.empty();
         return jdbc.query("""
-                SELECT t.id_taller, t.nombre, t.telefono, t.tiene_whatsapp, t.origen
+                SELECT t.id_taller, t.nombre, t.telefono, t.tiene_whatsapp,
+                       COALESCE(t.contacto_autorizado, false), t.origen
                 FROM mycar.mantenimiento m
                 JOIN mycar.taller t ON t.id_taller = m.id_taller
                 JOIN mycar.vehiculo v ON v.id_vehiculo = m.id_vehiculo
                 WHERE m.id_mantenimiento = ? AND v.id_usuario = ?
                   AND t.id_usuario = ? AND t.estado = 'ACTIVO'
                 """, (rs, n) -> new TallerContactoFila(
-                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getString(5)
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4),
+                rs.getBoolean(5), rs.getString(6)
         ), idMantenimiento, usuario, usuario).stream().findFirst();
     }
 
     public Optional<TallerContactoFila> tallerFavoritoActivo(long usuario) {
         return jdbc.query("""
-                SELECT id_taller, nombre, telefono, tiene_whatsapp, origen
+                SELECT id_taller, nombre, telefono, tiene_whatsapp,
+                       COALESCE(contacto_autorizado, false), origen
                 FROM mycar.taller
                 WHERE id_usuario = ? AND estado = 'ACTIVO' AND favorito = true
                 ORDER BY id_taller LIMIT 1
                 """, (rs, n) -> new TallerContactoFila(
-                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getString(5)
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4),
+                rs.getBoolean(5), rs.getString(6)
         ), usuario).stream().findFirst();
     }
 

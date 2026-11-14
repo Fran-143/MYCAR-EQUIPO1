@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * Upsert local del taller piloto ASOCIADO/demo. El teléfono NO va en Git:
  * solo {@code MYCAR_TALLER_PILOTO_WHATSAPP} / {@code mycar.taller-piloto.whatsapp}.
+ * Requiere {@code MYCAR_TALLER_PILOTO_USUARIO_ID} &gt; 0 y WhatsApp PE válido.
+ * {@code contacto_autorizado} solo si se configura explícitamente (default false).
  * Nunca habilitar contra Neon producción sin autorización.
  */
 @Component
@@ -23,24 +25,36 @@ public class TallerPilotoLocalSeed implements ApplicationRunner {
     private final String nombre;
     private final String whatsappRaw;
     private final long usuarioId;
+    private final boolean contactoAutorizado;
 
     public TallerPilotoLocalSeed(
             JdbcTemplate jdbc,
             @Value("${mycar.taller-piloto.nombre:Taller Piloto MyCar}") String nombre,
             @Value("${mycar.taller-piloto.whatsapp:}") String whatsappRaw,
-            @Value("${mycar.taller-piloto.usuario-id:12}") long usuarioId) {
+            @Value("${mycar.taller-piloto.usuario-id:0}") long usuarioId,
+            @Value("${mycar.taller-piloto.contacto-autorizado:false}") boolean contactoAutorizado) {
         this.jdbc = jdbc;
         this.nombre = nombre;
         this.whatsappRaw = whatsappRaw;
         this.usuarioId = usuarioId;
+        this.contactoAutorizado = contactoAutorizado;
     }
 
     @Override
     public void run(ApplicationArguments args) {
+        if (usuarioId <= 0) {
+            throw new IllegalStateException(
+                    "mycar.taller-piloto.habilitado=true requiere MYCAR_TALLER_PILOTO_USUARIO_ID > 0");
+        }
         String e164 = normalizarPeru(whatsappRaw);
         if (e164 == null) {
-            log.warn("Taller piloto omitido: mycar.taller-piloto.whatsapp vacío o inválido (PE 9 dígitos / 51…)");
-            return;
+            throw new IllegalStateException(
+                    "mycar.taller-piloto.habilitado=true requiere MYCAR_TALLER_PILOTO_WHATSAPP válido (PE 9 dígitos / 51…)");
+        }
+        boolean autorizar = contactoAutorizado;
+        if (autorizar) {
+            // Constraint: contacto_autorizado implica tiene_whatsapp + teléfono (ya garantizado por e164).
+            log.info("Taller piloto: contacto_autorizado=true (prueba autorizada explícita)");
         }
         Integer exists = jdbc.queryForObject("""
                 SELECT count(*)::int FROM mycar.taller_global
@@ -49,17 +63,18 @@ public class TallerPilotoLocalSeed implements ApplicationRunner {
         if (exists != null && exists > 0) {
             jdbc.update("""
                     UPDATE mycar.taller_global
-                    SET telefono = ?, tiene_whatsapp = true, es_demo = true, estado = 'ACTIVO'
+                    SET telefono = ?, tiene_whatsapp = true, es_demo = true,
+                        contacto_autorizado = ?, estado = 'ACTIVO'
                     WHERE lower(btrim(nombre)) = lower(btrim(?)) AND estado = 'ACTIVO'
-                    """, e164, nombre);
+                    """, e164, autorizar, nombre);
             log.info("Taller piloto actualizado (es_demo) visible para usuario-id={}", usuarioId);
             return;
         }
         jdbc.update("""
                 INSERT INTO mycar.taller_global
-                    (nombre, telefono, correo, direccion, tiene_whatsapp, es_demo, estado)
-                VALUES (?, ?, NULL, 'Catálogo demo — no es un negocio asociado real', true, true, 'ACTIVO')
-                """, nombre, e164);
+                    (nombre, telefono, correo, direccion, tiene_whatsapp, contacto_autorizado, es_demo, estado)
+                VALUES (?, ?, NULL, 'Catálogo demo — no es un negocio asociado real', true, ?, true, 'ACTIVO')
+                """, nombre, e164, autorizar);
         log.info("Taller piloto creado (es_demo) visible para usuario-id={}", usuarioId);
     }
 

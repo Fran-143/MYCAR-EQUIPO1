@@ -10,12 +10,19 @@ CREATE TABLE IF NOT EXISTS mycar.taller_global (
   correo VARCHAR(254),
   direccion VARCHAR(200),
   tiene_whatsapp BOOLEAN NOT NULL DEFAULT false,
+  -- Autorización explícita de contacto (WA/llamada). Teléfono o ASOCIADO solos NO autorizan.
+  contacto_autorizado BOOLEAN NOT NULL DEFAULT false,
   es_demo BOOLEAN NOT NULL DEFAULT false,
   estado VARCHAR(16) NOT NULL DEFAULT 'ACTIVO'
     CHECK (estado IN ('ACTIVO', 'INACTIVO')),
   creado_utc TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
   CONSTRAINT ck_taller_global_wa_requiere_tel
-    CHECK (NOT tiene_whatsapp OR (telefono IS NOT NULL AND btrim(telefono) <> ''))
+    CHECK (NOT tiene_whatsapp OR (telefono IS NOT NULL AND btrim(telefono) <> '')),
+  CONSTRAINT ck_taller_global_contacto_autorizado
+    CHECK (
+      NOT contacto_autorizado
+      OR (tiene_whatsapp AND telefono IS NOT NULL AND btrim(telefono) <> '')
+    )
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_taller_global_nombre_activo
@@ -26,7 +33,8 @@ ALTER TABLE mycar.taller
   ADD COLUMN IF NOT EXISTS origen VARCHAR(16) NOT NULL DEFAULT 'MANUAL',
   ADD COLUMN IF NOT EXISTS id_taller_global BIGINT
     REFERENCES mycar.taller_global(id_taller_global) ON DELETE RESTRICT,
-  ADD COLUMN IF NOT EXISTS tiene_whatsapp BOOLEAN NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS tiene_whatsapp BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS contacto_autorizado BOOLEAN NOT NULL DEFAULT false;
 
 DO $$
 BEGIN
@@ -51,6 +59,15 @@ BEGIN
     ALTER TABLE mycar.taller
       ADD CONSTRAINT ck_taller_wa_requiere_tel
         CHECK (NOT tiene_whatsapp OR (telefono IS NOT NULL AND btrim(telefono) <> ''));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ck_taller_contacto_autorizado'
+  ) THEN
+    ALTER TABLE mycar.taller
+      ADD CONSTRAINT ck_taller_contacto_autorizado CHECK (
+        NOT contacto_autorizado
+        OR (tiene_whatsapp AND telefono IS NOT NULL AND btrim(telefono) <> '')
+      );
   END IF;
 END $$;
 
