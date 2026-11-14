@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.mycar.app.features.soat.data.SoatDto
+import com.mycar.app.features.soat.domain.SoatRepository
 import com.mycar.app.features.vehiculos.data.DetalleVehiculoDto
 import com.mycar.app.features.vehiculos.domain.DetalleVehiculosRepository
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
@@ -22,12 +24,15 @@ data class EstadoDetalleVehiculo(
     val mensaje: String? = null,
     val ocupado: Boolean = false,
     val mensajeAccion: String? = null,
-    val accionError: Boolean = false
+    val accionError: Boolean = false,
+    val soatActual: SoatDto? = null,
+    val soatResumenCargando: Boolean = false
 )
 
 class DetalleVehiculoViewModel(
     private val idVehiculo: Long,
-    private val repository: DetalleVehiculosRepository
+    private val repository: DetalleVehiculosRepository,
+    private val soatRepository: SoatRepository?
 ) : ViewModel() {
     private val _estado = MutableStateFlow(EstadoDetalleVehiculo(idVehiculo))
     val estado = _estado.asStateFlow()
@@ -45,13 +50,16 @@ class DetalleVehiculoViewModel(
             mensaje = null,
             ocupado = false,
             mensajeAccion = null,
-            accionError = false
+            accionError = false,
+            soatActual = null,
+            soatResumenCargando = soatRepository != null
         )
         trabajo = viewModelScope.launch {
             try {
                 val detalle = repository.consultar(idVehiculo)
                 if (actual == revision) {
                     _estado.value = _estado.value.copy(fase = FaseDetalle.LISTO, detalle = detalle)
+                    cargarResumenSoat(actual)
                 }
             } catch (cancelada: CancellationException) {
                 throw cancelada
@@ -135,6 +143,26 @@ class DetalleVehiculoViewModel(
         else -> fallo?.mensajeServidor ?: "No se pudo completar la acción. Inténtalo nuevamente."
     }
 
+    private fun cargarResumenSoat(revisionCarga: Long) {
+        val repo = soatRepository ?: return
+        viewModelScope.launch {
+            try {
+                val consulta = repo.consultar(idVehiculo)
+                if (revision == revisionCarga) {
+                    _estado.value = _estado.value.copy(
+                        soatActual = consulta.actual,
+                        soatResumenCargando = false
+                    )
+                }
+            } catch (_: CancellationException) {
+            } catch (_: Exception) {
+                if (revision == revisionCarga) {
+                    _estado.value = _estado.value.copy(soatResumenCargando = false)
+                }
+            }
+        }
+    }
+
     private fun aplicarErrorCarga(error: Exception) {
         val fallo = error as? FalloRegistroVehiculo
         val sesion = fallo?.estadoHttp == 401
@@ -157,8 +185,12 @@ class DetalleVehiculoViewModel(
     }
 
     companion object {
-        fun factory(idVehiculo: Long, repository: DetalleVehiculosRepository) = viewModelFactory {
-            initializer { DetalleVehiculoViewModel(idVehiculo, repository) }
+        fun factory(
+            idVehiculo: Long,
+            repository: DetalleVehiculosRepository,
+            soatRepository: SoatRepository?
+        ) = viewModelFactory {
+            initializer { DetalleVehiculoViewModel(idVehiculo, repository, soatRepository) }
         }
     }
 }

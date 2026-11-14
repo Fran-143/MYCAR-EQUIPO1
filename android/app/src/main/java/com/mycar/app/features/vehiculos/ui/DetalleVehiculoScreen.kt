@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.R
+import com.mycar.app.features.soat.domain.SoatFormulario
+import com.mycar.app.features.soat.domain.SoatRepository
 import com.mycar.app.features.vehiculos.data.DetalleVehiculoDto
 import com.mycar.app.features.vehiculos.domain.DetalleVehiculosRepository
 import com.mycar.app.features.vehiculos.viewmodel.*
@@ -38,17 +40,23 @@ fun DetalleVehiculoRoute(
     claveCuenta: String,
     idVehiculo: Long,
     repository: DetalleVehiculosRepository,
+    soatRepository: SoatRepository? = null,
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onActualizarKm: (() -> Unit)? = null,
     onEditarDatos: (() -> Unit)? = null,
+    onRegistrarSoat: (() -> Unit)? = null,
+    onConsultarSoat: (() -> Unit)? = null,
+    onConfigurarSoat: (() -> Unit)? = null,
     onCambioOperativo: (() -> Unit)? = null,
     recargaToken: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val vm: DetalleVehiculoViewModel = viewModel(
         key = "rf10-$claveCuenta-$idVehiculo",
-        factory = remember(repository, idVehiculo) { DetalleVehiculoViewModel.factory(idVehiculo, repository) }
+        factory = remember(repository, soatRepository, idVehiculo) {
+            DetalleVehiculoViewModel.factory(idVehiculo, repository, soatRepository)
+        }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.cargar() }
@@ -60,6 +68,9 @@ fun DetalleVehiculoRoute(
         onIniciarSesion = onIniciarSesion,
         onActualizarKm = onActualizarKm,
         onEditarDatos = onEditarDatos,
+        onRegistrarSoat = onRegistrarSoat,
+        onConsultarSoat = onConsultarSoat,
+        onConfigurarSoat = onConfigurarSoat,
         onEstablecerPrincipal = { vm.establecerPrincipal { onCambioOperativo?.invoke() } },
         onActivar = { vm.activar { onCambioOperativo?.invoke() } },
         onDesactivar = { vm.desactivar { onCambioOperativo?.invoke() } },
@@ -75,6 +86,9 @@ fun DetalleVehiculoScreen(
     onIniciarSesion: () -> Unit,
     onActualizarKm: (() -> Unit)? = null,
     onEditarDatos: (() -> Unit)? = null,
+    onRegistrarSoat: (() -> Unit)? = null,
+    onConsultarSoat: (() -> Unit)? = null,
+    onConfigurarSoat: (() -> Unit)? = null,
     onEstablecerPrincipal: (() -> Unit)? = null,
     onActivar: (() -> Unit)? = null,
     onDesactivar: (() -> Unit)? = null,
@@ -201,7 +215,15 @@ fun DetalleVehiculoScreen(
                     }
 
                     SeccionIdentificacion(det)
-                    DocumentosProximamente()
+                    SeccionDocumentos(
+                        soatActual = estado.soatActual,
+                        soatCargando = estado.soatResumenCargando,
+                        vehiculoActivo = det.estadoVehiculo == "ACTIVO",
+                        onRegistrarSoat = onRegistrarSoat,
+                        onConsultarSoat = onConsultarSoat,
+                        onConfigurarSoat = onConfigurarSoat,
+                        ocupado = estado.ocupado
+                    )
                 }
             }
         }
@@ -420,28 +442,76 @@ private fun SeccionIdentificacion(v: DetalleVehiculoDto) {
 }
 
 @Composable
-private fun DocumentosProximamente() {
+private fun SeccionDocumentos(
+    soatActual: com.mycar.app.features.soat.data.SoatDto?,
+    soatCargando: Boolean,
+    vehiculoActivo: Boolean,
+    onRegistrarSoat: (() -> Unit)?,
+    onConsultarSoat: (() -> Unit)?,
+    onConfigurarSoat: (() -> Unit)?,
+    ocupado: Boolean
+) {
     Text("Documentos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = AzulDetalle)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Card(
-            Modifier.weight(1f),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("SOAT", fontWeight = FontWeight.Bold, color = AzulDetalle)
-                Text("Próximamente", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("SOAT", fontWeight = FontWeight.Bold, color = AzulDetalle)
+            when {
+                soatCargando -> {
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteDetalle)
+                    Text("Consultando SOAT…", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+                }
+                soatActual == null -> {
+                    Text("Sin SOAT registrado.", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+                    if (vehiculoActivo && onRegistrarSoat != null) {
+                        Button(
+                            onClick = onRegistrarSoat,
+                            enabled = !ocupado,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                        ) { Text("Registrar SOAT") }
+                    }
+                }
+                else -> {
+                    Text(
+                        "${SoatFormulario.etiquetaCobertura(soatActual.estadoCobertura)} · vence ${SoatFormulario.formatearFecha(soatActual.fechaVencimiento)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MyCarMuted
+                    )
+                    if (onConsultarSoat != null) {
+                        OutlinedButton(
+                            onClick = onConsultarSoat,
+                            enabled = !ocupado,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = AzulDetalle)
+                        ) { Text("Consultar SOAT") }
+                    }
+                    if (soatActual.vigencia == "ACTUAL" && vehiculoActivo && onConfigurarSoat != null) {
+                        Button(
+                            onClick = onConfigurarSoat,
+                            enabled = !ocupado,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = CelesteDetalle)
+                        ) { Text("Configurar SOAT") }
+                    }
+                }
             }
         }
-        Card(
-            Modifier.weight(1f),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("TIVE", fontWeight = FontWeight.Bold, color = AzulDetalle)
-                Text("Próximamente", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
-            }
+    }
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("TIVE", fontWeight = FontWeight.Bold, color = AzulDetalle)
+            Text("Próximamente", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
         }
     }
 }

@@ -1,0 +1,305 @@
+package com.mycar.app.features.soat.viewmodel
+
+import android.net.Uri
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.mycar.app.features.soat.data.SoatDocumentoRefDto
+import com.mycar.app.features.soat.data.SoatDto
+import com.mycar.app.features.soat.data.SoatMutacionDto
+import com.mycar.app.features.soat.data.SoatPresignSolicitudDto
+import com.mycar.app.features.soat.domain.*
+import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+enum class ModoDocSoat { NINGUNO, MANTENER, REEMPLAZAR, ELIMINAR }
+
+data class AdjuntoSoatUi(
+    val uri: Uri,
+    val nombre: String,
+    val contentType: String,
+    val tamanoBytes: Long
+)
+
+data class EstadoSoatForm(
+    val idVehiculo: Long,
+    val modo: TipoFormSoat,
+    val idSoat: Long? = null,
+    val campos: CamposSoat = CamposSoat(),
+    val errores: Map<String, String> = emptyMap(),
+    val ocupado: Boolean = false,
+    val mensaje: String? = null,
+    val exito: SoatDto? = null,
+    val sesionRequerida: Boolean = false,
+    val adjunto: AdjuntoSoatUi? = null,
+    val errorAdjunto: String? = null,
+    val ofrecerRecordatorio: Boolean = false,
+    val modoDocumento: ModoDocSoat = ModoDocSoat.NINGUNO,
+    val tieneDocumentoActual: Boolean = false,
+    val confirmarVisible: Boolean = false
+)
+
+enum class TipoFormSoat { REGISTRAR, CORREGIR, RENOVAR }
+
+abstract class SoatFormViewModelBase(
+    protected val idVehiculo: Long,
+    protected val repository: SoatRepository,
+    val modo: TipoFormSoat,
+    private val idSoat: Long? = null,
+    camposIniciales: CamposSoat = CamposSoat(),
+    tieneDocumento: Boolean = false
+) : ViewModel() {
+    protected val _estado = MutableStateFlow(
+        EstadoSoatForm(
+            idVehiculo = idVehiculo,
+            modo = modo,
+            idSoat = idSoat,
+            campos = camposIniciales,
+            tieneDocumentoActual = tieneDocumento,
+            modoDocumento = if (tieneDocumento && modo == TipoFormSoat.CORREGIR) ModoDocSoat.MANTENER else ModoDocSoat.NINGUNO
+        )
+    )
+    val estado = _estado.asStateFlow()
+
+    fun actualizarCampos(transform: (CamposSoat) -> CamposSoat) {
+        _estado.value = _estado.value.copy(campos = transform(_estado.value.campos), errores = emptyMap())
+    }
+
+    fun setAdjunto(adjunto: AdjuntoSoatUi?) {
+        val err = adjunto?.let { validarAdjunto(it) }
+        _estado.value = _estado.value.copy(
+            adjunto = if (err == null) adjunto else null,
+            errorAdjunto = err,
+            modoDocumento = when {
+                adjunto != null -> ModoDocSoat.REEMPLAZAR
+                _estado.value.modo == TipoFormSoat.CORREGIR && _estado.value.tieneDocumentoActual ->
+                    ModoDocSoat.MANTENER
+                else -> ModoDocSoat.NINGUNO
+            }
+        )
+    }
+
+    fun setModoDocumento(modo: ModoDocSoat) {
+        _estado.value = _estado.value.copy(
+            modoDocumento = modo,
+            adjunto = if (modo == ModoDocSoat.REEMPLAZAR) _estado.value.adjunto else null,
+            errorAdjunto = null
+        )
+    }
+
+    fun mostrarConfirmacion() {
+        val campos = _estado.value.campos
+        val errores = SoatFormulario.validarCampos(
+            campos.aseguradora, campos.numeroPoliza, campos.fechaInicio, campos.fechaVencimiento,
+            campos.fechaEmision, campos.importePrima
+        )
+        if (errores.isNotEmpty()) {
+            _estado.value = _estado.value.copy(errores = errores)
+            return
+        }
+        if (_estado.value.modo == TipoFormSoat.CORREGIR &&
+            _estado.value.modoDocumento == ModoDocSoat.REEMPLAZAR && _estado.value.adjunto == null
+        ) {
+            _estado.value = _estado.value.copy(errorAdjunto = "Selecciona el nuevo documento.")
+            return
+        }
+        _estado.value = _estado.value.copy(confirmarVisible = true)
+    }
+
+    fun ocultarConfirmacion() {
+        _estado.value = _estado.value.copy(confirmarVisible = false)
+    }
+
+    fun confirmar() {
+        val s = _estado.value
+        if (s.ocupado) return
+        _estado.value = s.copy(ocupado = true, confirmarVisible = false, mensaje = null)
+        viewModelScope.launch {
+            try {
+                val doc = prepararDocumento(s)
+                val solicitud = construirSolicitud(s, doc)
+                val resultado = enviar(solicitud)
+                _estado.value = _estado.value.copy(
+                    ocupado = false,
+                    exito = resultado,
+                    ofrecerRecordatorio = modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR
+                )
+            } catch (cancelada: CancellationException) {
+                throw cancelada
+            } catch (e: Exception) {
+                val fallo = e as? FalloRegistroVehiculo
+                _estado.value = _estado.value.copy(
+                    ocupado = false,
+                    sesionRequerida = fallo?.estadoHttp == 401,
+                    mensaje = fallo?.mensajeServidor ?: "No se pudo guardar. Inténtalo nuevamente."
+                )
+            }
+        }
+    }
+
+    private suspend fun prepararDocumento(s: EstadoSoatForm): SoatDocumentoRefDto? {
+        if (s.modoDocumento == ModoDocSoat.MANTENER || s.modoDocumento == ModoDocSoat.ELIMINAR) return null
+        val adj = s.adjunto ?: return null
+        val presign = repository.presignUpload(
+            idVehiculo,
+            SoatPresignSolicitudDto(adj.nombre, adj.contentType, adj.tamanoBytes)
+        )
+        val bytes = leerBytes(adj.uri)
+        repository.subirDocumento(presign, bytes, adj.contentType)
+        return SoatDocumentoRefDto(presign.objectKey, adj.contentType, adj.nombre)
+    }
+
+    protected open suspend fun leerBytes(uri: Uri): ByteArray =
+        throw UnsupportedOperationException("El host debe proveer lectura de URI")
+
+    protected open fun construirSolicitud(s: EstadoSoatForm, doc: SoatDocumentoRefDto?): SoatMutacionDto {
+        val c = s.campos
+        val prima = c.importePrima.trim().takeIf { it.isNotEmpty() }?.replace(",", ".")?.toDoubleOrNull()
+        val eliminar = s.modo == TipoFormSoat.CORREGIR && s.modoDocumento == ModoDocSoat.ELIMINAR
+        return SoatMutacionDto(
+            idOperacion = UUID.randomUUID().toString(),
+            aseguradora = c.aseguradora.trim(),
+            numeroPoliza = c.numeroPoliza.trim(),
+            fechaInicio = c.fechaInicio.trim(),
+            fechaVencimiento = c.fechaVencimiento.trim(),
+            fechaEmision = c.fechaEmision.trim().takeIf { it.isNotEmpty() },
+            nombreContratante = c.nombreContratante.trim().takeIf { it.isNotEmpty() },
+            importePrima = prima,
+            documento = doc,
+            eliminarDocumento = if (eliminar) true else null,
+            versionFila = c.versionFila
+        )
+    }
+
+    protected abstract suspend fun enviar(solicitud: SoatMutacionDto): SoatDto
+
+    private fun validarAdjunto(adj: AdjuntoSoatUi): String? {
+        val esPdf = adj.contentType == "application/pdf"
+        val esImg = adj.contentType.startsWith("image/")
+        if (!esPdf && !esImg) return "Solo JPG, PNG o PDF."
+        val max = if (esPdf) SOAT_MAX_PDF_BYTES else SOAT_MAX_IMAGEN_BYTES
+        if (adj.tamanoBytes > max) {
+            return if (esPdf) "El PDF no puede superar 10 MB." else "La imagen no puede superar 5 MB."
+        }
+        return null
+    }
+}
+
+class RegistrarSoatViewModel(
+    idVehiculo: Long,
+    repository: SoatRepository,
+    private val lectorUri: suspend (Uri) -> ByteArray
+) : SoatFormViewModelBase(idVehiculo, repository, TipoFormSoat.REGISTRAR) {
+    override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
+    override suspend fun enviar(solicitud: SoatMutacionDto) = repository.registrar(idVehiculo, solicitud)
+
+    companion object {
+        fun factory(
+            idVehiculo: Long,
+            repository: SoatRepository,
+            lectorUri: suspend (Uri) -> ByteArray
+        ) = viewModelFactory {
+            initializer { RegistrarSoatViewModel(idVehiculo, repository, lectorUri) }
+        }
+    }
+}
+
+class CorregirSoatViewModel(
+    idVehiculo: Long,
+    private val idSoatRegistro: Long,
+    repository: SoatRepository,
+    soat: SoatDto,
+    private val lectorUri: suspend (Uri) -> ByteArray
+) : SoatFormViewModelBase(
+    idVehiculo, repository, TipoFormSoat.CORREGIR, idSoatRegistro,
+    SoatFormulario.desdeSoat(soat), soat.tieneDocumento
+) {
+    override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
+    override suspend fun enviar(solicitud: SoatMutacionDto) =
+        repository.corregir(idVehiculo, idSoatRegistro, solicitud)
+
+    companion object {
+        fun factory(
+            idVehiculo: Long,
+            idSoat: Long,
+            repository: SoatRepository,
+            soat: SoatDto,
+            lectorUri: suspend (Uri) -> ByteArray
+        ) = viewModelFactory {
+            initializer { CorregirSoatViewModel(idVehiculo, idSoat, repository, soat, lectorUri) }
+        }
+    }
+}
+
+class RenovarSoatViewModel(
+    idVehiculo: Long,
+    repository: SoatRepository,
+    private val lectorUri: suspend (Uri) -> ByteArray
+) : SoatFormViewModelBase(idVehiculo, repository, TipoFormSoat.RENOVAR) {
+    override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
+    override suspend fun enviar(solicitud: SoatMutacionDto) = repository.renovar(idVehiculo, solicitud)
+
+    companion object {
+        fun factory(
+            idVehiculo: Long,
+            repository: SoatRepository,
+            lectorUri: suspend (Uri) -> ByteArray
+        ) = viewModelFactory {
+            initializer { RenovarSoatViewModel(idVehiculo, repository, lectorUri) }
+        }
+    }
+}
+
+class RecordatorioSoatViewModel(
+    private val idVehiculo: Long,
+    private val idSoat: Long,
+    private val repository: SoatRepository,
+    recordatorioInicial: Boolean
+) : ViewModel() {
+    data class Estado(
+        val activo: Boolean,
+        val ocupado: Boolean = false,
+        val mensaje: String? = null,
+        val exito: Boolean = false,
+        val sesion: Boolean = false
+    )
+
+    private val _estado = MutableStateFlow(Estado(recordatorioInicial))
+    val estado = _estado.asStateFlow()
+
+    fun alternar(activo: Boolean) {
+        if (_estado.value.ocupado) return
+        _estado.value = _estado.value.copy(ocupado = true, mensaje = null)
+        viewModelScope.launch {
+            try {
+                repository.recordatorio(idVehiculo, idSoat, activo)
+                _estado.value = Estado(activo, exito = true)
+            } catch (cancelada: CancellationException) {
+                throw cancelada
+            } catch (e: Exception) {
+                val fallo = e as? FalloRegistroVehiculo
+                _estado.value = _estado.value.copy(
+                    ocupado = false,
+                    sesion = fallo?.estadoHttp == 401,
+                    mensaje = fallo?.mensajeServidor ?: "No se pudo actualizar el recordatorio."
+                )
+            }
+        }
+    }
+
+    companion object {
+        fun factory(
+            idVehiculo: Long,
+            idSoat: Long,
+            repository: SoatRepository,
+            recordatorioInicial: Boolean
+        ) = viewModelFactory {
+            initializer { RecordatorioSoatViewModel(idVehiculo, idSoat, repository, recordatorioInicial) }
+        }
+    }
+}

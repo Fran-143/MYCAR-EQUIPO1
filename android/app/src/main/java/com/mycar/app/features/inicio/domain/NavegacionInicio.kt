@@ -13,6 +13,12 @@ enum class SecundariaMyCar(val titulo: String) {
     DETALLE("Detalle de vehículo"),
     EDITAR_VEHICULO("Editar datos"),
     KILOMETRAJE("Actualizar kilometraje"),
+    SOAT_REGISTRAR("Registrar SOAT"),
+    SOAT_CONSULTAR("Consultar SOAT"),
+    SOAT_CONFIGURAR("Configurar SOAT"),
+    SOAT_CORREGIR("Corregir SOAT"),
+    SOAT_RENOVAR("Renovar SOAT"),
+    SOAT_RECORDATORIO("Recordatorio SOAT"),
     DIAGNOSTICO("Conexión")
 }
 data class NavegacionInicio(val seccion: SeccionMyCar=SeccionMyCar.INICIO, val secundaria: SecundariaMyCar?=null) {
