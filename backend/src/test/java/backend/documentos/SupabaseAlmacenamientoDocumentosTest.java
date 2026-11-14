@@ -18,6 +18,12 @@ class SupabaseAlmacenamientoDocumentosTest {
                 "https://demo.supabase.co/storage/v1/object/sign/x",
                 storage.absolutizar("/storage/v1/object/sign/x"));
         assertEquals(
+                "https://demo.supabase.co/storage/v1/object/upload/sign/bucket/a.jpg",
+                storage.absolutizar("/object/upload/sign/bucket/a.jpg"));
+        assertEquals(
+                "https://demo.supabase.co/storage/v1/object/sign/bucket/a.pdf",
+                storage.absolutizar("/object/sign/bucket/a.pdf"));
+        assertEquals(
                 "https://cdn.example/a",
                 storage.absolutizar("https://cdn.example/a"));
         assertEquals("https://demo.supabase.co", SupabaseAlmacenamientoDocumentos.normalizarBase("https://demo.supabase.co/"));

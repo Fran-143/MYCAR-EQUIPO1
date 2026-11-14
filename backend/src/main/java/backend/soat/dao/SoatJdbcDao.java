@@ -53,9 +53,10 @@ public class SoatJdbcDao {
 
     public boolean existeActual(long vehiculo) {
         Integer n = jdbc.queryForObject("""
-                SELECT 1 FROM mycar.soat WHERE id_vehiculo = ? AND vigencia = 'ACTUAL' LIMIT 1
+                SELECT COUNT(*)::int FROM mycar.soat
+                WHERE id_vehiculo = ? AND vigencia = 'ACTUAL'
                 """, Integer.class, vehiculo);
-        return n != null;
+        return n != null && n > 0;
     }
 
     public Optional<FilaSoat> obtenerActual(long vehiculo) {
@@ -143,26 +144,24 @@ public class SoatJdbcDao {
     public boolean duplicadoContextual(long vehiculo, String aseguradora, String poliza,
             LocalDate inicio, LocalDate vencimiento, Long excluirIdSoat) {
         Integer n = jdbc.queryForObject("""
-                SELECT 1 FROM mycar.soat
+                SELECT COUNT(*)::int FROM mycar.soat
                 WHERE id_vehiculo = ?
                   AND lower(btrim(aseguradora)) = lower(btrim(?))
                   AND lower(btrim(numero_poliza)) = lower(btrim(?))
                   AND daterange(fecha_inicio, fecha_vencimiento, '[]') && daterange(?, ?, '[]')
-                  AND (? IS NULL OR id_soat <> ?)
-                LIMIT 1
+                  AND (?::bigint IS NULL OR id_soat <> ?)
                 """, Integer.class, vehiculo, aseguradora, poliza, inicio, vencimiento, excluirIdSoat, excluirIdSoat);
-        return n != null;
+        return n != null && n > 0;
     }
 
     public boolean solapeConHistorico(long vehiculo, LocalDate inicio, LocalDate vencimiento, Long excluir) {
         Integer n = jdbc.queryForObject("""
-                SELECT 1 FROM mycar.soat
+                SELECT COUNT(*)::int FROM mycar.soat
                 WHERE id_vehiculo = ?
                   AND daterange(fecha_inicio, fecha_vencimiento, '[]') && daterange(?, ?, '[]')
-                  AND (? IS NULL OR id_soat <> ?)
-                LIMIT 1
+                  AND (?::bigint IS NULL OR id_soat <> ?)
                 """, Integer.class, vehiculo, inicio, vencimiento, excluir, excluir);
-        return n != null;
+        return n != null && n > 0;
     }
 
     public Optional<AlertaSoat> alertaActivaPorSoat(long idSoat) {

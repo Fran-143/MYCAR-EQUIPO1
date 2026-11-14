@@ -184,10 +184,15 @@ public class SupabaseAlmacenamientoDocumentos implements AlmacenamientoDocumento
         if (signed.startsWith("http://") || signed.startsWith("https://")) {
             return signed;
         }
-        if (signed.startsWith("/")) {
-            return baseUrl + signed;
+        // Supabase a menudo devuelve rutas relativas "/object/..." sin el prefijo "/storage/v1".
+        String path = signed.startsWith("/") ? signed : "/" + signed;
+        if (path.startsWith("/storage/v1/")) {
+            return baseUrl + path;
         }
-        return baseUrl + "/" + signed;
+        if (path.startsWith("/object/")) {
+            return baseUrl + "/storage/v1" + path;
+        }
+        return baseUrl + path;
     }
 
     private static String primerTexto(JsonNode nodo, String... campos) {
