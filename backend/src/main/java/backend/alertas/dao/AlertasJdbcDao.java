@@ -125,11 +125,14 @@ public class AlertasJdbcDao {
 
     public List<ContratoRf22.AlertaDto> listar(long vehiculo) {
         return jdbc.query("""
-                SELECT a.id_alerta, tm.codigo, tm.nombre, a.criterio, a.origen_calculo, a.estado,
+                SELECT a.id_alerta,
+                       COALESCE(tm.codigo, 'SOAT') AS codigo,
+                       COALESCE(tm.nombre, 'SOAT') AS nombre,
+                       a.criterio, a.origen_calculo, a.estado,
                        a.fecha_objetivo, a.km_objetivo, a.km_base, a.intervalo_km,
                        a.servicio_otro, a.version_fila
                 FROM mycar.alerta a
-                JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
+                LEFT JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
                 WHERE a.id_vehiculo = ? AND a.estado <> 'ANULADA'
                 ORDER BY a.creada_utc DESC, a.id_alerta DESC
                 """, (rs, n) -> new ContratoRf22.AlertaDto(

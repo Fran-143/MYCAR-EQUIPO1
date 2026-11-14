@@ -30,16 +30,23 @@ public class SeguridadSesionVehiculos {
                                 "/api/v1/vehiculos/{idVehiculo:[0-9]+}",
                                 "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/actual",
                                 "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas",
-                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas/{idLectura:[0-9]+}/correccion"
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas/{idLectura:[0-9]+}/correccion",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/soat",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/soat/{idSoat:[0-9]+}/documento"
                         ).authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/vehiculos",
                                 "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas",
-                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas/{idLectura:[0-9]+}/correcciones"
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/kilometraje/lecturas/{idLectura:[0-9]+}/correcciones",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/soat",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/soat/renovar",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/soat/documentos/presign-upload"
                         ).authenticated()
                         .requestMatchers(HttpMethod.PUT,
                                 "/api/v1/vehiculos/{idVehiculo:[0-9]+}",
                                 "/api/v1/vehiculos/{idVehiculo:[0-9]+}/principal",
-                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/estado").authenticated()
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/estado",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/soat/{idSoat:[0-9]+}",
+                                "/api/v1/vehiculos/{idVehiculo:[0-9]+}/soat/{idSoat:[0-9]+}/recordatorio").authenticated()
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(sesiones, json), AnonymousAuthenticationFilter.class)
                 .build();
