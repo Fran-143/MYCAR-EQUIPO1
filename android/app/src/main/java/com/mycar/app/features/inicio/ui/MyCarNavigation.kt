@@ -355,31 +355,52 @@ fun MyCarNavigation(
                             }
                         }
                         secundaria == SecundariaMyCar.SOAT_RENOVAR && cuenta != null -> {
-                            val idSoat = vehiculoSoatId
-                            if (idSoat == null || idSoat <= 0) {
+                            val idVehiculoSoat = vehiculoSoatId
+                            var idSoatAnterior by remember(recargaSoat, idVehiculoSoat) { mutableStateOf<Long?>(null) }
+                            var cargaRenovar by remember(recargaSoat, idVehiculoSoat) { mutableStateOf(true) }
+                            LaunchedEffect(idVehiculoSoat, cuenta.soat, recargaSoat) {
+                                cargaRenovar = true
+                                idSoatAnterior = if (idVehiculoSoat != null) {
+                                    runCatching { cuenta.soat.consultar(idVehiculoSoat).actual?.idSoat }.getOrNull()
+                                } else null
+                                cargaRenovar = false
+                            }
+                            if (idVehiculoSoat == null || idVehiculoSoat <= 0) {
                                 PantallaProximamente("Renovar SOAT", onVolver = { navegar(navegacion.atras()) })
+                            } else if (cargaRenovar) {
+                                PantallaProximamente("Renovar SOAT", onVolver = {
+                                    navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR))
+                                })
                             } else {
-                                fun trasRenovar(dto: SoatDto) {
-                                    recargaSoat++
-                                    recargaDetalle++
-                                    soatIdRecordatorio = dto.idSoat
-                                    soatRecordatorioActivo = dto.recordatorioActivo
-                                    navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONSULTAR))
-                                }
-                                RenovarSoatRoute(
-                                    "${cuenta.ciclo}|soat-ren-$idSoat|s$soatSesion",
-                                    idSoat,
-                                    cuenta.soat,
-                                    onVolver = { navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR)) },
-                                    onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },
-                                    onExito = ::trasRenovar,
-                                    onRecordatorio = { dto ->
+                                val idAnterior = idSoatAnterior
+                                if (idAnterior == null || idAnterior <= 0) {
+                                    PantallaProximamente("Renovar SOAT", onVolver = {
+                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR))
+                                    })
+                                } else {
+                                    fun trasRenovar(dto: SoatDto) {
+                                        recargaSoat++
+                                        recargaDetalle++
                                         soatIdRecordatorio = dto.idSoat
                                         soatRecordatorioActivo = dto.recordatorioActivo
-                                        navegar(navegacion.abrir(SecundariaMyCar.SOAT_RECORDATORIO))
-                                    },
-                                    modifier = Modifier.statusBarsPadding()
-                                )
+                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONSULTAR))
+                                    }
+                                    RenovarSoatRoute(
+                                        "${cuenta.ciclo}|soat-ren-$idVehiculoSoat-$idAnterior|s$soatSesion",
+                                        idVehiculoSoat,
+                                        idAnterior,
+                                        cuenta.soat,
+                                        onVolver = { navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR)) },
+                                        onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },
+                                        onExito = ::trasRenovar,
+                                        onRecordatorio = { dto ->
+                                            soatIdRecordatorio = dto.idSoat
+                                            soatRecordatorioActivo = dto.recordatorioActivo
+                                            navegar(navegacion.abrir(SecundariaMyCar.SOAT_RECORDATORIO))
+                                        },
+                                        modifier = Modifier.statusBarsPadding()
+                                    )
+                                }
                             }
                         }
                         secundaria == SecundariaMyCar.SOAT_RECORDATORIO && cuenta != null -> {

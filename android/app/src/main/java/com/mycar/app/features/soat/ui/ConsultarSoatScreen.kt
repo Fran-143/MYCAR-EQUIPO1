@@ -36,8 +36,8 @@ fun ConsultarSoatRoute(
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
     val actual = estado.consulta?.actual
-    LaunchedEffect(actual?.idSoat, actual?.tieneDocumento) {
-        if (actual?.tieneDocumento == true) vm.cargarDocumento(actual)
+    LaunchedEffect(actual?.idSoat, actual?.conDocumento) {
+        if (actual?.conDocumento == true) vm.cargarDocumento(actual)
     }
     ConsultarSoatScreen(
         estado = estado,
@@ -88,7 +88,7 @@ fun ConsultarSoatScreen(
                     } else {
                         Text("Vigencia actual", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
                         SoatTarjetaDatos(actual)
-                        if (actual.tieneDocumento) {
+                        if (actual.conDocumento) {
                             Text("Documento", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
                             SoatVistaDocumento(estado.docBytes, estado.docEsPdf, estado.docCargando, estado.docError)
                         }

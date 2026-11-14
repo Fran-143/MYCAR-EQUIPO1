@@ -15,27 +15,27 @@ interface SoatApi {
     suspend fun registrar(
         @Path("idVehiculo") idVehiculo: Long,
         @Body solicitud: SoatMutacionDto
-    ): Response<SoatDto>
+    ): Response<SoatRegistrarRespuestaDto>
 
     @PUT("api/v1/vehiculos/{idVehiculo}/soat/{idSoat}")
     suspend fun corregir(
         @Path("idVehiculo") idVehiculo: Long,
         @Path("idSoat") idSoat: Long,
         @Body solicitud: SoatMutacionDto
-    ): Response<SoatDto>
+    ): Response<SoatCorregirRespuestaDto>
 
     @POST("api/v1/vehiculos/{idVehiculo}/soat/renovar")
     suspend fun renovar(
         @Path("idVehiculo") idVehiculo: Long,
         @Body solicitud: SoatMutacionDto
-    ): Response<SoatDto>
+    ): Response<SoatRenovarRespuestaDto>
 
     @PUT("api/v1/vehiculos/{idVehiculo}/soat/{idSoat}/recordatorio")
     suspend fun recordatorio(
         @Path("idVehiculo") idVehiculo: Long,
         @Path("idSoat") idSoat: Long,
         @Body solicitud: SoatRecordatorioDto
-    ): Response<SoatDto>
+    ): Response<SoatRecordatorioRespuestaDto>
 
     @POST("api/v1/vehiculos/{idVehiculo}/soat/documentos/presign-upload")
     suspend fun presignUpload(

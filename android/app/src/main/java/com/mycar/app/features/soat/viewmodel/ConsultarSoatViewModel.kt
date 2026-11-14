@@ -56,7 +56,7 @@ class ConsultarSoatViewModel(
     }
 
     fun cargarDocumento(soat: SoatDto) {
-        if (!soat.tieneDocumento) return
+        if (!soat.conDocumento) return
         _estado.value = _estado.value.copy(docCargando = true, docError = null, docBytes = null)
         viewModelScope.launch {
             try {

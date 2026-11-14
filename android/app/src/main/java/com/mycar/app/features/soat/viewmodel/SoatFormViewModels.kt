@@ -145,13 +145,14 @@ abstract class SoatFormViewModelBase(
     private suspend fun prepararDocumento(s: EstadoSoatForm): SoatDocumentoRefDto? {
         if (s.modoDocumento == ModoDocSoat.MANTENER || s.modoDocumento == ModoDocSoat.ELIMINAR) return null
         val adj = s.adjunto ?: return null
+        val tamano = adj.tamanoBytes.toInt().coerceAtLeast(1)
         val presign = repository.presignUpload(
             idVehiculo,
-            SoatPresignSolicitudDto(adj.nombre, adj.contentType, adj.tamanoBytes)
+            SoatPresignSolicitudDto(adj.contentType, tamano, adj.nombre)
         )
         val bytes = leerBytes(adj.uri)
         repository.subirDocumento(presign, bytes, adj.contentType)
-        return SoatDocumentoRefDto(presign.objectKey, adj.contentType, adj.nombre)
+        return SoatDocumentoRefDto(presign.objectKey, adj.contentType, tamano, adj.nombre)
     }
 
     protected open suspend fun leerBytes(uri: Uri): ByteArray =
@@ -160,9 +161,17 @@ abstract class SoatFormViewModelBase(
     protected open fun construirSolicitud(s: EstadoSoatForm, doc: SoatDocumentoRefDto?): SoatMutacionDto {
         val c = s.campos
         val prima = c.importePrima.trim().takeIf { it.isNotEmpty() }?.replace(",", ".")?.toDoubleOrNull()
-        val eliminar = s.modo == TipoFormSoat.CORREGIR && s.modoDocumento == ModoDocSoat.ELIMINAR
+        val accion = when (s.modo) {
+            TipoFormSoat.CORREGIR -> when (s.modoDocumento) {
+                ModoDocSoat.ELIMINAR -> "QUITAR"
+                ModoDocSoat.REEMPLAZAR -> "REEMPLAZAR"
+                else -> "MANTENER"
+            }
+            else -> null
+        }
         return SoatMutacionDto(
-            idOperacion = UUID.randomUUID().toString(),
+            idOperacion = if (s.modo == TipoFormSoat.CORREGIR) null else UUID.randomUUID().toString(),
+            idSoatAnterior = if (s.modo == TipoFormSoat.RENOVAR) s.idSoat else null,
             aseguradora = c.aseguradora.trim(),
             numeroPoliza = c.numeroPoliza.trim(),
             fechaInicio = c.fechaInicio.trim(),
@@ -171,8 +180,7 @@ abstract class SoatFormViewModelBase(
             nombreContratante = c.nombreContratante.trim().takeIf { it.isNotEmpty() },
             importePrima = prima,
             documento = doc,
-            eliminarDocumento = if (eliminar) true else null,
-            versionFila = c.versionFila
+            accionDocumento = accion
         )
     }
 
@@ -217,7 +225,7 @@ class CorregirSoatViewModel(
     private val lectorUri: suspend (Uri) -> ByteArray
 ) : SoatFormViewModelBase(
     idVehiculo, repository, TipoFormSoat.CORREGIR, idSoatRegistro,
-    SoatFormulario.desdeSoat(soat), soat.tieneDocumento
+    SoatFormulario.desdeSoat(soat), soat.conDocumento
 ) {
     override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
     override suspend fun enviar(solicitud: SoatMutacionDto) =
@@ -238,19 +246,21 @@ class CorregirSoatViewModel(
 
 class RenovarSoatViewModel(
     idVehiculo: Long,
+    idSoatAnterior: Long,
     repository: SoatRepository,
     private val lectorUri: suspend (Uri) -> ByteArray
-) : SoatFormViewModelBase(idVehiculo, repository, TipoFormSoat.RENOVAR) {
+) : SoatFormViewModelBase(idVehiculo, repository, TipoFormSoat.RENOVAR, idSoatAnterior) {
     override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
     override suspend fun enviar(solicitud: SoatMutacionDto) = repository.renovar(idVehiculo, solicitud)
 
     companion object {
         fun factory(
             idVehiculo: Long,
+            idSoatAnterior: Long,
             repository: SoatRepository,
             lectorUri: suspend (Uri) -> ByteArray
         ) = viewModelFactory {
-            initializer { RenovarSoatViewModel(idVehiculo, repository, lectorUri) }
+            initializer { RenovarSoatViewModel(idVehiculo, idSoatAnterior, repository, lectorUri) }
         }
     }
 }

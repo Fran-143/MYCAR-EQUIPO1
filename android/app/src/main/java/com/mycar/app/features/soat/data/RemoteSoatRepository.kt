@@ -3,12 +3,12 @@ package com.mycar.app.features.soat.data
 import com.google.gson.Gson
 import com.mycar.app.features.soat.domain.SoatRepository
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class RemoteSoatRepository(
     private val api: SoatApi,
@@ -20,20 +20,43 @@ class RemoteSoatRepository(
         val r = api.consultar(idVehiculo)
         if (r.code() == 404) return SoatConsultaResponse()
         if (!r.isSuccessful) throw fallo(r)
-        return r.body() ?: SoatConsultaResponse()
+        return normalizar(r.body() ?: SoatConsultaResponse())
     }
 
-    override suspend fun registrar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto =
-        exitoso(api.registrar(idVehiculo, solicitud)) { it.idSoat > 0 }
+    override suspend fun registrar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto {
+        val r = api.registrar(idVehiculo, solicitud.copy(idSoatAnterior = null, accionDocumento = null))
+        if (!r.isSuccessful) throw fallo(r)
+        val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        if (body.idSoat <= 0) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        return exigirActual(idVehiculo)
+    }
 
-    override suspend fun corregir(idVehiculo: Long, idSoat: Long, solicitud: SoatMutacionDto): SoatDto =
-        exitoso(api.corregir(idVehiculo, idSoat, solicitud)) { it.idSoat == idSoat }
+    override suspend fun corregir(idVehiculo: Long, idSoat: Long, solicitud: SoatMutacionDto): SoatDto {
+        val payload = solicitud.copy(idOperacion = null, idSoatAnterior = null)
+        val r = api.corregir(idVehiculo, idSoat, payload)
+        if (!r.isSuccessful) throw fallo(r)
+        val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        if (body.idSoat != idSoat) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        return exigirActual(idVehiculo)
+    }
 
-    override suspend fun renovar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto =
-        exitoso(api.renovar(idVehiculo, solicitud)) { it.idSoat > 0 && it.vigencia == "ACTUAL" }
+    override suspend fun renovar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto {
+        require(solicitud.idSoatAnterior != null && solicitud.idSoatAnterior > 0) {
+            "idSoatAnterior requerido"
+        }
+        val r = api.renovar(idVehiculo, solicitud.copy(accionDocumento = null))
+        if (!r.isSuccessful) throw fallo(r)
+        val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        if (body.idSoatNuevo <= 0) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        return exigirActual(idVehiculo)
+    }
 
-    override suspend fun recordatorio(idVehiculo: Long, idSoat: Long, activo: Boolean): SoatDto =
-        exitoso(api.recordatorio(idVehiculo, idSoat, SoatRecordatorioDto(activo))) { it.idSoat == idSoat }
+    override suspend fun recordatorio(idVehiculo: Long, idSoat: Long, activo: Boolean): SoatDto {
+        val r = api.recordatorio(idVehiculo, idSoat, SoatRecordatorioDto(activo))
+        if (!r.isSuccessful) throw fallo(r)
+        r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        return exigirActual(idVehiculo)
+    }
 
     override suspend fun presignUpload(idVehiculo: Long, solicitud: SoatPresignSolicitudDto): SoatPresignRespuestaDto =
         exitoso(api.presignUpload(idVehiculo, solicitud)) { it.uploadUrl.isNotBlank() && it.objectKey.isNotBlank() }
@@ -58,6 +81,23 @@ class RemoteSoatRepository(
         val resp = http.newCall(Request.Builder().url(url).get().build()).execute()
         if (!resp.isSuccessful) throw FalloRegistroVehiculo("DESCARGA_FALLIDA", resp.code)
         resp.body?.bytes() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
+    }
+
+    private suspend fun exigirActual(idVehiculo: Long): SoatDto {
+        val consulta = consultar(idVehiculo)
+        return consulta.actual ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
+    }
+
+    private fun normalizar(c: SoatConsultaResponse): SoatConsultaResponse {
+        fun norm(s: SoatDto): SoatDto {
+            val tiene = s.tieneDocumento || s.documento?.objectKey?.isNotBlank() == true
+            val cobertura = s.estadoCobertura?.takeIf { it.isNotBlank() } ?: c.estadoCobertura
+            return s.copy(tieneDocumento = tiene, estadoCobertura = cobertura)
+        }
+        return c.copy(
+            actual = c.actual?.let(::norm),
+            historial = c.historial.map(::norm)
+        )
     }
 
     private inline fun <T> exitoso(r: retrofit2.Response<T>, validar: (T) -> Boolean): T {

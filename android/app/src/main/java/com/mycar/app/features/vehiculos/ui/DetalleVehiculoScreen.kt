@@ -478,7 +478,7 @@ private fun SeccionDocumentos(
                 }
                 else -> {
                     Text(
-                        "${SoatFormulario.etiquetaCobertura(soatActual.estadoCobertura)} · vence ${SoatFormulario.formatearFecha(soatActual.fechaVencimiento)}",
+                        "${SoatFormulario.etiquetaCobertura(soatActual.estadoCobertura.orEmpty())} · vence ${SoatFormulario.formatearFecha(soatActual.fechaVencimiento)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MyCarMuted
                     )

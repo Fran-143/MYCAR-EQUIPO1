@@ -37,10 +37,10 @@ public class SoatService {
     public ContratoSoat.ConsultaResponse consultar(long usuario, long vehiculo) {
         exigirTitularidadConsulta(usuario, vehiculo);
         LocalDate hoy = dao.hoyLima();
-        var actualOpt = dao.obtenerActual(vehiculo).map(SoatJdbcDao::aDto);
-        String estado = actualOpt.map(a -> ValidadorSoat.estadoCobertura(
-                a.fechaInicio(), a.fechaVencimiento(), hoy)).orElse(null);
-        var historial = dao.listarHistorial(vehiculo).stream().map(SoatJdbcDao::aDto).toList();
+        var actualOpt = dao.obtenerActual(vehiculo).map(f -> SoatJdbcDao.aDto(f, hoy));
+        String estado = actualOpt.map(ContratoSoat.SoatDto::estadoCobertura).orElse(null);
+        var historial = dao.listarHistorial(vehiculo).stream()
+                .map(f -> SoatJdbcDao.aDto(f, hoy)).toList();
         ContratoSoat.RecordatorioDto recordatorio = null;
         if (actualOpt.isPresent()) {
             var alerta = dao.alertaActivaPorSoat(actualOpt.get().idSoat()).orElse(null);

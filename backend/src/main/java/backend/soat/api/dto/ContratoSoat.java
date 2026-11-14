@@ -26,7 +26,10 @@ public final class ContratoSoat {
             String nombreContratante,
             BigDecimal importePrima,
             String vigencia,
+            /** POR_INICIAR | VIGENTE | VENCIDA según fechas (America/Lima). */
+            String estadoCobertura,
             boolean recordatorioActivo,
+            boolean tieneDocumento,
             int versionFila,
             DocumentoDto documento
     ) { }

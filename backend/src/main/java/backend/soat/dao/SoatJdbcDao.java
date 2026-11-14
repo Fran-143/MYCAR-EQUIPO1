@@ -255,15 +255,21 @@ public class SoatJdbcDao {
     public record AlertaVersion(long idAlerta, String estado, int versionFila) { }
 
     public static ContratoSoat.SoatDto aDto(FilaSoat f) {
+        return aDto(f, LocalDate.now(java.time.ZoneId.of("America/Lima")));
+    }
+
+    public static ContratoSoat.SoatDto aDto(FilaSoat f, LocalDate hoy) {
         ContratoSoat.DocumentoDto doc = null;
         if (f.storageObjectKey() != null) {
             doc = new ContratoSoat.DocumentoDto(
                     f.storageObjectKey(), f.contentType(), f.tamanoBytes(), f.nombreOriginal());
         }
+        String cobertura = backend.soat.service.ValidadorSoat.estadoCobertura(
+                f.fechaInicio(), f.fechaVencimiento(), hoy);
         return new ContratoSoat.SoatDto(
                 f.idSoat(), f.aseguradora(), f.numeroPoliza(), f.fechaInicio(), f.fechaVencimiento(),
                 f.fechaEmision(), f.nombreContratante(), f.importePrima(), f.vigencia(),
-                f.recordatorioActivo(), f.versionFila(), doc);
+                cobertura, f.recordatorioActivo(), doc != null, f.versionFila(), doc);
     }
 
     private Optional<FilaSoat> buscarUno(String sql, Object... args) {

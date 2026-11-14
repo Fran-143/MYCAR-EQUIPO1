@@ -95,6 +95,7 @@ fun CorregirSoatRoute(
 fun RenovarSoatRoute(
     claveCuenta: String,
     idVehiculo: Long,
+    idSoatAnterior: Long,
     repository: SoatRepository,
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
@@ -107,9 +108,9 @@ fun RenovarSoatRoute(
         { uri -> leerUriSoat(context, uri) }
     }
     val vm: RenovarSoatViewModel = viewModel(
-        key = "rf31r-$claveCuenta-$idVehiculo",
-        factory = remember(repository, idVehiculo, lector) {
-            RenovarSoatViewModel.factory(idVehiculo, repository, lector)
+        key = "rf31r-$claveCuenta-$idVehiculo-$idSoatAnterior",
+        factory = remember(repository, idVehiculo, idSoatAnterior, lector) {
+            RenovarSoatViewModel.factory(idVehiculo, idSoatAnterior, repository, lector)
         }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()

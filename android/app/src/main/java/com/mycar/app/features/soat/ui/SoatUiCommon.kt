@@ -64,7 +64,7 @@ fun SoatTarjetaDatos(soat: SoatDto, modifier: Modifier = Modifier) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BadgeCobertura(soat.estadoCobertura)
+                BadgeCobertura(soat.estadoCobertura.orEmpty())
                 if (soat.recordatorioActivo) {
                     Surface(shape = RoundedCornerShape(50), color = MyCarSky.copy(alpha = 0.2f)) {
                         Text(
