@@ -32,8 +32,9 @@ public class ErrorSoat extends RuntimeException {
     }
 
     public Map<String, String> campos() {
-        return campos.isEmpty() ? Map.of() : campos.stream().collect(
-                java.util.stream.Collectors.toMap(k -> k, k -> "Revisa este campo."));
+        if (campos.isEmpty()) return Map.of();
+        String mensaje = getMessage() == null ? "Revisa este campo." : getMessage();
+        return campos.stream().collect(java.util.stream.Collectors.toMap(k -> k, k -> mensaje));
     }
 
     public boolean incierto() {

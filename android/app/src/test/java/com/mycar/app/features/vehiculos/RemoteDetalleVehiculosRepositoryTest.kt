@@ -3,6 +3,8 @@ package com.mycar.app.features.vehiculos
 import com.mycar.app.features.vehiculos.data.DetalleVehiculoApi
 import com.mycar.app.features.vehiculos.data.DetalleVehiculoDto
 import com.mycar.app.features.vehiculos.data.RemoteDetalleVehiculosRepository
+import com.mycar.app.features.vehiculos.data.SolicitudActualizacionVehiculoDto
+import com.mycar.app.features.vehiculos.data.SolicitudEstadoVehiculoDto
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
 import okhttp3.ResponseBody.Companion.toResponseBody
 import kotlinx.coroutines.runBlocking
@@ -14,11 +16,14 @@ import retrofit2.Response
 class RemoteDetalleVehiculosRepositoryTest {
     private class Api(var respuesta: Response<DetalleVehiculoDto>) : DetalleVehiculoApi {
         override suspend fun consultar(idVehiculo: Long) = respuesta
+        override suspend fun actualizar(idVehiculo: Long, solicitud: SolicitudActualizacionVehiculoDto) = respuesta
+        override suspend fun establecerPrincipal(idVehiculo: Long) = respuesta
+        override suspend fun cambiarEstado(idVehiculo: Long, solicitud: SolicitudEstadoVehiculoDto) = respuesta
     }
 
     private val dto = DetalleVehiculoDto(
         3, "A1B234", "Toyota", "Corolla", 2020, "Particular", "Gris",
-        "Combustión", "Gasolina", "ACTIVO", true, 50000, null,
+        "Combustión", "Gasolina", "ACTIVO", true, 50000.0, null,
         null, "SERIE", "MOTOR", null, false
     )
 

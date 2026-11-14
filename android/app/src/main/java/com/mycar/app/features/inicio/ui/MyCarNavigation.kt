@@ -361,12 +361,14 @@ fun MyCarNavigation(
                         }
                         secundaria == SecundariaMyCar.SOAT_RENOVAR && cuenta != null -> {
                             val idVehiculoSoat = vehiculoSoatId
-                            var idSoatAnterior by remember(recargaSoat, idVehiculoSoat) { mutableStateOf<Long?>(null) }
+                            var soatAnteriorRen by remember(recargaSoat, idVehiculoSoat) {
+                                mutableStateOf<SoatDto?>(null)
+                            }
                             var cargaRenovar by remember(recargaSoat, idVehiculoSoat) { mutableStateOf(true) }
                             LaunchedEffect(idVehiculoSoat, cuenta.soat, recargaSoat) {
                                 cargaRenovar = true
-                                idSoatAnterior = if (idVehiculoSoat != null) {
-                                    runCatching { cuenta.soat.consultar(idVehiculoSoat).actual?.idSoat }.getOrNull()
+                                soatAnteriorRen = if (idVehiculoSoat != null) {
+                                    runCatching { cuenta.soat.consultar(idVehiculoSoat).actual }.getOrNull()
                                 } else null
                                 cargaRenovar = false
                             }
@@ -377,7 +379,7 @@ fun MyCarNavigation(
                                     navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR))
                                 })
                             } else {
-                                val idAnterior = idSoatAnterior
+                                val idAnterior = soatAnteriorRen?.idSoat
                                 if (idAnterior == null || idAnterior <= 0) {
                                     PantallaProximamente("Renovar SOAT", onVolver = {
                                         navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR))
@@ -395,6 +397,7 @@ fun MyCarNavigation(
                                         "${cuenta.ciclo}|soat-ren-$idVehiculoSoat-$idAnterior|s$soatSesion",
                                         idVehiculoSoat,
                                         idAnterior,
+                                        soatAnteriorRen,
                                         cuenta.soat,
                                         onVolver = { navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR)) },
                                         onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },

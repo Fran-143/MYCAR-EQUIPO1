@@ -49,6 +49,7 @@ fun SoatFormScreen(
     onRetrocederPaso: () -> Unit = {},
     onRecordarChange: (Boolean) -> Unit = {},
     textoConfirmar: String,
+    botonHabilitado: Boolean = !estado.ocupado,
     modifier: Modifier = Modifier
 ) {
     val tituloPaso = when {
@@ -91,7 +92,7 @@ fun SoatFormScreen(
                 SoatBotonPrincipal(
                     if (estado.modo == TipoFormSoat.REGISTRAR) "Continuar" else textoConfirmar,
                     onContinuar,
-                    !estado.ocupado
+                    botonHabilitado && estado.errores.isEmpty()
                 )
             }
         }

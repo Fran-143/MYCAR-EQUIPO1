@@ -21,7 +21,8 @@ public class ErroresSoatController {
     @ExceptionHandler(ErrorSoat.class)
     public ResponseEntity<Map<String, Object>> funcional(ErrorSoat error) {
         HttpStatus estado = switch (error.codigo()) {
-            case "DATOS_INVALIDOS", "DOCUMENTO_DEMASIADO_GRANDE" -> HttpStatus.BAD_REQUEST;
+            case "DATOS_INVALIDOS", "DOCUMENTO_DEMASIADO_GRANDE", "SIN_CAMBIOS",
+                 "SOAT_GUARDAR_FALLIDO" -> HttpStatus.BAD_REQUEST;
             case "VEHICULO_NO_ENCONTRADO", "SOAT_NO_ENCONTRADO", "DOCUMENTO_NO_DISPONIBLE",
                  "DOCUMENTO_NO_ENCONTRADO" -> HttpStatus.NOT_FOUND;
             case "VEHICULO_INACTIVO" -> HttpStatus.FORBIDDEN;

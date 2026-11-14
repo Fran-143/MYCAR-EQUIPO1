@@ -74,8 +74,66 @@ abstract class SoatFormViewModelBase(
     val estado = _estado.asStateFlow()
 
     fun actualizarCampos(transform: (CamposSoat) -> CamposSoat) {
-        _estado.value = _estado.value.copy(campos = transform(_estado.value.campos), errores = emptyMap())
+        val nuevos = transform(_estado.value.campos)
+        // Validación en vivo solo de incoherencias (fechas/prima); obligatorios vacíos se bloquean al continuar.
+        val errores = SoatFormulario.validarCampos(
+            nuevos.aseguradora.ifBlank { "_" },
+            nuevos.numeroPoliza.ifBlank { "_" },
+            nuevos.fechaInicio,
+            nuevos.fechaVencimiento,
+            nuevos.fechaEmision,
+            nuevos.importePrima
+        ).toMutableMap()
+        errores.remove("aseguradora")
+        errores.remove("numeroPoliza")
+        if (nuevos.fechaInicio.isBlank()) errores.remove("fechaInicio")
+        if (nuevos.fechaVencimiento.isBlank()) errores.remove("fechaVencimiento")
+        camposBaseRenovacion()?.let { base ->
+            if (nuevos.fechaInicio.isNotBlank() && nuevos.fechaVencimiento.isNotBlank()) {
+                errores.putAll(
+                    SoatFormulario.validarFechasRenovacion(
+                        nuevos.fechaInicio, nuevos.fechaVencimiento,
+                        base.fechaInicio, base.fechaVencimiento
+                    )
+                )
+            }
+        }
+        _estado.value = _estado.value.copy(campos = nuevos, errores = errores, mensaje = null)
     }
+
+    /** Para RF31 renovar: vigencia actual de referencia (mismo idSoat). */
+    protected open fun camposBaseRenovacion(): CamposSoat? = null
+
+    fun formularioValido(): Boolean {
+        val c = _estado.value.campos
+        val errores = SoatFormulario.validarCampos(
+            c.aseguradora, c.numeroPoliza, c.fechaInicio, c.fechaVencimiento,
+            c.fechaEmision, c.importePrima
+        ).toMutableMap()
+        camposBaseRenovacion()?.let { base ->
+            errores.putAll(
+                SoatFormulario.validarFechasRenovacion(
+                    c.fechaInicio, c.fechaVencimiento, base.fechaInicio, base.fechaVencimiento
+                )
+            )
+        }
+        return errores.isEmpty()
+    }
+
+    fun puedeGuardarCorregir(): Boolean {
+        if (modo != TipoFormSoat.CORREGIR) return formularioValido()
+        if (!formularioValido()) return false
+        val s = _estado.value
+        val iniciales = camposInicialesCorregir() ?: return true
+        val modoDoc = when (s.modoDocumento) {
+            ModoDocSoat.REEMPLAZAR -> "REEMPLAZAR"
+            ModoDocSoat.ELIMINAR -> "ELIMINAR"
+            else -> "MANTENER"
+        }
+        return SoatFormulario.hayCambiosRespectoA(iniciales, s.campos, modoDoc)
+    }
+
+    protected open fun camposInicialesCorregir(): CamposSoat? = null
 
     fun setAdjunto(adjunto: AdjuntoSoatUi?) {
         val err = adjunto?.let { validarAdjunto(it) }
@@ -108,7 +166,14 @@ abstract class SoatFormViewModelBase(
         val errores = SoatFormulario.validarCampos(
             campos.aseguradora, campos.numeroPoliza, campos.fechaInicio, campos.fechaVencimiento,
             campos.fechaEmision, campos.importePrima
-        )
+        ).toMutableMap()
+        camposBaseRenovacion()?.let { base ->
+            errores.putAll(
+                SoatFormulario.validarFechasRenovacion(
+                    campos.fechaInicio, campos.fechaVencimiento, base.fechaInicio, base.fechaVencimiento
+                )
+            )
+        }
         if (errores.isNotEmpty()) {
             _estado.value = _estado.value.copy(errores = errores)
             return
@@ -116,11 +181,15 @@ abstract class SoatFormViewModelBase(
         when (modo) {
             TipoFormSoat.REGISTRAR -> _estado.value = _estado.value.copy(paso = PasoSoatForm.ADJUNTO, errores = emptyMap())
             TipoFormSoat.CORREGIR -> {
+                if (!puedeGuardarCorregir()) {
+                    _estado.value = _estado.value.copy(mensaje = "No hay cambios para guardar.")
+                    return
+                }
                 if (_estado.value.modoDocumento == ModoDocSoat.REEMPLAZAR && _estado.value.adjunto == null) {
                     _estado.value = _estado.value.copy(errorAdjunto = "Selecciona el nuevo documento.")
                     return
                 }
-                _estado.value = _estado.value.copy(confirmarVisible = true)
+                _estado.value = _estado.value.copy(confirmarVisible = true, mensaje = null)
             }
             TipoFormSoat.RENOVAR -> _estado.value = _estado.value.copy(confirmarVisible = true)
         }
@@ -180,7 +249,8 @@ abstract class SoatFormViewModelBase(
                 _estado.value = _estado.value.copy(
                     ocupado = false,
                     sesionRequerida = fallo?.estadoHttp == 401,
-                    mensaje = fallo?.mensajeServidor ?: "No se pudo guardar. Inténtalo nuevamente."
+                    mensaje = fallo?.mensajeServidor
+                        ?: "No pudimos guardar el SOAT. Inténtalo de nuevo"
                 )
             }
         }
@@ -271,6 +341,8 @@ class CorregirSoatViewModel(
     idVehiculo, repository, TipoFormSoat.CORREGIR, idSoatRegistro,
     SoatFormulario.desdeSoat(soat), soat.conDocumento
 ) {
+    private val iniciales = SoatFormulario.desdeSoat(soat)
+    override fun camposInicialesCorregir(): CamposSoat = iniciales
     override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
     override suspend fun enviar(solicitud: SoatMutacionDto) =
         repository.corregir(idVehiculo, idSoatRegistro, solicitud)
@@ -292,8 +364,11 @@ class RenovarSoatViewModel(
     idVehiculo: Long,
     idSoatAnterior: Long,
     repository: SoatRepository,
+    soatAnterior: SoatDto?,
     private val lectorUri: suspend (Uri) -> ByteArray
 ) : SoatFormViewModelBase(idVehiculo, repository, TipoFormSoat.RENOVAR, idSoatAnterior) {
+    private val base = soatAnterior?.let { SoatFormulario.desdeSoat(it) }
+    override fun camposBaseRenovacion(): CamposSoat? = base
     override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
     override suspend fun enviar(solicitud: SoatMutacionDto) = repository.renovar(idVehiculo, solicitud)
 
@@ -302,9 +377,12 @@ class RenovarSoatViewModel(
             idVehiculo: Long,
             idSoatAnterior: Long,
             repository: SoatRepository,
+            soatAnterior: SoatDto?,
             lectorUri: suspend (Uri) -> ByteArray
         ) = viewModelFactory {
-            initializer { RenovarSoatViewModel(idVehiculo, idSoatAnterior, repository, lectorUri) }
+            initializer {
+                RenovarSoatViewModel(idVehiculo, idSoatAnterior, repository, soatAnterior, lectorUri)
+            }
         }
     }
 }

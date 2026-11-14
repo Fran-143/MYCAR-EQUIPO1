@@ -36,3 +36,26 @@ Sin “póliza verificada”. Anticipación recordatorio: **30 días** (PROXIMA)
 **Consultar SOAT (RF64) es solo lectura** (+ acceso a Configurar). La maestra colocaba Corregir/Renovar dentro de Consultar; se documenta la diferencia y no se altera el resto del BCE.
 
 Registro + recordatorio: el toggle de revisión es preferencia UI; **primero** se confirma RF30/RF31 Renovar; **después** PUT recordatorio independiente. Si falla el recordatorio, el SOAT permanece y la confirmación muestra el estado real.
+
+## Inventario EA oficiales (fuentes)
+
+| RF | Fuente EA | Conteo |
+|----|-----------|--------|
+| RF30 | `SOAT_EA_DEFINITIVOS` (EA_487) | **11** (EA01–EA11) |
+| RF31 | `SOAT_EA_DEFINITIVOS` (EA_487) | **16** (EA01–EA16) |
+| RF32 | `INDICE_ESCENARIOS` / `DETALLE_BCE` (EA_487) | **6** (EA01–EA06) |
+| RF64 | `SOAT_EA_DEFINITIVOS` (EA_487) | **7** (EA01–EA07) |
+
+Mensajes canónicos de fechas/prima (RF30-EA01 / EA07):
+
+- «La fecha de vencimiento debe ser posterior a la fecha de inicio»
+- «El importe de la prima no es válido»
+
+Renovación (RF31-EA01 / EA04):
+
+- «La nueva vigencia debe vencer después de la actual»
+- «La nueva vigencia no puede empezar antes de que termine la actual»
+
+**RF30-EA06:** vencimiento ya pasado **no rechaza** el alta; solo omite oferta/creación de recordatorio en el mismo commit (el recordatorio sigue siendo PUT separado).
+
+**Navegación vs maestra RF31/RF32:** hub Configurar SOAT (plan APK / PDF) se conserva; Consultar RF64 permanece solo lectura.

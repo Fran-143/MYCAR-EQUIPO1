@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,6 +100,10 @@ public class SoatService {
             return resp;
         } catch (DataIntegrityViolationException ex) {
             throw new ErrorSoat("SOAT_ACTUAL_EXISTE", "Este vehículo ya tiene un SOAT vigente documental.");
+        } catch (ErrorSoat ex) {
+            throw ex;
+        } catch (DataAccessException ex) {
+            throw new ErrorSoat("SOAT_GUARDAR_FALLIDO", "No pudimos guardar el SOAT. Inténtalo de nuevo");
         }
     }
 
@@ -115,8 +120,11 @@ public class SoatService {
                 req.fechaInicio(), req.fechaVencimiento(), idSoat)) {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
         }
-        String antes = serializar(actual);
         DocumentoResuelto doc = resolverDocumentoCorregir(usuario, vehiculo, actual, req);
+        if (sinCambiosCorregir(actual, req, doc)) {
+            throw new ErrorSoat("SIN_CAMBIOS", "No hay cambios para guardar.");
+        }
+        String antes = serializar(actual);
         int filas = dao.actualizarCorregir(new SoatJdbcDao.DatosActualizacion(
                 idSoat, vehiculo, actual.versionFila(),
                 req.aseguradora().strip(), req.numeroPoliza().strip(),
@@ -158,9 +166,12 @@ public class SoatService {
         var anterior = dao.obtenerPropio(usuario, vehiculo, req.idSoatAnterior())
                 .filter(s -> "ACTUAL".equals(s.vigencia()))
                 .orElseThrow(() -> new ErrorSoat("SOAT_NO_ENCONTRADO", "SOAT anterior no encontrado."));
-        if (!req.fechaInicio().isAfter(anterior.fechaInicio())
-                && dao.solapeConHistorico(vehiculo, req.fechaInicio(), req.fechaVencimiento(), req.idSoatAnterior())) {
-            throw new ErrorSoat("SOAT_SOLAPE", "Las fechas se solapan con otro SOAT.");
+        ValidadorSoat.exigirFechasRenovacion(
+                req.fechaInicio(), req.fechaVencimiento(),
+                anterior.fechaInicio(), anterior.fechaVencimiento());
+        if (dao.solapeConHistorico(vehiculo, req.fechaInicio(), req.fechaVencimiento(), req.idSoatAnterior())) {
+            throw new ErrorSoat("SOAT_SOLAPE",
+                    "La nueva vigencia no puede empezar antes de que termine la actual.");
         }
         if (dao.duplicadoContextual(vehiculo, req.aseguradora(), req.numeroPoliza(),
                 req.fechaInicio(), req.fechaVencimiento(), null)) {
@@ -422,6 +433,32 @@ public class SoatService {
     private static String blancoANull(String texto) {
         if (texto == null || texto.isBlank()) return null;
         return texto.strip();
+    }
+
+    private static boolean sinCambiosCorregir(
+            SoatJdbcDao.FilaSoat actual, ContratoSoat.CorregirRequest req, DocumentoResuelto doc) {
+        if (req.accionDocumento() != ContratoSoat.AccionDocumento.MANTENER
+                && req.accionDocumento() != ContratoSoat.AccionDocumento.QUITAR
+                && req.accionDocumento() != ContratoSoat.AccionDocumento.REEMPLAZAR) {
+            return false;
+        }
+        boolean mismosDatos = Objects.equals(norm(actual.aseguradora()), norm(req.aseguradora()))
+                && Objects.equals(norm(actual.numeroPoliza()), norm(req.numeroPoliza()))
+                && Objects.equals(actual.fechaInicio(), req.fechaInicio())
+                && Objects.equals(actual.fechaVencimiento(), req.fechaVencimiento())
+                && Objects.equals(actual.fechaEmision(), req.fechaEmision())
+                && Objects.equals(blancoANull(actual.nombreContratante()), blancoANull(req.nombreContratante()))
+                && Objects.equals(actual.importePrima(), req.importePrima());
+        if (!mismosDatos) return false;
+        return switch (req.accionDocumento()) {
+            case MANTENER -> Objects.equals(actual.storageObjectKey(), doc.objectKey());
+            case QUITAR -> actual.storageObjectKey() == null;
+            case REEMPLAZAR -> Objects.equals(actual.storageObjectKey(), doc.objectKey());
+        };
+    }
+
+    private static String norm(String valor) {
+        return valor == null ? null : valor.strip();
     }
 
     private record DocumentoResuelto(String objectKey, String contentType, Integer tamanoBytes, String nombreOriginal) { }

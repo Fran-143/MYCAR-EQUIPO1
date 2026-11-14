@@ -44,6 +44,26 @@ public final class ValidadorSoat {
         documentoOpcional(req.documento());
     }
 
+    /**
+     * RF31-EA01 / EA04: la nueva vigencia empieza después de la actual y vence después de ella.
+     */
+    public static void exigirFechasRenovacion(LocalDate inicioNueva, LocalDate vencNueva,
+            LocalDate inicioAnterior, LocalDate vencAnterior) {
+        if (inicioNueva == null || vencNueva == null || inicioAnterior == null || vencAnterior == null) {
+            throw new ErrorSoat("DATOS_INVALIDOS", "Fechas de renovación incompletas.");
+        }
+        if (!inicioNueva.isAfter(vencAnterior)) {
+            throw new ErrorSoat("SOAT_SOLAPE",
+                    "La nueva vigencia no puede empezar antes de que termine la actual.",
+                    Set.of("fechaInicio"));
+        }
+        if (!vencNueva.isAfter(vencAnterior)) {
+            throw new ErrorSoat("DATOS_INVALIDOS",
+                    "La nueva vigencia debe vencer después de la actual.",
+                    Set.of("fechaVencimiento"));
+        }
+    }
+
     public static void exigirCorregir(ContratoSoat.CorregirRequest req) {
         if (req == null) throw new ErrorSoat("DATOS_INVALIDOS", "Solicitud vacía.");
         if (req.accionDocumento() == null) {
@@ -97,7 +117,8 @@ public final class ValidadorSoat {
             throw new ErrorSoat("DATOS_INVALIDOS", "fechaVencimiento obligatoria.", Set.of("fechaVencimiento"));
         }
         if (!vencimiento.isAfter(inicio)) {
-            throw new ErrorSoat("DATOS_INVALIDOS", "fechaVencimiento debe ser posterior a fechaInicio.",
+            throw new ErrorSoat("DATOS_INVALIDOS",
+                    "La fecha de vencimiento debe ser posterior a la fecha de inicio",
                     Set.of("fechaVencimiento"));
         }
         if (emision != null && emision.isAfter(vencimiento)) {
@@ -125,7 +146,7 @@ public final class ValidadorSoat {
     private static void prima(BigDecimal valor) {
         if (valor == null) return;
         if (valor.signum() < 0 || valor.compareTo(MAX_PRIMA) > 0 || valor.stripTrailingZeros().scale() > 2) {
-            throw new ErrorSoat("DATOS_INVALIDOS", "importePrima inválido.", Set.of("importePrima"));
+            throw new ErrorSoat("DATOS_INVALIDOS", "El importe de la prima no es válido", Set.of("importePrima"));
         }
     }
 
