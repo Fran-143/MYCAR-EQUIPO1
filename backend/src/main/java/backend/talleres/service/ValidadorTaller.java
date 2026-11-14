@@ -64,5 +64,16 @@ public class ValidadorTaller {
         return n;
     }
 
+    /**
+     * RF33/RF34: WhatsApp solo con teléfono válido; sin teléfono → false.
+     * Casilla desmarcada por defecto.
+     */
+    public boolean whatsappCoherente(String telefonoNormalizado, Boolean marcado) {
+        if (telefonoNormalizado == null || telefonoNormalizado.isBlank()) {
+            return false;
+        }
+        return Boolean.TRUE.equals(marcado);
+    }
+
     private record EmailProbe(@Email String value) { }
 }

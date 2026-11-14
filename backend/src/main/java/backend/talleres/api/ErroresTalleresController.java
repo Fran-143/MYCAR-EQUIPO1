@@ -1,10 +1,13 @@
 package backend.talleres.api;
 
 import backend.mantenimiento.seguridad.SesionMantenimientoNoValidada;
+import backend.talleres.model.TallerAsociadoNoEditable;
 import backend.talleres.model.TallerFavoritoFallido;
 import backend.talleres.model.TallerNombreDuplicado;
 import backend.talleres.model.TallerNoDisponible;
+import backend.talleres.model.TallerTelefonoDuplicado;
 import backend.talleres.model.TallerVersionConflicto;
+import backend.talleres.model.TallerYaVinculado;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -28,6 +31,21 @@ public class ErroresTalleresController {
     @ExceptionHandler(TallerNombreDuplicado.class)
     ResponseEntity<Error> nombreDuplicado(TallerNombreDuplicado ex) {
         return error(409, "NOMBRE_DUPLICADO", ex.getMessage());
+    }
+
+    @ExceptionHandler(TallerTelefonoDuplicado.class)
+    ResponseEntity<Error> telefonoDuplicado(TallerTelefonoDuplicado ex) {
+        return error(409, "TELEFONO_DUPLICADO", ex.getMessage());
+    }
+
+    @ExceptionHandler(TallerYaVinculado.class)
+    ResponseEntity<Error> yaVinculado(TallerYaVinculado ex) {
+        return error(409, "TALLER_YA_VINCULADO", ex.getMessage());
+    }
+
+    @ExceptionHandler(TallerAsociadoNoEditable.class)
+    ResponseEntity<Error> asociadoRo(TallerAsociadoNoEditable ex) {
+        return error(403, "TALLER_ASOCIADO_SOLO_LECTURA", ex.getMessage());
     }
 
     @ExceptionHandler(TallerFavoritoFallido.class)

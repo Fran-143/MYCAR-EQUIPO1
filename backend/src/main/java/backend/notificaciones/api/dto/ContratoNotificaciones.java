@@ -16,8 +16,25 @@ public final class ContratoNotificaciones {
             String destino,
             Long idAlerta,
             Long idVehiculo,
-            String fechaEmisionUtc
-    ) { }
+            String fechaEmisionUtc,
+            /** Estado RF23 de la alerta vinculada; null si no hay id_alerta. Distinto de estadoGestion. */
+            String estadoAlerta
+    ) {
+        public NotificacionDto(
+                long idNotificacion,
+                String categoria,
+                String estadoGestion,
+                boolean leida,
+                String titulo,
+                String cuerpo,
+                String destino,
+                Long idAlerta,
+                Long idVehiculo,
+                String fechaEmisionUtc) {
+            this(idNotificacion, categoria, estadoGestion, leida, titulo, cuerpo, destino,
+                    idAlerta, idVehiculo, fechaEmisionUtc, null);
+        }
+    }
 
     public record BandejaResponse(
             String pestana,

@@ -57,26 +57,47 @@ internal fun CampoMantenimiento(label: String, value: String, enabled: Boolean,
         supportingText = if (error != null) ({ Text(error) }) else null)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun <T> SelectorMantenimiento(label: String, value: String, opciones: List<Pair<T, String>>,
     enabled: Boolean, error: String? = null, modifier: Modifier = Modifier, onSelect: (T) -> Unit) {
     var abierto by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge)
-        Box {
-            OutlinedButton(onClick = { abierto = true }, enabled = enabled && opciones.isNotEmpty(),
-                shape = RoundedCornerShape(12.dp), modifier = modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
-                Text(value, modifier = Modifier.weight(1f))
-                Text("⌄")
-            }
-            DropdownMenu(expanded = abierto && enabled, onDismissRequest = { abierto = false },
-                modifier = Modifier.heightIn(max = 280.dp)) {
-                opciones.forEach { (clave, texto) -> DropdownMenuItem(text = { Text(texto) },
-                    onClick = { abierto = false; onSelect(clave) }) }
+    val puedeAbrir = enabled && opciones.isNotEmpty()
+    ExposedDropdownMenuBox(
+        expanded = abierto && puedeAbrir,
+        onExpandedChange = { if (puedeAbrir) abierto = it },
+        modifier = modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            enabled = puedeAbrir,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = abierto && puedeAbrir) },
+            isError = error != null,
+            supportingText = error?.let { { Text(it) } },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = puedeAbrir)
+                .fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        ExposedDropdownMenu(
+            expanded = abierto && puedeAbrir,
+            onDismissRequest = { abierto = false },
+            modifier = Modifier.heightIn(max = 280.dp)
+        ) {
+            opciones.forEach { (clave, texto) ->
+                DropdownMenuItem(
+                    text = { Text(texto) },
+                    onClick = {
+                        abierto = false
+                        onSelect(clave)
+                    }
+                )
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
 

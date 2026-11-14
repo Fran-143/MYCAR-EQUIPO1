@@ -36,9 +36,29 @@ fun HistorialMantenimientoScreen(
     modifier: Modifier = Modifier,
     registroDisponible: Boolean = false,
     onIniciarSesion: (() -> Unit)? = null,
-    onVerDetalle: ((Long) -> Unit)? = null
+    onVerDetalle: ((Long) -> Unit)? = null,
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
 ) {
     var pestana by remember { mutableStateOf(PestanaHistorial.MANTENIMIENTOS) }
+    if (pestana == PestanaHistorial.TALLERES && talleresRepository != null) {
+        Column(modifier.fillMaxSize().background(FondoHistorial).testTag("rf18.pantalla")) {
+            Surface(color = Color.White) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onVolver, modifier = Modifier.testTag("rf18.volver")) { Text("Volver") }
+                    Text("Historial", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold, color = AzulHistorial)
+                }
+            }
+            PestanasHistorial(pestana) { pestana = it }
+            com.mycar.app.features.talleres.ui.TalleresRoute(
+                repository = talleresRepository,
+                onVolver = onVolver,
+                modifier = Modifier.weight(1f)
+            )
+        }
+        return
+    }
     Column(modifier.fillMaxSize().background(FondoHistorial).testTag("rf18.pantalla")) {
         Surface(color = Color.White) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),

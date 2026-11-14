@@ -17,7 +17,7 @@ public class NotificacionJdbcDao {
     public Optional<AlertaContexto> cargarAlerta(long idAlerta) {
         return jdbc.query("""
                 SELECT a.id_alerta, a.id_vehiculo, v.id_usuario, a.estado, tm.nombre, v.placa,
-                       COALESCE(a.servicio_otro, tm.nombre) AS etiqueta
+                       COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre) AS etiqueta
                 FROM mycar.alerta a
                 JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
                 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
@@ -35,7 +35,7 @@ public class NotificacionJdbcDao {
     public List<AlertaContexto> listarAlertasVehiculoParaAvisos(long vehiculo) {
         return jdbc.query("""
                 SELECT a.id_alerta, a.id_vehiculo, v.id_usuario, a.estado, tm.nombre, v.placa,
-                       COALESCE(a.servicio_otro, tm.nombre) AS etiqueta
+                       COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre) AS etiqueta
                 FROM mycar.alerta a
                 JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
                 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
@@ -154,15 +154,17 @@ public class NotificacionJdbcDao {
             soloLeidas = true;
         }
         String sql = """
-                SELECT id_notificacion, categoria, estado_gestion, leida, titulo, cuerpo, destino,
-                       id_alerta, id_vehiculo,
-                       to_char(fecha_emision_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS emitida
-                FROM mycar.notificacion
-                WHERE id_usuario = ?
-                  AND estado_gestion %s
-                  AND (? OR categoria = ?)
-                  AND (? OR leida = ?)
-                ORDER BY fecha_emision_utc DESC, id_notificacion DESC
+                SELECT n.id_notificacion, n.categoria, n.estado_gestion, n.leida, n.titulo, n.cuerpo, n.destino,
+                       n.id_alerta, n.id_vehiculo,
+                       to_char(n.fecha_emision_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS emitida,
+                       a.estado AS estado_alerta
+                FROM mycar.notificacion n
+                LEFT JOIN mycar.alerta a ON a.id_alerta = n.id_alerta
+                WHERE n.id_usuario = ?
+                  AND n.estado_gestion %s
+                  AND (? OR n.categoria = ?)
+                  AND (? OR n.leida = ?)
+                ORDER BY n.fecha_emision_utc DESC, n.id_notificacion DESC
                 """.formatted(pendientes ? "= 'PENDIENTE'" : "IN ('ATENDIDA','CERRADA')");
         return jdbc.query(sql, (rs, n) -> new ContratoNotificaciones.NotificacionDto(
                 rs.getLong("id_notificacion"),
@@ -174,7 +176,8 @@ public class NotificacionJdbcDao {
                 rs.getString("destino"),
                 (Long) rs.getObject("id_alerta"),
                 (Long) rs.getObject("id_vehiculo"),
-                rs.getString("emitida")),
+                rs.getString("emitida"),
+                rs.getString("estado_alerta")),
                 usuario,
                 todasCat, todasCat ? "" : categoria,
                 todasLect, Boolean.TRUE.equals(soloLeidas));
@@ -182,11 +185,13 @@ public class NotificacionJdbcDao {
 
     public Optional<ContratoNotificaciones.NotificacionDto> obtenerPropia(long usuario, long idNotificacion) {
         return jdbc.query("""
-                SELECT id_notificacion, categoria, estado_gestion, leida, titulo, cuerpo, destino,
-                       id_alerta, id_vehiculo,
-                       to_char(fecha_emision_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS emitida
-                FROM mycar.notificacion
-                WHERE id_usuario = ? AND id_notificacion = ?
+                SELECT n.id_notificacion, n.categoria, n.estado_gestion, n.leida, n.titulo, n.cuerpo, n.destino,
+                       n.id_alerta, n.id_vehiculo,
+                       to_char(n.fecha_emision_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS emitida,
+                       a.estado AS estado_alerta
+                FROM mycar.notificacion n
+                LEFT JOIN mycar.alerta a ON a.id_alerta = n.id_alerta
+                WHERE n.id_usuario = ? AND n.id_notificacion = ?
                 """, (rs, n) -> new ContratoNotificaciones.NotificacionDto(
                 rs.getLong("id_notificacion"),
                 rs.getString("categoria"),
@@ -197,7 +202,8 @@ public class NotificacionJdbcDao {
                 rs.getString("destino"),
                 (Long) rs.getObject("id_alerta"),
                 (Long) rs.getObject("id_vehiculo"),
-                rs.getString("emitida")), usuario, idNotificacion).stream().findFirst();
+                rs.getString("emitida"),
+                rs.getString("estado_alerta")), usuario, idNotificacion).stream().findFirst();
     }
 
     public int marcarLeida(long usuario, long idNotificacion) {

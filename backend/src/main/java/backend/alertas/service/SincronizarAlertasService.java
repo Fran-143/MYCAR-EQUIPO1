@@ -62,7 +62,50 @@ public class SincronizarAlertasService {
                 base.versionFila(),
                 new ContratoRf22.VehiculoResumenDto(
                         base.idVehiculo(), base.placa(), base.marca(), base.modelo(), base.estadoVehiculo()),
-                acciones);
+                acciones,
+                resolverContacto(usuario, base));
+    }
+
+    /**
+     * RF24 EA09–EA14: prioridad EXPLICITO → mantenimiento ref → favorito → NINGUNO.
+     * No marca la alerta como atendida ni muta el mantenimiento histórico.
+     */
+    @Transactional
+    public ContratoRf22.DetalleAlertaDto elegirContactoTaller(
+            long usuario, long vehiculo, long idAlerta, ContratoRf22.ElegirContactoTallerRequest body) {
+        if (body == null || body.idTaller() == null || body.idTaller() <= 0) {
+            throw new ErrorAlertas("DATOS_INVALIDOS", "Selecciona un taller de tu catálogo.");
+        }
+        exigirVehiculo(usuario, vehiculo);
+        alertas.obtenerDetallePropio(usuario, vehiculo, idAlerta)
+                .orElseThrow(() -> new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible."));
+        alertas.tallerActivoPropio(usuario, body.idTaller())
+                .orElseThrow(() -> new ErrorAlertas("TALLER_NO_DISPONIBLE", "El taller no está disponible."));
+        if (!alertas.asignarTallerContacto(usuario, vehiculo, idAlerta, body.idTaller())) {
+            throw new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible.");
+        }
+        return consultarDetalle(usuario, vehiculo, idAlerta);
+    }
+
+    private ContratoRf22.ContactoTallerDto resolverContacto(long usuario, AlertasJdbcDao.DetalleAlertaFila base) {
+        if (base.idTallerContacto() != null) {
+            var t = alertas.tallerActivoPropio(usuario, base.idTallerContacto()).orElse(null);
+            if (t != null) return aContacto(t, "EXPLICITO");
+        }
+        var desdeMant = alertas.tallerDeMantenimientoReferencia(usuario, base.idMantenimientoReferencia()).orElse(null);
+        if (desdeMant != null) return aContacto(desdeMant, "MANTENIMIENTO_REF");
+        var fav = alertas.tallerFavoritoActivo(usuario).orElse(null);
+        if (fav != null) return aContacto(fav, "FAVORITO");
+        return new ContratoRf22.ContactoTallerDto(null, null, null, false, null, "NINGUNO", true);
+    }
+
+    private static ContratoRf22.ContactoTallerDto aContacto(
+            AlertasJdbcDao.TallerContactoFila t, String origenSugerencia) {
+        String tel = t.telefono() == null || t.telefono().isBlank() ? null : t.telefono().trim();
+        boolean sin = tel == null;
+        return new ContratoRf22.ContactoTallerDto(
+                t.idTaller(), t.nombre(), tel, !sin && t.tieneWhatsapp(),
+                t.origen(), origenSugerencia, sin);
     }
 
     private void exigirVehiculo(long usuario, long vehiculo) {

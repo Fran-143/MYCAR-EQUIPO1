@@ -613,7 +613,8 @@ class RegistroMantenimientoJdbcDaoTest {
                 daoRegistro, new OperacionMantenimientoJdbcDao(jdbc),
                 new backend.talleres.service.TallerService(
                         new backend.talleres.dao.TallerJdbcDao(jdbc),
-                        new backend.talleres.service.ValidadorTaller())
+                        new backend.talleres.service.ValidadorTaller(),
+                        12L)
         );
 
         // Aplicamos el control transaccional de Spring al servicio.

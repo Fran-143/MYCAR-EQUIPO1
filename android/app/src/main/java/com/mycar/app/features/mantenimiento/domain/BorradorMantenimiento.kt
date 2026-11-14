@@ -17,6 +17,8 @@ data class BorradorMantenimiento(
     val origen: String = "LECTURA", val lectura: Long? = null, val km: String = "",
     val servicioOtro: String = "", val observaciones: String = "", val costo: String = "",
     val proximaFecha: String = "", val proximoKm: String = "",
+    /** null = Sin taller (no autoseleccionar favorito). */
+    val idTaller: Long? = null,
     val repuestos: List<RepuestoBorrador> = emptyList(), val envioPendiente: Boolean = false
 ) {
     fun tieneContenido() = fechaModificada || codigoTipo.isNotBlank() || km.isNotBlank()
@@ -65,6 +67,7 @@ object ValidacionFormularioMantenimiento {
         if (b.origen == "LECTURA") b.lectura else null, importe(b.costo),
         b.servicioOtro.takeIf { b.codigoTipo == "OTRO" }, b.observaciones.takeIf { it.isNotBlank() },
         b.proximaFecha.takeIf { it.isNotBlank() }, b.proximoKm.toIntOrNull(),
+        b.idTaller,
         b.repuestos.map { RepuestoRf17Dto(it.nombre, it.marca.takeIf(String::isNotBlank),
             requireNotNull(it.cantidad.toIntOrNull()), importe(it.precio)) }
     )

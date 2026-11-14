@@ -74,6 +74,22 @@ public final class ContratoRf22 {
 
     public record AccionesDetalleDto(boolean atender, boolean anular) { }
 
+    /**
+     * RF24 EA09–EA14 — sugerencia de contacto voluntario.
+     * origenSugerencia: EXPLICITO | MANTENIMIENTO_REF | FAVORITO | NINGUNO
+     */
+    public record ContactoTallerDto(
+            Long idTaller,
+            String nombre,
+            String telefono,
+            boolean tieneWhatsapp,
+            String origen,
+            String origenSugerencia,
+            boolean sinContactoDisponible
+    ) { }
+
+    public record ElegirContactoTallerRequest(@Positive Long idTaller) { }
+
     public record DetalleAlertaDto(
             Long idAlerta,
             String categoria,
@@ -96,8 +112,22 @@ public final class ContratoRf22 {
             Long idMantenimientoAtencion,
             int versionFila,
             VehiculoResumenDto vehiculo,
-            AccionesDetalleDto acciones
-    ) { }
+            AccionesDetalleDto acciones,
+            ContactoTallerDto contactoTaller
+    ) {
+        public DetalleAlertaDto(
+                Long idAlerta, String categoria, String codigoTipo, String nombreTipo,
+                String criterio, String origenCalculo, String estado, String fechaEstadoUtc,
+                LocalDate fechaObjetivo, Integer kmObjetivo, Integer kmBase, Integer intervaloKm,
+                String unidadTiempo, Integer cantidadTiempo, LocalDate fechaBase, String servicioOtro,
+                Long idTipoMantenimiento, Long idMantenimientoReferencia, Long idMantenimientoAtencion,
+                int versionFila, VehiculoResumenDto vehiculo, AccionesDetalleDto acciones) {
+            this(idAlerta, categoria, codigoTipo, nombreTipo, criterio, origenCalculo, estado, fechaEstadoUtc,
+                    fechaObjetivo, kmObjetivo, kmBase, intervaloKm, unidadTiempo, cantidadTiempo, fechaBase,
+                    servicioOtro, idTipoMantenimiento, idMantenimientoReferencia, idMantenimientoAtencion,
+                    versionFila, vehiculo, acciones, null);
+        }
+    }
 
     public record EstadoResponse(UUID idOperacion, String estado, ProgramarResponse resultado) { }
 

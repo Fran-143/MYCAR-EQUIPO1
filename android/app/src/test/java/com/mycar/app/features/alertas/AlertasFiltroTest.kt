@@ -35,4 +35,10 @@ class AlertasFiltroTest {
         assertEquals(6, FiltroAlertas.entries.size)
         assertTrue(FiltroAlertas.entries.none { it.name.contains("ANUL") })
     }
+
+    @Test fun filtroNoMezclaAnuladasEnChips() {
+        val proximas = AlertasViewModel.filtrar(muestra, FiltroAlertas.PROXIMAS)
+        assertTrue(proximas.all { it.estado == "PROXIMA" })
+        assertTrue(proximas.none { it.estado == "ANULADA" })
+    }
 }

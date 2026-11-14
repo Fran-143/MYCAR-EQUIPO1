@@ -19,10 +19,14 @@ import com.mycar.app.R
 import com.mycar.app.features.alertas.ui.AlertasRoute
 import com.mycar.app.features.alertas.ui.ProgramarAlertaRoute
 import com.mycar.app.features.alertas.viewmodel.BorradorAlerta
+import com.mycar.app.features.autenticacion.ui.LocalConfirmedLogout
 import com.mycar.app.features.historial.ui.FlujoHistorialMantenimiento
 import com.mycar.app.features.inicio.domain.*
 import com.mycar.app.features.inicio.viewmodel.ResumenInicioViewModel
 import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
+import com.mycar.app.features.notificaciones.ui.NotificacionesRoute
+import com.mycar.app.features.perfil.ui.PerfilRoute
+import com.mycar.app.features.perfil.viewmodel.PerfilViewModel
 import com.mycar.app.features.sesion.viewmodel.SesionVehiculosViewModel
 import com.mycar.app.features.vehiculos.ui.ActualizarKilometrajeRoute
 import com.mycar.app.features.vehiculos.ui.DetalleVehiculoRoute
@@ -56,6 +60,8 @@ fun MyCarNavigation(
     var recargaAlertas by rememberSaveable { mutableIntStateOf(0) }
     var alertasFiltroTodasTrasExito by rememberSaveable { mutableStateOf(false) }
     var formularioAbierto by remember { mutableStateOf(false) }
+    var formularioAtencionAlerta by remember { mutableStateOf(false) }
+    var detalleAlertaTrasAtencion by rememberSaveable { mutableStateOf<Long?>(null) }
     var borradorAlertaRf17 by remember { mutableStateOf<BorradorAlerta?>(null) }
     val navegacion=NavegacionInicio(SeccionMyCar.valueOf(seccionNombre),secundariaNombre?.let(SecundariaMyCar::valueOf))
     fun navegar(n: NavegacionInicio) { seccionNombre=n.seccion.name; secundariaNombre=n.secundaria?.name; formularioAbierto=false }
@@ -112,10 +118,11 @@ fun MyCarNavigation(
     LaunchedEffect(cuenta?.ciclo) {
         vehiculoMantenimiento=null; vehiculoDetalleId=null; vehiculoKmId=null; kmOverlayMantenimiento=null
         alertasProgramarId=null; formularioAbierto=false; secundariaNombre=null
+        detalleAlertaTrasAtencion=null; formularioAtencionAlerta=false
         if(cuenta!=null) seccionNombre=SeccionMyCar.INICIO.name
     }
-    BackHandler(enabled=navegacion.secundaria!=null || navegacion.seccion!=SeccionMyCar.INICIO ||
-        kmOverlayMantenimiento!=null || alertasProgramarId!=null) {
+    BackHandler(enabled=!formularioAtencionAlerta && (navegacion.secundaria!=null || navegacion.seccion!=SeccionMyCar.INICIO ||
+        kmOverlayMantenimiento!=null || alertasProgramarId!=null)) {
         when {
             kmOverlayMantenimiento != null -> kmOverlayMantenimiento = null
             alertasProgramarId != null -> alertasProgramarId = null
@@ -127,7 +134,7 @@ fun MyCarNavigation(
         background=Color(0xFFF2FAFF),surface=Color.White,onSurface=Color(0xFF163468))
     MaterialTheme(colorScheme=esquema) {
         Scaffold(contentWindowInsets=WindowInsets(0),bottomBar={
-            if(navegacion.secundaria==null && !formularioAbierto && kmOverlayMantenimiento==null && alertasProgramarId==null)
+            if(navegacion.secundaria==null && !formularioAbierto && !formularioAtencionAlerta && kmOverlayMantenimiento==null && alertasProgramarId==null)
                 NavigationBar(containerColor=Color.White) {
                 SeccionMyCar.entries.forEach { destino ->
                     val icono=when(destino) {
@@ -184,6 +191,42 @@ fun MyCarNavigation(
                                     },
                                     modifier=Modifier.fillMaxSize().statusBarsPadding())
                             }
+                        }
+                        secundaria==SecundariaMyCar.PERFIL && cuenta!=null -> {
+                            val cerrarSesion = LocalConfirmedLogout.current
+                            val factoryPerfil = remember(cuenta.ciclo) {
+                                object : ViewModelProvider.Factory {
+                                    @Suppress("UNCHECKED_CAST")
+                                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                        require(modelClass.isAssignableFrom(PerfilViewModel::class.java))
+                                        return PerfilViewModel(
+                                            cuenta.perfil,
+                                            onNombreActualizado = { cuenta.nombrePresentacion.value = it }
+                                        ) as T
+                                    }
+                                }
+                            }
+                            val perfilVm: PerfilViewModel = viewModel(key = "perfil-${cuenta.ciclo}", factory = factoryPerfil)
+                            PerfilRoute(
+                                vm = perfilVm,
+                                preferenciasNotificacion = cuenta.preferenciasNotificacion,
+                                onVolver = { navegar(navegacion.atras()) },
+                                onSesionInvalida = { sesion.sesionRequerida(cuenta.ciclo) },
+                                onCerrarSesion = { cerrarSesion?.invoke() },
+                                modifier = Modifier.fillMaxSize().statusBarsPadding()
+                            )
+                        }
+                        secundaria==SecundariaMyCar.NOTIFICACIONES && cuenta!=null -> {
+                            NotificacionesRoute(
+                                repository = cuenta.notificaciones,
+                                onVolver = { navegar(navegacion.atras()) },
+                                onAbrirDetalleAlerta = { idVehiculo, idAlerta ->
+                                    vehiculoAlertas = idVehiculo
+                                    detalleAlertaTrasAtencion = idAlerta
+                                    navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
+                                },
+                                modifier = Modifier.fillMaxSize().statusBarsPadding()
+                            )
                         }
                         else -> PantallaProximamente(secundaria.titulo,onVolver={ navegar(navegacion.atras()) })
                     }
@@ -243,7 +286,8 @@ fun MyCarNavigation(
                                         idVehiculoInicial=vehiculoMantenimiento, archivoPendiente=cuenta.archivoMantenimiento,
                                         estadoEnSistema=false, onRegistroAbierto={ formularioAbierto=it },
                                         recargaRegistroToken = recargaMantenimiento,
-                                        onProgramarAlerta = { abrirProgramarDesdeRf17(it) })
+                                        onProgramarAlerta = { abrirProgramarDesdeRf17(it) },
+                                        talleresRepository = cuenta.talleres)
                                     if (idKmOverlay != null) {
                                         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                                             ActualizarKilometrajeRoute(
@@ -301,9 +345,16 @@ fun MyCarNavigation(
                                     AlertasRoute(
                                         cuenta.alertas, vehiculosAlertas, vehiculoAlertas,
                                         onProgramar={ abrirProgramarAlerta(it) },
+                                        mantenimientoRepository = cuenta.mantenimiento,
+                                        claveCuentaBorrador = "${com.mycar.app.BuildConfig.API_BASE_URL}|${cuenta.usuario}",
+                                        archivoPendiente = cuenta.archivoMantenimiento,
+                                        onFormularioAtencionAbierto = { formularioAtencionAlerta = it },
+                                        detalleInicialId = detalleAlertaTrasAtencion,
+                                        onDetalleInicialConsumido = { detalleAlertaTrasAtencion = null },
                                         recargaToken = recargaAlertas,
                                         reiniciarFiltroTodas = alertasFiltroTodasTrasExito,
                                         onReinicioFiltroConsumido = { alertasFiltroTodasTrasExito = false },
+                                        talleresRepository = cuenta.talleres,
                                         modifier=Modifier.statusBarsPadding())
                                 }
                             }

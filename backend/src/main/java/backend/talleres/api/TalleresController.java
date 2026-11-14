@@ -20,9 +20,19 @@ public class TalleresController {
     public TalleresController(TallerService servicio) { this.servicio = servicio; }
 
     @GetMapping("/talleres")
-    public ResponseEntity<ListaTalleres> listar(Authentication auth) {
+    public ResponseEntity<ListaTalleres> listar(
+            Authentication auth,
+            @RequestParam(defaultValue = "TODOS") String origen) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(servicio.listar(usuario(auth)));
+                .body(servicio.listar(usuario(auth), origen));
+    }
+
+    @GetMapping("/talleres/catalogo-global")
+    public ResponseEntity<ListaTalleresGlobales> catalogoGlobal(
+            Authentication auth,
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(servicio.listarCatalogoGlobal(usuario(auth), q));
     }
 
     @GetMapping("/talleres/{idTaller}")
@@ -35,6 +45,13 @@ public class TalleresController {
     public ResponseEntity<Taller> registrar(Authentication auth, @RequestBody RegistrarTallerRequest body) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(servicio.registrar(usuario(auth), body));
+    }
+
+    @PostMapping("/talleres/asociados")
+    public ResponseEntity<Taller> vincularAsociado(
+            Authentication auth, @RequestBody VincularAsociadoRequest body) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(servicio.vincularAsociado(usuario(auth), body));
     }
 
     @PutMapping("/talleres/{idTaller}")

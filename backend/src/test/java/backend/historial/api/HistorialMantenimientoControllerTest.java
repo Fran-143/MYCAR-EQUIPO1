@@ -12,7 +12,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import backend.historial.model.AnulacionBloqueadaPorAlerta;
+import backend.historial.model.MantenimientoNoDisponible;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
@@ -82,5 +85,31 @@ class HistorialMantenimientoControllerTest {
         runner.run(c -> assertTrue(c.getBeansOfType(HistorialMantenimientoController.class).isEmpty()));
         runner.withPropertyValues("mycar.rf18.api-habilitada=true")
                 .run(c -> assertEquals(1, c.getBeansOfType(HistorialMantenimientoController.class).size()));
+    }
+
+    @Test void rf21_anularOkDevuelve200YEstadoAnulado() throws Exception {
+        when(servicio.anular(7, 10, 21)).thenReturn(
+                new AnularMantenimientoResponse(21, "ANULADO", java.time.Instant.parse("2026-11-06T15:00:00Z")));
+        mvc.perform(post("/api/v1/rf18/vehiculos/10/mantenimientos/21/anular").principal(sesion))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idMantenimiento").value(21))
+                .andExpect(jsonPath("$.estado").value("ANULADO"))
+                .andExpect(jsonPath("$.anuladoUtc").exists());
+        verify(servicio).anular(7, 10, 21);
+    }
+
+    @Test void rf21_anularConAlertaActivaDevuelve409() throws Exception {
+        when(servicio.anular(7, 10, 21)).thenThrow(new AnulacionBloqueadaPorAlerta(55L));
+        mvc.perform(post("/api/v1/rf18/vehiculos/10/mantenimientos/21/anular").principal(sesion))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.codigo").value("ALERTA_ACTIVA_REFERENCIA"))
+                .andExpect(jsonPath("$.idAlerta").value(55));
+    }
+
+    @Test void rf21_anularYaAnuladoDevuelve404() throws Exception {
+        when(servicio.anular(7, 10, 21)).thenThrow(new MantenimientoNoDisponible());
+        mvc.perform(post("/api/v1/rf18/vehiculos/10/mantenimientos/21/anular").principal(sesion))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("MANTENIMIENTO_NO_DISPONIBLE"));
     }
 }

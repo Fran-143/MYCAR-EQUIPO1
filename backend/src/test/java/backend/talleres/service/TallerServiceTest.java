@@ -2,9 +2,11 @@ package backend.talleres.service;
 
 import backend.talleres.dao.TallerDao;
 import backend.talleres.model.DatosTaller.*;
+import backend.talleres.model.TallerAsociadoNoEditable;
 import backend.talleres.model.TallerNombreDuplicado;
 import backend.talleres.model.TallerNoDisponible;
 import backend.talleres.model.TallerVersionConflicto;
+import backend.talleres.model.TallerYaVinculado;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -19,35 +21,66 @@ class TallerServiceTest {
 
     @BeforeEach void preparar() {
         dao = mock(TallerDao.class);
-        servicio = new TallerService(dao, new ValidadorTaller());
+        servicio = new TallerService(dao, new ValidadorTaller(), 12L);
     }
 
     private Taller activo(long id, int version, boolean favorito) {
-        return new Taller(id, "TALLER " + id, null, null, null, null, "ACTIVO", favorito, version, Instant.now());
+        return new Taller(id, "TALLER " + id, null, null, null, null, "ACTIVO", favorito, version, Instant.now(),
+                "MANUAL", false, null, true);
+    }
+
+    private Taller asociado(long id, long idGlobal) {
+        return new Taller(id, "ASOC " + id, "999888777", null, null, null, "ACTIVO", false, 0, Instant.now(),
+                "ASOCIADO", true, idGlobal, false);
     }
 
     @Test void registrarInsertaActivoNoFavoritoMayusculas() {
         when(dao.existeNombreActivo(7L, "MI TALLER", 0L)).thenReturn(false);
-        when(dao.insertar(eq(7L), eq("MI TALLER"), isNull(), isNull(), isNull(), isNull()))
+        when(dao.insertarManual(eq(7L), eq("MI TALLER"), isNull(), isNull(), isNull(), isNull(), eq(false)))
                 .thenReturn(activo(11, 0, false));
         var r = servicio.registrar(7, new RegistrarTallerRequest("  Mi taller ", null, null, null, null));
         assertEquals(11, r.idTaller());
         assertFalse(r.favorito());
-        verify(dao).insertar(7L, "MI TALLER", null, null, null, null);
+        verify(dao).insertarManual(7L, "MI TALLER", null, null, null, null, false);
     }
 
     @Test void registrarNombreDuplicadoLanza() {
         when(dao.existeNombreActivo(7L, "CENTRO", 0L)).thenReturn(true);
         assertThrows(TallerNombreDuplicado.class, () ->
                 servicio.registrar(7, new RegistrarTallerRequest("Centro", null, null, null, null)));
-        verify(dao, never()).insertar(anyLong(), any(), any(), any(), any(), any());
+        verify(dao, never()).insertarManual(anyLong(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test void actualizarConVersionObsoletaLanza409() {
         when(dao.propioActivo(7, 11)).thenReturn(Optional.of(activo(11, 2, false)));
         assertThrows(TallerVersionConflicto.class, () ->
                 servicio.actualizar(7, 11, new ActualizarTallerRequest("Nuevo", null, null, null, null, 1)));
-        verify(dao, never()).actualizar(anyLong(), anyLong(), anyInt(), any(), any(), any(), any(), any());
+        verify(dao, never()).actualizarManual(anyLong(), anyLong(), anyInt(), any(), any(), any(), any(), any(), anyBoolean());
+    }
+
+    @Test void actualizarAsociadoRechaza() {
+        when(dao.propioActivo(7, 11)).thenReturn(Optional.of(asociado(11, 5)));
+        assertThrows(TallerAsociadoNoEditable.class, () ->
+                servicio.actualizar(7, 11, new ActualizarTallerRequest("X", null, null, null, null, 0)));
+    }
+
+    @Test void vincularAsociadoOk() {
+        var g = new TallerGlobal(5, "DEMO", "999888777", null, "LIMA", true, "ACTIVO");
+        when(dao.globalActivo(5)).thenReturn(Optional.of(g));
+        when(dao.existeVinculoAsociadoActivo(7, 5)).thenReturn(false);
+        when(dao.insertarAsociado(7, 5, "DEMO", "999888777", null, "LIMA", true))
+                .thenReturn(asociado(20, 5));
+        var r = servicio.vincularAsociado(7, new VincularAsociadoRequest(5));
+        assertEquals("ASOCIADO", r.origen());
+        assertFalse(r.editable());
+    }
+
+    @Test void vincularAsociadoDuplicado() {
+        var g = new TallerGlobal(5, "DEMO", null, null, null, false, "ACTIVO");
+        when(dao.globalActivo(5)).thenReturn(Optional.of(g));
+        when(dao.existeVinculoAsociadoActivo(7, 5)).thenReturn(true);
+        assertThrows(TallerYaVinculado.class, () ->
+                servicio.vincularAsociado(7, new VincularAsociadoRequest(5)));
     }
 
     @Test void retirarSoftDelete() {
@@ -80,7 +113,7 @@ class TallerServiceTest {
     }
 
     @Test void listarSoloActivos() {
-        when(dao.listarActivos(7)).thenReturn(List.of(activo(1, 0, true), activo(2, 0, false)));
+        when(dao.listarActivos(7, "TODOS")).thenReturn(List.of(activo(1, 0, true), activo(2, 0, false)));
         assertEquals(2, servicio.listar(7).talleres().size());
     }
 

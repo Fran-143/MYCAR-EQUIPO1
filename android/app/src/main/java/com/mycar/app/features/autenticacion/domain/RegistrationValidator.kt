@@ -46,6 +46,14 @@ data class RegistrationForm(
 }
 
 object RegistrationValidator {
+    /** Límites de entrada alineados con el backend (RF01–RF06). */
+    const val MAX_NOMBRE = 100
+    const val MAX_APELLIDO = 100
+    const val MAX_CORREO = 254
+    const val MAX_CONTRASENA = 64
+    const val MAX_FECHA_DISPLAY = 10 // dd/MM/yyyy
+    const val MAX_CODIGO_OTP = 6
+
     private val spaces = Regex("[\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]+")
     private val name = Regex("\\p{L}[\\p{L}\\p{M}]*(?:[ '\u2019-]\\p{L}[\\p{L}\\p{M}]*)*")
     private val dateFormat = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)
@@ -59,6 +67,35 @@ object RegistrationValidator {
     fun normalizedName(value: String) = spaces.replace(value, " ").trim { Character.isWhitespace(it) }
     fun normalizedEmail(value: String) = value.trim { Character.isWhitespace(it) }.lowercase(Locale.ROOT)
     fun birthDate(value: String): LocalDate? = try { LocalDate.parse(value, dateFormat) } catch (_: Exception) { null }
+
+    /**
+     * Formatea entrada de fecha: `11122007` → `11/12/2007`.
+     * Solo dígitos; inserta `/` tras día y mes; máximo 8 dígitos (10 con separadores).
+     */
+    fun formatBirthDateInput(raw: String): String {
+        val digits = raw.filter { it.isDigit() }.take(8)
+        return buildString {
+            digits.forEachIndexed { index, char ->
+                append(char)
+                if ((index == 1 || index == 3) && index != digits.lastIndex) append('/')
+            }
+            // Mantener la barra tras dd o MM mientras el usuario sigue escribiendo.
+            if (digits.length == 2 || digits.length == 4) append('/')
+        }
+    }
+
+    fun limitCodePoints(value: String, max: Int): String {
+        if (max <= 0) return ""
+        if (value.codePointCount(0, value.length) <= max) return value
+        var end = 0
+        var count = 0
+        while (end < value.length && count < max) {
+            val cp = value.codePointAt(end)
+            end += Character.charCount(cp)
+            count++
+        }
+        return value.substring(0, end)
+    }
     fun passwordRequirements(value: String): List<Pair<String, Boolean>> {
         val points = value.codePoints().toArray()
         return listOf(

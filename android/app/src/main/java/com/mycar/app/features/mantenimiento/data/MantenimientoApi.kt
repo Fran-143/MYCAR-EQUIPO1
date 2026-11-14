@@ -38,6 +38,7 @@ data class SolicitudRf17Dto(
     val idLecturaKmReferencia: Long?, val costoTotal: BigDecimal?,
     val servicioOtro: String?, val observaciones: String?,
     val proximaFechaSugerida: String?, val proximoKmSugerido: Int?,
+    val idTaller: Long? = null,
     val repuestos: List<RepuestoRf17Dto>
 )
 // Respuestas con campos anulables: un JSON incompleto nunca se presenta como éxito.

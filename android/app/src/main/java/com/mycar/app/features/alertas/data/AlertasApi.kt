@@ -4,7 +4,11 @@ import retrofit2.http.*
 
 interface AlertasApi {
     @GET("api/v1/rf22/contexto")
-    suspend fun contexto(@Query("idVehiculo") idVehiculo: Long): ContextoRf22Dto
+    suspend fun contexto(
+        @Query("idVehiculo") idVehiculo: Long,
+        @Query("codigoTipo") codigoTipo: String? = null,
+        @Query("servicioOtro") servicioOtro: String? = null
+    ): ContextoRf22Dto
 
     @GET("api/v1/rf22/vehiculos/{idVehiculo}/alertas")
     suspend fun listar(@Path("idVehiculo") idVehiculo: Long): ListaAlertasDto
@@ -31,8 +35,16 @@ interface AlertasApi {
     @POST("api/v1/rf22/vehiculos/{idVehiculo}/alertas/{idAlerta}/anular")
     suspend fun anular(
         @Path("idVehiculo") idVehiculo: Long,
-        @Path("idAlerta") idAlerta: Long
+        @Path("idAlerta") idAlerta: Long,
+        @Body body: AnularAlertaDto
     ): AnularAlertaRespuestaDto
+
+    @POST("api/v1/rf22/vehiculos/{idVehiculo}/alertas/{idAlerta}/contacto-taller")
+    suspend fun elegirContactoTaller(
+        @Path("idVehiculo") idVehiculo: Long,
+        @Path("idAlerta") idAlerta: Long,
+        @Body body: ElegirContactoTallerDto
+    ): DetalleAlertaDto
 }
 
 data class ContextoRf22Dto(
@@ -79,13 +91,31 @@ data class VehiculoResumenAlertaDto(
     val idVehiculo: Long?, val placa: String?, val marca: String?, val modelo: String?, val estadoVehiculo: String?
 )
 data class AccionesDetalleAlertaDto(val atender: Boolean?, val anular: Boolean?)
+data class ContactoTallerAlertaDto(
+    val idTaller: Long?,
+    val nombre: String?,
+    val telefono: String?,
+    val tieneWhatsapp: Boolean?,
+    val origen: String?,
+    val origenSugerencia: String?,
+    val sinContactoDisponible: Boolean?
+)
+data class ElegirContactoTallerDto(val idTaller: Long)
 data class DetalleAlertaDto(
     val idAlerta: Long?, val categoria: String?, val codigoTipo: String?, val nombreTipo: String?,
     val criterio: String?, val origenCalculo: String?, val estado: String?, val fechaEstadoUtc: String?,
     val fechaObjetivo: String?, val kmObjetivo: Int?, val kmBase: Int?, val intervaloKm: Int?,
     val unidadTiempo: String?, val cantidadTiempo: Int?, val fechaBase: String?, val servicioOtro: String?,
     val idTipoMantenimiento: Long?, val idMantenimientoReferencia: Long?, val idMantenimientoAtencion: Long?,
-    val versionFila: Int?, val vehiculo: VehiculoResumenAlertaDto?, val acciones: AccionesDetalleAlertaDto?
+    val versionFila: Int?, val vehiculo: VehiculoResumenAlertaDto?, val acciones: AccionesDetalleAlertaDto?,
+    val contactoTaller: ContactoTallerAlertaDto? = null
+)
+
+data class AtenderRepuestoDto(
+    val nombre: String,
+    val marca: String? = null,
+    val cantidad: Int,
+    val precioUnitario: String? = null
 )
 
 data class AtenderAlertaDto(
@@ -95,7 +125,9 @@ data class AtenderAlertaDto(
     val origenKmServicio: String = "HISTORICO_MANUAL",
     val idLecturaKmReferencia: Long? = null,
     val costoTotal: String? = null,
-    val observaciones: String? = null
+    val observaciones: String? = null,
+    val repuestos: List<AtenderRepuestoDto>? = null,
+    val idTaller: Long? = null
 )
 data class AtenderAlertaRespuestaDto(
     val idAlerta: Long?,
@@ -103,4 +135,12 @@ data class AtenderAlertaRespuestaDto(
     val idMantenimientoAtencion: Long?,
     val idOperacion: String?
 )
-data class AnularAlertaRespuestaDto(val idAlerta: Long?, val estado: String?)
+data class AnularAlertaDto(
+    val idOperacion: String,
+    val motivo: String
+)
+data class AnularAlertaRespuestaDto(
+    val idAlerta: Long?,
+    val estado: String?,
+    val idOperacion: String? = null
+)

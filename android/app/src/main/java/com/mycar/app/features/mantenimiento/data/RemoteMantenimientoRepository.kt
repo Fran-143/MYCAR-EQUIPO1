@@ -16,18 +16,22 @@ class RemoteMantenimientoRepository(private val api: MantenimientoApi) : Manteni
         try {
             require(c.zonaHoraria == "America/Lima")
             LocalDate.parse(c.fechaServidor)
-            c.vehiculos.forEach { v ->
-                require(v.idVehiculo > 0 && v.placa.isNotBlank())
-                if (v.idLecturaActual != null) {
-                    require(v.idLecturaActual > 0 && v.kmActual?.let { it > 0 } == true)
-                    OffsetDateTime.parse(v.fechaLecturaActual)
-                }
+            // Un vehículo con lectura inconsistente no tumba todo el contexto.
+            val vehiculos = c.vehiculos.mapNotNull { v ->
+                if (v.idVehiculo <= 0 || v.placa.isBlank()) return@mapNotNull null
+                if (v.idLecturaActual == null) return@mapNotNull v
+                val kmOk = v.idLecturaActual > 0 && v.kmActual?.let { it > 0 } == true
+                val fechaOk = runCatching { OffsetDateTime.parse(v.fechaLecturaActual) }.isSuccess
+                if (kmOk && fechaOk) v
+                else v.copy(idLecturaActual = null, kmActual = null, fechaLecturaActual = null)
             }
-            c.tipos.forEach { require(it.idTipoMantenimiento > 0 && it.codigo.isNotBlank() && it.nombre.isNotBlank()) }
+            val tipos = c.tipos.filter {
+                it.idTipoMantenimiento > 0 && it.codigo.isNotBlank() && it.nombre.isNotBlank()
+            }
+            return c.copy(vehiculos = vehiculos, tipos = tipos)
         } catch (e: Exception) {
             throw ErrorMantenimientoRemoto("RESPUESTA_INVALIDA", "No se pudieron cargar referencias válidas")
         }
-        return c
     }
     override suspend fun lecturas(vehiculo: Long, fecha: String): List<LecturaRf17Dto> {
         val lecturas = respuesta(false) { api.lecturas(vehiculo, fecha) }
@@ -65,13 +69,17 @@ class RemoteMantenimientoRepository(private val api: MantenimientoApi) : Manteni
             val incierto = escritura && (error?.resultadoIncierto == true ||
                     (r.code() >= 500 && error?.codigo != "INTEGRACION_PENDIENTE") ||
                     error?.codigo == "OPERACION_EN_PROCESO")
+            val codigo = error?.codigo ?: when (r.code()) {
+                401 -> "SESION_NO_VALIDA"
+                403 -> "ACCESO_DENEGADO"
+                else -> "HTTP_${r.code()}"
+            }
             val mensaje = error?.mensaje ?: when (r.code()) {
                 401,403 -> "Inicia sesión nuevamente en MyCar"
                 404 -> "El recurso solicitado no está disponible"
                 else -> "No se pudo completar la solicitud"
             }
-            throw ErrorMantenimientoRemoto(error?.codigo ?: "HTTP_${r.code()}", mensaje, incierto,
-                error?.campos ?: emptyMap())
+            throw ErrorMantenimientoRemoto(codigo, mensaje, incierto, error?.campos ?: emptyMap())
         } catch (e: CancellationException) { throw e
         } catch (e: ErrorMantenimientoRemoto) { throw e
         } catch (e: IOException) {

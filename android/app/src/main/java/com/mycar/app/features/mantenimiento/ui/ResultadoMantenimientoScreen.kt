@@ -20,6 +20,7 @@ internal fun ResultadoMantenimientoScreen(
     modifier: Modifier,
     onVolver: () -> Unit,
     oferta: OfertaProgramarAlerta? = null,
+    atencionDesdeAlerta: Boolean = false,
     onProgramarAlerta: (OfertaProgramarAlerta) -> Unit = {}
 ) {
     Column(modifier.fillMaxSize().testTag("rf17.resultado").verticalScroll(rememberScrollState()).padding(24.dp),
@@ -29,8 +30,17 @@ internal fun ResultadoMantenimientoScreen(
             Text("✓", Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
                 style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
-        Text("Mantenimiento registrado", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-        Text("El servicio se guardó correctamente.", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            if (atencionDesdeAlerta) "Alerta atendida" else "Mantenimiento registrado",
+            style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            if (atencionDesdeAlerta)
+                "Se registró el mantenimiento y la alerta quedó REALIZADA."
+            else
+                "El servicio se guardó correctamente.",
+            style = MaterialTheme.typography.bodyMedium
+        )
         OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 DatoResultado("Número de registro", r.idMantenimiento?.toString() ?: "—")
@@ -52,8 +62,13 @@ internal fun ResultadoMantenimientoScreen(
                 modifier = Modifier.fillMaxWidth().testTag("rf17.resultado.volver")
             ) { Text("Ahora no") }
         } else {
-            AvisoMantenimiento("Las recomendaciones se conservaron sin crear una alerta.")
-            Button(onClick = onVolver, modifier = Modifier.fillMaxWidth()) { Text("Volver") }
+            if (!atencionDesdeAlerta) {
+                AvisoMantenimiento("Las recomendaciones se conservaron sin crear una alerta.")
+            }
+            Button(
+                onClick = onVolver,
+                modifier = Modifier.fillMaxWidth().testTag("rf17.resultado.volver")
+            ) { Text(if (atencionDesdeAlerta) "Volver al detalle de la alerta" else "Volver") }
         }
     }
 }

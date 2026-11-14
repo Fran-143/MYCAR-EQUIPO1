@@ -85,9 +85,70 @@ class AlertasControllerTest {
     }
 
     @Test void contextoIncluyeKm() throws Exception {
-        when(programar.contexto(9L, 3L)).thenReturn(new ContratoRf22.ContextoResponse(
+        when(programar.contexto(eq(9L), eq(3L), isNull(), isNull())).thenReturn(new ContratoRf22.ContextoResponse(
                 LocalDate.of(2026, 10, 28), "America/Lima", 20000, 1L, List.of(), List.of(), true));
         mvc.perform(get("/api/v1/rf22/contexto?idVehiculo=3").principal(auth))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.kmActual").value(20000));
+        verify(programar).contexto(9L, 3L, null, null);
+    }
+
+    @Test void contextoPasaFiltroTipoYServicioOtro() throws Exception {
+        when(programar.contexto(eq(9L), eq(3L), eq("OTRO"), eq("Correa"))).thenReturn(new ContratoRf22.ContextoResponse(
+                LocalDate.of(2026, 10, 28), "America/Lima", 20000, 1L, List.of(), List.of(), true));
+        mvc.perform(get("/api/v1/rf22/contexto")
+                        .param("idVehiculo", "3")
+                        .param("codigoTipo", "OTRO")
+                        .param("servicioOtro", "Correa")
+                        .principal(auth))
+                .andExpect(status().isOk());
+        verify(programar).contexto(9L, 3L, "OTRO", "Correa");
+    }
+
+    @Test void listarVehiculoAjenoEs404() throws Exception {
+        when(sincronizar.listarMisAlertas(9L, 3L))
+                .thenThrow(new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible."));
+        mvc.perform(get("/api/v1/rf22/vehiculos/3/alertas").principal(auth))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("VEHICULO_NO_ENCONTRADO"));
+    }
+
+    @Test void atenderDevuelve200() throws Exception {
+        UUID op = UUID.randomUUID();
+        when(atender.atender(eq(9L), eq(3L), eq(12L), any()))
+                .thenReturn(new ContratoRf22.AtenderResponse(12L, "REALIZADA", 99L, op));
+        mvc.perform(post("/api/v1/rf22/vehiculos/3/alertas/12/atender").principal(auth)
+                        .contentType("application/json")
+                        .content("""
+                                {"idOperacion":"%s","fechaServicio":"2026-11-07","kmServicio":25000,"origenKmServicio":"HISTORICO_MANUAL","idTaller":55}
+                                """.formatted(op)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoAlerta").value("REALIZADA"))
+                .andExpect(jsonPath("$.idMantenimientoAtencion").value(99));
+    }
+
+    @Test void anularDevuelve200() throws Exception {
+        UUID op = UUID.randomUUID();
+        when(atender.anular(eq(9L), eq(3L), eq(12L), any()))
+                .thenReturn(new ContratoRf22.AnularAlertaResponse(12L, "ANULADA", op));
+        mvc.perform(post("/api/v1/rf22/vehiculos/3/alertas/12/anular").principal(auth)
+                        .contentType("application/json")
+                        .content("""
+                                {"idOperacion":"%s","motivo":"Ya no aplica"}
+                                """.formatted(op)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("ANULADA"))
+                .andExpect(jsonPath("$.idOperacion").value(op.toString()));
+    }
+
+    @Test void atenderAlertaAjenaEs404() throws Exception {
+        when(atender.atender(anyLong(), anyLong(), anyLong(), any()))
+                .thenThrow(new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible."));
+        mvc.perform(post("/api/v1/rf22/vehiculos/3/alertas/12/atender").principal(auth)
+                        .contentType("application/json")
+                        .content("""
+                                {"idOperacion":"%s","fechaServicio":"2026-11-07","kmServicio":1,"origenKmServicio":"HISTORICO_MANUAL"}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("ALERTA_NO_ENCONTRADA"));
     }
 }

@@ -241,4 +241,30 @@ class ProgramarAlertaServiceReglasTest {
         ErrorAlertas ex = assertThrows(ErrorAlertas.class, () -> service.programar(9L, 3L, req));
         assertEquals("DATOS_INVALIDOS", ex.codigo());
     }
+
+    @Test void contextoSinTipoPideReferenciasVacias() {
+        when(alertas.tiposActivos()).thenReturn(java.util.List.of());
+        when(alertas.referenciasRealizadas(3L, null, null)).thenReturn(java.util.List.of());
+        var ctx = service.contexto(9L, 3L, null, null);
+        assertTrue(ctx.referencias().isEmpty());
+        verify(alertas).referenciasRealizadas(3L, null, null);
+        verify(alertas).verificarVehiculoPropioActivo(9L, 3L);
+    }
+
+    @Test void contextoConTipoFiltraReferencias() {
+        var ref = new ContratoRf22.ReferenciaDto(55L, "CAMBIO_ACEITE", fechaServicio, 15000, null);
+        when(alertas.tiposActivos()).thenReturn(java.util.List.of());
+        when(alertas.referenciasRealizadas(3L, "CAMBIO_ACEITE", null)).thenReturn(java.util.List.of(ref));
+        var ctx = service.contexto(9L, 3L, "CAMBIO_ACEITE", null);
+        assertEquals(1, ctx.referencias().size());
+        assertEquals(55L, ctx.referencias().getFirst().idMantenimiento());
+        verify(alertas).referenciasRealizadas(3L, "CAMBIO_ACEITE", null);
+    }
+
+    @Test void contextoOtroPasaServicio() {
+        when(alertas.tiposActivos()).thenReturn(java.util.List.of());
+        when(alertas.referenciasRealizadas(3L, "OTRO", "Correa")).thenReturn(java.util.List.of());
+        service.contexto(9L, 3L, "OTRO", "Correa");
+        verify(alertas).referenciasRealizadas(3L, "OTRO", "Correa");
+    }
 }

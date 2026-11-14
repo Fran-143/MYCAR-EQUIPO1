@@ -6,6 +6,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -38,10 +40,12 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
         // El JOIN vuelve a limitar por propietario; no se obtiene el odómetro vigente.
         return jdbc.query("""
                 SELECT m.id_mantenimiento, t.codigo, t.nombre, m.servicio_otro,
-                       m.fecha_servicio, m.km_servicio, m.estado, m.costo_total, m.nombre_taller
+                       m.fecha_servicio, m.km_servicio, m.estado, m.costo_total,
+                       coalesce(tal.nombre, m.nombre_taller) AS nombre_taller
                 FROM mycar.mantenimiento m
                 JOIN mycar.vehiculo v ON v.id_vehiculo = m.id_vehiculo
                 JOIN mycar.tipo_mantenimiento t ON t.id_tipo_mantenimiento = m.id_tipo_mantenimiento
+                LEFT JOIN mycar.taller tal ON tal.id_taller = m.id_taller
                 WHERE v.id_usuario = ? AND v.id_vehiculo = ?
                   AND v.estado_vehiculo IN ('ACTIVO', 'INACTIVO')
                   AND m.estado IN ('REALIZADO', 'ANULADO')
@@ -56,33 +60,55 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
     @Override
     public Optional<DetalleMantenimiento> detallePropio(long usuario, long vehiculo, long idMantenimiento) {
         var filas = jdbc.query("""
-                SELECT m.id_mantenimiento, m.id_vehiculo, t.codigo, t.nombre, m.servicio_otro,
+                SELECT m.id_mantenimiento, m.id_vehiculo, v.placa, v.marca, v.modelo, v.estado_vehiculo,
+                       t.codigo, t.nombre, m.servicio_otro,
                        m.fecha_servicio, m.km_servicio, m.estado, m.costo_total,
-                       m.descripcion, m.nombre_taller
+                       m.descripcion, m.id_taller,
+                       coalesce(tal.nombre, m.nombre_taller) AS nombre_taller,
+                       m.proxima_fecha_sugerida, m.proximo_km_sugerido, m.anulado_utc
                 FROM mycar.mantenimiento m
                 JOIN mycar.vehiculo v ON v.id_vehiculo = m.id_vehiculo
                 JOIN mycar.tipo_mantenimiento t ON t.id_tipo_mantenimiento = m.id_tipo_mantenimiento
+                LEFT JOIN mycar.taller tal ON tal.id_taller = m.id_taller
                 WHERE v.id_usuario = ? AND v.id_vehiculo = ? AND m.id_mantenimiento = ?
                   AND v.estado_vehiculo IN ('ACTIVO', 'INACTIVO')
                   AND m.estado IN ('REALIZADO', 'ANULADO')
                 """, (r, n) -> {
             long id = r.getLong("id_mantenimiento");
             String estado = r.getString("estado");
+            String estadoVehiculo = r.getString("estado_vehiculo");
             Long alerta = alertaActivaReferenciando(id).orElse(null);
             boolean realizado = "REALIZADO".equals(estado);
+            boolean vehiculoActivo = "ACTIVO".equals(estadoVehiculo);
             boolean bloqueado = alerta != null;
+            // RF20: editable solo REALIZADO + vehículo ACTIVO (independiente de alerta).
+            // RF21: anulable REALIZADO + ACTIVO + sin alerta activa.
+            // RF19: marca vive en mycar.repuesto (no hay marca_snapshot en mantenimiento_repuesto).
             List<RepuestoDetalle> reps = jdbc.query("""
-                    SELECT nombre_snapshot, cantidad, precio_unitario
-                    FROM mycar.mantenimiento_repuesto WHERE id_mantenimiento = ?
-                    ORDER BY nombre_snapshot
+                    SELECT mr.nombre_snapshot, r.marca, mr.cantidad, mr.precio_unitario
+                    FROM mycar.mantenimiento_repuesto mr
+                    JOIN mycar.repuesto r ON r.id_repuesto = mr.id_repuesto
+                    WHERE mr.id_mantenimiento = ?
+                    ORDER BY mr.nombre_snapshot
                     """, (rr, nn) -> new RepuestoDetalle(
-                    rr.getString(1), null, rr.getInt(2), rr.getBigDecimal(3)), id);
+                    rr.getString(1), rr.getString(2), rr.getInt(3), rr.getBigDecimal(4)), id);
+            Timestamp anuladoTs = r.getTimestamp("anulado_utc");
+            Instant anuladoUtc = anuladoTs == null ? null : anuladoTs.toInstant();
+            Long idTaller = r.getObject("id_taller") == null ? null : r.getLong("id_taller");
             return new DetalleMantenimiento(
-                    id, r.getLong("id_vehiculo"), r.getString("codigo"), r.getString("nombre"),
+                    id, r.getLong("id_vehiculo"),
+                    r.getString("placa"), r.getString("marca"), r.getString("modelo"), estadoVehiculo,
+                    r.getString("codigo"), r.getString("nombre"),
                     r.getString("servicio_otro"), r.getObject("fecha_servicio", LocalDate.class),
                     r.getObject("km_servicio", Integer.class), estado, r.getBigDecimal("costo_total"),
                     r.getString("descripcion"), r.getString("nombre_taller"),
-                    realizado, realizado && !bloqueado, bloqueado, reps);
+                    idTaller,
+                    r.getObject("proxima_fecha_sugerida", LocalDate.class),
+                    r.getObject("proximo_km_sugerido", Integer.class),
+                    anuladoUtc,
+                    realizado && vehiculoActivo,
+                    realizado && vehiculoActivo && !bloqueado,
+                    bloqueado, reps);
         }, usuario, vehiculo, idMantenimiento);
         return filas.stream().findFirst();
     }
@@ -99,16 +125,19 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
 
     @Override
     public boolean modificarCamposAutorizados(long usuario, long vehiculo, long idMantenimiento,
-                                              java.math.BigDecimal costoTotal, String observaciones, String taller) {
+                                              java.math.BigDecimal costoTotal, String observaciones,
+                                              Long idTaller, String nombreTaller) {
+        // RF20 B1: escritura solo con vehículo ACTIVO y mantenimiento REALIZADO.
         return jdbc.update("""
                 UPDATE mycar.mantenimiento m
-                SET costo_total = ?, descripcion = ?, nombre_taller = ?
+                SET costo_total = ?, descripcion = ?, id_taller = ?, nombre_taller = ?
                 FROM mycar.vehiculo v
                 WHERE m.id_mantenimiento = ? AND m.id_vehiculo = ?
                   AND v.id_vehiculo = m.id_vehiculo AND v.id_usuario = ?
-                  AND v.estado_vehiculo IN ('ACTIVO', 'INACTIVO')
+                  AND v.estado_vehiculo = 'ACTIVO'
                   AND m.estado = 'REALIZADO'
-                """, costoTotal, observaciones, taller, idMantenimiento, vehiculo, usuario) == 1;
+                """, costoTotal, observaciones, idTaller, nombreTaller,
+                idMantenimiento, vehiculo, usuario) == 1;
     }
 
     @Override
@@ -119,7 +148,7 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
                 JOIN mycar.vehiculo v ON v.id_vehiculo = m.id_vehiculo
                 WHERE m.id_mantenimiento = ? AND m.id_vehiculo = ?
                   AND v.id_usuario = ? AND m.estado = 'REALIZADO'
-                  AND v.estado_vehiculo IN ('ACTIVO', 'INACTIVO')
+                  AND v.estado_vehiculo = 'ACTIVO'
                 FOR UPDATE OF m
                 """, rs -> rs.next() ? 1 : null, idMantenimiento, vehiculo, usuario);
         if (ok == null) return false;
@@ -128,7 +157,8 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
             throw new AnulacionBloqueadaPorAlerta(alerta.get());
         }
         return jdbc.update("""
-                UPDATE mycar.mantenimiento SET estado = 'ANULADO'
+                UPDATE mycar.mantenimiento
+                SET estado = 'ANULADO', anulado_utc = clock_timestamp()
                 WHERE id_mantenimiento = ? AND id_vehiculo = ? AND estado = 'REALIZADO'
                 """, idMantenimiento, vehiculo) == 1;
     }

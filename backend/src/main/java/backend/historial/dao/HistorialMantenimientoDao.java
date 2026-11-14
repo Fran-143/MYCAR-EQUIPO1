@@ -11,6 +11,7 @@ public interface HistorialMantenimientoDao {
     Optional<DetalleMantenimiento> detallePropio(long usuario, long vehiculo, long idMantenimiento);
     Optional<Long> alertaActivaReferenciando(long idMantenimiento);
     boolean modificarCamposAutorizados(long usuario, long vehiculo, long idMantenimiento,
-                                       java.math.BigDecimal costoTotal, String observaciones, String taller);
+                                       java.math.BigDecimal costoTotal, String observaciones,
+                                       Long idTaller, String nombreTaller);
     boolean anularSiSinAlertaActiva(long usuario, long vehiculo, long idMantenimiento);
 }

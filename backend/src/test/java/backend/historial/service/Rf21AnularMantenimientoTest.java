@@ -19,21 +19,23 @@ class Rf21AnularMantenimientoTest {
 
     @BeforeEach void preparar() {
         dao = mock(HistorialMantenimientoDao.class);
-        servicio = new HistorialMantenimientoService(dao);
+        servicio = new HistorialMantenimientoService(dao, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class));
         when(dao.vehiculoPropio(7, 3)).thenReturn(Optional.of(
                 new Vehiculo(3, "ABC123", "Toyota", "Yaris", "ACTIVO", true)));
     }
 
     @Test void bloqueaSiHayAlertaActiva() {
         when(dao.detallePropio(7, 3, 10)).thenReturn(Optional.of(detalle("REALIZADO", true)));
-        when(dao.anularSiSinAlertaActiva(7, 3, 10)).thenThrow(new AnulacionBloqueadaPorAlerta(55));
+        when(dao.alertaActivaReferenciando(10)).thenReturn(Optional.of(55L));
         var ex = assertThrows(AnulacionBloqueadaPorAlerta.class, () -> servicio.anular(7, 3, 10));
         assertEquals(55, ex.idAlerta());
-        verify(dao).anularSiSinAlertaActiva(7, 3, 10);
+        verify(dao, never()).anularSiSinAlertaActiva(anyLong(), anyLong(), anyLong());
     }
 
     @Test void anulaCuandoNoHayDependenciaActiva() {
-        when(dao.detallePropio(7, 3, 10)).thenReturn(Optional.of(detalle("REALIZADO", false)));
+        when(dao.detallePropio(7, 3, 10))
+                .thenReturn(Optional.of(detalle("REALIZADO", false)))
+                .thenReturn(Optional.of(detalle("ANULADO", false)));
         when(dao.anularSiSinAlertaActiva(7, 3, 10)).thenReturn(true);
         var r = servicio.anular(7, 3, 10);
         assertEquals("ANULADO", r.estado());
@@ -47,8 +49,10 @@ class Rf21AnularMantenimientoTest {
     }
 
     private DetalleMantenimiento detalle(String estado, boolean bloqueado) {
-        return new DetalleMantenimiento(10, 3, "CAMBIO_ACEITE", "Cambio de aceite", null,
-                LocalDate.of(2026, 1, 10), 20000, estado, BigDecimal.TEN, null, null,
+        return new DetalleMantenimiento(10, 3, "ABC123", "Toyota", "Yaris", "ACTIVO",
+                "CAMBIO_ACEITE", "Cambio de aceite", null,
+                LocalDate.of(2026, 1, 10), 20000, estado, BigDecimal.TEN, null, null, null,
+                null, null, null,
                 "REALIZADO".equals(estado), "REALIZADO".equals(estado) && !bloqueado, bloqueado, List.of());
     }
 }

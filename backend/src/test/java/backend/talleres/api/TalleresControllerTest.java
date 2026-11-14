@@ -44,12 +44,12 @@ class TalleresControllerTest {
     }
 
     @Test void listarUsaIdentidadSesion() throws Exception {
-        when(servicio.listar(7)).thenReturn(new ListaTalleres(List.of(ejemplo())));
+        when(servicio.listar(7L, "TODOS")).thenReturn(new ListaTalleres(List.of(ejemplo())));
         mvc.perform(get("/api/v1/rf34/talleres").principal(sesion))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.talleres[0].idTaller").value(11))
                 .andExpect(jsonPath("$.talleres[0].nombre").value("Taller Centro"));
-        verify(servicio).listar(7);
+        verify(servicio).listar(7L, "TODOS");
     }
 
     @Test void registrar200() throws Exception {

@@ -23,7 +23,7 @@ class HistorialMantenimientoServiceTest {
     @BeforeEach void preparar() {
         // Arrange compartido: DAO mock y vehículo propio activo
         dao = mock(HistorialMantenimientoDao.class);
-        servicio = new HistorialMantenimientoService(dao);
+        servicio = new HistorialMantenimientoService(dao, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class));
         when(dao.vehiculoPropio(1, 10)).thenReturn(Optional.of(activo));
     }
 

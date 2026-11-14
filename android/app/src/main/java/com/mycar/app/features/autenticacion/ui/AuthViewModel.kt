@@ -36,6 +36,12 @@ class AuthViewModel(
     }
     fun confirmedLogout() {
         if (!mutableLogout.value.confirmation || mutableLogout.value.busy) return
+        executeLogout()
+    }
+
+    /** RF06 desde Perfil: la confirmación visual ya ocurrió en la pantalla de Perfil. */
+    fun executeLogout() {
+        if (mutableLogout.value.busy || !session.value.canRequestLogout) return
         val attempt = ++logoutAttempt
         mutableLogout.value = LogoutUiState(busy = true)
         viewModelScope.launch(logoutDispatcher) {

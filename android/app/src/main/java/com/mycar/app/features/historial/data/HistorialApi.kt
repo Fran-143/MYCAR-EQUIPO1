@@ -51,6 +51,10 @@ data class RepuestoDetalleDto(
 data class DetalleMantenimientoDto(
     val idMantenimiento: Long?,
     val idVehiculo: Long?,
+    val placa: String? = null,
+    val marca: String? = null,
+    val modelo: String? = null,
+    val estadoVehiculo: String? = null,
     val codigoTipo: String?,
     val tipo: String?,
     val servicioOtro: String?,
@@ -60,6 +64,10 @@ data class DetalleMantenimientoDto(
     val costoTotal: JsonElement?,
     val observaciones: String?,
     val taller: String?,
+    val idTaller: Long? = null,
+    val proximaFechaSugerida: String? = null,
+    val proximoKmSugerido: Int? = null,
+    val anuladoUtc: String? = null,
     val editable: Boolean?,
     val anulable: Boolean?,
     val bloqueadoPorAlertaActiva: Boolean?,
@@ -68,7 +76,8 @@ data class DetalleMantenimientoDto(
 data class ModificarMantenimientoDto(
     val costoTotal: String?,
     val observaciones: String?,
-    val taller: String?
+    val idTaller: Long? = null,
+    val sinTaller: Boolean? = null
 )
-data class AnularMantenimientoDto(val idMantenimiento: Long?, val estado: String?)
+data class AnularMantenimientoDto(val idMantenimiento: Long?, val estado: String?, val anuladoUtc: String? = null)
 data class ErrorHistorialDto(val codigo: String?, val mensaje: String?, val idAlerta: Long? = null)

@@ -42,7 +42,8 @@ class RemoteHistorialRepository(private val api: HistorialApi) : HistorialReposi
         detalleDe(cuerpo(api.modificar(idVehiculo, idMantenimiento, ModificarMantenimientoDto(
             costoTotal = datos.costoTotal?.toPlainString(),
             observaciones = datos.observaciones,
-            taller = datos.taller
+            idTaller = datos.idTaller,
+            sinTaller = if (datos.sinTaller) true else null
         ))))
     }
 
@@ -78,6 +79,10 @@ class RemoteHistorialRepository(private val api: HistorialApi) : HistorialReposi
         return DetalleMantenimientoHistorial(
             id = id,
             idVehiculo = idVehiculo,
+            placa = d.placa?.takeIf { it.isNotBlank() },
+            marca = d.marca?.takeIf { it.isNotBlank() },
+            modelo = d.modelo?.takeIf { it.isNotBlank() },
+            estadoVehiculo = d.estadoVehiculo?.takeIf { it.isNotBlank() },
             codigoTipo = codigo,
             tipo = texto(d.tipo),
             servicioOtro = d.servicioOtro,
@@ -87,6 +92,10 @@ class RemoteHistorialRepository(private val api: HistorialApi) : HistorialReposi
             costo = costo(d.costoTotal),
             observaciones = d.observaciones?.takeIf { it.isNotBlank() },
             taller = d.taller?.takeIf { it.isNotBlank() },
+            idTaller = d.idTaller?.takeIf { it > 0 },
+            proximaFechaSugerida = d.proximaFechaSugerida?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
+            proximoKmSugerido = d.proximoKmSugerido?.takeIf { it > 0 },
+            anuladoUtc = d.anuladoUtc?.takeIf { it.isNotBlank() },
             editable = d.editable == true,
             anulable = d.anulable == true,
             bloqueadoPorAlertaActiva = d.bloqueadoPorAlertaActiva == true,

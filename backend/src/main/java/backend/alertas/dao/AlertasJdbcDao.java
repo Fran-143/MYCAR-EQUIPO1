@@ -156,6 +156,7 @@ public class AlertasJdbcDao {
                        a.fecha_objetivo, a.km_objetivo, a.km_base, a.intervalo_km,
                        a.unidad_tiempo, a.cantidad_tiempo, a.fecha_base, a.servicio_otro,
                        a.id_mantenimiento_referencia, a.id_mantenimiento_atencion, a.version_fila,
+                       a.id_taller_contacto,
                        v.placa, v.marca, v.modelo, v.estado_vehiculo
                 FROM mycar.alerta a
                 JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
@@ -172,6 +173,7 @@ public class AlertasJdbcDao {
                 rs.getObject("fecha_base", LocalDate.class), rs.getString("servicio_otro"),
                 rs.getObject("id_mantenimiento_referencia", Long.class),
                 rs.getObject("id_mantenimiento_atencion", Long.class), rs.getInt("version_fila"),
+                rs.getObject("id_taller_contacto", Long.class),
                 rs.getString("placa"), rs.getString("marca"), rs.getString("modelo"),
                 rs.getString("estado_vehiculo")), idAlerta, vehiculo, usuario).stream().findFirst();
     }
@@ -182,8 +184,58 @@ public class AlertasJdbcDao {
             String fechaEstadoUtc, LocalDate fechaObjetivo, Integer kmObjetivo, Integer kmBase,
             Integer intervaloKm, String unidadTiempo, Integer cantidadTiempo, LocalDate fechaBase,
             String servicioOtro, Long idMantenimientoReferencia, Long idMantenimientoAtencion,
-            int versionFila, String placa, String marca, String modelo, String estadoVehiculo
+            int versionFila, Long idTallerContacto,
+            String placa, String marca, String modelo, String estadoVehiculo
     ) { }
+
+    public record TallerContactoFila(
+            long idTaller, String nombre, String telefono, boolean tieneWhatsapp, String origen
+    ) { }
+
+    public Optional<TallerContactoFila> tallerActivoPropio(long usuario, long idTaller) {
+        return jdbc.query("""
+                SELECT id_taller, nombre, telefono, tiene_whatsapp, origen
+                FROM mycar.taller
+                WHERE id_taller = ? AND id_usuario = ? AND estado = 'ACTIVO'
+                """, (rs, n) -> new TallerContactoFila(
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getString(5)
+        ), idTaller, usuario).stream().findFirst();
+    }
+
+    public Optional<TallerContactoFila> tallerDeMantenimientoReferencia(long usuario, Long idMantenimiento) {
+        if (idMantenimiento == null) return Optional.empty();
+        return jdbc.query("""
+                SELECT t.id_taller, t.nombre, t.telefono, t.tiene_whatsapp, t.origen
+                FROM mycar.mantenimiento m
+                JOIN mycar.taller t ON t.id_taller = m.id_taller
+                JOIN mycar.vehiculo v ON v.id_vehiculo = m.id_vehiculo
+                WHERE m.id_mantenimiento = ? AND v.id_usuario = ?
+                  AND t.id_usuario = ? AND t.estado = 'ACTIVO'
+                """, (rs, n) -> new TallerContactoFila(
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getString(5)
+        ), idMantenimiento, usuario, usuario).stream().findFirst();
+    }
+
+    public Optional<TallerContactoFila> tallerFavoritoActivo(long usuario) {
+        return jdbc.query("""
+                SELECT id_taller, nombre, telefono, tiene_whatsapp, origen
+                FROM mycar.taller
+                WHERE id_usuario = ? AND estado = 'ACTIVO' AND favorito = true
+                ORDER BY id_taller LIMIT 1
+                """, (rs, n) -> new TallerContactoFila(
+                rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getString(5)
+        ), usuario).stream().findFirst();
+    }
+
+    public boolean asignarTallerContacto(long usuario, long vehiculo, long idAlerta, Long idTaller) {
+        return jdbc.update("""
+                UPDATE mycar.alerta a
+                SET id_taller_contacto = ?
+                FROM mycar.vehiculo v
+                WHERE a.id_alerta = ? AND a.id_vehiculo = ? AND v.id_vehiculo = a.id_vehiculo
+                  AND v.id_usuario = ? AND a.categoria = 'MANTENIMIENTO' AND a.estado <> 'ANULADA'
+                """, idTaller, idAlerta, vehiculo, usuario) == 1;
+    }
 
     public List<ContratoRf22.TipoDto> tiposActivos() {
         return jdbc.query("""

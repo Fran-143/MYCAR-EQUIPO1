@@ -83,6 +83,14 @@ public class AlertasController {
         return atender.anular(usuario(auth), idVehiculo, idAlerta, body);
     }
 
+    /** RF24-EA11 — preferencia de contacto solo para esta alerta (no atiende ni muta historial). */
+    @PostMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}/contacto-taller")
+    public ContratoRf22.DetalleAlertaDto elegirContactoTaller(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta,
+            @Valid @RequestBody ContratoRf22.ElegirContactoTallerRequest body) {
+        return sincronizar.elegirContactoTaller(usuario(auth), idVehiculo, idAlerta, body);
+    }
+
     private long usuario(Authentication auth) {
         if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
             throw new SesionAlertasNoValidada();

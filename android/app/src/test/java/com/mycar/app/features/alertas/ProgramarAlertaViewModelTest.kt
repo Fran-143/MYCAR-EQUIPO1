@@ -49,7 +49,11 @@ class ProgramarAlertaViewModelTest {
         val idsOperacion = mutableListOf<String>()
         var ultimaSolicitud: ProgramarAlertaDto? = null
         var fallo: Exception? = null
-        override suspend fun contexto(idVehiculo: Long) = ContextoProgramarAlerta(
+        override suspend fun contexto(
+            idVehiculo: Long,
+            codigoTipo: String?,
+            servicioOtro: String?
+        ) = ContextoProgramarAlerta(
             fecha, km, if (km != null) 1L else null,
             listOf(
                 TipoAlerta("CAMBIO_ACEITE", "Cambio de aceite"),
@@ -78,6 +82,8 @@ class ProgramarAlertaViewModelTest {
         }
         override suspend fun atender(idVehiculo: Long, idAlerta: Long, solicitud: SolicitudAtenderAlerta) = error("no usado")
         override suspend fun anular(idVehiculo: Long, idAlerta: Long) = error("no usado")
+        override suspend fun anular(idVehiculo: Long, idAlerta: Long, motivo: String, idOperacion: String) = error("no usado")
+        override suspend fun elegirContactoTaller(idVehiculo: Long, idAlerta: Long, idTaller: Long) = error("no usado")
     }
 
     private fun BorradorAlerta.km(tipo: String = "CAMBIO_ACEITE", intervalo: String = "5000") =

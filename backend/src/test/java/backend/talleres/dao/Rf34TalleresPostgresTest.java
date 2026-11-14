@@ -72,11 +72,13 @@ class Rf34TalleresPostgresTest {
         assertTrue(svc.listar(usuario).talleres().stream().noneMatch(t -> t.idTaller() == b.idTaller()));
 
         // Legacy nombre_taller intacto en mantenimiento sin id_taller.
+        // Placa oficial V7: A1B234 o ABC123 (no relajar CHECK).
+        String placa = String.format("A1B%03d", (int) (usuario % 1000));
         long vehiculo = jdbc.queryForObject("""
                 INSERT INTO mycar.vehiculo (id_usuario,placa,marca,modelo,uso_vehiculo_codigo,anio_fabricacion,color,id_tipo_motor)
                 VALUES (?,?,'M','M','PARTICULAR',2020,'Azul',
                     (SELECT id_tipo_motor FROM mycar.tipo_motor WHERE codigo='ELECTRICO')) RETURNING id_vehiculo
-                """, Long.class, usuario, "T34" + (usuario % 1000));
+                """, Long.class, usuario, placa);
         long mant = jdbc.queryForObject("""
                 INSERT INTO mycar.mantenimiento (id_vehiculo,id_tipo_mantenimiento,fecha_servicio,km_servicio,
                     origen_km_servicio,estado,nombre_taller)
@@ -130,7 +132,7 @@ class Rf34TalleresPostgresTest {
         interceptor.setTransactionManager(gestor);
         interceptor.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());
         interceptor.afterPropertiesSet();
-        var proxy = new ProxyFactory(new TallerService(dao, new ValidadorTaller()));
+        var proxy = new ProxyFactory(new TallerService(dao, new ValidadorTaller(), 12L));
         proxy.setProxyTargetClass(true);
         proxy.addAdvice(interceptor);
         return (TallerService) proxy.getProxy();

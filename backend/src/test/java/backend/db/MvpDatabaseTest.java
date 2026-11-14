@@ -48,7 +48,7 @@ class MvpDatabaseTest {
             exec(db, "CREATE TABLE public.evidencia_preservada(valor TEXT PRIMARY KEY)");
             exec(db, "INSERT INTO public.evidencia_preservada VALUES ('no modificar')");
         }
-        assertEquals(24, flyway(url, null).migrate().migrationsExecuted);
+        assertEquals(25, flyway(url, null).migrate().migrationsExecuted);
         flyway(url, null).validate();
     }
 

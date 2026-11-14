@@ -37,9 +37,13 @@ object AuthGraph {
                 onSessionClosing = { access, installation ->
                     com.mycar.app.features.push.data.PushTokenSync.desvincularAlCerrar(access, installation)
                 })
-                // Live 5f8d513: AuthGate no cablea Recovery UI; no referenciar cliente ausente.
-                // El flujo real de recuperación permanece en prep (sin stubs aquí).
-                .also { instance = it }
+                .also { instance = it; recoveryInstance = RecoveryRepository(retrofit.create(RecoveryApi::class.java)) }
         }
+    }
+
+    @Volatile private var recoveryInstance: RecoveryRepository? = null
+    fun recovery(context: Context): RecoveryRepository {
+        repository(context)
+        return recoveryInstance!!
     }
 }

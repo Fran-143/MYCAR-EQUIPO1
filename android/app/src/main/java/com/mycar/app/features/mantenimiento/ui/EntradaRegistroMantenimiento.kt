@@ -22,7 +22,8 @@ fun EntradaRegistroMantenimiento(
     archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
     estadoEnSistema: Boolean = true,
     recargaToken: Int = 0,
-    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null
+    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null,
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
 ) {
     if (repository != null && !claveCuentaBorrador.isNullOrBlank()) {
         RegistrarMantenimientoRoute(
@@ -32,7 +33,8 @@ fun EntradaRegistroMantenimiento(
             onActualizarKm = onActualizarKm, onSesionRequerida = onSesionRequerida,
             archivoPendiente = archivoPendiente, estadoEnSistema = estadoEnSistema,
             recargaToken = recargaToken,
-            onProgramarAlerta = onProgramarAlerta
+            onProgramarAlerta = onProgramarAlerta,
+            talleresRepository = talleresRepository
         )
     } else {
         BackHandler(onBack = onCerrar)

@@ -1,11 +1,12 @@
 package backend.talleres.dao;
 
 import backend.talleres.model.DatosTaller.Taller;
+import backend.talleres.model.DatosTaller.TallerGlobal;
 import java.util.List;
 import java.util.Optional;
 
 public interface TallerDao {
-    List<Taller> listarActivos(long idUsuario);
+    List<Taller> listarActivos(long idUsuario, String filtroOrigen);
 
     Optional<Taller> propio(long idUsuario, long idTaller);
 
@@ -14,17 +15,30 @@ public interface TallerDao {
     /** true si hay otro taller ACTIVO del usuario con ese nombre (excluye idExcluir si > 0). */
     boolean existeNombreActivo(long idUsuario, String nombre, long idExcluir);
 
-    Taller insertar(long idUsuario, String nombre, String telefono, String correo,
-                    String direccion, String notas);
+    boolean existeTelefonoManualActivo(long idUsuario, String telefono, long idExcluir);
 
-    boolean actualizar(long idUsuario, long idTaller, int versionFila,
-                       String nombre, String telefono, String correo,
-                       String direccion, String notas);
+    Taller insertarManual(long idUsuario, String nombre, String telefono, String correo,
+                          String direccion, String notas, boolean tieneWhatsapp);
+
+    Optional<TallerGlobal> globalActivo(long idTallerGlobal);
+
+    /** Catálogo global; filas es_demo solo visibles para {@code idUsuarioPilotoDemo}. */
+    List<TallerGlobal> listarGlobalesActivos(long idUsuario, String busqueda, long idUsuarioPilotoDemo);
+
+    boolean existeVinculoAsociadoActivo(long idUsuario, long idTallerGlobal);
+
+    Taller insertarAsociado(long idUsuario, long idTallerGlobal, String nombre, String telefono,
+                            String correo, String direccion, boolean tieneWhatsapp);
+
+    boolean actualizarManual(long idUsuario, long idTaller, int versionFila,
+                             String nombre, String telefono, String correo,
+                             String direccion, String notas, boolean tieneWhatsapp);
 
     boolean retirar(long idUsuario, long idTaller, int versionFila);
 
-    /** Desmarca cualquier favorito ACTIVO del usuario y marca el indicado. */
     boolean marcarFavoritoAtomico(long idUsuario, long idTaller);
 
     boolean desmarcarFavorito(long idUsuario, long idTaller);
+
+    Optional<Taller> favoritoActivo(long idUsuario);
 }

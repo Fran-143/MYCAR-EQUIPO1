@@ -41,7 +41,8 @@ internal fun FormularioRegistroMantenimiento(
         ResultadoMantenimientoScreen(
             r = it,
             modifier = modifier,
-            oferta = s.ofertaProgramarAlerta,
+            oferta = if (s.modoDesdeAlerta) null else s.ofertaProgramarAlerta,
+            atencionDesdeAlerta = s.modoDesdeAlerta,
             onVolver = onCerrarConfirmado,
             onProgramarAlerta = { oferta ->
                 onProgramarAlerta?.invoke(oferta) ?: onCerrarConfirmado()
@@ -62,9 +63,17 @@ internal fun FormularioRegistroMantenimiento(
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Registrar mantenimiento", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text("Cuida el historial de tu vehículo. Registra un servicio que ya realizaste.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (s.modoDesdeAlerta) "Registrar como realizado" else "Registrar mantenimiento",
+                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    if (s.modoDesdeAlerta)
+                        "Completa el servicio para marcar la alerta como REALIZADA. Se creará un mantenimiento nuevo."
+                    else
+                        "Cuida el historial de tu vehículo. Registra un servicio que ya realizaste.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             if (s.requiereSesion) {
                 AvisoMantenimiento("Inicia sesión para elegir tu vehículo y registrar un mantenimiento.")
@@ -97,8 +106,16 @@ internal fun FormularioRegistroMantenimiento(
             SeccionMantenimiento("1", "Tu vehículo") {
                 SelectorMantenimiento("Vehículo *", vehiculo?.let { "${it.placa} · ${it.marca} ${it.modelo}" } ?: "Seleccionar vehículo",
                     s.contexto?.vehiculos.orEmpty().map { it.idVehiculo to "${it.placa} · ${it.marca} ${it.modelo}" },
-                    enabled, s.errores["idVehiculo"], onSelect = vm::solicitarVehiculo)
-                if (s.contexto?.vehiculos?.isEmpty() == true) Text("No tienes vehículos activos disponibles.")
+                    enabled && !s.modoDesdeAlerta, s.errores["idVehiculo"], onSelect = vm::solicitarVehiculo)
+                if (s.modoDesdeAlerta) {
+                    Text("Vehículo fijado por la alerta (solo lectura).", style = MaterialTheme.typography.bodySmall)
+                }
+                if (s.contexto == null && !s.cargando) {
+                    Text("No se pudieron cargar tus vehículos. Pulsa «Actualizar referencias».",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                } else if (s.contexto?.vehiculos?.isEmpty() == true) {
+                    Text("No tienes vehículos activos disponibles.")
+                }
                 HorizontalDivider()
                 Text("Kilometraje vigente: ${vehiculo?.kmActual?.let { "$it km" } ?: "Sin lectura"}",
                     style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
@@ -118,22 +135,45 @@ internal fun FormularioRegistroMantenimiento(
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Text("Taller: Sin taller", style = MaterialTheme.typography.bodySmall)
-                if (!s.requiereSesion) {
+                val talleres = s.talleresActivos
+                val etiquetaTaller = when {
+                    b.idTaller == null -> "Sin taller"
+                    else -> talleres.firstOrNull { it.id == b.idTaller }?.nombre ?: "Taller #${b.idTaller}"
+                }
+                val opcionesTaller = listOf(null to "Sin taller") +
+                    talleres.map { it.id as Long? to (if (it.favorito) "★ ${it.nombre}" else it.nombre) }
+                SelectorMantenimiento(
+                    "Taller asociado",
+                    etiquetaTaller,
+                    opcionesTaller.map { (id, nom) -> (id?.toString() ?: "") to nom },
+                    enabled,
+                    s.errores["idTaller"],
+                    Modifier.testTag("rf17.taller")
+                ) { codigo ->
+                    vm.actualizar { it.copy(idTaller = codigo.toLongOrNull()) }
+                }
+                if (!s.requiereSesion && !s.modoDesdeAlerta) {
                     OutlinedButton(onClick = { b.idVehiculo?.let { onActualizarKm?.invoke(it) } },
                         enabled = enabled && b.idVehiculo != null && onActualizarKm != null) { Text("Actualizar kilometraje vigente") }
                     if (onActualizarKm == null) Text("La actualización del kilometraje aún no está disponible desde esta pantalla.",
                         style = MaterialTheme.typography.bodySmall)
                 }
+                if (s.modoDesdeAlerta) {
+                    Text("El km del servicio usa lecturas históricas (no crea una lectura RF14).",
+                        style = MaterialTheme.typography.bodySmall)
+                }
             }
             SeccionMantenimiento("2", "Detalle del servicio", "Los campos con * son obligatorios.") {
                 SelectorMantenimiento("Tipo de mantenimiento *",
-                    s.contexto?.tipos?.firstOrNull { it.codigo == b.codigoTipo }?.nombre ?: "Seleccionar tipo",
-                    s.contexto?.tipos.orEmpty().map { it.codigo to it.nombre }, enabled,
+                    s.contexto?.tipos?.firstOrNull { it.codigo == b.codigoTipo }?.nombre ?: b.codigoTipo.ifBlank { "Seleccionar tipo" },
+                    s.contexto?.tipos.orEmpty().map { it.codigo to it.nombre }, enabled && !s.modoDesdeAlerta,
                     s.errores["codigoTipoMantenimiento"], Modifier.testTag("rf17.tipo")) { codigo ->
                     vm.actualizar { it.copy(codigoTipo = codigo, servicioOtro = if (codigo == "OTRO") it.servicioOtro else "") }
                 }
-                if (b.codigoTipo == "OTRO") CampoMantenimiento("Servicio específico *", b.servicioOtro, enabled,
+                if (s.modoDesdeAlerta) {
+                    Text("Tipo fijado por la alerta (solo lectura).", style = MaterialTheme.typography.bodySmall)
+                }
+                if (b.codigoTipo == "OTRO") CampoMantenimiento("Servicio específico *", b.servicioOtro, enabled && !s.modoDesdeAlerta,
                     s.errores["servicioOtro"], modifier = Modifier.testTag("rf17.servicioOtro")) {
                     v -> vm.actualizar { it.copy(servicioOtro = v) }
                 }
@@ -191,15 +231,17 @@ internal fun FormularioRegistroMantenimiento(
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
-            SeccionMantenimiento("5", "Próxima recomendación", "Opcional. Se conserva como referencia para el siguiente servicio.") {
-                FechaMantenimiento("Próxima fecha sugerida", b.proximaFecha, enabled, null,
-                    { v -> vm.actualizar { it.copy(proximaFecha = v) } }, opcional = true,
-                    error = s.errores["proximaFechaSugerida"])
-                CampoMantenimiento("Próximo kilometraje sugerido", b.proximoKm, enabled,
-                    s.errores["proximoKmSugerido"], KeyboardType.Number) { v -> vm.actualizar { it.copy(proximoKm = v) } }
-                if (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank()) {
-                    Text("Puedes guardar y programar una alerta preventiva con esta recomendación.",
-                        style = MaterialTheme.typography.bodySmall)
+            if (!s.modoDesdeAlerta) {
+                SeccionMantenimiento("5", "Próxima recomendación", "Opcional. Se conserva como referencia para el siguiente servicio.") {
+                    FechaMantenimiento("Próxima fecha sugerida", b.proximaFecha, enabled, null,
+                        { v -> vm.actualizar { it.copy(proximaFecha = v) } }, opcional = true,
+                        error = s.errores["proximaFechaSugerida"])
+                    CampoMantenimiento("Próximo kilometraje sugerido", b.proximoKm, enabled,
+                        s.errores["proximoKmSugerido"], KeyboardType.Number) { v -> vm.actualizar { it.copy(proximoKm = v) } }
+                    if (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank()) {
+                        Text("Puedes guardar y programar una alerta preventiva con esta recomendación.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
             Spacer(Modifier.height(4.dp))
@@ -208,7 +250,7 @@ internal fun FormularioRegistroMantenimiento(
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val hayRecomendacion = b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank()
+            val hayRecomendacion = !s.modoDesdeAlerta && (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank())
             val puedeGuardar = enabled && s.contexto?.registroDisponible == true
             if (hayRecomendacion) {
                 Button(
@@ -234,7 +276,14 @@ internal fun FormularioRegistroMantenimiento(
                     modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
                     shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)
                 ) {
-                    Text(if (s.enviando) "Guardando…" else "Guardar mantenimiento")
+                    Text(
+                        when {
+                            s.enviando && s.modoDesdeAlerta -> "Registrando…"
+                            s.enviando -> "Guardando…"
+                            s.modoDesdeAlerta -> "Registrar y marcar alerta"
+                            else -> "Guardar mantenimiento"
+                        }
+                    )
                 }
             }
             TextButton(onClick = { if (s.requiereSesion) onCerrar() else vm.solicitarSalir() },

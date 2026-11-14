@@ -37,7 +37,8 @@ fun FlujoHistorialMantenimiento(
     estadoEnSistema: Boolean = true,
     onRegistroAbierto: (Boolean) -> Unit = {},
     recargaRegistroToken: Int = 0,
-    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null
+    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null,
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
 ) {
     key(claveCuenta) {
         var registrando by rememberSaveable { mutableStateOf(false) }
@@ -53,7 +54,8 @@ fun FlujoHistorialMantenimiento(
                     onProgramarAlerta = { oferta ->
                         registrando = false
                         onProgramarAlerta?.invoke(oferta)
-                    })
+                    },
+                    talleresRepository = talleresRepository)
             }
         } else {
             AmbitoHistorial {
@@ -61,7 +63,8 @@ fun FlujoHistorialMantenimiento(
                     idInicial = vehiculoElegido, onSeleccionConfirmada = { vehiculoElegido = it },
                     onVolver = onVolverInicio, modifier = modifier,
                     registroDisponible = mantenimientoRepository != null && !claveCuenta.isNullOrBlank(),
-                    onRegistrar = { vehiculoElegido = it; registrando = true }, onIniciarSesion = onIniciarSesion)
+                    onRegistrar = { vehiculoElegido = it; registrando = true }, onIniciarSesion = onIniciarSesion,
+                    talleresRepository = talleresRepository)
             }
         }
     }
@@ -89,7 +92,8 @@ fun EntradaHistorialMantenimiento(
     repository: HistorialRepository?, claveCuenta: String?, idInicial: Long?,
     onSeleccionConfirmada: (Long) -> Unit, onVolver: () -> Unit, onRegistrar: (Long) -> Unit,
     modifier: Modifier = Modifier, registroDisponible: Boolean = false,
-    onIniciarSesion: (() -> Unit)? = null
+    onIniciarSesion: (() -> Unit)? = null,
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
 ) {
     var detalleId by rememberSaveable { mutableStateOf<Long?>(null) }
     BackHandler(onBack = {
@@ -133,13 +137,15 @@ fun EntradaHistorialMantenimiento(
                 detalleId = null
                 vm.recargar()
             },
-            modifier = modifier
+            modifier = modifier,
+            talleresRepository = talleresRepository
         )
     } else {
         HistorialMantenimientoScreen(
             estado, onVolver, vm::seleccionar, vm::reintentar, vm::recargar,
             onRegistrar, modifier, registroDisponible, onIniciarSesion,
-            onVerDetalle = { detalleId = it }
+            onVerDetalle = { detalleId = it },
+            talleresRepository = talleresRepository
         )
     }
 }
