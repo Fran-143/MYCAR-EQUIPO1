@@ -10,7 +10,7 @@ Sin push / sin deploy / sin writes Neon.
 - Padre hotfix sesión: `23a67c4`
 
 ## 2. Commits Agente 1 (tras base)
-- Ver `git log ca97769..HEAD` — contrato `contacto_autorizado`, piloto sin usuario fijo, sidecar gradle, checklist.
+- **A1:** `910ce058fbd1fc9bc6b6bd597f0008f0b806c205` — `feat(v26): contacto_autorizado + piloto sin usuario fijo + sidecar APK`
 
 ## 3. Estado V26
 - SQL: `taller_global` + `taller` con `origen`, `tiene_whatsapp`, **`contacto_autorizado`** (default false).
