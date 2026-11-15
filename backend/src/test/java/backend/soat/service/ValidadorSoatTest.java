@@ -25,10 +25,20 @@ class ValidadorSoatTest {
 
     @Test
     void vigenciaAnualAceptaAniversarioYUltimoDia() {
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
         assertDoesNotThrow(() -> ValidadorSoat.exigirRegistro(
-                registro(LocalDate.of(2026, 11, 15), LocalDate.of(2027, 11, 15))));
+                registro(hoy, hoy.plusYears(1))));
         assertDoesNotThrow(() -> ValidadorSoat.exigirRegistro(
-                registro(LocalDate.of(2026, 11, 15), LocalDate.of(2027, 11, 14))));
+                registro(hoy, hoy.plusYears(1).minusDays(1))));
+    }
+
+    @Test
+    void rechazaInicioPosteriorAHoy() {
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
+        ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(
+                registro(hoy.plusYears(10), hoy.plusYears(11))));
+        assertEquals(ValidadorSoat.MSG_INICIO_FUTURO, e.getMessage());
+        assertTrue(e.campos().containsKey("fechaInicio"));
     }
 
     @Test
@@ -37,8 +47,9 @@ class ValidadorSoatTest {
                 corregir(LocalDate.of(2020, 11, 15), LocalDate.of(2026, 11, 15))));
         assertEquals(ValidadorSoat.MSG_VIGENCIA_ANUAL, seis.getMessage());
 
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
         ErrorSoat dos = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(
-                registro(LocalDate.of(2026, 11, 15), LocalDate.of(2028, 11, 15))));
+                registro(hoy, hoy.plusYears(2))));
         assertEquals(ValidadorSoat.MSG_VIGENCIA_ANUAL, dos.getMessage());
     }
 
@@ -59,9 +70,10 @@ class ValidadorSoatTest {
 
     @Test
     void rechazaAseguradoraFueraDeCatalogo() {
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
         var req = new ContratoSoat.RegistrarRequest(
                 UUID.randomUUID(), "ASEGURADORA FANTASMA", "012-4589",
-                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                hoy, hoy.plusYears(1),
                 null, null, null, null);
         ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(req));
         assertTrue(e.getMessage().contains("aseguradora") || e.getMessage().contains("catálogo")
@@ -85,18 +97,20 @@ class ValidadorSoatTest {
         assertDoesNotThrow(() -> ValidadorSoat.exigirRegistro(
                 registroPoliza("AB12-34")));
         // Interseguro: 8 dígitos ilustrativos, no obligatorios
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
         assertDoesNotThrow(() -> ValidadorSoat.exigirRegistro(
                 new ContratoSoat.RegistrarRequest(
                         UUID.randomUUID(), "INTERSEGURO", "1234567",
-                        LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                        hoy, hoy.plusYears(1),
                         null, null, null, null)));
     }
 
     @Test
     void rechazaPolizaConCaracteresInvalidos() {
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
         var req = new ContratoSoat.RegistrarRequest(
                 UUID.randomUUID(), "RIMAC SEGUROS", "ABC@123",
-                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                hoy, hoy.plusYears(1),
                 null, null, null, null);
         ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(req));
         assertTrue(e.getMessage().toLowerCase().contains("póliza")
@@ -106,9 +120,10 @@ class ValidadorSoatTest {
 
     @Test
     void rf30Ea07RechazaPrimaNegativaYTope() {
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
         var req = new ContratoSoat.RegistrarRequest(
                 UUID.randomUUID(), "RIMAC SEGUROS", "012-4589",
-                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                hoy, hoy.plusYears(1),
                 null, null, new BigDecimal("-1"), null);
         ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(req));
         assertEquals("El importe de la prima no es válido", e.getMessage());
@@ -116,7 +131,7 @@ class ValidadorSoatTest {
 
         var tope = new ContratoSoat.RegistrarRequest(
                 UUID.randomUUID(), "RIMAC SEGUROS", "012-4589",
-                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                hoy, hoy.plusYears(1),
                 null, null, new BigDecimal("1000000.00"), null);
         ErrorSoat e2 = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(tope));
         assertEquals("El importe de la prima no es válido", e2.getMessage());
@@ -124,7 +139,7 @@ class ValidadorSoatTest {
         assertDoesNotThrow(() -> ValidadorSoat.exigirRegistro(
                 new ContratoSoat.RegistrarRequest(
                         UUID.randomUUID(), "RIMAC SEGUROS", "012-4589",
-                        LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                        hoy, hoy.plusYears(1),
                         null, null, new BigDecimal("150.50"), null)));
     }
 
@@ -158,6 +173,12 @@ class ValidadorSoatTest {
 
         assertDoesNotThrow(() -> ValidadorSoat.exigirFechasRenovacion(
                 LocalDate.of(2026, 1, 2), LocalDate.of(2027, 1, 2), iniA, venA));
+
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
+        ErrorSoat futuro = assertThrows(ErrorSoat.class, () ->
+                ValidadorSoat.exigirFechasRenovacion(
+                        hoy.plusYears(10), hoy.plusYears(11), iniA, venA));
+        assertEquals(ValidadorSoat.MSG_INICIO_FUTURO, futuro.getMessage());
     }
 
     @Test
@@ -173,9 +194,10 @@ class ValidadorSoatTest {
     }
 
     private static ContratoSoat.RegistrarRequest registroPoliza(String poliza) {
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
         return new ContratoSoat.RegistrarRequest(
                 UUID.randomUUID(), "RIMAC SEGUROS", poliza,
-                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                hoy, hoy.plusYears(1),
                 null, null, null, null);
     }
 

@@ -174,7 +174,7 @@ private fun FormularioCamposSoat(
             placeholder = "Ej. ${AseguradoraSoat.ejemploPoliza(c.aseguradora)}",
             error = estado.errores["numeroPoliza"],
             enabled = !estado.ocupado,
-            keyboard = KeyboardType.Ascii,
+            keyboard = KeyboardType.Text,
             mayusculas = true
         )
         Text(

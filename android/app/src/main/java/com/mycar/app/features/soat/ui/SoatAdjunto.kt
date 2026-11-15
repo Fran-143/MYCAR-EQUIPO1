@@ -321,12 +321,51 @@ private fun archivoCaptura(context: Context): File {
 
 private fun metaAdjunto(context: Context, uri: Uri): AdjuntoSoatUi? {
     val cr = context.contentResolver
-    val type = cr.getType(uri) ?: return null
     val nombre = cr.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
         if (c.moveToFirst()) c.getString(0) else "documento"
     } ?: "documento"
-    val tamano = cr.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: 0L
-    return AdjuntoSoatUi(uri, nombre, type, tamano)
+    var type = cr.getType(uri)
+    if (type.isNullOrBlank()) {
+        type = when {
+            nombre.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
+            nombre.endsWith(".png", ignoreCase = true) -> "image/png"
+            nombre.endsWith(".jpg", ignoreCase = true) ||
+                nombre.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+            else -> null
+        }
+    }
+    if (type.isNullOrBlank()) return null
+    // Copia a caché: mantiene lectura estable (galería/PDF pierden el grant al salir del picker).
+    val estable = copiarAdjuntoACache(context, uri, nombre, type) ?: return null
+    return estable
+}
+
+private fun copiarAdjuntoACache(
+    context: Context,
+    uri: Uri,
+    nombre: String,
+    contentType: String
+): AdjuntoSoatUi? {
+    return runCatching {
+        val dir = File(context.cacheDir, "soat_adjuntos").apply { mkdirs() }
+        val ext = when {
+            contentType == "application/pdf" -> ".pdf"
+            contentType.contains("png") -> ".png"
+            else -> ".jpg"
+        }
+        val dest = File(dir, "adj_${System.currentTimeMillis()}$ext")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            dest.outputStream().use { output -> input.copyTo(output) }
+        } ?: return null
+        if (!dest.isFile || dest.length() <= 0L) return null
+        val authority = "${context.packageName}.fileprovider"
+        AdjuntoSoatUi(
+            uri = FileProvider.getUriForFile(context, authority, dest),
+            nombre = nombre,
+            contentType = contentType,
+            tamanoBytes = dest.length()
+        )
+    }.getOrNull()
 }
 
 private fun tamanoLegible(bytes: Long): String {

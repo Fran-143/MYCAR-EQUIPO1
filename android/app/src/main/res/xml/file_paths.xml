@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="soat_capture" path="soat_capture/" />
+    <cache-path name="soat_adjuntos" path="soat_adjuntos/" />
 </paths>

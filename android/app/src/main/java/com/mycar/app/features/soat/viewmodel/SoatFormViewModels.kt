@@ -85,6 +85,9 @@ abstract class SoatFormViewModelBase(
 
     private fun exigirCatalogoActivo(): Boolean = modo != TipoFormSoat.CORREGIR
 
+    /** RENOVACIÓN tolera inicio = día siguiente al vencimiento anterior (mismo día de renovar). */
+    private fun exigirInicioNoFuturo(): Boolean = modo != TipoFormSoat.RENOVAR
+
     private fun mapearErroresServidor(fallo: FalloRegistroVehiculo?): Map<String, String> {
         if (fallo == null) return emptyMap()
         if (fallo.erroresPorCampo.isNotEmpty()) return fallo.erroresPorCampo
@@ -100,6 +103,9 @@ abstract class SoatFormViewModelBase(
             "DATOS_INVALIDOS" -> when {
                 msg.contains("anual", ignoreCase = true) ||
                     msg.contains("aniversario", ignoreCase = true) -> mapOf("fechaVencimiento" to msg)
+                msg.contains("inicio", ignoreCase = true) &&
+                    (msg.contains("posterior", ignoreCase = true) ||
+                        msg.contains("hoy", ignoreCase = true)) -> mapOf("fechaInicio" to msg)
                 msg.contains("vencimiento", ignoreCase = true) &&
                     msg.contains("inicio", ignoreCase = true) -> mapOf("fechaVencimiento" to msg)
                 msg.contains("vencimiento", ignoreCase = true) ||
@@ -129,7 +135,8 @@ abstract class SoatFormViewModelBase(
             nuevos.fechaEmision,
             nuevos.importePrima,
             exigirVencimientoFuturo = exigirVencimientoFuturo(),
-            exigirCatalogoActivo = exigirCatalogoActivo()
+            exigirCatalogoActivo = exigirCatalogoActivo(),
+            exigirInicioNoFuturo = exigirInicioNoFuturo()
         ).toMutableMap()
         if (nuevos.aseguradora.isBlank()) errores.remove("aseguradora")
         if (nuevos.numeroPoliza.isBlank()) errores.remove("numeroPoliza")
@@ -157,7 +164,8 @@ abstract class SoatFormViewModelBase(
             c.aseguradora, c.numeroPoliza, c.fechaInicio, c.fechaVencimiento,
             c.fechaEmision, c.importePrima,
             exigirVencimientoFuturo = exigirVencimientoFuturo(),
-            exigirCatalogoActivo = exigirCatalogoActivo()
+            exigirCatalogoActivo = exigirCatalogoActivo(),
+            exigirInicioNoFuturo = exigirInicioNoFuturo()
         ).toMutableMap()
         camposBaseRenovacion()?.let { base ->
             errores.putAll(
@@ -216,7 +224,8 @@ abstract class SoatFormViewModelBase(
             campos.aseguradora, campos.numeroPoliza, campos.fechaInicio, campos.fechaVencimiento,
             campos.fechaEmision, campos.importePrima,
             exigirVencimientoFuturo = exigirVencimientoFuturo(),
-            exigirCatalogoActivo = exigirCatalogoActivo()
+            exigirCatalogoActivo = exigirCatalogoActivo(),
+            exigirInicioNoFuturo = exigirInicioNoFuturo()
         ).toMutableMap()
         camposBaseRenovacion()?.let { base ->
             errores.putAll(
@@ -254,7 +263,8 @@ abstract class SoatFormViewModelBase(
                             c.aseguradora, c.numeroPoliza, c.fechaInicio, c.fechaVencimiento,
                             c.fechaEmision, c.importePrima,
                             exigirVencimientoFuturo = true,
-                            exigirCatalogoActivo = true
+                            exigirCatalogoActivo = true,
+                            exigirInicioNoFuturo = false
                         )
                     )
                     return

@@ -61,6 +61,7 @@ object SoatFormulario {
         "Ingresa un número de póliza o certificado válido (letras, números y separadores)"
     const val MSG_POLIZA_VACIA = "Indica el número de póliza."
     const val MSG_FECHA_MENOR_HOY = "La fecha no puede ser menor a la fecha actual"
+    const val MSG_INICIO_FUTURO = "La fecha de inicio no puede ser posterior a hoy"
     const val MSG_VIGENCIA_ANUAL =
         "El SOAT ordinario debe tener vigencia anual (aniversario calendario)"
     const val MSG_RENOV_INICIO =
@@ -75,6 +76,8 @@ object SoatFormulario {
      * @param exigirVencimientoFuturo true en REGISTRO y RENOVACIÓN (decisión MyCar vs RF30-EA06 antiguo).
      *        false en CORREGIR para no bloquear edición de históricos ya vencidos.
      * @param exigirCatalogoActivo true en alta/renovación; false en corregir (admite históricos).
+     * @param exigirInicioNoFuturo true en REGISTRO/CORREGIR; false en RENOVACIÓN
+     *        (la tolerancia del día siguiente al vencimiento va en [validarFechasRenovacion]).
      */
     fun validarCampos(
         aseguradora: String,
@@ -85,6 +88,7 @@ object SoatFormulario {
         importePrima: String,
         exigirVencimientoFuturo: Boolean = true,
         exigirCatalogoActivo: Boolean = true,
+        exigirInicioNoFuturo: Boolean = true,
         hoy: LocalDate = hoyLima()
     ): Map<String, String> {
         val errores = mutableMapOf<String, String>()
@@ -109,6 +113,9 @@ object SoatFormulario {
             errores["fechaVencimiento"] = MSG_VENCIMIENTO_POSTERIOR
         } else if (inicio != null && fin != null && !esVigenciaAnualOrdinaria(inicio, fin)) {
             errores["fechaVencimiento"] = MSG_VIGENCIA_ANUAL
+        }
+        if (exigirInicioNoFuturo && inicio != null && inicio.isAfter(hoy)) {
+            errores["fechaInicio"] = MSG_INICIO_FUTURO
         }
         if (exigirVencimientoFuturo && fin != null && fin.isBefore(hoy)) {
             errores["fechaVencimiento"] = MSG_FECHA_MENOR_HOY
@@ -226,7 +233,8 @@ object SoatFormulario {
         fechaInicioNueva: String,
         fechaVencimientoNueva: String,
         fechaInicioAnterior: String,
-        fechaVencimientoAnterior: String
+        fechaVencimientoAnterior: String,
+        hoy: LocalDate = hoyLima()
     ): Map<String, String> {
         val errores = mutableMapOf<String, String>()
         val inicioN = parsearFecha(fechaInicioNueva)
@@ -237,6 +245,12 @@ object SoatFormulario {
         }
         if (vencN != null && vencA != null && !vencN.isAfter(vencA)) {
             errores["fechaVencimiento"] = MSG_RENOV_VENC
+        }
+        // Máximo hoy; solo se tolera el día siguiente al vencimiento anterior.
+        if (inicioN != null && inicioN.isAfter(hoy) &&
+            (vencA == null || inicioN != vencA.plusDays(1))
+        ) {
+            errores["fechaInicio"] = MSG_INICIO_FUTURO
         }
         parsearFecha(fechaInicioAnterior)
         return errores

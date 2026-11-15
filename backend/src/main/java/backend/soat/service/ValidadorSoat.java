@@ -17,6 +17,8 @@ public final class ValidadorSoat {
     private static final BigDecimal MAX_PRIMA = new BigDecimal("999999.00");
     static final String MSG_VIGENCIA_ANUAL =
             "El SOAT ordinario debe tener vigencia anual (aniversario calendario)";
+    static final String MSG_INICIO_FUTURO =
+            "La fecha de inicio no puede ser posterior a hoy";
     static final String MSG_POLIZA =
             "Ingresa un número de póliza o certificado válido (letras, números y separadores)";
 
@@ -28,7 +30,7 @@ public final class ValidadorSoat {
                 Set.of("idOperacion"));
         texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true, true);
         poliza(req.numeroPoliza(), req.aseguradora());
-        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision());
+        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(), true, true);
         textoOpcional("nombreContratante", req.nombreContratante(), MAX_CONTRATANTE);
         prima(req.importePrima());
         documentoOpcional(req.documento());
@@ -43,7 +45,8 @@ public final class ValidadorSoat {
         }
         texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true, true);
         poliza(req.numeroPoliza(), req.aseguradora());
-        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision());
+        // Inicio futuro estricto se valida en exigirFechasRenovacion (permite día siguiente al vencimiento).
+        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(), true, false);
         textoOpcional("nombreContratante", req.nombreContratante(), MAX_CONTRATANTE);
         prima(req.importePrima());
         documentoOpcional(req.documento());
@@ -67,6 +70,11 @@ public final class ValidadorSoat {
                     "La nueva vigencia debe vencer después de la actual.",
                     Set.of("fechaVencimiento"));
         }
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
+        // Máximo hoy; solo se tolera el día siguiente al vencimiento anterior (renovar el mismo día).
+        if (inicioNueva.isAfter(hoy) && !inicioNueva.equals(vencAnterior.plusDays(1))) {
+            throw new ErrorSoat("DATOS_INVALIDOS", MSG_INICIO_FUTURO, Set.of("fechaInicio"));
+        }
     }
 
     /** Renovar solo si ya se llegó al día de vencimiento del SOAT actual (hoy Lima >= vencimiento). */
@@ -88,8 +96,8 @@ public final class ValidadorSoat {
         // Corregir admite catálogo histórico (HDI/Chubb/…) ya persistido.
         texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true, false);
         poliza(req.numeroPoliza(), req.aseguradora());
-        // CORREGIR: no rechazar vencimientos pasados de SOAT ya registrados.
-        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(), false);
+        // CORREGIR: no rechazar vencimientos pasados; sí rechazar inicio futuro.
+        fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(), false, true);
         textoOpcional("nombreContratante", req.nombreContratante(), MAX_CONTRATANTE);
         prima(req.importePrima());
         if (req.accionDocumento() == ContratoSoat.AccionDocumento.REEMPLAZAR) {
@@ -129,16 +137,14 @@ public final class ValidadorSoat {
         return MAX_IMAGEN;
     }
 
-    private static void fechas(LocalDate inicio, LocalDate vencimiento, LocalDate emision) {
-        fechas(inicio, vencimiento, emision, true);
-    }
-
     /**
      * @param exigirVencimientoFuturo REGISTRO/RENOVACIÓN: rechaza vencimiento &lt; hoy Lima.
      *                                CORREGIR: false para permitir editar históricos ya vencidos.
+     * @param exigirInicioNoFuturo REGISTRO/CORREGIR: rechaza inicio &gt; hoy Lima.
+     *                             RENOVACIÓN: false (se valida en {@link #exigirFechasRenovacion}).
      */
     private static void fechas(LocalDate inicio, LocalDate vencimiento, LocalDate emision,
-            boolean exigirVencimientoFuturo) {
+            boolean exigirVencimientoFuturo, boolean exigirInicioNoFuturo) {
         if (inicio == null) throw new ErrorSoat("DATOS_INVALIDOS", "fechaInicio obligatoria.", Set.of("fechaInicio"));
         if (vencimiento == null) {
             throw new ErrorSoat("DATOS_INVALIDOS", "fechaVencimiento obligatoria.", Set.of("fechaVencimiento"));
@@ -151,13 +157,14 @@ public final class ValidadorSoat {
         if (!esVigenciaAnualOrdinaria(inicio, vencimiento)) {
             throw new ErrorSoat("DATOS_INVALIDOS", MSG_VIGENCIA_ANUAL, Set.of("fechaVencimiento"));
         }
-        if (exigirVencimientoFuturo) {
-            LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
-            if (vencimiento.isBefore(hoy)) {
-                throw new ErrorSoat("DATOS_INVALIDOS",
-                        "No puedes registrar un SOAT con fecha de vencimiento pasada",
-                        Set.of("fechaVencimiento"));
-            }
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
+        if (exigirInicioNoFuturo && inicio.isAfter(hoy)) {
+            throw new ErrorSoat("DATOS_INVALIDOS", MSG_INICIO_FUTURO, Set.of("fechaInicio"));
+        }
+        if (exigirVencimientoFuturo && vencimiento.isBefore(hoy)) {
+            throw new ErrorSoat("DATOS_INVALIDOS",
+                    "No puedes registrar un SOAT con fecha de vencimiento pasada",
+                    Set.of("fechaVencimiento"));
         }
         if (emision != null && emision.isAfter(vencimiento)) {
             throw new ErrorSoat("DATOS_INVALIDOS", "fechaEmision no puede ser posterior al vencimiento.",

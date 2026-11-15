@@ -6,7 +6,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 
 @Configuration(proxyBeanMethods = false)
 public class DocumentosConfiguracion {
@@ -21,10 +20,8 @@ public class DocumentosConfiguracion {
     /**
      * Storage real. Activar con {@code mycar.documentos.modo=supabase}
      * y URL + secret ({@code sb_secret_…} o service_role JWT legacy).
-     * Lazy: no materializar HttpClient/SDK en el camino crítico hasta Tomcat.
      */
     @Bean
-    @Lazy
     @ConditionalOnProperty(prefix = "mycar.documentos", name = "modo", havingValue = "supabase")
     AlmacenamientoDocumentos supabaseDocumentos(
             @Value("${mycar.documentos.supabase.url}") String url,

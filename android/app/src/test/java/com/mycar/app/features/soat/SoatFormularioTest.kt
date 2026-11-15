@@ -13,7 +13,7 @@ import org.junit.Test
 
 class SoatFormularioTest {
 
-    private val hoy = LocalDate.of(2026, 11, 14)
+    private val hoy = LocalDate.of(2026, 11, 15)
 
     @Test
     fun rf30Ea01_rechazaFechasIgualesYAnteriores() {
@@ -155,27 +155,41 @@ class SoatFormularioTest {
     @Test
     fun rf30Ea07_primaNegativaYTope() {
         val err = SoatFormulario.validarCampos(
-            "RÍMAC SEGUROS", "0124589", "01/01/2027", "01/01/2028", "", "-10",
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "15/11/2027", "", "-10",
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertEquals(SoatFormulario.MSG_PRIMA_INVALIDA, err["importePrima"])
         val letras = SoatFormulario.validarCampos(
-            "RÍMAC SEGUROS", "0124589", "01/01/2027", "01/01/2028", "", "abc",
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "15/11/2027", "", "abc",
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertEquals(SoatFormulario.MSG_PRIMA_INVALIDA, letras["importePrima"])
         val decimalOk = SoatFormulario.validarCampos(
-            "RÍMAC SEGUROS", "0124589", "01/01/2027", "01/01/2028", "", "150.50",
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "15/11/2027", "", "150.50",
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertTrue(decimalOk.isEmpty())
         val tope = SoatFormulario.validarCampos(
-            "RÍMAC SEGUROS", "0124589", "01/01/2027", "01/01/2028", "", "1000000",
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "15/11/2027", "", "1000000",
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertEquals(SoatFormulario.MSG_PRIMA_INVALIDA, tope["importePrima"])
         assertEquals("999999.99", SoatFormulario.limitarPrima("9999999.999"))
         assertEquals("150.00", SoatFormulario.limitarPrima("150.00"))
+    }
+
+    @Test
+    fun rechazaInicioPosteriorAHoy() {
+        val err = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "01/01/2036", "01/01/2037", "", "",
+            exigirVencimientoFuturo = true, hoy = hoy
+        )
+        assertEquals(SoatFormulario.MSG_INICIO_FUTURO, err["fechaInicio"])
+        val hoyOk = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "15/11/2027", "", "",
+            exigirVencimientoFuturo = true, hoy = hoy
+        )
+        assertTrue(hoyOk.isEmpty())
     }
 
     @Test
@@ -213,15 +227,29 @@ class SoatFormularioTest {
         assertEquals(SoatFormulario.MSG_RENOV_VENC, venc["fechaVencimiento"])
 
         val ok = SoatFormulario.validarFechasRenovacion(
-            "02/01/2026", "02/01/2027", "01/01/2025", "01/01/2026"
+            "02/01/2026", "02/01/2027", "01/01/2025", "01/01/2026",
+            hoy = LocalDate.of(2026, 1, 2)
         )
         assertTrue(ok.isEmpty())
+
+        val futuroLejos = SoatFormulario.validarFechasRenovacion(
+            "01/01/2036", "01/01/2037", "01/01/2025", "01/01/2026",
+            hoy = hoy
+        )
+        assertEquals(SoatFormulario.MSG_INICIO_FUTURO, futuroLejos["fechaInicio"])
+
+        // Renovar el día de vencimiento: se tolera inicio = vencimiento+1.
+        val diaSiguiente = SoatFormulario.validarFechasRenovacion(
+            "16/11/2026", "16/11/2027", "15/11/2025", "15/11/2026",
+            hoy = hoy
+        )
+        assertTrue(diaSiguiente.isEmpty())
     }
 
     @Test
     fun regresion_camposOpcionalesVaciosNoInvalidanParseo() {
         val ok = SoatFormulario.validarCampos(
-            "MAPFRE PERÚ", "9876543", "15/01/2027", "15/01/2028", "", "",
+            "MAPFRE PERÚ", "9876543", "15/11/2026", "15/11/2027", "", "",
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertTrue(ok.isEmpty())
