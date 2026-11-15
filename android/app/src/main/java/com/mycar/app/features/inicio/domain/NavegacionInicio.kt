@@ -24,5 +24,17 @@ enum class SecundariaMyCar(val titulo: String) {
 data class NavegacionInicio(val seccion: SeccionMyCar=SeccionMyCar.INICIO, val secundaria: SecundariaMyCar?=null) {
     fun abrir(destino: SeccionMyCar) = copy(seccion=destino,secundaria=null)
     fun abrir(destino: SecundariaMyCar) = copy(secundaria=destino)
-    fun atras() = if(secundaria!=null) copy(secundaria=null) else copy(seccion=SeccionMyCar.INICIO)
+    /** Vuelve a la pantalla previa del flujo (SOAT/detalle), no al listado de sección. */
+    fun atras() = when (secundaria) {
+        SecundariaMyCar.SOAT_CORREGIR,
+        SecundariaMyCar.SOAT_RENOVAR,
+        SecundariaMyCar.SOAT_RECORDATORIO -> copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR)
+        SecundariaMyCar.SOAT_CONFIGURAR,
+        SecundariaMyCar.SOAT_CONSULTAR,
+        SecundariaMyCar.SOAT_REGISTRAR,
+        SecundariaMyCar.EDITAR_VEHICULO,
+        SecundariaMyCar.KILOMETRAJE -> copy(secundaria = SecundariaMyCar.DETALLE)
+        null -> copy(seccion = SeccionMyCar.INICIO)
+        else -> copy(secundaria = null)
+    }
 }

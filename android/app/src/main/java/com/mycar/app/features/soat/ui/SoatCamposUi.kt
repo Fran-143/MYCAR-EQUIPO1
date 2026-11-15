@@ -101,8 +101,15 @@ fun SoatCampoFecha(
         OutlinedTextField(
             value = field,
             onValueChange = { nuevo ->
+                val digitosAntes = field.text.count { it.isDigit() }
+                val digitosNuevos = nuevo.text.count { it.isDigit() }
                 val enmascarado = SoatFormulario.aplicarMascaraFecha(nuevo.text)
-                val cursor = enmascarado.length.coerceAtMost(enmascarado.length)
+                // Al borrar, respetar el cursor del usuario; al escribir, ir al final del grupo.
+                val cursor = if (digitosNuevos < digitosAntes) {
+                    nuevo.selection.start.coerceIn(0, enmascarado.length)
+                } else {
+                    enmascarado.length
+                }
                 field = TextFieldValue(enmascarado, TextRange(cursor))
                 onChange(enmascarado)
             },

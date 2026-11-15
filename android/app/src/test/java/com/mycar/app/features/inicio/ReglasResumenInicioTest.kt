@@ -44,4 +44,12 @@ class ReglasResumenInicioTest {
         assertEquals(NavegacionInicio(),origen.atras())
         assertEquals(origen,origen.abrir(SeccionMyCar.VEHICULOS))
     }
+
+    @Test fun atrasSoatVuelveAConfigurarODetalle() {
+        val detalle = NavegacionInicio(SeccionMyCar.VEHICULOS, SecundariaMyCar.DETALLE)
+        val config = detalle.abrir(SecundariaMyCar.SOAT_CONFIGURAR)
+        assertEquals(config, config.abrir(SecundariaMyCar.SOAT_CORREGIR).atras())
+        assertEquals(config, config.abrir(SecundariaMyCar.SOAT_RENOVAR).atras())
+        assertEquals(detalle, config.atras())
+    }
 }

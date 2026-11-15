@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import backend.registro.RegistrationStore;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -24,6 +25,7 @@ class LoginFlowTest {
     final SessionCredentials credentials=mock(SessionCredentials.class);
     final PasswordEncoder passwords=mock(PasswordEncoder.class);
     final PlatformTransactionManager manager=mock(PlatformTransactionManager.class);
+    final RegistrationStore registrationStore=mock(RegistrationStore.class);
     final LoginCommand command=new LoginCommand("test@example.com","input-secret",UUID.randomUUID());
     final Instant now=Instant.now();
     SessionAuthentication auth;
@@ -31,7 +33,7 @@ class LoginFlowTest {
         when(manager.getTransaction(any())).thenAnswer(call->new SimpleTransactionStatus());
         when(passwords.encode(any())).thenReturn("dummy-test-hash");
         when(validator.validate(command)).thenReturn(command);when(store.now()).thenReturn(now);
-        auth=new SessionAuthentication(validator,store,credentials,passwords,manager);
+        auth=new SessionAuthentication(validator,store,credentials,passwords,manager,registrationStore,false,"1.0");
         clearInvocations(passwords);
     }
     @Test void failedPasswordIsCommittedBeforeAuthenticationIsRejected(){
@@ -96,7 +98,7 @@ class LoginFlowTest {
         doReturn(refresh).when(realCredentials).newRefresh();
         when(store.createSession(1,command.idInstalacion(),SessionCredentials.hashRefresh(refresh),deadline,started))
                 .thenAnswer(call->{clock.set(issued);return 12L;});
-        var service=new SessionAuthentication(validator,store,realCredentials,passwords,manager);
+        var service=new SessionAuthentication(validator,store,realCredentials,passwords,manager,registrationStore,false,"1.0");
 
         var result=service.login(command);
         var jwt=SignedJWT.parse(result.accessToken()).getJWTClaimsSet();

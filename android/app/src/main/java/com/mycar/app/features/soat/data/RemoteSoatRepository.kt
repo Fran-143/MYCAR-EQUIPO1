@@ -14,7 +14,11 @@ class RemoteSoatRepository(
     private val api: SoatApi,
     private val http: OkHttpClient = OkHttpClient()
 ) : SoatRepository {
-    private data class ErrorApi(val codigo: String?, val mensaje: String? = null)
+    private data class ErrorApi(
+        val codigo: String?,
+        val mensaje: String? = null,
+        val campos: Map<String, String>? = null
+    )
 
     override suspend fun consultar(idVehiculo: Long): SoatConsultaResponse {
         val r = api.consultar(idVehiculo)
@@ -112,6 +116,13 @@ class RemoteSoatRepository(
             r.errorBody()?.use { Gson().fromJson(it.string(), ErrorApi::class.java) }
         }.getOrNull()
         val codigo = parsed?.codigo ?: if (r.code() == 401) "SESION_NO_VALIDA" else "ERROR_HTTP"
-        return FalloRegistroVehiculo(codigo, r.code(), mensajeServidor = parsed?.mensaje)
+        val porCampo = parsed?.campos.orEmpty()
+        return FalloRegistroVehiculo(
+            codigo = codigo,
+            estadoHttp = r.code(),
+            campos = porCampo.keys,
+            mensajeServidor = parsed?.mensaje,
+            erroresPorCampo = porCampo
+        )
     }
 }

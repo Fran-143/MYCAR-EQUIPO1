@@ -154,6 +154,33 @@ public class SoatJdbcDao {
         return n != null && n > 0;
     }
 
+    /** Misma póliza (solo dígitos) ya usada por cualquier SOAT de otro registro. */
+    public boolean polizaYaRegistrada(String poliza, Long excluirIdSoat) {
+        String digitos = poliza == null ? "" : poliza.replaceAll("[^0-9]", "");
+        if (digitos.isEmpty()) return false;
+        Integer n = jdbc.queryForObject("""
+                SELECT COUNT(*)::int FROM mycar.soat
+                WHERE regexp_replace(numero_poliza, '[^0-9]', '', 'g') = ?
+                  AND (?::bigint IS NULL OR id_soat <> ?)
+                """, Integer.class, digitos, excluirIdSoat, excluirIdSoat);
+        return n != null && n > 0;
+    }
+
+    /** Mismo vehículo + misma aseguradora + misma prima (si hay prima). */
+    public boolean aseguradoraPrimaDuplicada(long vehiculo, String aseguradora, java.math.BigDecimal prima,
+            Long excluirIdSoat) {
+        if (prima == null || aseguradora == null || aseguradora.isBlank()) return false;
+        Integer n = jdbc.queryForObject("""
+                SELECT COUNT(*)::int FROM mycar.soat
+                WHERE id_vehiculo = ?
+                  AND lower(btrim(aseguradora)) = lower(btrim(?))
+                  AND importe_prima IS NOT NULL
+                  AND importe_prima = ?
+                  AND (?::bigint IS NULL OR id_soat <> ?)
+                """, Integer.class, vehiculo, aseguradora, prima, excluirIdSoat, excluirIdSoat);
+        return n != null && n > 0;
+    }
+
     public boolean solapeConHistorico(long vehiculo, LocalDate inicio, LocalDate vencimiento, Long excluir) {
         Integer n = jdbc.queryForObject("""
                 SELECT COUNT(*)::int FROM mycar.soat

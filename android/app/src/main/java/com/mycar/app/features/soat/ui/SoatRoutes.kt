@@ -96,8 +96,7 @@ fun CorregirSoatRoute(
         onExitoContinuar = onExito,
         onConfigurarRecordatorio = onExito,
         textoConfirmar = "Guardar cambios",
-        // Siempre visible/accionable si el formulario es válido; sin cambios responde el propio flujo.
-        botonHabilitado = !estado.ocupado && estado.errores.isEmpty(),
+        botonHabilitado = !estado.ocupado && estado.errores.isEmpty() && vm.puedeGuardarCorregir(),
         modifier = modifier
     )
 }

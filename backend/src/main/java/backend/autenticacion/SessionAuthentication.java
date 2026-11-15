@@ -1,6 +1,10 @@
 package backend.autenticacion;
 
+import backend.registro.RegistrationData;
+import backend.registro.RegistrationException;
+import backend.registro.RegistrationStore;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -10,6 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,10 +34,17 @@ public class SessionAuthentication {
     private final PasswordEncoder passwords;
     private final TransactionTemplate tx;
     private final String dummyHash;
+    private final boolean loginAutoAlta;
+    private final RegistrationStore registrationStore;
+    private final String privacyVersion;
 
     public SessionAuthentication(LoginValidator validator,AuthenticationStore store,SessionCredentials credentials,
-            @Qualifier("registrationPasswordEncoder") PasswordEncoder passwords,PlatformTransactionManager manager){
+            @Qualifier("registrationPasswordEncoder") PasswordEncoder passwords,PlatformTransactionManager manager,
+            RegistrationStore registrationStore,
+            @Value("${mycar.auth.login-auto-alta:false}") boolean loginAutoAlta,
+            @Value("${mycar.registro.privacidad.version-vigente:1.0}") String privacyVersion){
         this.validator=validator;this.store=store;this.credentials=credentials;this.passwords=passwords;
+        this.registrationStore=registrationStore;this.loginAutoAlta=loginAutoAlta;this.privacyVersion=privacyVersion;
         this.tx=new TransactionTemplate(manager);
         this.tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.dummyHash=passwords.encode(UUID.randomUUID().toString());
@@ -43,6 +55,9 @@ public class SessionAuthentication {
         credentials.requireConfigured();
         Outcome outcome=tx.execute(status->{
             var account=store.lockAccount(command.correo()).orElse(null);
+            if(account==null && loginAutoAlta){
+                account=provisionLocalAccount(command);
+            }
             if(account==null){passwords.matches(command.contrasena(),dummyHash);return new Outcome(null,true);}
             Instant checkedAt=store.now();
             if(account.blockedUntil()!=null && checkedAt.isBefore(account.blockedUntil()))return new Outcome(null,true);
@@ -66,6 +81,19 @@ public class SessionAuthentication {
         });
         if(outcome==null || outcome.rejected())throw AuthenticationFailure.credentials();
         return outcome.issued();
+    }
+
+    /** Solo local/USB: alta mínima si el correo aún no existe (sin OTP). */
+    private AuthenticationStore.Account provisionLocalAccount(LoginCommand command){
+        try{
+            registrationStore.createAccount(
+                    new RegistrationData("Prueba","USB",command.correo(),LocalDate.of(1990,1,1),privacyVersion),
+                    passwords.encode(command.contrasena()),
+                    store.now());
+        }catch(RegistrationException ex){
+            if(ex.reason()!=RegistrationException.Reason.EMAIL_UNAVAILABLE)throw ex;
+        }
+        return store.lockAccount(command.correo()).orElse(null);
     }
 
     public Issued renew(UUID installation,String refresh){

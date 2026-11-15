@@ -77,27 +77,7 @@ fun RecordatorioSoatScreen(
     var pendienteActivar by remember { mutableStateOf(false) }
     val primerAviso = SoatFormulario.fechaPrimerAviso(fechaVencimiento)
 
-    if (estado.exito) {
-        SoatScaffold("Recordatorio del SOAT", onExitoVolver, modifier = modifier) {
-            Text(
-                if (estado.activo) "Recordatorio activado" else "Recordatorio desactivado",
-                color = Color(0xFF2E7D32),
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium
-            )
-            if (estado.activo && primerAviso != null) {
-                Text(
-                    "Recibirás un aviso el $primerAviso (30 días antes del vencimiento).",
-                    color = MyCarMuted
-                )
-            } else {
-                Text("Ya no se generarán avisos futuros de este SOAT.", color = MyCarMuted)
-            }
-            SoatBotonPrincipal("Volver", onExitoVolver)
-        }
-        return
-    }
-
+    // El switch queda usable tras activar/desactivar (antes el éxito bloqueaba volver a prenderlo).
     SoatScaffold("Recordatorio del SOAT", onVolver, estado.ocupado, modifier) {
         if (estado.ocupado) LinearProgressIndicator(Modifier.fillMaxWidth(), color = MyCarTeal)
         Text(
@@ -105,6 +85,13 @@ fun RecordatorioSoatScreen(
             color = MyCarMuted,
             fontWeight = FontWeight.Medium
         )
+        if (estado.exito) {
+            Text(
+                if (estado.activo) "Recordatorio activado" else "Recordatorio desactivado",
+                color = Color(0xFF2E7D32),
+                fontWeight = FontWeight.SemiBold
+            )
+        }
         Card(
             Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -131,7 +118,7 @@ fun RecordatorioSoatScreen(
                         checked = estado.activo,
                         onCheckedChange = { activar ->
                             if (activar && !estado.activo) pendienteActivar = true
-                            else onCambio(activar)
+                            else if (!activar && estado.activo) onCambio(false)
                         },
                         enabled = !estado.ocupado
                     )
@@ -145,7 +132,7 @@ fun RecordatorioSoatScreen(
                     )
                 }
                 Text(
-                    "Al activarlo recibirás alertas en la app y notificaciones en el dispositivo según tus preferencias.",
+                    "Puedes activar o desactivar el recordatorio cuando quieras.",
                     color = MyCarMuted,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -158,6 +145,7 @@ fun RecordatorioSoatScreen(
         }
         estado.mensaje?.let { Text(it, color = Color(0xFFC62828)) }
         if (estado.sesion) SoatBotonPrincipal("Iniciar sesión", onIniciarSesion)
+        SoatBotonSecundario("Volver", onExitoVolver, enabled = !estado.ocupado)
     }
 
     if (pendienteActivar) {

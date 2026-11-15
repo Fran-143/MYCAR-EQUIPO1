@@ -1,9 +1,7 @@
 package com.mycar.app.features.soat.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -79,47 +77,43 @@ fun ConsultarSoatScreen(
             FaseConsultaSoat.LISTO -> {
                 val consulta = estado.consulta
                 val actual = consulta?.actual
-                Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    if (actual == null) {
-                        Text("No hay SOAT vigente registrado.", color = MyCarMuted)
+                // Sin scroll anidado: SoatScaffold ya hace verticalScroll (evita crash al consultar).
+                if (actual == null) {
+                    Text("No hay SOAT vigente registrado.", color = MyCarMuted)
+                } else {
+                    SoatTarjetaDatos(actual)
+                    Text(
+                        if (actual.recordatorioActivo) "Recordatorio: Activo" else "Recordatorio: Inactivo",
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (actual.recordatorioActivo) Color(0xFF2E7D32) else MyCarMuted
+                    )
+                    if (actual.conDocumento) {
+                        Text("Documento", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+                        SoatVistaDocumento(estado.docBytes, estado.docEsPdf, estado.docCargando, estado.docError)
                     } else {
-                        SoatTarjetaDatos(actual)
-                        Text(
-                            if (actual.recordatorioActivo) "Recordatorio: Activo" else "Recordatorio: Inactivo",
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (actual.recordatorioActivo) Color(0xFF2E7D32) else MyCarMuted
-                        )
-                        if (actual.conDocumento) {
-                            Text("Documento", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-                            SoatVistaDocumento(estado.docBytes, estado.docEsPdf, estado.docCargando, estado.docError)
-                        } else {
-                            Text("Sin documento adjunto", color = MyCarMuted)
-                        }
-                        // Solo lectura (RF64). Gestión: Detalle → Configurar SOAT.
-                        SoatBotonPrincipal("Configurar SOAT", onConfigurar)
-                        SoatBotonSecundario("Volver", onVolver)
+                        Text("Sin documento adjunto", color = MyCarMuted)
                     }
-                    val historial = consulta?.historial.orEmpty().filter { it.vigencia != "ACTUAL" }
-                    if (historial.isNotEmpty()) {
-                        Text("Historial", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-                        historial.forEach { h ->
-                            Card(
-                                Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White)
-                            ) {
-                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(h.aseguradora, fontWeight = FontWeight.Bold, color = MyCarNavy)
-                                    Text("Póliza ${h.numeroPoliza}", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
-                                    Text(
-                                        "${SoatFormulario.formatearFecha(h.fechaInicio)} – ${SoatFormulario.formatearFecha(h.fechaVencimiento)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MyCarMuted
-                                    )
-                                }
+                    // Solo lectura (RF64). Gestión: Detalle → Configurar SOAT.
+                    SoatBotonPrincipal("Configurar SOAT", onConfigurar)
+                    SoatBotonSecundario("Volver", onVolver)
+                }
+                val historial = consulta?.historial.orEmpty().filter { it.vigencia != "ACTUAL" }
+                if (historial.isNotEmpty()) {
+                    Text("Historial", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+                    historial.forEach { h ->
+                        Card(
+                            Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
+                        ) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(h.aseguradora, fontWeight = FontWeight.Bold, color = MyCarNavy)
+                                Text("Póliza ${h.numeroPoliza}", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "${SoatFormulario.formatearFecha(h.fechaInicio)} – ${SoatFormulario.formatearFecha(h.fechaVencimiento)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MyCarMuted
+                                )
                             }
                         }
                     }

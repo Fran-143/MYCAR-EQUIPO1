@@ -2,6 +2,7 @@ package backend.autenticacion;
 
 import backend.registro.RegisterAccount;
 import backend.registro.RegistrationCommand;
+import backend.registro.RegistrationStore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +61,7 @@ class AuthenticationIntegrationTest {
         p.add("mycar.auth.session-ttl",()->"P1D");
     }
     @Autowired RegisterAccount registration;
+    @Autowired RegistrationStore registrationStore;
     @Autowired SessionAuthentication auth;
     @Autowired SessionCredentials credentials;
     @Autowired JdbcTemplate jdbc;
@@ -321,7 +323,8 @@ class AuthenticationIntegrationTest {
             }
             return read==1?started.minusSeconds(1):started;
         }).when(controlledStore).now();
-        var controlled=new SessionAuthentication(validator,controlledStore,credentials,passwords,transactions);
+        var controlled=new SessionAuthentication(validator,controlledStore,credentials,passwords,transactions,
+                registrationStore,false,"1.0");
         assertEquals(AuthenticationFailure.Reason.INVALID_SESSION,
                 assertThrows(AuthenticationFailure.class,()->controlled.login(command(installation,PASSWORD))).reason());
 

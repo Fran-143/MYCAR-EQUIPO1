@@ -9,11 +9,12 @@ import java.util.Set;
 
 public final class ValidadorSoat {
     private static final int MAX_ASEGURADORA = 120;
-    private static final int MAX_POLIZA = 80;
+    private static final int MAX_POLIZA = 15;
+    private static final int DIGITOS_POLIZA = 7;
     private static final int MAX_CONTRATANTE = 160;
     private static final long MAX_IMAGEN = 5L * 1024 * 1024;
     private static final long MAX_PDF = 10L * 1024 * 1024;
-    private static final BigDecimal MAX_PRIMA = new BigDecimal("9999999999.99");
+    private static final BigDecimal MAX_PRIMA = new BigDecimal("999999.00");
 
     private ValidadorSoat() { }
 
@@ -61,6 +62,17 @@ public final class ValidadorSoat {
             throw new ErrorSoat("DATOS_INVALIDOS",
                     "La nueva vigencia debe vencer después de la actual.",
                     Set.of("fechaVencimiento"));
+        }
+    }
+
+    /** Renovar solo si ya se llegó al día de vencimiento del SOAT actual (hoy Lima >= vencimiento). */
+    public static void exigirPuedeRenovar(LocalDate vencimientoAnterior, LocalDate hoyLima) {
+        if (vencimientoAnterior == null || hoyLima == null) {
+            throw new ErrorSoat("DATOS_INVALIDOS", "Fecha de vencimiento no disponible.");
+        }
+        if (hoyLima.isBefore(vencimientoAnterior)) {
+            throw new ErrorSoat("SOAT_NO_RENOVABLE",
+                    "Solo puedes renovar el SOAT a partir de su fecha de vencimiento");
         }
     }
 
@@ -188,9 +200,10 @@ public final class ValidadorSoat {
             }
         }
         if ("numeroPoliza".equals(campo)) {
-            if (!limpio.matches("^[0-9]+(-[0-9]+)*$") || limpio.length() < 4 || limpio.length() > 40) {
+            long digitos = limpio.chars().filter(Character::isDigit).count();
+            if (!limpio.matches("^[0-9]+(-[0-9]+)*$") || digitos != DIGITOS_POLIZA) {
                 throw new ErrorSoat("DATOS_INVALIDOS",
-                        "Ingresa un número de póliza válido (ej. 012-4589)", Set.of(campo));
+                        "El número de póliza debe tener exactamente 7 dígitos", Set.of(campo));
             }
         }
     }

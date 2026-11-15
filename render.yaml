@@ -42,5 +42,14 @@ services:
       # Secreto admin catálogo oficial (Dashboard only; nunca en Git).
       - key: MYCAR_TALLER_ADMIN_SECRET
         sync: false
+      # SOAT documentos — Supabase Storage (secretos solo Dashboard).
+      - key: MYCAR_DOCUMENTOS_MODO
+        value: supabase
+      - key: MYCAR_DOCUMENTOS_SUPABASE_URL
+        sync: false
+      - key: MYCAR_DOCUMENTOS_SUPABASE_SECRET
+        sync: false
+      - key: MYCAR_DOCUMENTOS_SUPABASE_BUCKET
+        value: mycar-documentos-privados
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError"

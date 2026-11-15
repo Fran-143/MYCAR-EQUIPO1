@@ -49,7 +49,9 @@ data class EstadoSoatForm(
     val modoDocumento: ModoDocSoat = ModoDocSoat.NINGUNO,
     val tieneDocumentoActual: Boolean = false,
     val confirmarVisible: Boolean = false,
-    val paso: PasoSoatForm = PasoSoatForm.FORMULARIO
+    val paso: PasoSoatForm = PasoSoatForm.FORMULARIO,
+    /** Ayuda al renovar: cuándo terminó / termina el SOAT anterior. */
+    val avisoRenovacion: String? = null
 )
 
 enum class TipoFormSoat { REGISTRAR, CORREGIR, RENOVAR }
@@ -77,12 +79,42 @@ abstract class SoatFormViewModelBase(
     private fun exigirVencimientoFuturo(): Boolean =
         modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR
 
+    private fun mapearErroresServidor(fallo: FalloRegistroVehiculo?): Map<String, String> {
+        if (fallo == null) return emptyMap()
+        if (fallo.erroresPorCampo.isNotEmpty()) return fallo.erroresPorCampo
+        val msg = fallo.mensajeServidor ?: return emptyMap()
+        // Códigos conocidos → campo concreto (evita solo el banner superior).
+        return when (fallo.codigo) {
+            "SOAT_POLIZA_DUPLICADA" -> mapOf("numeroPoliza" to msg)
+            "SOAT_DUPLICADO_PRIMA" -> mapOf(
+                "aseguradora" to msg,
+                "importePrima" to msg
+            )
+            "SOAT_SOLAPE" -> mapOf("fechaInicio" to msg)
+            "DATOS_INVALIDOS" -> when {
+                msg.contains("vencimiento", ignoreCase = true) &&
+                    msg.contains("inicio", ignoreCase = true) -> mapOf("fechaVencimiento" to msg)
+                msg.contains("vencimiento", ignoreCase = true) ||
+                    msg.contains("pasada", ignoreCase = true) -> mapOf("fechaVencimiento" to msg)
+                msg.contains("póliza", ignoreCase = true) ||
+                    msg.contains("poliza", ignoreCase = true) -> mapOf("numeroPoliza" to msg)
+                msg.contains("prima", ignoreCase = true) -> mapOf("importePrima" to msg)
+                msg.contains("aseguradora", ignoreCase = true) -> mapOf("aseguradora" to msg)
+                msg.contains("emisión", ignoreCase = true) ||
+                    msg.contains("emision", ignoreCase = true) -> mapOf("fechaEmision" to msg)
+                msg.contains("inicio", ignoreCase = true) -> mapOf("fechaInicio" to msg)
+                else -> emptyMap()
+            }
+            else -> emptyMap()
+        }
+    }
+
     fun actualizarCampos(transform: (CamposSoat) -> CamposSoat) {
         val nuevos = transform(_estado.value.campos)
         // Validación en vivo solo de incoherencias (fechas/prima); obligatorios vacíos se bloquean al continuar.
         val errores = SoatFormulario.validarCampos(
             nuevos.aseguradora.ifBlank { "_" },
-            nuevos.numeroPoliza.ifBlank { "0000" },
+            nuevos.numeroPoliza.ifBlank { "0000000" },
             nuevos.fechaInicio,
             nuevos.fechaVencimiento,
             nuevos.fechaEmision,
@@ -195,10 +227,7 @@ abstract class SoatFormViewModelBase(
                 )
             }
             TipoFormSoat.CORREGIR -> {
-                if (!puedeGuardarCorregir()) {
-                    _estado.value = _estado.value.copy(mensaje = "No hay cambios para guardar.")
-                    return
-                }
+                if (!puedeGuardarCorregir()) return
                 if (_estado.value.modoDocumento == ModoDocSoat.REEMPLAZAR && _estado.value.adjunto == null) {
                     _estado.value = _estado.value.copy(errorAdjunto = "Selecciona el nuevo documento.")
                     return
@@ -286,11 +315,15 @@ abstract class SoatFormViewModelBase(
                 throw cancelada
             } catch (e: Exception) {
                 val fallo = e as? FalloRegistroVehiculo
+                val porCampo = mapearErroresServidor(fallo)
                 _estado.value = _estado.value.copy(
                     ocupado = false,
                     sesionRequerida = fallo?.estadoHttp == 401,
-                    mensaje = fallo?.mensajeServidor
-                        ?: "No pudimos guardar el SOAT. Inténtalo de nuevo"
+                    errores = if (porCampo.isNotEmpty()) porCampo else _estado.value.errores,
+                    // Si el fallo tiene campos, no saturar con mensaje genérico arriba.
+                    mensaje = if (porCampo.isNotEmpty()) null
+                    else fallo?.mensajeServidor ?: "No pudimos guardar el SOAT. Inténtalo de nuevo",
+                    paso = if (porCampo.isNotEmpty()) PasoSoatForm.FORMULARIO else _estado.value.paso
                 )
             }
         }
@@ -426,6 +459,15 @@ class RenovarSoatViewModel(
     } ?: CamposSoat()
 ) {
     private val base = soatAnterior?.let { SoatFormulario.desdeSoat(it) }
+    init {
+        soatAnterior?.let { ant ->
+            val fin = SoatFormulario.formatearFecha(ant.fechaVencimiento)
+            _estado.value = _estado.value.copy(
+                avisoRenovacion =
+                    "Tu SOAT anterior termina el $fin. La nueva vigencia debe empezar después de esa fecha."
+            )
+        }
+    }
     override fun camposBaseRenovacion(): CamposSoat? = base
     override suspend fun leerBytes(uri: Uri) = lectorUri(uri)
     override suspend fun enviar(solicitud: SoatMutacionDto) = repository.renovar(idVehiculo, solicitud)
@@ -464,17 +506,20 @@ class RecordatorioSoatViewModel(
 
     fun alternar(activo: Boolean) {
         if (_estado.value.ocupado) return
-        _estado.value = _estado.value.copy(ocupado = true, mensaje = null)
+        if (_estado.value.activo == activo) return
+        _estado.value = _estado.value.copy(ocupado = true, mensaje = null, exito = false)
         viewModelScope.launch {
             try {
                 repository.recordatorio(idVehiculo, idSoat, activo)
-                _estado.value = Estado(activo, exito = true)
+                // Mantener la pantalla operable para volver a activar/desactivar.
+                _estado.value = Estado(activo = activo, exito = true)
             } catch (cancelada: CancellationException) {
                 throw cancelada
             } catch (e: Exception) {
                 val fallo = e as? FalloRegistroVehiculo
                 _estado.value = _estado.value.copy(
                     ocupado = false,
+                    exito = false,
                     sesion = fallo?.estadoHttp == 401,
                     mensaje = fallo?.mensajeServidor ?: "No se pudo actualizar el recordatorio."
                 )

@@ -72,7 +72,10 @@ fun SoatFormScreen(
     }
     SoatScaffold(tituloPaso, volver, estado.ocupado, modifier) {
         if (estado.ocupado) LinearProgressIndicator(Modifier.fillMaxWidth(), color = MyCarTeal)
-        estado.mensaje?.let { Text(it, color = Color(0xFFC62828)) }
+        // Solo mensajes no asociados a un campo (los de fecha/póliza van bajo cada input).
+        if (estado.mensaje != null && estado.errores.isEmpty()) {
+            Text(estado.mensaje, color = Color(0xFFC62828))
+        }
         when {
             estado.sesionRequerida -> SoatBotonPrincipal("Iniciar sesión", onIniciarSesion)
             estado.exito != null || estado.paso == PasoSoatForm.EXITO -> ExitoSoatPdf(
@@ -137,6 +140,22 @@ private fun FormularioCamposSoat(
         Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        estado.avisoRenovacion?.let { aviso ->
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MyCarTile,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MyCarOutlineSoft)
+            ) {
+                Text(
+                    aviso,
+                    Modifier.padding(12.dp),
+                    color = MyCarNavy,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
         Text("Datos obligatorios", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
         val c = estado.campos
         SoatSelectorAseguradora(
@@ -148,8 +167,8 @@ private fun FormularioCamposSoat(
         SoatCampoPlaceholder(
             etiqueta = "Número de póliza *",
             valor = c.numeroPoliza,
-            onChange = { t -> onActualizar { it.copy(numeroPoliza = t.filter { ch -> ch.isDigit() || ch == '-' }) } },
-            placeholder = "Ej. 012-4589",
+            onChange = { t -> onActualizar { it.copy(numeroPoliza = SoatFormulario.limitarPoliza(t)) } },
+            placeholder = "Ej. 0124589",
             error = estado.errores["numeroPoliza"],
             enabled = !estado.ocupado,
             keyboard = KeyboardType.Number
@@ -180,8 +199,8 @@ private fun FormularioCamposSoat(
         SoatCampoPlaceholder(
             etiqueta = "Prima (S/)",
             valor = c.importePrima,
-            onChange = { t -> onActualizar { it.copy(importePrima = t) } },
-            placeholder = "Ej. 150.00",
+            onChange = { t -> onActualizar { it.copy(importePrima = SoatFormulario.limitarPrima(t)) } },
+            placeholder = "Ej. 150.00 (máx. 999999.00)",
             error = estado.errores["importePrima"],
             enabled = !estado.ocupado,
             keyboard = KeyboardType.Decimal

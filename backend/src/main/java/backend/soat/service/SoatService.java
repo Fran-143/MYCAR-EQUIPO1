@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
@@ -84,6 +85,15 @@ public class SoatService {
                 req.fechaInicio(), req.fechaVencimiento(), null)) {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
         }
+        if (dao.polizaYaRegistrada(req.numeroPoliza(), null)) {
+            throw new ErrorSoat("SOAT_POLIZA_DUPLICADA",
+                    "Este número de póliza ya está registrado",
+                    Set.of("numeroPoliza"));
+        }
+        if (dao.aseguradoraPrimaDuplicada(vehiculo, req.aseguradora(), req.importePrima(), null)) {
+            throw new ErrorSoat("SOAT_DUPLICADO_PRIMA", "Ya existe registrado",
+                    Set.of("aseguradora", "importePrima"));
+        }
         var doc = resolverDocumentoNuevo(usuario, vehiculo, null, req.documento());
         try {
             long idSoat = dao.insertar(new SoatJdbcDao.DatosInsercion(
@@ -119,6 +129,15 @@ public class SoatService {
         if (dao.duplicadoContextual(vehiculo, req.aseguradora(), req.numeroPoliza(),
                 req.fechaInicio(), req.fechaVencimiento(), idSoat)) {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
+        }
+        if (dao.polizaYaRegistrada(req.numeroPoliza(), idSoat)) {
+            throw new ErrorSoat("SOAT_POLIZA_DUPLICADA",
+                    "Este número de póliza ya está registrado",
+                    Set.of("numeroPoliza"));
+        }
+        if (dao.aseguradoraPrimaDuplicada(vehiculo, req.aseguradora(), req.importePrima(), idSoat)) {
+            throw new ErrorSoat("SOAT_DUPLICADO_PRIMA", "Ya existe registrado",
+                    Set.of("aseguradora", "importePrima"));
         }
         DocumentoResuelto doc = resolverDocumentoCorregir(usuario, vehiculo, actual, req);
         if (sinCambiosCorregir(actual, req, doc)) {
@@ -166,6 +185,7 @@ public class SoatService {
         var anterior = dao.obtenerPropio(usuario, vehiculo, req.idSoatAnterior())
                 .filter(s -> "ACTUAL".equals(s.vigencia()))
                 .orElseThrow(() -> new ErrorSoat("SOAT_NO_ENCONTRADO", "SOAT anterior no encontrado."));
+        ValidadorSoat.exigirPuedeRenovar(anterior.fechaVencimiento(), dao.hoyLima());
         ValidadorSoat.exigirFechasRenovacion(
                 req.fechaInicio(), req.fechaVencimiento(),
                 anterior.fechaInicio(), anterior.fechaVencimiento());
@@ -176,6 +196,15 @@ public class SoatService {
         if (dao.duplicadoContextual(vehiculo, req.aseguradora(), req.numeroPoliza(),
                 req.fechaInicio(), req.fechaVencimiento(), null)) {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
+        }
+        if (dao.polizaYaRegistrada(req.numeroPoliza(), req.idSoatAnterior())) {
+            throw new ErrorSoat("SOAT_POLIZA_DUPLICADA",
+                    "Este número de póliza ya está registrado",
+                    Set.of("numeroPoliza"));
+        }
+        if (dao.aseguradoraPrimaDuplicada(vehiculo, req.aseguradora(), req.importePrima(), req.idSoatAnterior())) {
+            throw new ErrorSoat("SOAT_DUPLICADO_PRIMA", "Ya existe registrado",
+                    Set.of("aseguradora", "importePrima"));
         }
         boolean recordatorio = anterior.recordatorioActivo();
         cerrarAlertaPorRenovacion(anterior.idSoat());

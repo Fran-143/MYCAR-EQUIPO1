@@ -58,7 +58,7 @@ class ValidadorSoatTest {
     }
 
     @Test
-    void rf30Ea07RechazaPrimaNegativa() {
+    void rf30Ea07RechazaPrimaNegativaYTope() {
         var req = new ContratoSoat.RegistrarRequest(
                 UUID.randomUUID(), "RIMAC SEGUROS", "012-4589",
                 LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
@@ -66,6 +66,25 @@ class ValidadorSoatTest {
         ErrorSoat e = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(req));
         assertEquals("El importe de la prima no es válido", e.getMessage());
         assertTrue(e.campos().containsKey("importePrima"));
+
+        var tope = new ContratoSoat.RegistrarRequest(
+                UUID.randomUUID(), "RIMAC SEGUROS", "012-4589",
+                LocalDate.of(2026, 12, 1), LocalDate.of(2027, 12, 1),
+                null, null, new BigDecimal("1000000.00"), null);
+        ErrorSoat e2 = assertThrows(ErrorSoat.class, () -> ValidadorSoat.exigirRegistro(tope));
+        assertEquals("El importe de la prima no es válido", e2.getMessage());
+    }
+
+    @Test
+    void renovarRechazaSiAunNoLlegaVencimiento() {
+        LocalDate hoy = LocalDate.of(2026, 11, 15);
+        ErrorSoat e = assertThrows(ErrorSoat.class, () ->
+                ValidadorSoat.exigirPuedeRenovar(LocalDate.of(2027, 11, 14), hoy));
+        assertEquals("SOAT_NO_RENOVABLE", e.codigo());
+        assertDoesNotThrow(() ->
+                ValidadorSoat.exigirPuedeRenovar(LocalDate.of(2026, 11, 14), hoy));
+        assertDoesNotThrow(() ->
+                ValidadorSoat.exigirPuedeRenovar(LocalDate.of(2026, 11, 15), hoy));
     }
 
     @Test
