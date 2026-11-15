@@ -43,8 +43,12 @@ data class EstadoSoatForm(
     val adjunto: AdjuntoSoatUi? = null,
     val errorAdjunto: String? = null,
     val ofrecerRecordatorio: Boolean = false,
-    /** Preferencia UI del PDF en la pantalla de revisión (RF30); se aplica con PUT recordatorio tras el alta. */
-    val recordarAlRegistrar: Boolean = true,
+    /**
+     * Preferencia UI en revisión (RF30). Default false: el alta no activa recordatorio;
+     * el usuario lo enciende después en Configurar recordatorio (o con el switch si lo pide).
+     */
+    val recordarAlRegistrar: Boolean = false,
+    /** null = no se intentó activar; true/false = resultado del PUT recordatorio. */
     val recordatorioAplicado: Boolean? = null,
     val modoDocumento: ModoDocSoat = ModoDocSoat.NINGUNO,
     val tieneDocumentoActual: Boolean = false,
@@ -79,6 +83,8 @@ abstract class SoatFormViewModelBase(
     private fun exigirVencimientoFuturo(): Boolean =
         modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR
 
+    private fun exigirCatalogoActivo(): Boolean = modo != TipoFormSoat.CORREGIR
+
     private fun mapearErroresServidor(fallo: FalloRegistroVehiculo?): Map<String, String> {
         if (fallo == null) return emptyMap()
         if (fallo.erroresPorCampo.isNotEmpty()) return fallo.erroresPorCampo
@@ -92,12 +98,15 @@ abstract class SoatFormViewModelBase(
             )
             "SOAT_SOLAPE" -> mapOf("fechaInicio" to msg)
             "DATOS_INVALIDOS" -> when {
+                msg.contains("anual", ignoreCase = true) ||
+                    msg.contains("aniversario", ignoreCase = true) -> mapOf("fechaVencimiento" to msg)
                 msg.contains("vencimiento", ignoreCase = true) &&
                     msg.contains("inicio", ignoreCase = true) -> mapOf("fechaVencimiento" to msg)
                 msg.contains("vencimiento", ignoreCase = true) ||
                     msg.contains("pasada", ignoreCase = true) -> mapOf("fechaVencimiento" to msg)
                 msg.contains("póliza", ignoreCase = true) ||
-                    msg.contains("poliza", ignoreCase = true) -> mapOf("numeroPoliza" to msg)
+                    msg.contains("poliza", ignoreCase = true) ||
+                    msg.contains("certificado", ignoreCase = true) -> mapOf("numeroPoliza" to msg)
                 msg.contains("prima", ignoreCase = true) -> mapOf("importePrima" to msg)
                 msg.contains("aseguradora", ignoreCase = true) -> mapOf("aseguradora" to msg)
                 msg.contains("emisión", ignoreCase = true) ||
@@ -114,12 +123,13 @@ abstract class SoatFormViewModelBase(
         // Validación en vivo solo de incoherencias (fechas/prima); obligatorios vacíos se bloquean al continuar.
         val errores = SoatFormulario.validarCampos(
             nuevos.aseguradora.ifBlank { "_" },
-            nuevos.numeroPoliza.ifBlank { "0000000" },
+            nuevos.numeroPoliza.ifBlank { "0" },
             nuevos.fechaInicio,
             nuevos.fechaVencimiento,
             nuevos.fechaEmision,
             nuevos.importePrima,
-            exigirVencimientoFuturo = exigirVencimientoFuturo()
+            exigirVencimientoFuturo = exigirVencimientoFuturo(),
+            exigirCatalogoActivo = exigirCatalogoActivo()
         ).toMutableMap()
         if (nuevos.aseguradora.isBlank()) errores.remove("aseguradora")
         if (nuevos.numeroPoliza.isBlank()) errores.remove("numeroPoliza")
@@ -146,7 +156,8 @@ abstract class SoatFormViewModelBase(
         val errores = SoatFormulario.validarCampos(
             c.aseguradora, c.numeroPoliza, c.fechaInicio, c.fechaVencimiento,
             c.fechaEmision, c.importePrima,
-            exigirVencimientoFuturo = exigirVencimientoFuturo()
+            exigirVencimientoFuturo = exigirVencimientoFuturo(),
+            exigirCatalogoActivo = exigirCatalogoActivo()
         ).toMutableMap()
         camposBaseRenovacion()?.let { base ->
             errores.putAll(
@@ -204,7 +215,8 @@ abstract class SoatFormViewModelBase(
         val errores = SoatFormulario.validarCampos(
             campos.aseguradora, campos.numeroPoliza, campos.fechaInicio, campos.fechaVencimiento,
             campos.fechaEmision, campos.importePrima,
-            exigirVencimientoFuturo = exigirVencimientoFuturo()
+            exigirVencimientoFuturo = exigirVencimientoFuturo(),
+            exigirCatalogoActivo = exigirCatalogoActivo()
         ).toMutableMap()
         camposBaseRenovacion()?.let { base ->
             errores.putAll(
@@ -240,7 +252,9 @@ abstract class SoatFormViewModelBase(
                     _estado.value = _estado.value.copy(
                         errores = SoatFormulario.validarCampos(
                             c.aseguradora, c.numeroPoliza, c.fechaInicio, c.fechaVencimiento,
-                            c.fechaEmision, c.importePrima, exigirVencimientoFuturo = true
+                            c.fechaEmision, c.importePrima,
+                            exigirVencimientoFuturo = true,
+                            exigirCatalogoActivo = true
                         )
                     )
                     return
@@ -284,9 +298,9 @@ abstract class SoatFormViewModelBase(
             try {
                 val doc = prepararDocumento(s)
                 val solicitud = construirSolicitud(s, doc)
-                // 1) Persistir SOAT (RF30 / renovar). 2) Recordatorio = operación aparte.
+                // 1) Persistir SOAT (RF30 / renovar). 2) Recordatorio = operación aparte (solo si el switch lo pide).
                 var resultado = enviar(solicitud)
-                var recordatorioOk: Boolean? = false
+                var recordatorioOk: Boolean? = null
                 // RF30-EA06: registro con vencimiento pasado → no activar recordatorio en el mismo flujo.
                 val permitirRecordatorioAlta = when (modo) {
                     TipoFormSoat.REGISTRAR ->
@@ -299,7 +313,7 @@ abstract class SoatFormViewModelBase(
                         resultado = repository.recordatorio(idVehiculo, resultado.idSoat, true)
                         recordatorioOk = resultado.recordatorioActivo
                     } catch (_: Exception) {
-                        // Conservar SOAT; confirmación muestra recordatorio inactivo.
+                        // Conservar SOAT; confirmación muestra fallo de recordatorio (rojo).
                         recordatorioOk = false
                         resultado = repository.consultar(idVehiculo).actual ?: resultado
                     }

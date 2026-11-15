@@ -31,28 +31,63 @@ class SoatFormularioTest {
     }
 
     @Test
-    fun rf30_aceptaVencimientoPosteriorFuturo() {
-        val ok = SoatFormulario.validarCampos(
-            "RÍMAC SEGUROS", "0124589", "01/12/2026", "02/12/2026", "", "",
+    fun vigenciaAnual_aceptaAniversarioYUltimoDiaIncluido() {
+        val aniversario = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "15/11/2027", "", "",
             exigirVencimientoFuturo = true, hoy = hoy
         )
-        assertTrue(ok.isEmpty())
+        assertTrue(aniversario.isEmpty())
+
+        val ultimoIncluido = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "14/11/2027", "", "",
+            exigirVencimientoFuturo = true, hoy = hoy
+        )
+        assertTrue(ultimoIncluido.isEmpty())
+    }
+
+    @Test
+    fun vigenciaAnual_rechazaSeisYDosAnios() {
+        val seis = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "15/11/2020", "15/11/2026", "", "",
+            exigirVencimientoFuturo = false, hoy = hoy
+        )
+        assertEquals(SoatFormulario.MSG_VIGENCIA_ANUAL, seis["fechaVencimiento"])
+
+        val dos = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "15/11/2026", "15/11/2028", "", "",
+            exigirVencimientoFuturo = true, hoy = hoy
+        )
+        assertEquals(SoatFormulario.MSG_VIGENCIA_ANUAL, dos["fechaVencimiento"])
+    }
+
+    @Test
+    fun vigenciaAnual_bisiesto() {
+        assertTrue(
+            SoatFormulario.esVigenciaAnualOrdinaria(
+                LocalDate.of(2024, 2, 29), LocalDate.of(2025, 2, 28)
+            )
+        )
+        assertTrue(
+            SoatFormulario.esVigenciaAnualOrdinaria(
+                LocalDate.of(2024, 2, 29), LocalDate.of(2025, 2, 27)
+            )
+        )
     }
 
     @Test
     fun rn_rechazaVencimientoPasadoEnAlta() {
         val err = SoatFormulario.validarCampos(
-            "RÍMAC SEGUROS", "0124589", "01/01/2024", "31/12/2024", "", "",
+            "RÍMAC SEGUROS", "0124589", "15/01/2024", "15/01/2025", "", "",
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertEquals(SoatFormulario.MSG_FECHA_MENOR_HOY, err["fechaVencimiento"])
     }
 
     @Test
-    fun corregir_permiteVencimientoPasado() {
+    fun corregir_permiteVencimientoPasadoSiAnual() {
         val ok = SoatFormulario.validarCampos(
-            "RÍMAC SEGUROS", "0124589", "01/01/2024", "31/12/2024", "", "",
-            exigirVencimientoFuturo = false, hoy = hoy
+            "RÍMAC SEGUROS", "0124589", "15/01/2024", "15/01/2025", "", "",
+            exigirVencimientoFuturo = false, exigirCatalogoActivo = false, hoy = hoy
         )
         assertTrue(ok.isEmpty())
     }
@@ -67,25 +102,41 @@ class SoatFormularioTest {
     }
 
     @Test
-    fun aseguradoraFueraDeCatalogo() {
+    fun catalogoApesegNueveActivas() {
+        assertEquals(9, AseguradoraSoat.activas().size)
+        assertTrue(AseguradoraSoat.esValidaParaAlta("PACÍFICO SEGUROS"))
+        assertTrue(AseguradoraSoat.esValidaParaAlta("VIVIR SEGUROS"))
+        assertTrue(AseguradoraSoat.esValidaParaAlta("QUÁLITAS PERÚ"))
+        assertFalse(AseguradoraSoat.esValidaParaAlta("HDI SEGUROS"))
+        assertTrue(AseguradoraSoat.esReconocida("HDI SEGUROS"))
         val err = SoatFormulario.validarCampos(
-            "ASEGURADORA INVENTADA", "0124589", "01/12/2026", "01/12/2027", "", "",
+            "ASEGURADORA INVENTADA", "0124589", "15/11/2026", "15/11/2027", "", "",
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertEquals(SoatFormulario.MSG_ASEGURADORA, err["aseguradora"])
-        assertTrue(AseguradoraSoat.esValida("PACÍFICO SEGUROS"))
     }
 
     @Test
-    fun polizaExactamente7Digitos() {
-        assertEquals(SoatFormulario.MSG_POLIZA, SoatFormulario.validarPoliza("ABC-123"))
-        assertEquals(SoatFormulario.MSG_POLIZA, SoatFormulario.validarPoliza("012458"))
-        assertEquals(SoatFormulario.MSG_POLIZA, SoatFormulario.validarPoliza("01245890"))
+    fun polizaGeneral_sinLongitudFija() {
+        assertEquals(SoatFormulario.MSG_POLIZA_VACIA, SoatFormulario.validarPoliza(""))
+        assertEquals(SoatFormulario.MSG_POLIZA, SoatFormulario.validarPoliza("ABC@123"))
         assertNull(SoatFormulario.validarPoliza("0124589"))
         assertNull(SoatFormulario.validarPoliza("012-4589"))
-        assertEquals("0124589", SoatFormulario.limitarPoliza("0124589999"))
-        assertEquals("012-4589", SoatFormulario.limitarPoliza("012-45899"))
+        assertNull(SoatFormulario.validarPoliza("001234567890"))
+        assertNull(SoatFormulario.validarPoliza("AB-12/34.5", "INTERSEGURO"))
+        // Interseguro: ejemplo 8 dígitos NO es obligatorio
+        assertNull(SoatFormulario.validarPoliza("1234567", "INTERSEGURO"))
+        assertNull(SoatFormulario.validarPoliza("123456789", "INTERSEGURO"))
+        assertEquals("0124589999", SoatFormulario.limitarPoliza("0124589999"))
         assertEquals("012-4589", SoatFormulario.normalizarPoliza(" 012-4589 "))
+        assertTrue(SoatFormulario.normalizarPoliza("00-123").startsWith("00"))
+    }
+
+    @Test
+    fun cambioAseguradora_revalidaConPerfil() {
+        assertNotNull(AseguradoraSoat.ayudaPoliza("RÍMAC SEGUROS"))
+        assertEquals("12345678", AseguradoraSoat.ejemploPoliza("INTERSEGURO"))
+        assertTrue(AseguradoraSoat.ayudaPoliza("INTERSEGURO").contains("ilustrativo"))
     }
 
     @Test
@@ -95,7 +146,6 @@ class SoatFormularioTest {
         assertEquals(LocalDate.of(2026, 12, 1), SoatFormulario.parsearFecha("2026-12-01"))
         assertNull(SoatFormulario.parsearFecha("31/02/2027"))
         assertEquals("2026-12-01", SoatFormulario.fechaUiAIso("01/12/2026"))
-        // Borrar: con 4 dígitos no debe quedar slash colgante (antes: 11/11/).
         assertEquals("11/11", SoatFormulario.aplicarMascaraFecha("1111"))
         assertEquals("11/1", SoatFormulario.aplicarMascaraFecha("111"))
         assertEquals("11", SoatFormulario.aplicarMascaraFecha("11"))
@@ -109,6 +159,16 @@ class SoatFormularioTest {
             exigirVencimientoFuturo = true, hoy = hoy
         )
         assertEquals(SoatFormulario.MSG_PRIMA_INVALIDA, err["importePrima"])
+        val letras = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "01/01/2027", "01/01/2028", "", "abc",
+            exigirVencimientoFuturo = true, hoy = hoy
+        )
+        assertEquals(SoatFormulario.MSG_PRIMA_INVALIDA, letras["importePrima"])
+        val decimalOk = SoatFormulario.validarCampos(
+            "RÍMAC SEGUROS", "0124589", "01/01/2027", "01/01/2028", "", "150.50",
+            exigirVencimientoFuturo = true, hoy = hoy
+        )
+        assertTrue(decimalOk.isEmpty())
         val tope = SoatFormulario.validarCampos(
             "RÍMAC SEGUROS", "0124589", "01/01/2027", "01/01/2028", "", "1000000",
             exigirVencimientoFuturo = true, hoy = hoy

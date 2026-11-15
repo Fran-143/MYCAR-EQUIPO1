@@ -19,6 +19,7 @@ fun RegistrarSoatRoute(
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onExito: (SoatDto) -> Unit,
+    onVerSoat: (SoatDto) -> Unit = onExito,
     onRecordatorio: (SoatDto) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -50,6 +51,7 @@ fun RegistrarSoatRoute(
         onOcultarConfirmacion = vm::ocultarConfirmacion,
         onIniciarSesion = onIniciarSesion,
         onExitoContinuar = { estado.exito?.let(onExito) },
+        onVerSoat = { estado.exito?.let(onVerSoat) },
         onConfigurarRecordatorio = { estado.exito?.let(onRecordatorio) },
         onAvanzarAdjunto = vm::avanzarDesdeAdjunto,
         onRetrocederPaso = vm::retrocederPaso,

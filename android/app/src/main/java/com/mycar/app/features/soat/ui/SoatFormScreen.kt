@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.mycar.app.features.soat.domain.AseguradoraSoat
 import com.mycar.app.features.soat.domain.CamposSoat
 import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.features.soat.viewmodel.*
@@ -44,6 +45,8 @@ fun SoatFormScreen(
     onOcultarConfirmacion: () -> Unit,
     onIniciarSesion: () -> Unit,
     onExitoContinuar: () -> Unit,
+    /** Si no se pasa, "Ver SOAT" usa [onExitoContinuar] (p. ej. corregir → hub). */
+    onVerSoat: (() -> Unit)? = null,
     onConfigurarRecordatorio: () -> Unit,
     onAvanzarAdjunto: () -> Unit = {},
     onRetrocederPaso: () -> Unit = {},
@@ -80,7 +83,7 @@ fun SoatFormScreen(
             estado.sesionRequerida -> SoatBotonPrincipal("Iniciar sesión", onIniciarSesion)
             estado.exito != null || estado.paso == PasoSoatForm.EXITO -> ExitoSoatPdf(
                 estado = estado,
-                onVerSoat = onExitoContinuar,
+                onVerSoat = onVerSoat ?: onExitoContinuar,
                 onVolverDetalle = onExitoContinuar,
                 onConfigurarRecordatorio = onConfigurarRecordatorio
             )
@@ -165,13 +168,19 @@ private fun FormularioCamposSoat(
             enabled = !estado.ocupado
         )
         SoatCampoPlaceholder(
-            etiqueta = "Número de póliza *",
+            etiqueta = "Número de póliza / certificado *",
             valor = c.numeroPoliza,
             onChange = { t -> onActualizar { it.copy(numeroPoliza = SoatFormulario.limitarPoliza(t)) } },
-            placeholder = "Ej. 0124589",
+            placeholder = "Ej. ${AseguradoraSoat.ejemploPoliza(c.aseguradora)}",
             error = estado.errores["numeroPoliza"],
             enabled = !estado.ocupado,
-            keyboard = KeyboardType.Number
+            keyboard = KeyboardType.Ascii,
+            mayusculas = true
+        )
+        Text(
+            AseguradoraSoat.ayudaPoliza(c.aseguradora),
+            color = MyCarMuted,
+            style = MaterialTheme.typography.bodySmall
         )
         SoatCampoFecha(
             etiqueta = "Fecha de inicio *",
@@ -426,9 +435,17 @@ private fun ExitoSoatPdf(
         }
         SoatBotonPrincipal("Ver SOAT", onVerSoat)
         SoatBotonSecundario("Volver al detalle del vehículo", onVolverDetalle)
-        if (estado.recordatorioAplicado == false) {
-            Text("El SOAT se guardó, pero el recordatorio no se activó.", color = Color(0xFFC62828))
-            SoatBotonSecundario("Configurar recordatorio", onConfigurarRecordatorio)
+        val recActivo = estado.recordatorioAplicado ?: soat?.recordatorioActivo ?: false
+        when {
+            // Intentó activar en el alta y falló el PUT.
+            estado.recordatorioAplicado == false -> {
+                Text("El SOAT se guardó, pero el recordatorio no se activó.", color = Color(0xFFC62828))
+                SoatBotonSecundario("Configurar recordatorio", onConfigurarRecordatorio)
+            }
+            // Alta/renovación sin activar: queda inactivo; se configura después.
+            !recActivo && estado.modo != TipoFormSoat.CORREGIR -> {
+                SoatBotonSecundario("Configurar recordatorio", onConfigurarRecordatorio)
+            }
         }
     }
 }

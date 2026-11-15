@@ -1,6 +1,7 @@
 package com.mycar.app.features.soat.domain
 
 import com.mycar.app.features.soat.data.SoatDto
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -56,18 +57,24 @@ object SoatFormulario {
     const val MSG_SOLAPE = "Esta vigencia se superpone con un SOAT registrado"
     const val MSG_PRIMA_INVALIDA = "El importe de la prima no es válido (máx. 999999.00)"
     const val MSG_ASEGURADORA = "Selecciona una aseguradora del catálogo"
-    const val MSG_POLIZA = "El número de póliza debe tener exactamente 7 dígitos"
+    const val MSG_POLIZA =
+        "Ingresa un número de póliza o certificado válido (letras, números y separadores)"
+    const val MSG_POLIZA_VACIA = "Indica el número de póliza."
     const val MSG_FECHA_MENOR_HOY = "La fecha no puede ser menor a la fecha actual"
+    const val MSG_VIGENCIA_ANUAL =
+        "El SOAT ordinario debe tener vigencia anual (aniversario calendario)"
     const val MSG_RENOV_INICIO =
         "La nueva vigencia no puede empezar antes de que termine la actual"
     const val MSG_RENOV_VENC =
         "La nueva vigencia debe vencer después de la actual"
-    const val MAX_DIGITOS_POLIZA = 7
-    private val MAX_PRIMA = 999_999.00
+    /** Límite técnico alineado a mycar.soat.numero_poliza VARCHAR(80). */
+    const val MAX_CHARS_POLIZA = 80
+    private val MAX_PRIMA = BigDecimal("999999.00")
 
     /**
-     * @param exigirVencimientoFuturo true en REGISTRO y RENOVACIÓN (cambio RN vs RF30-EA06 antiguo).
+     * @param exigirVencimientoFuturo true en REGISTRO y RENOVACIÓN (decisión MyCar vs RF30-EA06 antiguo).
      *        false en CORREGIR para no bloquear edición de históricos ya vencidos.
+     * @param exigirCatalogoActivo true en alta/renovación; false en corregir (admite históricos).
      */
     fun validarCampos(
         aseguradora: String,
@@ -77,13 +84,19 @@ object SoatFormulario {
         fechaEmision: String,
         importePrima: String,
         exigirVencimientoFuturo: Boolean = true,
+        exigirCatalogoActivo: Boolean = true,
         hoy: LocalDate = hoyLima()
     ): Map<String, String> {
         val errores = mutableMapOf<String, String>()
-        if (!AseguradoraSoat.esValida(aseguradora)) {
+        val asegOk = if (exigirCatalogoActivo) {
+            AseguradoraSoat.esValidaParaAlta(aseguradora)
+        } else {
+            AseguradoraSoat.esReconocida(aseguradora)
+        }
+        if (!asegOk) {
             errores["aseguradora"] = if (aseguradora.isBlank()) "Indica la aseguradora." else MSG_ASEGURADORA
         }
-        val polizaErr = validarPoliza(numeroPoliza)
+        val polizaErr = validarPoliza(numeroPoliza, aseguradora)
         if (polizaErr != null) errores["numeroPoliza"] = polizaErr
 
         val inicio = parsearFecha(fechaInicio)
@@ -94,48 +107,79 @@ object SoatFormulario {
         if (fechaVencimiento.isBlank()) errores["fechaVencimiento"] = "Indica la fecha de vencimiento."
         if (inicio != null && fin != null && !fin.isAfter(inicio)) {
             errores["fechaVencimiento"] = MSG_VENCIMIENTO_POSTERIOR
+        } else if (inicio != null && fin != null && !esVigenciaAnualOrdinaria(inicio, fin)) {
+            errores["fechaVencimiento"] = MSG_VIGENCIA_ANUAL
         }
         if (exigirVencimientoFuturo && fin != null && fin.isBefore(hoy)) {
-            // Mensaje corto bajo el label + RN de alta/renovación.
             errores["fechaVencimiento"] = MSG_FECHA_MENOR_HOY
         }
         if (fechaEmision.isNotBlank() && parsearFecha(fechaEmision) == null) {
             errores["fechaEmision"] = MSG_FECHA_INVALIDA
         }
         if (importePrima.isNotBlank()) {
-            val valor = importePrima.replace(",", ".").toDoubleOrNull()
-            if (valor == null || valor < 0 || valor > MAX_PRIMA) errores["importePrima"] = MSG_PRIMA_INVALIDA
-            else if (importePrima.replace(",", ".").substringAfter('.', "").length > 2) {
-                errores["importePrima"] = MSG_PRIMA_INVALIDA
-            }
+            val primaErr = validarPrima(importePrima)
+            if (primaErr != null) errores["importePrima"] = primaErr
         }
         return errores
     }
 
-    fun validarPoliza(raw: String): String? {
+    /**
+     * Validación de formato (no autenticidad oficial).
+     * Perfil por aseguradora solo aporta ayuda/límites documentados; sin evidencia → reglas generales.
+     */
+    fun validarPoliza(raw: String, aseguradora: String? = null): String? {
         val limpio = raw.trim()
-        if (limpio.isEmpty()) return "Indica el número de póliza."
-        if (!limpio.matches(Regex("^[0-9]+(-[0-9]+)*$"))) return MSG_POLIZA
-        val digitos = limpio.count { it.isDigit() }
-        if (digitos != MAX_DIGITOS_POLIZA) return MSG_POLIZA
+        if (limpio.isEmpty()) return MSG_POLIZA_VACIA
+        if (limpio.codePointCount(0, limpio.length) > MAX_CHARS_POLIZA) {
+            return "El número de póliza supera el límite permitido"
+        }
+        if (limpio.any { Character.isISOControl(it) }) return MSG_POLIZA
+        // Letras, dígitos y separadores razonables de certificados; sin emojis ni símbolos raros.
+        if (!limpio.matches(Regex("^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9][A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9\\-/. ]*$"))) {
+            return MSG_POLIZA
+        }
+        val perfil = AseguradoraSoat.perfilDe(aseguradora)
+        val digitosYLetras = limpio.count { it.isLetterOrDigit() }
+        if (digitosYLetras < 1) return MSG_POLIZA
+        perfil?.longitudMinDocumentada?.let { min ->
+            if (digitosYLetras < min) return MSG_POLIZA
+        }
+        perfil?.longitudMaxDocumentada?.let { max ->
+            if (digitosYLetras > max) return MSG_POLIZA
+        }
         return null
     }
 
-    /** Solo dígitos/guion; se detiene al completar 7 dígitos. */
+    /** Filtra a caracteres admitidos; no impone longitud fija ni agrega guiones. */
     fun limitarPoliza(raw: String): String {
         val out = StringBuilder()
-        var digitos = 0
         for (ch in raw) {
+            if (out.codePointCount(0, out.length) >= MAX_CHARS_POLIZA) break
             when {
-                ch.isDigit() -> {
-                    if (digitos >= MAX_DIGITOS_POLIZA) continue
-                    out.append(ch)
-                    digitos++
+                ch.isLetterOrDigit() -> out.append(ch.uppercaseChar())
+                ch == '-' || ch == '/' || ch == '.' || ch == ' ' -> {
+                    if (out.isNotEmpty() && out.last() != ch) out.append(ch)
                 }
-                ch == '-' && out.isNotEmpty() && out.last() != '-' -> out.append('-')
             }
         }
-        return out.toString()
+        return out.toString().trimEnd()
+    }
+
+    /** Valor para guardar/mostrar (String; conserva ceros). */
+    fun normalizarPoliza(raw: String): String = limitarPoliza(raw.trim())
+
+    /** Clave de comparación (mayúsculas, sin acentos superfluos en letras). */
+    fun normalizarPolizaParaComparar(raw: String): String =
+        AseguradoraSoat.normalizar(normalizarPoliza(raw)).orEmpty()
+
+    fun validarPrima(raw: String): String? {
+        val t = raw.trim().replace(',', '.')
+        if (t.isEmpty()) return null
+        if (!t.matches(Regex("^\\d+(\\.\\d{1,2})?$"))) return MSG_PRIMA_INVALIDA
+        val valor = runCatching { BigDecimal(t) }.getOrNull() ?: return MSG_PRIMA_INVALIDA
+        if (valor.signum() < 0 || valor > MAX_PRIMA) return MSG_PRIMA_INVALIDA
+        if (valor.scale() > 2) return MSG_PRIMA_INVALIDA
+        return null
     }
 
     /** Entero hasta 6 cifras + hasta 2 decimales (máx 999999.00). */
@@ -166,7 +210,17 @@ object SoatFormulario {
         return out.toString()
     }
 
-    fun normalizarPoliza(raw: String): String = raw.trim()
+    /**
+     * SOAT ordinario: aniversario calendario (LocalDate.plusYears), no 365 días fijos.
+     * Acepta fin = inicio+1 año o el día anterior (último día incluido del certificado).
+     * Placas de exhibición/rotativas/extranjeras: sin flujo aprobado → se aplica regla ordinaria.
+     */
+    fun esVigenciaAnualOrdinaria(inicio: LocalDate, fin: LocalDate): Boolean {
+        if (!fin.isAfter(inicio)) return false
+        val aniversario = inicio.plusYears(1)
+        val ultimoDiaIncluido = aniversario.minusDays(1)
+        return fin == aniversario || fin == ultimoDiaIncluido
+    }
 
     fun validarFechasRenovacion(
         fechaInicioNueva: String,
@@ -195,7 +249,8 @@ object SoatFormulario {
     ): Boolean {
         val mismosDatos =
             AseguradoraSoat.normalizar(actual.aseguradora) == AseguradoraSoat.normalizar(editado.aseguradora) &&
-                normalizarPoliza(actual.numeroPoliza) == normalizarPoliza(editado.numeroPoliza) &&
+                normalizarPolizaParaComparar(actual.numeroPoliza) ==
+                normalizarPolizaParaComparar(editado.numeroPoliza) &&
                 fechaUiAIso(actual.fechaInicio) == fechaUiAIso(editado.fechaInicio) &&
                 fechaUiAIso(actual.fechaVencimiento) == fechaUiAIso(editado.fechaVencimiento) &&
                 fechaUiAIso(actual.fechaEmision).orEmpty() == fechaUiAIso(editado.fechaEmision).orEmpty() &&
@@ -264,7 +319,9 @@ object SoatFormulario {
         fechaVencimiento = fechaIsoAUi(soat.fechaVencimiento),
         fechaEmision = fechaIsoAUi(soat.fechaEmision),
         nombreContratante = soat.nombreContratante.orEmpty(),
-        importePrima = soat.importePrima?.toString().orEmpty(),
+        importePrima = soat.importePrima?.let { v ->
+            BigDecimal.valueOf(v).stripTrailingZeros().toPlainString()
+        }.orEmpty(),
         versionFila = soat.versionFila
     )
 

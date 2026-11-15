@@ -9,12 +9,16 @@ import java.util.Set;
 
 public final class ValidadorSoat {
     private static final int MAX_ASEGURADORA = 120;
-    private static final int MAX_POLIZA = 15;
-    private static final int DIGITOS_POLIZA = 7;
+    /** Alineado a mycar.soat.numero_poliza VARCHAR(80). */
+    private static final int MAX_POLIZA = 80;
     private static final int MAX_CONTRATANTE = 160;
     private static final long MAX_IMAGEN = 5L * 1024 * 1024;
     private static final long MAX_PDF = 10L * 1024 * 1024;
     private static final BigDecimal MAX_PRIMA = new BigDecimal("999999.00");
+    static final String MSG_VIGENCIA_ANUAL =
+            "El SOAT ordinario debe tener vigencia anual (aniversario calendario)";
+    static final String MSG_POLIZA =
+            "Ingresa un número de póliza o certificado válido (letras, números y separadores)";
 
     private ValidadorSoat() { }
 
@@ -22,8 +26,8 @@ public final class ValidadorSoat {
         if (req == null) throw new ErrorSoat("DATOS_INVALIDOS", "Solicitud vacía.");
         if (req.idOperacion() == null) throw new ErrorSoat("DATOS_INVALIDOS", "idOperacion es obligatorio.",
                 Set.of("idOperacion"));
-        texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true);
-        texto("numeroPoliza", req.numeroPoliza(), MAX_POLIZA, true);
+        texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true, true);
+        poliza(req.numeroPoliza(), req.aseguradora());
         fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision());
         textoOpcional("nombreContratante", req.nombreContratante(), MAX_CONTRATANTE);
         prima(req.importePrima());
@@ -37,8 +41,8 @@ public final class ValidadorSoat {
         if (req.idSoatAnterior() <= 0) {
             throw new ErrorSoat("SOAT_NO_ENCONTRADO", "SOAT anterior no válido.");
         }
-        texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true);
-        texto("numeroPoliza", req.numeroPoliza(), MAX_POLIZA, true);
+        texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true, true);
+        poliza(req.numeroPoliza(), req.aseguradora());
         fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision());
         textoOpcional("nombreContratante", req.nombreContratante(), MAX_CONTRATANTE);
         prima(req.importePrima());
@@ -81,8 +85,9 @@ public final class ValidadorSoat {
         if (req.accionDocumento() == null) {
             throw new ErrorSoat("DATOS_INVALIDOS", "Indica la acción del documento.", Set.of("accionDocumento"));
         }
-        texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true);
-        texto("numeroPoliza", req.numeroPoliza(), MAX_POLIZA, true);
+        // Corregir admite catálogo histórico (HDI/Chubb/…) ya persistido.
+        texto("aseguradora", req.aseguradora(), MAX_ASEGURADORA, true, false);
+        poliza(req.numeroPoliza(), req.aseguradora());
         // CORREGIR: no rechazar vencimientos pasados de SOAT ya registrados.
         fechas(req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(), false);
         textoOpcional("nombreContratante", req.nombreContratante(), MAX_CONTRATANTE);
@@ -143,6 +148,9 @@ public final class ValidadorSoat {
                     "La fecha de vencimiento debe ser posterior a la fecha de inicio",
                     Set.of("fechaVencimiento"));
         }
+        if (!esVigenciaAnualOrdinaria(inicio, vencimiento)) {
+            throw new ErrorSoat("DATOS_INVALIDOS", MSG_VIGENCIA_ANUAL, Set.of("fechaVencimiento"));
+        }
         if (exigirVencimientoFuturo) {
             LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Lima"));
             if (vencimiento.isBefore(hoy)) {
@@ -157,35 +165,27 @@ public final class ValidadorSoat {
         }
     }
 
-    private static final Set<String> ASEGURADORAS = Set.of(
-            "RIMAC SEGUROS",
-            "PACIFICO SEGUROS",
-            "MAPFRE PERU",
-            "LA POSITIVA SEGUROS",
-            "INTERSEGURO",
-            "PROTECTA SECURITY",
-            "QUALITAS",
-            "HDI SEGUROS",
-            "CRECER SEGUROS",
-            "CHUBB PERU",
-            "BNP PARIBAS CARDIF"
-    );
+    /**
+     * SOAT ordinario: aniversario calendario ({@link LocalDate#plusYears(long)}), no 365 días.
+     * Acepta fin = inicio+1 año o el día anterior (último día incluido del certificado).
+     */
+    public static boolean esVigenciaAnualOrdinaria(LocalDate inicio, LocalDate fin) {
+        if (inicio == null || fin == null || !fin.isAfter(inicio)) return false;
+        LocalDate aniversario = inicio.plusYears(1);
+        LocalDate ultimoIncluido = aniversario.minusDays(1);
+        return fin.equals(aniversario) || fin.equals(ultimoIncluido);
+    }
 
     static String normalizarAseguradora(String valor) {
-        if (valor == null) return null;
-        String n = java.text.Normalizer.normalize(valor.strip(), java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "")
-                .toUpperCase(Locale.ROOT)
-                .replaceAll("\\s+", " ");
-        return ASEGURADORAS.contains(n) ? n : null;
+        return CatalogoAseguradorasSoat.codigoParaGuardar(valor);
     }
 
     static String normalizarPoliza(String valor) {
         if (valor == null) return null;
-        return valor.strip();
+        return valor.strip().toUpperCase(Locale.ROOT);
     }
 
-    private static void texto(String campo, String valor, int max, boolean obligatorio) {
+    private static void texto(String campo, String valor, int max, boolean obligatorio, boolean soloActivas) {
         if (valor == null || valor.isBlank()) {
             if (obligatorio) throw new ErrorSoat("DATOS_INVALIDOS", campo + " obligatorio.", Set.of(campo));
             return;
@@ -195,27 +195,61 @@ public final class ValidadorSoat {
             throw new ErrorSoat("DATOS_INVALIDOS", campo + " inválido.", Set.of(campo));
         }
         if ("aseguradora".equals(campo)) {
-            if (normalizarAseguradora(limpio) == null) {
+            boolean ok = soloActivas
+                    ? CatalogoAseguradorasSoat.esActiva(limpio)
+                    : CatalogoAseguradorasSoat.esReconocida(limpio);
+            if (!ok) {
                 throw new ErrorSoat("DATOS_INVALIDOS", "Selecciona una aseguradora del catálogo", Set.of(campo));
-            }
-        }
-        if ("numeroPoliza".equals(campo)) {
-            long digitos = limpio.chars().filter(Character::isDigit).count();
-            if (!limpio.matches("^[0-9]+(-[0-9]+)*$") || digitos != DIGITOS_POLIZA) {
-                throw new ErrorSoat("DATOS_INVALIDOS",
-                        "El número de póliza debe tener exactamente 7 dígitos", Set.of(campo));
             }
         }
     }
 
     private static void textoOpcional(String campo, String valor, int max) {
         if (valor == null || valor.isBlank()) return;
-        texto(campo, valor, max, false);
+        texto(campo, valor, max, false, false);
+    }
+
+    private static void poliza(String valor, String aseguradora) {
+        if (valor == null || valor.isBlank()) {
+            throw new ErrorSoat("DATOS_INVALIDOS", "numeroPoliza obligatorio.", Set.of("numeroPoliza"));
+        }
+        String limpio = valor.strip();
+        if (limpio.isEmpty() || limpio.codePointCount(0, limpio.length()) > MAX_POLIZA) {
+            throw new ErrorSoat("DATOS_INVALIDOS", "numeroPoliza inválido.", Set.of("numeroPoliza"));
+        }
+        for (int i = 0; i < limpio.length(); ) {
+            int cp = limpio.codePointAt(i);
+            if (Character.isISOControl(cp)) {
+                throw new ErrorSoat("DATOS_INVALIDOS", MSG_POLIZA, Set.of("numeroPoliza"));
+            }
+            i += Character.charCount(cp);
+        }
+        if (!limpio.matches("^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9][A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9\\-/. ]*$")) {
+            throw new ErrorSoat("DATOS_INVALIDOS", MSG_POLIZA, Set.of("numeroPoliza"));
+        }
+        int alfanum = 0;
+        for (int i = 0; i < limpio.length(); ) {
+            int cp = limpio.codePointAt(i);
+            if (Character.isLetterOrDigit(cp)) alfanum++;
+            i += Character.charCount(cp);
+        }
+        if (alfanum < 1) {
+            throw new ErrorSoat("DATOS_INVALIDOS", MSG_POLIZA, Set.of("numeroPoliza"));
+        }
+        var perfil = CatalogoAseguradorasSoat.perfil(aseguradora);
+        if (perfil != null) {
+            if (perfil.longitudMinDocumentada() != null && alfanum < perfil.longitudMinDocumentada()) {
+                throw new ErrorSoat("DATOS_INVALIDOS", MSG_POLIZA, Set.of("numeroPoliza"));
+            }
+            if (perfil.longitudMaxDocumentada() != null && alfanum > perfil.longitudMaxDocumentada()) {
+                throw new ErrorSoat("DATOS_INVALIDOS", MSG_POLIZA, Set.of("numeroPoliza"));
+            }
+        }
     }
 
     private static void prima(BigDecimal valor) {
         if (valor == null) return;
-        if (valor.signum() < 0 || valor.compareTo(MAX_PRIMA) > 0 || valor.stripTrailingZeros().scale() > 2) {
+        if (valor.signum() < 0 || valor.compareTo(MAX_PRIMA) > 0 || valor.scale() > 2) {
             throw new ErrorSoat("DATOS_INVALIDOS", "El importe de la prima no es válido", Set.of("importePrima"));
         }
     }

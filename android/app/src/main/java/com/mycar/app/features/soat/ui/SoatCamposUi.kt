@@ -168,10 +168,11 @@ fun SoatSelectorAseguradora(
     val seleccion = AseguradoraSoat.porCodigo(valor)
     val opciones = remember(filtro) {
         val f = AseguradoraSoat.normalizar(filtro).orEmpty()
-        AseguradoraSoat.entries.filter {
+        AseguradoraSoat.activas().filter {
             f.isEmpty() ||
                 AseguradoraSoat.normalizar(it.nombre)?.contains(f) == true ||
-                AseguradoraSoat.normalizar(it.codigo)?.contains(f) == true
+                AseguradoraSoat.normalizar(it.codigo)?.contains(f) == true ||
+                AseguradoraSoat.normalizar(it.id)?.contains(f) == true
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

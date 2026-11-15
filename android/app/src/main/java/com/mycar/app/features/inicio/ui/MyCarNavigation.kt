@@ -286,10 +286,15 @@ fun MyCarNavigation(
                             if (idSoat == null || idSoat <= 0) {
                                 PantallaProximamente("Registrar SOAT", onVolver = { navegar(navegacion.atras()) })
                             } else {
-                                fun trasSoat(@Suppress("UNUSED_PARAMETER") dto: SoatDto) {
+                                fun trasSoatDetalle(@Suppress("UNUSED_PARAMETER") dto: SoatDto) {
                                     recargaSoat++
                                     recargaDetalle++
                                     navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE))
+                                }
+                                fun trasSoatConsultar(@Suppress("UNUSED_PARAMETER") dto: SoatDto) {
+                                    recargaSoat++
+                                    recargaDetalle++
+                                    navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONSULTAR))
                                 }
                                 RegistrarSoatRoute(
                                     "${cuenta.ciclo}|soat-$idSoat|s$soatSesion|r$recargaSoat",
@@ -297,7 +302,8 @@ fun MyCarNavigation(
                                     cuenta.soat,
                                     onVolver = { navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE)) },
                                     onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },
-                                    onExito = ::trasSoat,
+                                    onExito = ::trasSoatDetalle,
+                                    onVerSoat = ::trasSoatConsultar,
                                     onRecordatorio = { dto ->
                                         soatIdRecordatorio = dto.idSoat
                                         soatRecordatorioActivo = dto.recordatorioActivo
