@@ -33,13 +33,16 @@ fun ConsultarSoatRoute(
         factory = remember(repository, idVehiculo) { ConsultarSoatViewModel.factory(idVehiculo, repository) }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
-    val actual = estado.consulta?.actual
-    LaunchedEffect(actual?.idSoat, actual?.conDocumento) {
-        if (actual?.conDocumento == true) vm.cargarDocumento(actual)
+    DisposableEffect(Unit) {
+        onDispose { vm.ocultarDocumento() }
     }
     ConsultarSoatScreen(
         estado = estado,
         onRecargar = vm::cargar,
+        onRevelarDocumento = {
+            estado.consulta?.actual?.let { if (it.conDocumento) vm.cargarDocumento(it) }
+        },
+        onOcultarDocumento = vm::ocultarDocumento,
         onVolver = onVolver,
         onIniciarSesion = onIniciarSesion,
         onConfigurar = onConfigurar,
@@ -53,6 +56,8 @@ fun ConsultarSoatRoute(
 fun ConsultarSoatScreen(
     estado: com.mycar.app.features.soat.viewmodel.EstadoConsultaSoat,
     onRecargar: () -> Unit,
+    onRevelarDocumento: () -> Unit,
+    onOcultarDocumento: () -> Unit,
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onConfigurar: () -> Unit,
@@ -77,7 +82,6 @@ fun ConsultarSoatScreen(
             FaseConsultaSoat.LISTO -> {
                 val consulta = estado.consulta
                 val actual = consulta?.actual
-                // Sin scroll anidado: SoatScaffold ya hace verticalScroll (evita crash al consultar).
                 if (actual == null) {
                     Text("No hay SOAT vigente registrado.", color = MyCarMuted)
                 } else {
@@ -89,11 +93,19 @@ fun ConsultarSoatScreen(
                     )
                     if (actual.conDocumento) {
                         Text("Documento", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-                        SoatVistaDocumento(estado.docBytes, estado.docEsPdf, estado.docCargando, estado.docError)
+                        SoatVistaDocumento(
+                            bytes = estado.docBytes,
+                            esPdf = estado.docEsPdf,
+                            cargando = estado.docCargando,
+                            error = estado.docError,
+                            revelado = estado.docRevelado,
+                            onRevelar = onRevelarDocumento,
+                            onOcultar = onOcultarDocumento,
+                            tieneDocumento = true
+                        )
                     } else {
                         Text("Sin documento adjunto", color = MyCarMuted)
                     }
-                    // Solo lectura (RF64). Gestión: Detalle → Configurar SOAT.
                     SoatBotonPrincipal("Configurar SOAT", onConfigurar)
                     SoatBotonSecundario("Volver", onVolver)
                 }
@@ -108,7 +120,11 @@ fun ConsultarSoatScreen(
                         ) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(h.aseguradora, fontWeight = FontWeight.Bold, color = MyCarNavy)
-                                Text("Póliza ${h.numeroPoliza}", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    "Póliza ${SoatFormulario.enmascararPoliza(h.numeroPoliza)}",
+                                    color = MyCarMuted,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                                 Text(
                                     "${SoatFormulario.formatearFecha(h.fechaInicio)} – ${SoatFormulario.formatearFecha(h.fechaVencimiento)}",
                                     style = MaterialTheme.typography.bodySmall,

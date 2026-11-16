@@ -13,8 +13,13 @@ public final class ContratoSoat {
             String objectKey,
             String contentType,
             Integer tamanoBytes,
-            String nombreOriginal
-    ) { }
+            String nombreOriginal,
+            @JsonInclude(JsonInclude.Include.NON_NULL) Boolean cifrado
+    ) {
+        public DocumentoDto(String objectKey, String contentType, Integer tamanoBytes, String nombreOriginal) {
+            this(objectKey, contentType, tamanoBytes, nombreOriginal, null);
+        }
+    }
 
     public record SoatDto(
             Long idSoat,

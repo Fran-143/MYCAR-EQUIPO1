@@ -23,7 +23,8 @@ data class EstadoConsultaSoat(
     val docBytes: ByteArray? = null,
     val docEsPdf: Boolean = false,
     val docCargando: Boolean = false,
-    val docError: String? = null
+    val docError: String? = null,
+    val docRevelado: Boolean = false
 )
 
 class ConsultarSoatViewModel(
@@ -41,7 +42,8 @@ class ConsultarSoatViewModel(
             mensaje = null,
             consulta = null,
             docBytes = null,
-            docError = null
+            docError = null,
+            docRevelado = false
         )
         viewModelScope.launch {
             try {
@@ -57,11 +59,15 @@ class ConsultarSoatViewModel(
 
     fun cargarDocumento(soat: SoatDto) {
         if (!soat.conDocumento) return
-        _estado.value = _estado.value.copy(docCargando = true, docError = null, docBytes = null)
+        _estado.value = _estado.value.copy(
+            docRevelado = true,
+            docCargando = true,
+            docError = null,
+            docBytes = null
+        )
         viewModelScope.launch {
             try {
-                val url = repository.urlDocumento(idVehiculo, soat.idSoat)
-                val bytes = repository.descargarBytes(url)
+                val bytes = repository.descargarDocumento(idVehiculo, soat.idSoat)
                 val esPdf = bytes.size > 4 && bytes[0] == '%'.code.toByte() && bytes[1] == 'P'.code.toByte()
                 _estado.value = _estado.value.copy(docCargando = false, docBytes = bytes, docEsPdf = esPdf)
             } catch (cancelada: CancellationException) {
@@ -74,6 +80,20 @@ class ConsultarSoatViewModel(
                 )
             }
         }
+    }
+
+    fun ocultarDocumento() {
+        _estado.value = _estado.value.copy(
+            docRevelado = false,
+            docBytes = null,
+            docError = null,
+            docCargando = false
+        )
+    }
+
+    override fun onCleared() {
+        ocultarDocumento()
+        super.onCleared()
     }
 
     private fun manejarError(e: Exception) {

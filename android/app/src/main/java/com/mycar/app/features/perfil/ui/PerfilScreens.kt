@@ -32,6 +32,7 @@ import com.mycar.app.features.perfil.viewmodel.PerfilViewModel
 fun PerfilRoute(
     vm: PerfilViewModel,
     preferenciasNotificacion: com.mycar.app.features.preferenciasnotif.domain.PreferenciasNotificacionRepository,
+    licenciaRepository: com.mycar.app.features.licencia.domain.LicenciaRepository,
     onVolver: () -> Unit,
     onSesionInvalida: () -> Unit,
     onCerrarSesion: () -> Unit,
@@ -55,6 +56,13 @@ fun PerfilRoute(
             PantallaPerfil.NOTIFICACIONES_EXTERNAS ->
                 com.mycar.app.features.preferenciasnotif.ui.PreferenciasNotificacionRoute(
                     repository = preferenciasNotificacion,
+                    onVolver = vm::volverAtras,
+                    onSesionInvalida = onSesionInvalida,
+                    modifier = Modifier.fillMaxSize()
+                )
+            PantallaPerfil.LICENCIA ->
+                com.mycar.app.features.licencia.ui.LicenciaRoute(
+                    repository = licenciaRepository,
                     onVolver = vm::volverAtras,
                     onSesionInvalida = onSesionInvalida,
                     modifier = Modifier.fillMaxSize()
@@ -150,6 +158,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                     Spacer(Modifier.height(20.dp))
                     Seccion("CUENTA") {
                         FilaAccion("Cambiar contraseña", onClick = vm::abrirCambiarContrasena)
+                        FilaAccion("Licencia de conducir", onClick = vm::abrirLicencia)
                         FilaDeshabilitada("Planes y suscripción")
                     }
                     Seccion("NOTIFICACIONES") {

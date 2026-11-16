@@ -48,6 +48,19 @@ public class AlertasController {
         return sincronizar.listarMisAlertas(usuario(auth), idVehiculo);
     }
 
+    /** RF23 — alertas personales de licencia (sin idVehiculo). */
+    @GetMapping("/alertas/licencia")
+    public ContratoRf22.ListaResponse listarLicencia(Authentication auth) {
+        return sincronizar.listarMisAlertasLicencia(usuario(auth));
+    }
+
+    /** RF23/RF24 — detalle de alerta LICENCIA propia. */
+    @GetMapping("/alertas/licencia/{idAlerta}")
+    public ContratoRf22.DetalleAlertaDto detalleLicencia(
+            Authentication auth, @PathVariable long idAlerta) {
+        return sincronizar.consultarDetalleLicencia(usuario(auth), idAlerta);
+    }
+
     /** RF24 B1 — consultarDetalleAlertaUsuario + sync + acciones. */
     @GetMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}")
     public ContratoRf22.DetalleAlertaDto detalle(

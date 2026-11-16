@@ -40,6 +40,36 @@ public class SincronizarAlertasService {
         return new ContratoRf22.ListaResponse(cambios, alertas.listar(vehiculo));
     }
 
+    /** RF23: listado personal de alertas LICENCIA (sincroniza antes). */
+    @Transactional
+    public ContratoRf22.ListaResponse listarMisAlertasLicencia(long usuario) {
+        if (usuario <= 0) throw new ErrorAlertas("SESION_NO_VALIDADA", "Sesión no válida.");
+        int cambios = sincronizarLicenciaSeguro(usuario);
+        return new ContratoRf22.ListaResponse(cambios, alertas.listarLicencia(usuario));
+    }
+
+    /** Detalle de alerta LICENCIA propia (sin Atender RF24; gestión vía Perfil → Licencia). */
+    @Transactional
+    public ContratoRf22.DetalleAlertaDto consultarDetalleLicencia(long usuario, long idAlerta) {
+        if (usuario <= 0 || idAlerta <= 0) {
+            throw new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible.");
+        }
+        sincronizarLicenciaSeguro(usuario);
+        var base = alertas.obtenerDetalleLicenciaPropio(usuario, idAlerta)
+                .orElseThrow(() -> new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible."));
+        var acciones = new ContratoRf22.AccionesDetalleDto(false, false);
+        return new ContratoRf22.DetalleAlertaDto(
+                base.idAlerta(), "LICENCIA", base.codigoTipo(), base.nombreTipo(),
+                base.criterio(), base.origenCalculo(), base.estado(), base.fechaEstadoUtc(),
+                base.fechaObjetivo(), base.kmObjetivo(), base.kmBase(), base.intervaloKm(),
+                base.unidadTiempo(), base.cantidadTiempo(), base.fechaBase(), base.servicioOtro(),
+                null, null, null,
+                base.versionFila(),
+                null,
+                acciones,
+                new ContratoRf22.ContactoTallerDto(null, null, null, false, false, null, "NINGUNO", true));
+    }
+
     /** RF24 B1: consulta detalle, sincroniza estados del vehículo y expone acciones. */
     @Transactional
     public ContratoRf22.DetalleAlertaDto consultarDetalle(long usuario, long vehiculo, long idAlerta) {
@@ -170,6 +200,21 @@ public class SincronizarAlertasService {
             return cambios;
         } catch (EmptyResultDataAccessException ex) {
             throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible.");
+        }
+    }
+
+    private int sincronizarLicenciaSeguro(long usuario) {
+        try {
+            int cambios = alertas.sincronizarLicencia(usuario);
+            if (notificaciones != null) {
+                var n = notificaciones.getIfAvailable();
+                if (n != null) {
+                    n.sincronizarAvisosLicenciaUsuario(usuario);
+                }
+            }
+            return cambios;
+        } catch (EmptyResultDataAccessException ex) {
+            throw new ErrorAlertas("ALERTA_NO_ENCONTRADA", "No se pudo sincronizar la licencia.");
         }
     }
 }

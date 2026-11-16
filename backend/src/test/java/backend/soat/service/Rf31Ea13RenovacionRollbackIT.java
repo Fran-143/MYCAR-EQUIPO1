@@ -1,5 +1,7 @@
 package backend.soat.service;
 
+import backend.crypto.DatosSensiblesCrypto;
+import backend.crypto.DatosSensiblesCryptoGate;
 import backend.documentos.AlmacenamientoDocumentos;
 import backend.documentos.FakeAlmacenamientoDocumentos;
 import backend.soat.api.dto.ContratoSoat;
@@ -88,7 +90,16 @@ class Rf31Ea13RenovacionRollbackIT {
                 mock(ObjectProvider.class);
         when(notif.getIfAvailable()).thenReturn(null);
 
-        SoatService servicio = transactional(new SoatService(spyDao, operaciones, storage, json, notif), txm);
+        byte[] aes = new byte[32];
+        byte[] blind = new byte[32];
+        for (int i = 0; i < 32; i++) {
+            aes[i] = (byte) i;
+            blind[i] = (byte) (i + 40);
+        }
+        DatosSensiblesCryptoGate crypto = DatosSensiblesCryptoGate.habilitado(
+                new DatosSensiblesCrypto(aes, blind, "v1"));
+        SoatService servicio = transactional(
+                new SoatService(spyDao, operaciones, storage, crypto, json, notif), txm);
 
         var req = new ContratoSoat.RenovarRequest(
                 UUID.randomUUID(),

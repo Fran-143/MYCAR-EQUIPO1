@@ -423,7 +423,7 @@ private fun ExitoSoatPdf(
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilaSoat("Aseguradora", it.aseguradora)
-                    FilaSoat("Póliza", it.numeroPoliza)
+                    FilaSoat("Póliza", SoatFormulario.enmascararPoliza(it.numeroPoliza))
                     FilaSoat(
                         "Vigencia",
                         "${SoatFormulario.formatearFecha(it.fechaInicio)} – ${SoatFormulario.formatearFecha(it.fechaVencimiento)}"

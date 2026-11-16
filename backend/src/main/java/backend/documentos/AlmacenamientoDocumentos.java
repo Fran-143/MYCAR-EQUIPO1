@@ -13,6 +13,10 @@ public interface AlmacenamientoDocumentos {
 
     void borrarLogicoHuerfano(String objectKey);
 
+    void guardar(String objectKey, byte[] contenido, String contentType);
+
+    byte[] leer(String objectKey);
+
     record PresignUpload(
             String url,
             Map<String, String> headers,

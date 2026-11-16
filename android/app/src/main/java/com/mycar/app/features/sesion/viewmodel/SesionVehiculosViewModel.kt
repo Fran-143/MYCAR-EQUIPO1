@@ -29,6 +29,9 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     val soat = com.mycar.app.features.soat.data.RemoteSoatRepository(
         cliente.retrofit.create(com.mycar.app.features.soat.data.SoatApi::class.java)
     )
+    val licencia = com.mycar.app.features.licencia.data.RemoteLicenciaRepository(
+        cliente.retrofit.create(com.mycar.app.features.licencia.data.LicenciaApi::class.java)
+    )
     val mantenimiento = com.mycar.app.features.mantenimiento.data.MantenimientoApiAdapter.desde(cliente.retrofit)
     val historial = com.mycar.app.features.historial.data.HistorialApiAdapter.desde(cliente.retrofit)
     val talleres = com.mycar.app.features.talleres.data.TalleresApiAdapter.desde(cliente)

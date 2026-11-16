@@ -117,6 +117,60 @@ public class SupabaseAlmacenamientoDocumentos implements AlmacenamientoDocumento
     }
 
     @Override
+    public void guardar(String objectKey, byte[] contenido, String contentType) {
+        RutasDocumentoSoat.exigirSegmentosValidos(objectKey);
+        if (contenido == null) {
+            throw new ErrorAlmacenamiento("DATOS_INVALIDOS", "Contenido vacío.");
+        }
+        try {
+            String ct = contentType == null ? "application/octet-stream" : contentType;
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/storage/v1/object/" + bucket + "/" + escaparRuta(objectKey)))
+                    .header("Authorization", "Bearer " + serviceSecret)
+                    .header("apikey", serviceSecret)
+                    .header("Content-Type", ct)
+                    .header("x-upsert", "true")
+                    .timeout(TIMEOUT)
+                    .PUT(HttpRequest.BodyPublishers.ofByteArray(contenido))
+                    .build();
+            HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+            if (res.statusCode() < 200 || res.statusCode() >= 300) {
+                throw new ErrorAlmacenamiento("STORAGE_NO_DISPONIBLE", "No se pudo guardar el documento.");
+            }
+        } catch (ErrorAlmacenamiento ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ErrorAlmacenamiento("STORAGE_NO_DISPONIBLE", "No se pudo guardar el documento.");
+        }
+    }
+
+    @Override
+    public byte[] leer(String objectKey) {
+        RutasDocumentoSoat.exigirSegmentosValidos(objectKey);
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/storage/v1/object/" + bucket + "/" + escaparRuta(objectKey)))
+                    .header("Authorization", "Bearer " + serviceSecret)
+                    .header("apikey", serviceSecret)
+                    .timeout(TIMEOUT)
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+            if (res.statusCode() == 404) {
+                throw new ErrorAlmacenamiento("OBJETO_NO_ENCONTRADO", "El documento no está disponible.");
+            }
+            if (res.statusCode() < 200 || res.statusCode() >= 300) {
+                throw new ErrorAlmacenamiento("STORAGE_NO_DISPONIBLE", "No se pudo leer el documento.");
+            }
+            return res.body() == null ? new byte[0] : res.body();
+        } catch (ErrorAlmacenamiento ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ErrorAlmacenamiento("STORAGE_NO_DISPONIBLE", "No se pudo leer el documento.");
+        }
+    }
+
+    @Override
     public void borrarLogicoHuerfano(String objectKey) {
         RutasDocumentoSoat.exigirSegmentosValidos(objectKey);
         try {

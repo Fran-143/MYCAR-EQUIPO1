@@ -66,6 +66,8 @@ fun AlertasRoute(
     talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
     onNotificaciones: (() -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
+    onAbrirSoatDesdeAlerta: ((idVehiculo: Long) -> Unit)? = null,
+    onAbrirLicenciaDesdeAlerta: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val vm: AlertasViewModel = viewModel(key = "rf23-lista-${vehiculos.map { it.first }.joinToString()}-$idVehiculoInicial") {
@@ -119,8 +121,22 @@ fun AlertasRoute(
     val ctxAtencion = atencion
     val idDetalle = detalleId
     val idVehiculo = estado.vehiculoId
-    // Detalle/atención RF24 solo en ámbito vehicular.
     when {
+        estado.ambito == AmbitoAlertas.LICENCIA && idDetalle != null -> {
+            DetalleAlertaLicenciaRoute(
+                repository = repository,
+                idAlerta = idDetalle,
+                onVolver = {
+                    detalleId = null
+                    vm.recargar()
+                },
+                onAbrirLicencia = {
+                    detalleId = null
+                    onAbrirLicenciaDesdeAlerta?.invoke()
+                },
+                modifier = modifier
+            )
+        }
         estado.ambito == AmbitoAlertas.VEHICULOS &&
             ctxAtencion != null && mantenimientoRepository != null && !claveCuentaBorrador.isNullOrBlank() -> {
             RegistrarMantenimientoRoute(
@@ -155,6 +171,7 @@ fun AlertasRoute(
                 onRegistrarComoRealizado = { d ->
                     abrirRegistro(d.id, idVehiculo, d.codigoTipo, d.servicioOtro)
                 },
+                onAbrirSoat = onAbrirSoatDesdeAlerta?.let { cb -> { cb(idVehiculo) } },
                 talleresRepository = talleresRepository,
                 modifier = modifier
             )
@@ -244,7 +261,7 @@ fun AlertasScreen(
                 onVerDetalle = onVerDetalle
             )
         } else {
-            ContenidoLicencia(estado = estado, onRecargar = onRecargar)
+            ContenidoLicencia(estado = estado, onRecargar = onRecargar, onVerDetalle = onVerDetalle)
         }
         }
     }
@@ -413,7 +430,11 @@ private fun ColumnScope.ContenidoVehiculos(
 }
 
 @Composable
-private fun ColumnScope.ContenidoLicencia(estado: EstadoAlertas, onRecargar: () -> Unit) {
+private fun ColumnScope.ContenidoLicencia(
+    estado: EstadoAlertas,
+    onRecargar: () -> Unit,
+    onVerDetalle: (Long) -> Unit = {}
+) {
     Text(
         "Alertas de licencia de conducir",
         style = MaterialTheme.typography.titleMedium,
@@ -438,13 +459,19 @@ private fun ColumnScope.ContenidoLicencia(estado: EstadoAlertas, onRecargar: () 
             )
         }
         FaseAlertas.LISTO -> {
-            // Reservado para cuando RF51–56 exponga alertas personales reales.
+            if (estado.sincronizadasLicencia > 0) {
+                Text(
+                    "Se actualizó el estado de ${estado.sincronizadasLicencia} alerta(s) de licencia.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF6881A5)
+                )
+            }
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.weight(1f, fill = true)
             ) {
                 items(estado.alertasLicencia, key = { it.id }) { a ->
-                    TarjetaAlerta(a, onVerDetalle = {})
+                    TarjetaAlerta(a, onVerDetalle = onVerDetalle)
                 }
             }
         }
@@ -484,9 +511,10 @@ private fun TarjetaAlerta(
     onVerDetalle: (Long) -> Unit = {}
 ) {
     val badge = colorEstado(a.estado)
-    val esSoat = a.codigoTipo.equals("SOAT", ignoreCase = true)
-    val atendible = !esSoat && a.estado in setOf("PROXIMA", "PENDIENTE", "VENCIDA")
-    val anulable = !esSoat && a.estado in setOf("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA")
+    val esDocumento = a.codigoTipo.equals("SOAT", ignoreCase = true)
+        || a.codigoTipo.equals("LICENCIA", ignoreCase = true)
+    val atendible = !esDocumento && a.estado in setOf("PROXIMA", "PENDIENTE", "VENCIDA")
+    val anulable = !esDocumento && a.estado in setOf("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA")
     var dialogAnular by remember { mutableStateOf(false) }
     var motivoAnular by remember { mutableStateOf("") }
     Card(

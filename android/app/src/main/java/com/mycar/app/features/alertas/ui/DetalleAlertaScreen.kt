@@ -143,6 +143,7 @@ fun DetalleAlertaRoute(
     onVolver: () -> Unit,
     /** RF24: abrir RF17 DESDE_ALERTA en lugar del diálogo rápido. */
     onRegistrarComoRealizado: (DetalleAlerta) -> Unit = {},
+    onAbrirSoat: (() -> Unit)? = null,
     talleresRepository: TalleresRepository? = null,
     modifier: Modifier = Modifier
 ) {
@@ -155,6 +156,11 @@ fun DetalleAlertaRoute(
     LaunchedEffect(estado.fase, estado.detalle?.contactoTaller, talleresRepository) {
         if (preferenciaContactoAplicada) return@LaunchedEffect
         if (estado.fase != FaseDetalleAlerta.LISTO) return@LaunchedEffect
+        val cat = estado.detalle?.categoria.orEmpty()
+        if (cat.equals("SOAT", true) || cat.equals("LICENCIA", true)) {
+            preferenciaContactoAplicada = true
+            return@LaunchedEffect
+        }
         val repo = talleresRepository ?: return@LaunchedEffect
         val c = estado.detalle?.contactoTaller
         preferenciaContactoAplicada = true
@@ -182,7 +188,56 @@ fun DetalleAlertaRoute(
         onRegistrarComoRealizado = onRegistrarComoRealizado,
         onAnular = vm::anular,
         onElegirContacto = { idTaller -> vm.elegirContacto(idTaller) },
+        onAbrirDocumento = onAbrirSoat,
         talleresRepository = talleresRepository,
+        modifier = modifier
+    )
+}
+
+class DetalleAlertaLicenciaViewModel(
+    private val repository: AlertasRepository,
+    private val idAlerta: Long
+) : ViewModel() {
+    private val mutable = MutableStateFlow(EstadoDetalleAlerta())
+    val estado = mutable.asStateFlow()
+
+    init { cargar() }
+
+    fun cargar() {
+        mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.CARGANDO)
+        viewModelScope.launch {
+            try {
+                val d = repository.detalleLicencia(idAlerta)
+                mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.LISTO, detalle = d)
+            } catch (e: Exception) {
+                mutable.value = EstadoDetalleAlerta(
+                    fase = FaseDetalleAlerta.ERROR,
+                    mensaje = e.message ?: "No se pudo cargar el detalle."
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DetalleAlertaLicenciaRoute(
+    repository: AlertasRepository,
+    idAlerta: Long,
+    onVolver: () -> Unit,
+    onAbrirLicencia: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val vm: DetalleAlertaLicenciaViewModel = viewModel(key = "rf23-lic-$idAlerta") {
+        DetalleAlertaLicenciaViewModel(repository, idAlerta)
+    }
+    val estado by vm.estado.collectAsStateWithLifecycle()
+    DetalleAlertaScreen(
+        estado = estado,
+        onVolver = onVolver,
+        onRecargar = vm::cargar,
+        onRegistrarComoRealizado = {},
+        onAnular = {},
+        onAbrirDocumento = onAbrirLicencia,
         modifier = modifier
     )
 }
@@ -195,6 +250,7 @@ fun DetalleAlertaScreen(
     onRegistrarComoRealizado: (DetalleAlerta) -> Unit,
     onAnular: (String) -> Unit,
     onElegirContacto: (Long) -> Unit = {},
+    onAbrirDocumento: (() -> Unit)? = null,
     talleresRepository: TalleresRepository? = null,
     modifier: Modifier = Modifier
 ) {
@@ -247,31 +303,50 @@ fun DetalleAlertaScreen(
                         Text(estado.mensaje ?: "Sin datos de la alerta.", color = Azul)
                     } else {
                         ContenidoDetalleAlerta(d)
-                        ContactoTallerAlertaCard(
-                            contacto = d.contactoTaller,
-                            ocupado = estado.ocupado,
-                            onWhatsApp = { tel ->
-                                val error = WhatsAppEnlace.abrir(context, tel)
-                                if (error != null) {
-                                    avisoContacto = error
-                                    telefonoFallback = WhatsAppEnlace.normalizarPeruE164(tel)
+                        val esDocumento = d.categoria.equals("SOAT", true)
+                            || d.categoria.equals("LICENCIA", true)
+                        if (!esDocumento) {
+                            ContactoTallerAlertaCard(
+                                contacto = d.contactoTaller,
+                                ocupado = estado.ocupado,
+                                onWhatsApp = { tel ->
+                                    val error = WhatsAppEnlace.abrir(context, tel)
+                                    if (error != null) {
+                                        avisoContacto = error
+                                        telefonoFallback = WhatsAppEnlace.normalizarPeruE164(tel)
+                                    }
+                                },
+                                onLlamar = { tel ->
+                                    val llamada = WhatsAppEnlace.uriLlamada(tel)
+                                    if (llamada == null) {
+                                        avisoContacto = "Número telefónico no disponible."
+                                        return@ContactoTallerAlertaCard
+                                    }
+                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(llamada)))
+                                },
+                                onCambiarTaller = {
+                                    dialogCambiarTaller = true
+                                    if (talleresRepository != null) {
+                                        // Carga diferida en efecto abajo
+                                    }
                                 }
-                            },
-                            onLlamar = { tel ->
-                                val llamada = WhatsAppEnlace.uriLlamada(tel)
-                                if (llamada == null) {
-                                    avisoContacto = "Número telefónico no disponible."
-                                    return@ContactoTallerAlertaCard
-                                }
-                                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(llamada)))
-                            },
-                            onCambiarTaller = {
-                                dialogCambiarTaller = true
-                                if (talleresRepository != null) {
-                                    // Carga diferida en efecto abajo
-                                }
+                            )
+                        }
+                        if (esDocumento && onAbrirDocumento != null) {
+                            val etiqueta = if (d.categoria.equals("LICENCIA", true)) {
+                                "Ir a licencia de conducir"
+                            } else {
+                                "Ir al SOAT del vehículo"
                             }
-                        )
+                            Button(
+                                onClick = onAbrirDocumento,
+                                enabled = !estado.ocupado,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Azul),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                    .testTag("rf23.abrir.documento")
+                            ) { Text(etiqueta, fontWeight = FontWeight.SemiBold) }
+                        }
                         if (d.estado == "VENCIDA" && d.puedeAtender) {
                             Text(
                                 "Esta alerta está VENCIDA. Al registrar el mantenimiento se conservará la evidencia de atención tardía.",

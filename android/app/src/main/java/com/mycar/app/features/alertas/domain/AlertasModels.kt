@@ -92,7 +92,9 @@ interface AlertasRepository {
     ): ContextoProgramarAlerta
 
     suspend fun listar(idVehiculo: Long): Pair<Int, List<DatosAlerta>>
+    suspend fun listarLicencia(): Pair<Int, List<DatosAlerta>>
     suspend fun detalle(idVehiculo: Long, idAlerta: Long): DetalleAlerta
+    suspend fun detalleLicencia(idAlerta: Long): DetalleAlerta
     suspend fun programar(idVehiculo: Long, solicitud: ProgramarAlertaDto): Long
     suspend fun operacion(idOperacion: String): EstadoOperacionAlerta
     suspend fun atender(idVehiculo: Long, idAlerta: Long, solicitud: SolicitudAtenderAlerta): Long

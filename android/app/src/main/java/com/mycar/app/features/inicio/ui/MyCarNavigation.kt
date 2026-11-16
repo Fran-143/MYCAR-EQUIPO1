@@ -74,6 +74,7 @@ fun MyCarNavigation(
     var formularioAbierto by remember { mutableStateOf(false) }
     var formularioAtencionAlerta by remember { mutableStateOf(false) }
     var detalleAlertaTrasAtencion by rememberSaveable { mutableStateOf<Long?>(null) }
+    var perfilAbrirLicencia by rememberSaveable { mutableStateOf(false) }
     var borradorAlertaRf17 by remember { mutableStateOf<BorradorAlerta?>(null) }
     val navegacion=NavegacionInicio(SeccionMyCar.valueOf(seccionNombre),secundariaNombre?.let(SecundariaMyCar::valueOf))
     fun navegar(n: NavegacionInicio) { seccionNombre=n.seccion.name; secundariaNombre=n.secundaria?.name; formularioAbierto=false }
@@ -272,9 +273,16 @@ fun MyCarNavigation(
                                 }
                             }
                             val perfilVm: PerfilViewModel = viewModel(key = "perfil-${cuenta.ciclo}", factory = factoryPerfil)
+                            LaunchedEffect(perfilAbrirLicencia) {
+                                if (perfilAbrirLicencia) {
+                                    perfilVm.abrirLicencia()
+                                    perfilAbrirLicencia = false
+                                }
+                            }
                             PerfilRoute(
                                 vm = perfilVm,
                                 preferenciasNotificacion = cuenta.preferenciasNotificacion,
+                                licenciaRepository = cuenta.licencia,
                                 onVolver = { navegar(navegacion.atras()) },
                                 onSesionInvalida = { sesion.sesionRequerida(cuenta.ciclo) },
                                 onCerrarSesion = { cerrarSesion?.invoke() },
@@ -518,6 +526,14 @@ fun MyCarNavigation(
                                     detalleAlertaTrasAtencion = idAlerta
                                     navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
                                 },
+                                onAbrirSoatDesdeAviso = { idVehiculo ->
+                                    vehiculoDetalleId = idVehiculo
+                                    abrirSoat(idVehiculo, SecundariaMyCar.SOAT_CONSULTAR)
+                                },
+                                onAbrirLicenciaDesdeAviso = {
+                                    perfilAbrirLicencia = true
+                                    navegar(navegacion.abrir(SecundariaMyCar.PERFIL))
+                                },
                                 onPerfil = { navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -671,6 +687,14 @@ fun MyCarNavigation(
                                         talleresRepository = cuenta.talleres,
                                         onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
                                         onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
+                                        onAbrirSoatDesdeAlerta = { idVehiculo ->
+                                            vehiculoDetalleId = idVehiculo
+                                            abrirSoat(idVehiculo, SecundariaMyCar.SOAT_CONSULTAR)
+                                        },
+                                        onAbrirLicenciaDesdeAlerta = {
+                                            perfilAbrirLicencia = true
+                                            navegar(navegacion.abrir(SecundariaMyCar.PERFIL))
+                                        },
                                         modifier=Modifier)
                                 }
                             }

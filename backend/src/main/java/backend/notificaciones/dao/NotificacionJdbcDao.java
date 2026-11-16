@@ -16,17 +16,19 @@ public class NotificacionJdbcDao {
 
     public Optional<AlertaContexto> cargarAlerta(long idAlerta) {
         return jdbc.query("""
-                SELECT a.id_alerta, a.id_vehiculo, v.id_usuario, a.estado, a.categoria, v.placa,
+                SELECT a.id_alerta, a.id_vehiculo, COALESCE(v.id_usuario, a.id_usuario) AS id_usuario,
+                       a.estado, a.categoria, v.placa,
                        CASE WHEN a.categoria = 'SOAT' THEN 'SOAT'
+                            WHEN a.categoria = 'LICENCIA' THEN 'LICENCIA'
                             ELSE COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre, 'Mantenimiento')
                        END AS etiqueta
                 FROM mycar.alerta a
-                JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
+                LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
                 LEFT JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
                 WHERE a.id_alerta = ?
                 """, (rs, n) -> new AlertaContexto(
                 rs.getLong("id_alerta"),
-                rs.getLong("id_vehiculo"),
+                (Long) rs.getObject("id_vehiculo"),
                 rs.getLong("id_usuario"),
                 rs.getString("estado"),
                 rs.getString("categoria"),
@@ -56,12 +58,34 @@ public class NotificacionJdbcDao {
                 rs.getString("etiqueta")), vehiculo);
     }
 
+    /** Alertas LICENCIA del usuario para reconciliar avisos internos. */
+    public List<AlertaContexto> listarAlertasLicenciaUsuarioParaAvisos(long usuario) {
+        return jdbc.query("""
+                SELECT a.id_alerta, a.id_vehiculo, a.id_usuario, a.estado, a.categoria,
+                       CAST(NULL AS VARCHAR) AS placa,
+                       'LICENCIA' AS etiqueta
+                FROM mycar.alerta a
+                WHERE a.id_usuario = ?
+                  AND a.categoria = 'LICENCIA'
+                  AND a.id_vehiculo IS NULL
+                  AND a.estado IN ('PROGRAMADA','PROXIMA','PENDIENTE','VENCIDA','REALIZADA','ANULADA')
+                ORDER BY a.id_alerta
+                """, (rs, n) -> new AlertaContexto(
+                rs.getLong("id_alerta"),
+                (Long) rs.getObject("id_vehiculo"),
+                rs.getLong("id_usuario"),
+                rs.getString("estado"),
+                rs.getString("categoria"),
+                rs.getString("placa"),
+                rs.getString("etiqueta")), usuario);
+    }
+
     /**
      * Upsert idempotente por (usuario, alerta). No duplica filas.
      * Si estado_gestion destino es PENDIENTE y ya existía, refresca emisión y textos.
      */
     public void upsertPorAlerta(
-            long usuario, long idAlerta, long idVehiculo,
+            long usuario, long idAlerta, Long idVehiculo,
             String categoria, String estadoGestion, String titulo, String cuerpo) {
         String cat = (categoria == null || categoria.isBlank()) ? "MANTENIMIENTO" : categoria;
         jdbc.update("""
@@ -221,7 +245,7 @@ public class NotificacionJdbcDao {
     }
 
     public record AlertaContexto(
-            long idAlerta, long idVehiculo, long idUsuario, String estado,
+            long idAlerta, Long idVehiculo, long idUsuario, String estado,
             String categoria, String placa, String etiquetaServicio
     ) { }
 }

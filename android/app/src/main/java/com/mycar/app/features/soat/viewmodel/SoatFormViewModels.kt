@@ -356,14 +356,8 @@ abstract class SoatFormViewModelBase(
     private suspend fun prepararDocumento(s: EstadoSoatForm): SoatDocumentoRefDto? {
         if (s.modoDocumento == ModoDocSoat.MANTENER || s.modoDocumento == ModoDocSoat.ELIMINAR) return null
         val adj = s.adjunto ?: return null
-        val tamano = adj.tamanoBytes.toInt().coerceAtLeast(1)
-        val presign = repository.presignUpload(
-            idVehiculo,
-            SoatPresignSolicitudDto(adj.contentType, tamano, adj.nombre)
-        )
         val bytes = leerBytes(adj.uri)
-        repository.subirDocumento(presign, bytes, adj.contentType)
-        return SoatDocumentoRefDto(presign.objectKey, adj.contentType, tamano, adj.nombre)
+        return repository.subirDocumento(idVehiculo, bytes, adj.contentType, adj.nombre)
     }
 
     protected open suspend fun leerBytes(uri: Uri): ByteArray =

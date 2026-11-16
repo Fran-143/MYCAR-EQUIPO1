@@ -8,8 +8,12 @@ interface SoatRepository {
     suspend fun corregir(idVehiculo: Long, idSoat: Long, solicitud: SoatMutacionDto): SoatDto
     suspend fun renovar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto
     suspend fun recordatorio(idVehiculo: Long, idSoat: Long, activo: Boolean): SoatDto
-    suspend fun presignUpload(idVehiculo: Long, solicitud: SoatPresignSolicitudDto): SoatPresignRespuestaDto
-    suspend fun subirDocumento(presign: SoatPresignRespuestaDto, bytes: ByteArray, contentType: String)
-    suspend fun urlDocumento(idVehiculo: Long, idSoat: Long): String
-    suspend fun descargarBytes(url: String): ByteArray
+    /** Sube adjunto: multipart si el servidor lo soporta; si no, presign (Render actual). */
+    suspend fun subirDocumento(
+        idVehiculo: Long,
+        bytes: ByteArray,
+        contentType: String,
+        nombreOriginal: String
+    ): SoatDocumentoRefDto
+    suspend fun descargarDocumento(idVehiculo: Long, idSoat: Long): ByteArray
 }

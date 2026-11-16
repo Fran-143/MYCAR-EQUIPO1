@@ -50,6 +50,14 @@ public class NotificacionInternaService {
         }
     }
 
+    /** Tras sync RF23 de licencia: reconcilia avisos personales LICENCIA. */
+    @Transactional
+    public void sincronizarAvisosLicenciaUsuario(long idUsuario) {
+        for (var ctx : dao.listarAlertasLicenciaUsuarioParaAvisos(idUsuario)) {
+            sincronizarContexto(ctx);
+        }
+    }
+
     /** RF24 atención: aviso activo → ATENDIDA. */
     @Transactional
     public void marcarAtendidaPorAlerta(long idAlerta) {
@@ -110,15 +118,25 @@ public class NotificacionInternaService {
             return;
         }
         if (ACTIVAS.contains(estado)) {
-            boolean soat = "SOAT".equalsIgnoreCase(ctx.categoria());
-            String titulo = soat
-                    ? tituloSoat(estado)
-                    : tituloActivo(estado, ctx.etiquetaServicio());
-            String cuerpo = soat
-                    ? cuerpoSoat(estado, ctx.placa())
-                    : cuerpoActivo(estado, ctx.placa(), ctx.etiquetaServicio());
+            String cat = ctx.categoria() == null ? "MANTENIMIENTO" : ctx.categoria().toUpperCase(Locale.ROOT);
+            String titulo;
+            String cuerpo;
+            String categoriaGuardar;
+            if ("SOAT".equals(cat)) {
+                titulo = tituloSoat(estado);
+                cuerpo = cuerpoSoat(estado, ctx.placa());
+                categoriaGuardar = "SOAT";
+            } else if ("LICENCIA".equals(cat)) {
+                titulo = tituloLicencia(estado);
+                cuerpo = cuerpoLicencia(estado);
+                categoriaGuardar = "LICENCIA";
+            } else {
+                titulo = tituloActivo(estado, ctx.etiquetaServicio());
+                cuerpo = cuerpoActivo(estado, ctx.placa(), ctx.etiquetaServicio());
+                categoriaGuardar = "MANTENIMIENTO";
+            }
             dao.upsertPorAlerta(ctx.idUsuario(), ctx.idAlerta(), ctx.idVehiculo(),
-                    soat ? "SOAT" : "MANTENIMIENTO", "PENDIENTE", titulo, cuerpo);
+                    categoriaGuardar, "PENDIENTE", titulo, cuerpo);
             // Push externo: solo RecordatorioPushService (cron / km). Evita duplicados con listado.
             return;
         }
@@ -175,6 +193,24 @@ public class NotificacionInternaService {
             case "PENDIENTE" -> "Corresponde renovar el SOAT de " + p + ".";
             case "VENCIDA" -> "El SOAT de " + p + " está vencido.";
             default -> "Revisa el SOAT de " + p + ".";
+        };
+    }
+
+    private static String tituloLicencia(String estado) {
+        return switch (estado) {
+            case "PROXIMA" -> "Próximo vencimiento de tu licencia";
+            case "PENDIENTE" -> "Licencia por vencer";
+            case "VENCIDA" -> "Licencia vencida";
+            default -> "Aviso de licencia";
+        };
+    }
+
+    private static String cuerpoLicencia(String estado) {
+        return switch (estado) {
+            case "PROXIMA" -> "Faltan 30 días o menos para el vencimiento de tu licencia de conducir.";
+            case "PENDIENTE" -> "Corresponde renovar tu licencia de conducir.";
+            case "VENCIDA" -> "Tu licencia de conducir está vencida.";
+            default -> "Revisa el vencimiento de tu licencia de conducir.";
         };
     }
 

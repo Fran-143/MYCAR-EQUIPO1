@@ -108,6 +108,13 @@ public class AlertasJdbcDao {
         return n == null ? 0 : n;
     }
 
+    /** RF23: sincroniza alertas personales LICENCIA (sin vehículo). */
+    public int sincronizarLicencia(long usuario) {
+        Integer n = jdbc.queryForObject(
+                "SELECT mycar.sincronizar_alertas_licencia_usuario(?)", Integer.class, usuario);
+        return n == null ? 0 : n;
+    }
+
     /** Vehículos ACTIVO con al menos una alerta evaluable (para job diario RF23). */
     public List<VehiculoActivo> listarVehiculosActivosConAlertasEvaluables() {
         return jdbc.query("""
@@ -121,19 +128,35 @@ public class AlertasJdbcDao {
                 """, (rs, n) -> new VehiculoActivo(rs.getLong(1), rs.getLong(2)));
     }
 
+    /** Usuarios con alertas LICENCIA evaluables (job diario RF23). */
+    public List<Long> listarUsuariosConAlertasLicenciaEvaluables() {
+        return jdbc.query("""
+                SELECT DISTINCT a.id_usuario
+                FROM mycar.alerta a
+                JOIN mycar.usuario u ON u.id_usuario = a.id_usuario AND u.estado_cuenta = 'ACTIVA'
+                WHERE a.categoria = 'LICENCIA'
+                  AND a.id_vehiculo IS NULL
+                  AND a.estado IN ('PROGRAMADA','PROXIMA','PENDIENTE','VENCIDA')
+                ORDER BY a.id_usuario
+                """, (rs, n) -> rs.getLong(1));
+    }
+
     public record VehiculoActivo(long idVehiculo, long idUsuario) { }
 
     public List<ContratoRf22.AlertaDto> listar(long vehiculo) {
         return jdbc.query("""
                 SELECT a.id_alerta,
-                       COALESCE(tm.codigo, 'SOAT') AS codigo,
-                       COALESCE(tm.nombre, 'SOAT') AS nombre,
+                       CASE WHEN a.categoria = 'SOAT' THEN 'SOAT'
+                            ELSE COALESCE(tm.codigo, 'MANTENIMIENTO') END AS codigo,
+                       CASE WHEN a.categoria = 'SOAT' THEN 'SOAT'
+                            ELSE COALESCE(tm.nombre, 'Mantenimiento') END AS nombre,
                        a.criterio, a.origen_calculo, a.estado,
                        a.fecha_objetivo, a.km_objetivo, a.km_base, a.intervalo_km,
                        a.servicio_otro, a.version_fila
                 FROM mycar.alerta a
                 LEFT JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
                 WHERE a.id_vehiculo = ? AND a.estado <> 'ANULADA'
+                  AND a.categoria IN ('MANTENIMIENTO', 'SOAT')
                 ORDER BY a.creada_utc DESC, a.id_alerta DESC
                 """, (rs, n) -> new ContratoRf22.AlertaDto(
                 rs.getLong("id_alerta"),
@@ -148,6 +171,40 @@ public class AlertasJdbcDao {
                 rs.getObject("intervalo_km", Integer.class),
                 rs.getString("servicio_otro"),
                 rs.getInt("version_fila")), vehiculo);
+    }
+
+    /**
+     * Alertas personales LICENCIA del usuario (sin datos confidenciales:
+     * solo categoría declarada y vencimiento/objetivo).
+     */
+    public List<ContratoRf22.AlertaDto> listarLicencia(long usuario) {
+        return jdbc.query("""
+                SELECT a.id_alerta,
+                       'LICENCIA' AS codigo,
+                       'Licencia de conducir' AS nombre,
+                       a.criterio, a.origen_calculo, a.estado,
+                       a.fecha_objetivo, a.km_objetivo, a.km_base, a.intervalo_km,
+                       l.categoria AS servicio_otro, a.version_fila
+                FROM mycar.alerta a
+                JOIN mycar.licencia l ON l.id_licencia = a.id_licencia
+                WHERE a.id_usuario = ? AND a.categoria = 'LICENCIA'
+                  AND a.id_vehiculo IS NULL
+                  AND a.estado <> 'ANULADA'
+                  AND l.vigencia = 'ACTUAL'
+                ORDER BY a.creada_utc DESC, a.id_alerta DESC
+                """, (rs, n) -> new ContratoRf22.AlertaDto(
+                rs.getLong("id_alerta"),
+                rs.getString("codigo"),
+                rs.getString("nombre"),
+                rs.getString("criterio"),
+                rs.getString("origen_calculo"),
+                rs.getString("estado"),
+                rs.getObject("fecha_objetivo", LocalDate.class),
+                rs.getObject("km_objetivo", Integer.class),
+                rs.getObject("km_base", Integer.class),
+                rs.getObject("intervalo_km", Integer.class),
+                rs.getString("servicio_otro"),
+                rs.getInt("version_fila")), usuario);
     }
 
     /** Detalle SOAT (sin tipo mantenimiento; no habilita Atender RF24). */
@@ -172,6 +229,31 @@ public class AlertasJdbcDao {
                 null,
                 rs.getString("placa"), rs.getString("marca"), rs.getString("modelo"),
                 rs.getString("estado_vehiculo")), idAlerta, vehiculo, usuario).stream().findFirst();
+    }
+
+    /** Detalle LICENCIA propia (sin vehículo ni datos confidenciales). */
+    public Optional<DetalleAlertaFila> obtenerDetalleLicenciaPropio(long usuario, long idAlerta) {
+        return jdbc.query("""
+                SELECT a.id_alerta, a.criterio, a.origen_calculo, a.estado,
+                       to_char(a.fecha_estado_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS fecha_estado,
+                       a.fecha_objetivo, a.unidad_tiempo, a.cantidad_tiempo, a.fecha_base, a.version_fila,
+                       l.categoria
+                FROM mycar.alerta a
+                JOIN mycar.licencia l ON l.id_licencia = a.id_licencia
+                WHERE a.id_alerta = ? AND a.id_usuario = ?
+                  AND a.categoria = 'LICENCIA' AND a.id_vehiculo IS NULL
+                  AND a.estado <> 'ANULADA'
+                  AND l.vigencia = 'ACTUAL'
+                """, (rs, n) -> new DetalleAlertaFila(
+                rs.getLong("id_alerta"), 0L, 0L,
+                "LICENCIA", "Licencia de conducir", rs.getString("criterio"),
+                rs.getString("origen_calculo"), rs.getString("estado"), rs.getString("fecha_estado"),
+                rs.getObject("fecha_objetivo", LocalDate.class), null, null, null,
+                rs.getString("unidad_tiempo"), rs.getObject("cantidad_tiempo", Integer.class),
+                rs.getObject("fecha_base", LocalDate.class), rs.getString("categoria"),
+                null, null, rs.getInt("version_fila"),
+                null,
+                null, null, null, null), idAlerta, usuario).stream().findFirst();
     }
 
     /** RF24: detalle propio (categoria=MANTENIMIENTO) con ficha de vehículo. */

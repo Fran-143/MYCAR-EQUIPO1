@@ -60,6 +60,20 @@ class RemoteAlertasRepository(private val api: AlertasApi) : AlertasRepository {
         }
     }
 
+    override suspend fun listarLicencia(): Pair<Int, List<DatosAlerta>> {
+        try {
+            val r = api.listarLicencia()
+            return (r.alertasSincronizadas ?: 0) to r.alertas.orEmpty().map {
+                DatosAlerta(
+                    it.idAlerta ?: 0, it.nombreTipo.orEmpty(), it.criterio.orEmpty(), it.estado.orEmpty(),
+                    it.fechaObjetivo, it.kmObjetivo, it.servicioOtro, it.codigoTipo.orEmpty()
+                )
+            }
+        } catch (e: Exception) {
+            throw IOException(mensajeHttp(e, "No se pudieron cargar las alertas de licencia"), e)
+        }
+    }
+
     override suspend fun detalle(idVehiculo: Long, idAlerta: Long): DetalleAlerta {
         try {
             val d = api.detalle(idVehiculo, idAlerta)
@@ -70,6 +84,16 @@ class RemoteAlertasRepository(private val api: AlertasApi) : AlertasRepository {
             return mapDetalle(d, etiqueta)
         } catch (e: Exception) {
             throw IOException(mensajeHttp(e, "No se pudo cargar el detalle de la alerta"), e)
+        }
+    }
+
+    override suspend fun detalleLicencia(idAlerta: Long): DetalleAlerta {
+        try {
+            val d = api.detalleLicencia(idAlerta)
+            val cat = d.servicioOtro?.takeIf { it.isNotBlank() }?.let { "Categoría $it" } ?: "Licencia de conducir"
+            return mapDetalle(d, cat)
+        } catch (e: Exception) {
+            throw IOException(mensajeHttp(e, "No se pudo cargar el detalle de la alerta de licencia"), e)
         }
     }
 

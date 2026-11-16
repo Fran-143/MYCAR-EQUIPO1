@@ -179,6 +179,13 @@ class SoatFormularioTest {
     }
 
     @Test
+    fun enmascaraPolizaUltimosCuatro() {
+        assertEquals("****5678", SoatFormulario.enmascararPoliza("Q12345678"))
+        assertEquals("****", SoatFormulario.enmascararPoliza("AB"))
+        assertEquals("", SoatFormulario.enmascararPoliza(""))
+    }
+
+    @Test
     fun rechazaInicioPosteriorAHoy() {
         val err = SoatFormulario.validarCampos(
             "RÍMAC SEGUROS", "0124589", "01/01/2036", "01/01/2037", "", "",

@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Núcleo RF23 reutilizable por el job interno (opcional) y por el endpoint de cron externo.
- * Idempotente: {@code sincronizar_alertas_vehiculo} + upsert avisos + outbox ON CONFLICT.
- * Extensible: futuras reglas SOAT/licencia se añaden aquí sin cambiar el Worker.
+ * Idempotente: sincronizar_alertas_vehiculo + sincronizar_alertas_licencia_usuario
+ * + upsert avisos + outbox ON CONFLICT.
  */
 @Service
 public class EvaluacionProgramadaAlertasService {
@@ -49,9 +49,13 @@ public class EvaluacionProgramadaAlertasService {
         }
         try {
             List<AlertasJdbcDao.VehiculoActivo> vehiculos = alertas.listarVehiculosActivosConAlertasEvaluables();
+            List<Long> usuariosLicencia = alertas.listarUsuariosConAlertasLicenciaEvaluables();
             if (modo == Modo.SIMULAR) {
-                log.info("RF23 evaluación SIMULAR: {} vehículos (sin escrituras)", vehiculos.size());
-                return new Resultado(false, modo.name(), vehiculos.size(), 0, 0);
+                log.info(
+                        "RF23 evaluación SIMULAR: {} vehículos, {} usuarios licencia (sin escrituras)",
+                        vehiculos.size(),
+                        usuariosLicencia.size());
+                return new Resultado(false, modo.name(), vehiculos.size() + usuariosLicencia.size(), 0, 0);
             }
             int totalCambios = 0;
             int errores = 0;
@@ -62,19 +66,31 @@ public class EvaluacionProgramadaAlertasService {
                     if (n != null) {
                         n.sincronizarAvisosVehiculo(v.idVehiculo());
                     }
-                    // Futuro: evaluadores SOAT / licencia por vehículo o por usuario,
-                    // sin cambiar el contrato del Worker Cloudflare.
                 } catch (RuntimeException ex) {
                     errores++;
                     log.warn("RF23 evaluación falló para vehículo {}: {}", v.idVehiculo(), ex.toString());
                 }
             }
+            for (Long idUsuario : usuariosLicencia) {
+                try {
+                    totalCambios += alertas.sincronizarLicencia(idUsuario);
+                    var n = notificaciones.getIfAvailable();
+                    if (n != null) {
+                        n.sincronizarAvisosLicenciaUsuario(idUsuario);
+                    }
+                } catch (RuntimeException ex) {
+                    errores++;
+                    log.warn("RF23 evaluación falló para licencia usuario {}: {}", idUsuario, ex.toString());
+                }
+            }
             log.info(
-                    "RF23 evaluación COMPLETO: {} vehículos, {} cambios, {} errores",
+                    "RF23 evaluación COMPLETO: {} vehículos, {} licencia, {} cambios, {} errores",
                     vehiculos.size(),
+                    usuariosLicencia.size(),
                     totalCambios,
                     errores);
-            return new Resultado(false, modo.name(), vehiculos.size(), totalCambios, errores);
+            return new Resultado(
+                    false, modo.name(), vehiculos.size() + usuariosLicencia.size(), totalCambios, errores);
         } finally {
             enCurso.set(false);
         }

@@ -26,4 +26,16 @@ public final class AlmacenamientoNoConfigurado implements AlmacenamientoDocument
         throw new ErrorAlmacenamiento("STORAGE_NO_CONFIGURADO",
                 "El almacenamiento de documentos no está configurado.");
     }
+
+    @Override
+    public void guardar(String objectKey, byte[] contenido, String contentType) {
+        throw new ErrorAlmacenamiento("STORAGE_NO_CONFIGURADO",
+                "El almacenamiento de documentos no está configurado.");
+    }
+
+    @Override
+    public byte[] leer(String objectKey) {
+        throw new ErrorAlmacenamiento("STORAGE_NO_CONFIGURADO",
+                "El almacenamiento de documentos no está configurado.");
+    }
 }

@@ -37,15 +37,16 @@ data class EstadoAlertas(
     val avisoAccion: String? = null,
     val ocupadoAccion: Boolean = false,
     val generacion: Int = 0,
-    /** RF23 LICENCIA: estado independiente del vehículo (RF51–56 pendiente de API). */
+    /** RF23 LICENCIA: estado independiente del vehículo. */
     val faseLicencia: FaseAlertas = FaseAlertas.VACIO,
     val mensajeLicencia: String? = MENSAJE_SIN_ALERTAS_LICENCIA,
     val alertasLicencia: List<DatosAlerta> = emptyList(),
+    val sincronizadasLicencia: Int = 0,
     val generacionLicencia: Int = 0
 ) {
     companion object {
         const val MENSAJE_SIN_ALERTAS_LICENCIA =
-            "No tienes alertas de licencia disponibles para consultar."
+            "No tienes alertas de licencia configuradas. Puedes activarlas desde Perfil → Licencia."
         const val TITULO_SIN_ALERTAS_LICENCIA = "Sin alertas de licencia"
         const val MENSAJE_SIN_VEHICULOS =
             "Necesitas un vehículo activo para consultar sus alertas."
@@ -204,10 +205,7 @@ class AlertasViewModel(
         }
     }
 
-    /**
-     * RF23 LICENCIA: sin API de licencia en el MVP (RF51–56).
-     * Empty-state real EA06; no inventa tarjetas ni consulta por idVehiculo.
-     */
+    /** RF23 LICENCIA: listado personal + sync (sin idVehiculo). */
     private fun cargarLicencia() {
         val gen = mutable.value.generacionLicencia + 1
         mutable.value = mutable.value.copy(
@@ -216,14 +214,27 @@ class AlertasViewModel(
             mensajeLicencia = null
         )
         viewModelScope.launch {
-            // Placeholder: cuando exista endpoint personal, cablear aquí sin idVehiculo.
-            val s = mutable.value
-            if (s.generacionLicencia != gen || s.ambito != AmbitoAlertas.LICENCIA) return@launch
-            mutable.value = s.copy(
-                faseLicencia = FaseAlertas.VACIO,
-                alertasLicencia = emptyList(),
-                mensajeLicencia = EstadoAlertas.MENSAJE_SIN_ALERTAS_LICENCIA
-            )
+            try {
+                val (sync, lista) = repository.listarLicencia()
+                val s = mutable.value
+                if (s.generacionLicencia != gen || s.ambito != AmbitoAlertas.LICENCIA) return@launch
+                val sinAnuladas = lista.filter { it.estado != "ANULADA" }
+                mutable.value = s.copy(
+                    sincronizadasLicencia = sync,
+                    alertasLicencia = sinAnuladas,
+                    faseLicencia = if (sinAnuladas.isEmpty()) FaseAlertas.VACIO else FaseAlertas.LISTO,
+                    mensajeLicencia = if (sinAnuladas.isEmpty()) {
+                        EstadoAlertas.MENSAJE_SIN_ALERTAS_LICENCIA
+                    } else null
+                )
+            } catch (e: Exception) {
+                val s = mutable.value
+                if (s.generacionLicencia != gen || s.ambito != AmbitoAlertas.LICENCIA) return@launch
+                mutable.value = s.copy(
+                    faseLicencia = FaseAlertas.ERROR,
+                    mensajeLicencia = e.message ?: "No se pudieron cargar las alertas de licencia"
+                )
+            }
         }
     }
 

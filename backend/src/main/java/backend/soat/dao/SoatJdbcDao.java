@@ -14,6 +14,20 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class SoatJdbcDao {
     private final JdbcTemplate jdbc;
 
+    private static final String COLUMNAS_SOAT = """
+            id_soat, id_vehiculo, aseguradora, numero_poliza, numero_poliza_blind, crypto_key_id,
+            fecha_inicio, fecha_vencimiento, fecha_emision, nombre_contratante, importe_prima,
+            vigencia, recordatorio_activo, version_fila, storage_object_key, content_type,
+            tamano_bytes, nombre_original, documento_cifrado
+            """;
+
+    private static final String COLUMNAS_SOAT_S = """
+            s.id_soat, s.id_vehiculo, s.aseguradora, s.numero_poliza, s.numero_poliza_blind, s.crypto_key_id,
+            s.fecha_inicio, s.fecha_vencimiento, s.fecha_emision, s.nombre_contratante, s.importe_prima,
+            s.vigencia, s.recordatorio_activo, s.version_fila, s.storage_object_key, s.content_type,
+            s.tamano_bytes, s.nombre_original, s.documento_cifrado
+            """;
+
     public SoatJdbcDao(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -60,61 +74,58 @@ public class SoatJdbcDao {
     }
 
     public Optional<FilaSoat> obtenerActual(long vehiculo) {
-        return buscarUno("""
-                SELECT id_soat, id_vehiculo, aseguradora, numero_poliza, fecha_inicio, fecha_vencimiento,
-                       fecha_emision, nombre_contratante, importe_prima, vigencia, recordatorio_activo,
-                       version_fila, storage_object_key, content_type, tamano_bytes, nombre_original
-                FROM mycar.soat WHERE id_vehiculo = ? AND vigencia = 'ACTUAL'
-                """, vehiculo);
+        return buscarUno(
+                "SELECT " + COLUMNAS_SOAT + " FROM mycar.soat WHERE id_vehiculo = ? AND vigencia = 'ACTUAL'",
+                vehiculo);
     }
 
     public Optional<FilaSoat> obtenerPropio(long usuario, long vehiculo, long idSoat) {
-        return buscarUno("""
-                SELECT s.id_soat, s.id_vehiculo, s.aseguradora, s.numero_poliza, s.fecha_inicio, s.fecha_vencimiento,
-                       s.fecha_emision, s.nombre_contratante, s.importe_prima, s.vigencia, s.recordatorio_activo,
-                       s.version_fila, s.storage_object_key, s.content_type, s.tamano_bytes, s.nombre_original
-                FROM mycar.soat s
-                JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo
-                WHERE s.id_soat = ? AND s.id_vehiculo = ? AND v.id_usuario = ?
-                """, idSoat, vehiculo, usuario);
+        return buscarUno(
+                "SELECT " + COLUMNAS_SOAT_S
+                        + " FROM mycar.soat s"
+                        + " JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo"
+                        + " WHERE s.id_soat = ? AND s.id_vehiculo = ? AND v.id_usuario = ?",
+                idSoat, vehiculo, usuario);
     }
 
     public List<FilaSoat> listarHistorial(long vehiculo) {
-        return jdbc.query("""
-                SELECT id_soat, id_vehiculo, aseguradora, numero_poliza, fecha_inicio, fecha_vencimiento,
-                       fecha_emision, nombre_contratante, importe_prima, vigencia, recordatorio_activo,
-                       version_fila, storage_object_key, content_type, tamano_bytes, nombre_original
-                FROM mycar.soat WHERE id_vehiculo = ? AND vigencia = 'HISTORICO'
-                ORDER BY fecha_inicio DESC, id_soat DESC
-                """, (rs, n) -> mapear(rs), vehiculo);
+        return jdbc.query(
+                "SELECT " + COLUMNAS_SOAT
+                        + " FROM mycar.soat WHERE id_vehiculo = ? AND vigencia = 'HISTORICO'"
+                        + " ORDER BY fecha_inicio DESC, id_soat DESC",
+                (rs, n) -> mapear(rs),
+                vehiculo);
     }
 
     public long insertar(DatosInsercion d) {
         return jdbc.queryForObject("""
                 INSERT INTO mycar.soat(
-                    id_vehiculo, aseguradora, numero_poliza, fecha_inicio, fecha_vencimiento,
-                    fecha_emision, nombre_contratante, importe_prima, vigencia, recordatorio_activo,
-                    storage_object_key, content_type, tamano_bytes, nombre_original)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    id_vehiculo, aseguradora, numero_poliza, numero_poliza_blind, crypto_key_id,
+                    fecha_inicio, fecha_vencimiento, fecha_emision, nombre_contratante, importe_prima,
+                    vigencia, recordatorio_activo, storage_object_key, content_type, tamano_bytes,
+                    nombre_original, documento_cifrado)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 RETURNING id_soat
                 """, Long.class,
-                d.idVehiculo(), d.aseguradora(), d.numeroPoliza(), d.fechaInicio(), d.fechaVencimiento(),
-                d.fechaEmision(), d.nombreContratante(), d.importePrima(), d.vigencia(), d.recordatorioActivo(),
-                d.storageObjectKey(), d.contentType(), d.tamanoBytes(), d.nombreOriginal());
+                d.idVehiculo(), d.aseguradora(), d.numeroPoliza(), d.numeroPolizaBlind(), d.cryptoKeyId(),
+                d.fechaInicio(), d.fechaVencimiento(), d.fechaEmision(), d.nombreContratante(), d.importePrima(),
+                d.vigencia(), d.recordatorioActivo(), d.storageObjectKey(), d.contentType(), d.tamanoBytes(),
+                d.nombreOriginal(), d.documentoCifrado());
     }
 
     public int actualizarCorregir(DatosActualizacion d) {
         return jdbc.update("""
                 UPDATE mycar.soat SET
-                    aseguradora = ?, numero_poliza = ?, fecha_inicio = ?, fecha_vencimiento = ?,
-                    fecha_emision = ?, nombre_contratante = ?, importe_prima = ?,
-                    storage_object_key = ?, content_type = ?, tamano_bytes = ?, nombre_original = ?,
+                    aseguradora = ?, numero_poliza = ?, numero_poliza_blind = ?, crypto_key_id = ?,
+                    fecha_inicio = ?, fecha_vencimiento = ?, fecha_emision = ?, nombre_contratante = ?,
+                    importe_prima = ?, storage_object_key = ?, content_type = ?, tamano_bytes = ?,
+                    nombre_original = ?, documento_cifrado = ?,
                     version_fila = version_fila + 1, actualizado_utc = clock_timestamp()
                 WHERE id_soat = ? AND id_vehiculo = ? AND vigencia = 'ACTUAL' AND version_fila = ?
                 """,
-                d.aseguradora(), d.numeroPoliza(), d.fechaInicio(), d.fechaVencimiento(),
-                d.fechaEmision(), d.nombreContratante(), d.importePrima(),
-                d.storageObjectKey(), d.contentType(), d.tamanoBytes(), d.nombreOriginal(),
+                d.aseguradora(), d.numeroPoliza(), d.numeroPolizaBlind(), d.cryptoKeyId(),
+                d.fechaInicio(), d.fechaVencimiento(), d.fechaEmision(), d.nombreContratante(), d.importePrima(),
+                d.storageObjectKey(), d.contentType(), d.tamanoBytes(), d.nombreOriginal(), d.documentoCifrado(),
                 d.idSoat(), d.idVehiculo(), d.versionEsperada());
     }
 
@@ -141,29 +152,63 @@ public class SoatJdbcDao {
                 """, idSoat, usuario, antes, despues);
     }
 
-    public boolean duplicadoContextual(long vehiculo, String aseguradora, String poliza,
+    public boolean duplicadoContextual(long vehiculo, String aseguradora, String numeroPolizaBlind,
             LocalDate inicio, LocalDate vencimiento, Long excluirIdSoat) {
+        if (numeroPolizaBlind == null || numeroPolizaBlind.isBlank()) return false;
         Integer n = jdbc.queryForObject("""
                 SELECT COUNT(*)::int FROM mycar.soat
                 WHERE id_vehiculo = ?
                   AND lower(btrim(aseguradora)) = lower(btrim(?))
-                  AND lower(btrim(numero_poliza)) = lower(btrim(?))
+                  AND numero_poliza_blind = ?
                   AND daterange(fecha_inicio, fecha_vencimiento, '[]') && daterange(?, ?, '[]')
                   AND (?::bigint IS NULL OR id_soat <> ?)
-                """, Integer.class, vehiculo, aseguradora, poliza, inicio, vencimiento, excluirIdSoat, excluirIdSoat);
+                """, Integer.class, vehiculo, aseguradora, numeroPolizaBlind, inicio, vencimiento,
+                excluirIdSoat, excluirIdSoat);
         return n != null && n > 0;
     }
 
-    /** Misma póliza (solo dígitos) ya usada por cualquier SOAT de otro registro. */
-    public boolean polizaYaRegistrada(String poliza, Long excluirIdSoat) {
-        String digitos = poliza == null ? "" : poliza.replaceAll("[^0-9]", "");
-        if (digitos.isEmpty()) return false;
+    /** Misma póliza (índice ciego) ya usada por otro registro SOAT. */
+    public boolean polizaYaRegistrada(String numeroPolizaBlind, Long excluirIdSoat) {
+        if (numeroPolizaBlind == null || numeroPolizaBlind.isBlank()) return false;
         Integer n = jdbc.queryForObject("""
                 SELECT COUNT(*)::int FROM mycar.soat
-                WHERE regexp_replace(numero_poliza, '[^0-9]', '', 'g') = ?
+                WHERE numero_poliza_blind = ?
                   AND (?::bigint IS NULL OR id_soat <> ?)
-                """, Integer.class, digitos, excluirIdSoat, excluirIdSoat);
+                """, Integer.class, numeroPolizaBlind, excluirIdSoat, excluirIdSoat);
         return n != null && n > 0;
+    }
+
+    public List<FilaSinCifrado> listarSinCifrado(int limite) {
+        return jdbc.query("""
+                SELECT id_soat, id_vehiculo, numero_poliza, nombre_contratante
+                FROM mycar.soat
+                WHERE crypto_key_id IS NULL
+                ORDER BY id_soat
+                LIMIT ?
+                """, (rs, n) -> new FilaSinCifrado(
+                        rs.getLong("id_soat"),
+                        rs.getLong("id_vehiculo"),
+                        rs.getString("numero_poliza"),
+                        rs.getString("nombre_contratante")), limite);
+    }
+
+    public int actualizarCifrado(long idSoat, String numeroPoliza, String nombreContratante,
+            String numeroPolizaBlind, String cryptoKeyId) {
+        return jdbc.update("""
+                UPDATE mycar.soat SET numero_poliza = ?, nombre_contratante = ?,
+                    numero_poliza_blind = ?, crypto_key_id = ?, actualizado_utc = clock_timestamp()
+                WHERE id_soat = ? AND crypto_key_id IS NULL
+                """, numeroPoliza, nombreContratante, numeroPolizaBlind, cryptoKeyId, idSoat);
+    }
+
+    /** Tras alta: canónica AAD por id_soat (el insert usó AAD temporal por vehículo). */
+    public int reemplazarCifrado(long idSoat, String numeroPoliza, String nombreContratante,
+            String numeroPolizaBlind, String cryptoKeyId) {
+        return jdbc.update("""
+                UPDATE mycar.soat SET numero_poliza = ?, nombre_contratante = ?,
+                    numero_poliza_blind = ?, crypto_key_id = ?, actualizado_utc = clock_timestamp()
+                WHERE id_soat = ?
+                """, numeroPoliza, nombreContratante, numeroPolizaBlind, cryptoKeyId, idSoat);
     }
 
     /** Mismo vehículo + misma aseguradora + misma prima (si hay prima). */
@@ -277,25 +322,33 @@ public class SoatJdbcDao {
     }
 
     public record DatosInsercion(
-            long idVehiculo, String aseguradora, String numeroPoliza,
+            long idVehiculo, String aseguradora, String numeroPoliza, String numeroPolizaBlind, String cryptoKeyId,
             LocalDate fechaInicio, LocalDate fechaVencimiento, LocalDate fechaEmision,
             String nombreContratante, BigDecimal importePrima, String vigencia, boolean recordatorioActivo,
-            String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal
+            String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal,
+            boolean documentoCifrado
     ) { }
 
     public record DatosActualizacion(
             long idSoat, long idVehiculo, int versionEsperada,
-            String aseguradora, String numeroPoliza,
+            String aseguradora, String numeroPoliza, String numeroPolizaBlind, String cryptoKeyId,
             LocalDate fechaInicio, LocalDate fechaVencimiento, LocalDate fechaEmision,
             String nombreContratante, BigDecimal importePrima,
-            String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal
+            String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal,
+            boolean documentoCifrado
     ) { }
 
     public record FilaSoat(
             long idSoat, long idVehiculo, String aseguradora, String numeroPoliza,
+            String numeroPolizaBlind, String cryptoKeyId,
             LocalDate fechaInicio, LocalDate fechaVencimiento, LocalDate fechaEmision,
             String nombreContratante, BigDecimal importePrima, String vigencia, boolean recordatorioActivo,
-            int versionFila, String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal
+            int versionFila, String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal,
+            boolean documentoCifrado
+    ) { }
+
+    public record FilaSinCifrado(
+            long idSoat, long idVehiculo, String numeroPoliza, String nombreContratante
     ) { }
 
     public record AlertaSoat(long idAlerta, String estado) { }
@@ -307,17 +360,13 @@ public class SoatJdbcDao {
     }
 
     public static ContratoSoat.SoatDto aDto(FilaSoat f, LocalDate hoy) {
-        ContratoSoat.DocumentoDto doc = null;
-        if (f.storageObjectKey() != null) {
-            doc = new ContratoSoat.DocumentoDto(
-                    f.storageObjectKey(), f.contentType(), f.tamanoBytes(), f.nombreOriginal());
-        }
+        boolean tieneDocumento = f.storageObjectKey() != null && !f.storageObjectKey().isBlank();
         String cobertura = backend.soat.service.ValidadorSoat.estadoCobertura(
                 f.fechaInicio(), f.fechaVencimiento(), hoy);
         return new ContratoSoat.SoatDto(
                 f.idSoat(), f.aseguradora(), f.numeroPoliza(), f.fechaInicio(), f.fechaVencimiento(),
                 f.fechaEmision(), f.nombreContratante(), f.importePrima(), f.vigencia(),
-                cobertura, f.recordatorioActivo(), doc != null, f.versionFila(), doc);
+                cobertura, f.recordatorioActivo(), tieneDocumento, f.versionFila(), null);
     }
 
     private Optional<FilaSoat> buscarUno(String sql, Object... args) {
@@ -327,13 +376,14 @@ public class SoatJdbcDao {
     private static FilaSoat mapear(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new FilaSoat(
                 rs.getLong("id_soat"), rs.getLong("id_vehiculo"), rs.getString("aseguradora"),
-                rs.getString("numero_poliza"),
+                rs.getString("numero_poliza"), rs.getString("numero_poliza_blind"), rs.getString("crypto_key_id"),
                 rs.getObject("fecha_inicio", LocalDate.class), rs.getObject("fecha_vencimiento", LocalDate.class),
                 rs.getObject("fecha_emision", LocalDate.class), rs.getString("nombre_contratante"),
                 rs.getObject("importe_prima", BigDecimal.class), rs.getString("vigencia"),
                 rs.getBoolean("recordatorio_activo"), rs.getInt("version_fila"),
                 rs.getString("storage_object_key"), rs.getString("content_type"),
-                rs.getObject("tamano_bytes", Integer.class), rs.getString("nombre_original"));
+                rs.getObject("tamano_bytes", Integer.class), rs.getString("nombre_original"),
+                rs.getBoolean("documento_cifrado"));
     }
 
     private void exigirTx() {

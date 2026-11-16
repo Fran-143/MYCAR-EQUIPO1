@@ -67,6 +67,8 @@ fun NotificacionesRoute(
     repository: NotificacionesRepository,
     onVolver: () -> Unit,
     onAbrirDetalleAlerta: (idVehiculo: Long, idAlerta: Long) -> Unit,
+    onAbrirSoatDesdeAviso: ((idVehiculo: Long) -> Unit)? = null,
+    onAbrirLicenciaDesdeAviso: (() -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -96,9 +98,24 @@ fun NotificacionesRoute(
             vm.abrir(
                 item,
                 onDestino = { lectura: ResultadoLectura ->
-                    val idV = lectura.idVehiculo
-                    val idA = lectura.idAlerta
-                    if (idV != null && idA != null) onAbrirDetalleAlerta(idV, idA)
+                    when (item.categoria) {
+                        "LICENCIA" -> onAbrirLicenciaDesdeAviso?.invoke()
+                            ?: run { avisoDestino = "No se pudo abrir la licencia." }
+                        "SOAT" -> {
+                            val idV = lectura.idVehiculo
+                            if (idV != null && idV > 0) {
+                                onAbrirSoatDesdeAviso?.invoke(idV)
+                                    ?: onAbrirDetalleAlerta(idV, lectura.idAlerta ?: 0)
+                            } else {
+                                avisoDestino = "No se pudo abrir el SOAT."
+                            }
+                        }
+                        else -> {
+                            val idV = lectura.idVehiculo
+                            val idA = lectura.idAlerta
+                            if (idV != null && idA != null) onAbrirDetalleAlerta(idV, idA)
+                        }
+                    }
                 },
                 onDestinoInvalido = { avisoDestino = it }
             )

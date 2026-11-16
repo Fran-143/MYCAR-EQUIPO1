@@ -18,12 +18,12 @@ object AuthGraph {
         instance ?: run {
             val app = context.applicationContext
             val client = OkHttpClient.Builder()
-                .retryOnConnectionFailure(false)
+                .retryOnConnectionFailure(true)
                 .followRedirects(false)
                 .followSslRedirects(false)
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(20, TimeUnit.SECONDS)
-                .callTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(45, TimeUnit.SECONDS)
                 .build()
             val retrofit = Retrofit.Builder().baseUrl(BuildConfig.API_BASE_URL)
                 .client(client).addConverterFactory(GsonConverterFactory.create()).build()

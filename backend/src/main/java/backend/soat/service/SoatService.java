@@ -1,5 +1,6 @@
 package backend.soat.service;
 
+import backend.crypto.DatosSensiblesCryptoGate;
 import backend.documentos.AlmacenamientoDocumentos;
 import backend.documentos.ErrorAlmacenamiento;
 import backend.documentos.RutasDocumentoSoat;
@@ -28,15 +29,17 @@ public class SoatService {
     private final SoatJdbcDao dao;
     private final OperacionVehiculoDao operaciones;
     private final AlmacenamientoDocumentos almacenamiento;
+    private final DatosSensiblesCryptoGate cryptoGate;
     private final ObjectMapper json;
     private final ObjectProvider<NotificacionInternaService> notificaciones;
 
     public SoatService(SoatJdbcDao dao, OperacionVehiculoDao operaciones,
-            AlmacenamientoDocumentos almacenamiento, ObjectMapper json,
-            ObjectProvider<NotificacionInternaService> notificaciones) {
+            AlmacenamientoDocumentos almacenamiento, DatosSensiblesCryptoGate cryptoGate,
+            ObjectMapper json, ObjectProvider<NotificacionInternaService> notificaciones) {
         this.dao = dao;
         this.operaciones = operaciones;
         this.almacenamiento = almacenamiento;
+        this.cryptoGate = cryptoGate;
         this.json = json;
         this.notificaciones = notificaciones;
     }
@@ -45,10 +48,10 @@ public class SoatService {
     public ContratoSoat.ConsultaResponse consultar(long usuario, long vehiculo) {
         exigirTitularidadConsulta(usuario, vehiculo);
         LocalDate hoy = dao.hoyLima();
-        var actualOpt = dao.obtenerActual(vehiculo).map(f -> SoatJdbcDao.aDto(f, hoy));
+        var actualOpt = dao.obtenerActual(vehiculo).map(f -> dtoPublico(f, hoy));
         String estado = actualOpt.map(ContratoSoat.SoatDto::estadoCobertura).orElse(null);
         var historial = dao.listarHistorial(vehiculo).stream()
-                .map(f -> SoatJdbcDao.aDto(f, hoy)).toList();
+                .map(f -> dtoPublico(f, hoy)).toList();
         ContratoSoat.RecordatorioDto recordatorio = null;
         if (actualOpt.isPresent()) {
             var alerta = dao.alertaActivaPorSoat(actualOpt.get().idSoat()).orElse(null);
@@ -81,11 +84,12 @@ public class SoatService {
         if (dao.existeActual(vehiculo)) {
             throw new ErrorSoat("SOAT_ACTUAL_EXISTE", "Este vehículo ya tiene un SOAT vigente documental.");
         }
-        if (dao.duplicadoContextual(vehiculo, req.aseguradora(), req.numeroPoliza(),
+        String polizaBlind = blindDePoliza(req.numeroPoliza());
+        if (dao.duplicadoContextual(vehiculo, req.aseguradora(), polizaBlind,
                 req.fechaInicio(), req.fechaVencimiento(), null)) {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
         }
-        if (dao.polizaYaRegistrada(req.numeroPoliza(), null)) {
+        if (dao.polizaYaRegistrada(polizaBlind, null)) {
             throw new ErrorSoat("SOAT_POLIZA_DUPLICADA",
                     "Este número de póliza ya está registrado",
                     Set.of("numeroPoliza"));
@@ -95,14 +99,17 @@ public class SoatService {
                     Set.of("aseguradora", "importePrima"));
         }
         var doc = resolverDocumentoNuevo(usuario, vehiculo, null, req.documento());
+        var sensibles = sellarCampos(vehiculo, null, req.numeroPoliza(), blancoANull(req.nombreContratante()));
         try {
             long idSoat = dao.insertar(new SoatJdbcDao.DatosInsercion(
-                    vehiculo, req.aseguradora().strip(), req.numeroPoliza().strip(),
+                    vehiculo, req.aseguradora().strip(), sensibles.polizaCifrada(), sensibles.blind(), sensibles.keyId(),
                     req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(),
-                    blancoANull(req.nombreContratante()), req.importePrima(),
+                    sensibles.nombreCifrado(), req.importePrima(),
                     "ACTUAL", false,
                     doc == null ? null : doc.objectKey(), doc == null ? null : doc.contentType(),
-                    doc == null ? null : doc.tamanoBytes(), doc == null ? null : doc.nombreOriginal()));
+                    doc == null ? null : doc.tamanoBytes(), doc == null ? null : doc.nombreOriginal(),
+                    documentoEstaCifrado(doc)));
+            resellarTrasAlta(idSoat, vehiculo, req.numeroPoliza(), blancoANull(req.nombreContratante()), sensibles.blind());
             LocalDate hoy = dao.hoyLima();
             String cobertura = ValidadorSoat.estadoCobertura(req.fechaInicio(), req.fechaVencimiento(), hoy);
             var resp = new ContratoSoat.RegistrarResponse(req.idOperacion(), idSoat, cobertura);
@@ -126,11 +133,12 @@ public class SoatService {
         var actual = dao.obtenerPropio(usuario, vehiculo, idSoat)
                 .filter(s -> "ACTUAL".equals(s.vigencia()))
                 .orElseThrow(() -> new ErrorSoat("SOAT_NO_ENCONTRADO", "SOAT no encontrado."));
-        if (dao.duplicadoContextual(vehiculo, req.aseguradora(), req.numeroPoliza(),
+        String polizaBlind = blindDePoliza(req.numeroPoliza());
+        if (dao.duplicadoContextual(vehiculo, req.aseguradora(), polizaBlind,
                 req.fechaInicio(), req.fechaVencimiento(), idSoat)) {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
         }
-        if (dao.polizaYaRegistrada(req.numeroPoliza(), idSoat)) {
+        if (dao.polizaYaRegistrada(polizaBlind, idSoat)) {
             throw new ErrorSoat("SOAT_POLIZA_DUPLICADA",
                     "Este número de póliza ya está registrado",
                     Set.of("numeroPoliza"));
@@ -144,12 +152,14 @@ public class SoatService {
             throw new ErrorSoat("SIN_CAMBIOS", "No hay cambios para guardar.");
         }
         String antes = serializar(actual);
+        var sensibles = sellarCampos(vehiculo, idSoat, req.numeroPoliza(), blancoANull(req.nombreContratante()));
         int filas = dao.actualizarCorregir(new SoatJdbcDao.DatosActualizacion(
                 idSoat, vehiculo, actual.versionFila(),
-                req.aseguradora().strip(), req.numeroPoliza().strip(),
+                req.aseguradora().strip(), sensibles.polizaCifrada(), sensibles.blind(), sensibles.keyId(),
                 req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(),
-                blancoANull(req.nombreContratante()), req.importePrima(),
-                doc.objectKey(), doc.contentType(), doc.tamanoBytes(), doc.nombreOriginal()));
+                sensibles.nombreCifrado(), req.importePrima(),
+                doc.objectKey(), doc.contentType(), doc.tamanoBytes(), doc.nombreOriginal(),
+                doc.documentoCifrado()));
         if (filas != 1) throw new ErrorSoat("CONFLICTO_VERSION", "El SOAT cambió. Vuelve a cargar.");
         // Solo tras COMMIT lógico de la fila: limpiar objeto sustituido/quitado (conservar si falla).
         limpiarDocumentoAnteriorSiCorresponde(actual.storageObjectKey(), doc.objectKey(), req.accionDocumento());
@@ -193,11 +203,12 @@ public class SoatService {
             throw new ErrorSoat("SOAT_SOLAPE",
                     "La nueva vigencia no puede empezar antes de que termine la actual.");
         }
-        if (dao.duplicadoContextual(vehiculo, req.aseguradora(), req.numeroPoliza(),
+        String polizaBlind = blindDePoliza(req.numeroPoliza());
+        if (dao.duplicadoContextual(vehiculo, req.aseguradora(), polizaBlind,
                 req.fechaInicio(), req.fechaVencimiento(), null)) {
             throw new ErrorSoat("SOAT_DUPLICADO", "Ya existe un SOAT equivalente en ese período.");
         }
-        if (dao.polizaYaRegistrada(req.numeroPoliza(), req.idSoatAnterior())) {
+        if (dao.polizaYaRegistrada(polizaBlind, req.idSoatAnterior())) {
             throw new ErrorSoat("SOAT_POLIZA_DUPLICADA",
                     "Este número de póliza ya está registrado",
                     Set.of("numeroPoliza"));
@@ -211,13 +222,16 @@ public class SoatService {
         int hist = dao.marcarHistorico(anterior.idSoat(), vehiculo, anterior.versionFila());
         if (hist != 1) throw new ErrorSoat("CONFLICTO_VERSION", "No se pudo archivar el SOAT anterior.");
         var doc = resolverDocumentoNuevo(usuario, vehiculo, null, req.documento());
+        var sensibles = sellarCampos(vehiculo, null, req.numeroPoliza(), blancoANull(req.nombreContratante()));
         long idNuevo = dao.insertar(new SoatJdbcDao.DatosInsercion(
-                vehiculo, req.aseguradora().strip(), req.numeroPoliza().strip(),
+                vehiculo, req.aseguradora().strip(), sensibles.polizaCifrada(), sensibles.blind(), sensibles.keyId(),
                 req.fechaInicio(), req.fechaVencimiento(), req.fechaEmision(),
-                blancoANull(req.nombreContratante()), req.importePrima(),
+                sensibles.nombreCifrado(), req.importePrima(),
                 "ACTUAL", recordatorio,
                 doc == null ? null : doc.objectKey(), doc == null ? null : doc.contentType(),
-                doc == null ? null : doc.tamanoBytes(), doc == null ? null : doc.nombreOriginal()));
+                doc == null ? null : doc.tamanoBytes(), doc == null ? null : doc.nombreOriginal(),
+                documentoEstaCifrado(doc)));
+        resellarTrasAlta(idNuevo, vehiculo, req.numeroPoliza(), blancoANull(req.nombreContratante()), sensibles.blind());
         if (recordatorio) {
             long idAlerta = activarAlerta(idNuevo, vehiculo, req.fechaVencimiento());
             sincronizarNotificacion(idAlerta);
@@ -268,17 +282,55 @@ public class SoatService {
     }
 
     @Transactional(readOnly = true)
-    public ContratoSoat.DocumentoDescargaResponse descargarDocumento(long usuario, long vehiculo, long idSoat) {
+    public SoatJdbcDao.FilaSoat obtenerFilaDocumento(long usuario, long vehiculo, long idSoat) {
         exigirTitularidadConsulta(usuario, vehiculo);
-        var fila = dao.obtenerPropio(usuario, vehiculo, idSoat)
+        return dao.obtenerPropio(usuario, vehiculo, idSoat)
                 .orElseThrow(() -> new ErrorSoat("SOAT_NO_ENCONTRADO", "SOAT no encontrado."));
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] leerDocumentoBytes(long usuario, long vehiculo, long idSoat) {
+        var fila = obtenerFilaDocumento(usuario, vehiculo, idSoat);
         if (fila.storageObjectKey() == null) {
             throw new ErrorSoat("DOCUMENTO_NO_DISPONIBLE", "Este SOAT no tiene documento adjunto.");
         }
         try {
-            var presign = almacenamiento.generarPresignDownload(fila.storageObjectKey());
-            return new ContratoSoat.DocumentoDescargaResponse(
-                    presign.url(), presign.expiresAt(), fila.nombreOriginal());
+            byte[] almacenado = almacenamiento.leer(fila.storageObjectKey());
+            String aad = aadDoc(fila.storageObjectKey());
+            if (fila.documentoCifrado()) {
+                try {
+                    return cryptoGate.abrirBytes(almacenado, aad);
+                } catch (RuntimeException ignorada) {
+                    return almacenado;
+                }
+            }
+            try {
+                return cryptoGate.abrirBytes(almacenado, aad);
+            } catch (RuntimeException ignorada) {
+                return almacenado;
+            }
+        } catch (ErrorAlmacenamiento ex) {
+            throw new ErrorSoat(ex.codigo(), ex.getMessage());
+        }
+    }
+
+    @Transactional
+    public ContratoSoat.DocumentoDto subirDocumentoAutenticado(
+            long usuario, long vehiculo, String contentType, String nombreOriginal, byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            throw new ErrorSoat("DATOS_INVALIDOS", "Archivo vacío.", Set.of("file"));
+        }
+        var solicitud = new ContratoSoat.PresignUploadRequest(contentType, bytes.length, nombreOriginal);
+        ValidadorSoat.exigirPresign(solicitud);
+        exigirVehiculoActivoMutacion(usuario, vehiculo);
+        cryptoGate.exigir();
+        String nombre = RutasDocumentoSoat.nombreSeguro(nombreOriginal);
+        String key = RutasDocumentoSoat.claveTemp(usuario, vehiculo, nombre);
+        String ct = contentType == null ? "application/octet-stream" : contentType.strip();
+        try {
+            byte[] cifrado = cryptoGate.sellarBytes(bytes, aadDoc(key));
+            almacenamiento.guardar(key, cifrado, ct);
+            return new ContratoSoat.DocumentoDto(key, ct, bytes.length, nombreOriginal, true);
         } catch (ErrorAlmacenamiento ex) {
             throw new ErrorSoat(ex.codigo(), ex.getMessage());
         }
@@ -341,15 +393,17 @@ public class SoatService {
             long usuario, long vehiculo, SoatJdbcDao.FilaSoat actual, ContratoSoat.CorregirRequest req) {
         return switch (req.accionDocumento()) {
             case MANTENER -> new DocumentoResuelto(
-                    actual.storageObjectKey(), actual.contentType(), actual.tamanoBytes(), actual.nombreOriginal());
-            case QUITAR -> new DocumentoResuelto(null, null, null, null);
+                    actual.storageObjectKey(), actual.contentType(), actual.tamanoBytes(), actual.nombreOriginal(),
+                    actual.documentoCifrado());
+            case QUITAR -> new DocumentoResuelto(null, null, null, null, false);
             case REEMPLAZAR -> {
                 ContratoSoat.DocumentoDto nuevo = resolverDocumentoNuevo(usuario, vehiculo, actual.idSoat(), req.documento());
                 if (nuevo == null) {
-                    yield new DocumentoResuelto(null, null, null, null);
+                    yield new DocumentoResuelto(null, null, null, null, false);
                 }
                 yield new DocumentoResuelto(
-                        nuevo.objectKey(), nuevo.contentType(), nuevo.tamanoBytes(), nuevo.nombreOriginal());
+                        nuevo.objectKey(), nuevo.contentType(), nuevo.tamanoBytes(), nuevo.nombreOriginal(),
+                        documentoEstaCifrado(nuevo));
             }
         };
     }
@@ -468,7 +522,20 @@ public class SoatService {
 
     private String serializar(SoatJdbcDao.FilaSoat fila) {
         try {
-            return json.writeValueAsString(SoatJdbcDao.aDto(fila));
+            var claro = descifrarFila(fila);
+            var snap = new java.util.LinkedHashMap<String, Object>();
+            snap.put("idSoat", claro.idSoat());
+            snap.put("aseguradora", claro.aseguradora());
+            snap.put("numeroPoliza", mascarPoliza(claro.numeroPoliza()));
+            snap.put("fechaInicio", claro.fechaInicio());
+            snap.put("fechaVencimiento", claro.fechaVencimiento());
+            snap.put("fechaEmision", claro.fechaEmision());
+            snap.put("importePrima", claro.importePrima());
+            snap.put("vigencia", claro.vigencia());
+            snap.put("recordatorioActivo", claro.recordatorioActivo());
+            snap.put("tieneDocumento", claro.storageObjectKey() != null && !claro.storageObjectKey().isBlank());
+            snap.put("versionFila", claro.versionFila());
+            return json.writeValueAsString(snap);
         } catch (Exception ex) {
             throw new IllegalStateException("No se pudo serializar SOAT", ex);
         }
@@ -479,25 +546,28 @@ public class SoatService {
         return texto.strip();
     }
 
-    private static boolean sinCambiosCorregir(
+    private boolean sinCambiosCorregir(
             SoatJdbcDao.FilaSoat actual, ContratoSoat.CorregirRequest req, DocumentoResuelto doc) {
         if (req.accionDocumento() != ContratoSoat.AccionDocumento.MANTENER
                 && req.accionDocumento() != ContratoSoat.AccionDocumento.QUITAR
                 && req.accionDocumento() != ContratoSoat.AccionDocumento.REEMPLAZAR) {
             return false;
         }
-        boolean mismosDatos = Objects.equals(norm(actual.aseguradora()), norm(req.aseguradora()))
-                && Objects.equals(norm(actual.numeroPoliza()), norm(req.numeroPoliza()))
-                && Objects.equals(actual.fechaInicio(), req.fechaInicio())
-                && Objects.equals(actual.fechaVencimiento(), req.fechaVencimiento())
-                && Objects.equals(actual.fechaEmision(), req.fechaEmision())
-                && Objects.equals(blancoANull(actual.nombreContratante()), blancoANull(req.nombreContratante()))
-                && Objects.equals(actual.importePrima(), req.importePrima());
+        var claro = descifrarFila(actual);
+        boolean mismosDatos = Objects.equals(norm(claro.aseguradora()), norm(req.aseguradora()))
+                && Objects.equals(norm(claro.numeroPoliza()), norm(req.numeroPoliza()))
+                && Objects.equals(claro.fechaInicio(), req.fechaInicio())
+                && Objects.equals(claro.fechaVencimiento(), req.fechaVencimiento())
+                && Objects.equals(claro.fechaEmision(), req.fechaEmision())
+                && Objects.equals(blancoANull(claro.nombreContratante()), blancoANull(req.nombreContratante()))
+                && Objects.equals(claro.importePrima(), req.importePrima());
         if (!mismosDatos) return false;
         return switch (req.accionDocumento()) {
-            case MANTENER -> Objects.equals(actual.storageObjectKey(), doc.objectKey());
+            case MANTENER -> Objects.equals(actual.storageObjectKey(), doc.objectKey())
+                    && actual.documentoCifrado() == doc.documentoCifrado();
             case QUITAR -> actual.storageObjectKey() == null;
-            case REEMPLAZAR -> Objects.equals(actual.storageObjectKey(), doc.objectKey());
+            case REEMPLAZAR -> Objects.equals(actual.storageObjectKey(), doc.objectKey())
+                    && actual.documentoCifrado() == doc.documentoCifrado();
         };
     }
 
@@ -505,5 +575,97 @@ public class SoatService {
         return valor == null ? null : valor.strip();
     }
 
-    private record DocumentoResuelto(String objectKey, String contentType, Integer tamanoBytes, String nombreOriginal) { }
+    private ContratoSoat.SoatDto dtoPublico(SoatJdbcDao.FilaSoat fila, LocalDate hoy) {
+        return SoatJdbcDao.aDto(descifrarFila(fila), hoy);
+    }
+
+    private SoatJdbcDao.FilaSoat descifrarFila(SoatJdbcDao.FilaSoat fila) {
+        String poliza = abrirCampoSoat(fila.numeroPoliza(), aadPoliza(fila.idSoat()), aadPolizaVehiculo(fila.idVehiculo()));
+        String nombre = abrirCampoSoat(
+                fila.nombreContratante(), aadContratante(fila.idSoat()), aadContratanteVehiculo(fila.idVehiculo()));
+        return new SoatJdbcDao.FilaSoat(
+                fila.idSoat(), fila.idVehiculo(), fila.aseguradora(), poliza, fila.numeroPolizaBlind(),
+                fila.cryptoKeyId(), fila.fechaInicio(), fila.fechaVencimiento(), fila.fechaEmision(), nombre,
+                fila.importePrima(), fila.vigencia(), fila.recordatorioActivo(), fila.versionFila(),
+                fila.storageObjectKey(), fila.contentType(), fila.tamanoBytes(), fila.nombreOriginal(),
+                fila.documentoCifrado());
+    }
+
+    /** Alta usa AAD por vehículo hasta tener id; lectura acepta ambos. */
+    private String abrirCampoSoat(String valor, String aadId, String aadVehiculo) {
+        try {
+            return cryptoGate.abrirCampo(valor, aadId);
+        } catch (RuntimeException primera) {
+            try {
+                return cryptoGate.abrirCampo(valor, aadVehiculo);
+            } catch (RuntimeException ignorada) {
+                throw primera;
+            }
+        }
+    }
+
+    private void resellarTrasAlta(long idSoat, long vehiculo, String poliza, String nombre, String blind) {
+        var canonicos = sellarCampos(vehiculo, idSoat, poliza, nombre);
+        dao.reemplazarCifrado(idSoat, canonicos.polizaCifrada(), canonicos.nombreCifrado(),
+                blind != null ? blind : canonicos.blind(), canonicos.keyId());
+    }
+
+    private CamposSellados sellarCampos(long vehiculo, Long idSoat, String poliza, String nombre) {
+        var crypto = cryptoGate.exigir();
+        String polizaPlano = poliza.strip();
+        String blind = crypto.indiceCiego(polizaPlano.replaceAll("[^0-9]", ""));
+        String polizaAad = idSoat == null ? "soat|poliza|v|" + vehiculo : aadPoliza(idSoat);
+        String nombreAad = idSoat == null ? "soat|contratante|v|" + vehiculo : aadContratante(idSoat);
+        String polizaCifrada = crypto.sellar(polizaPlano, polizaAad);
+        String nombreCifrado = nombre == null ? null : crypto.sellar(nombre, nombreAad);
+        return new CamposSellados(polizaCifrada, nombreCifrado, blind, crypto.keyId());
+    }
+
+    private String blindDePoliza(String poliza) {
+        if (poliza == null || poliza.isBlank()) {
+            return null;
+        }
+        return cryptoGate.indiceCiego(poliza.strip().replaceAll("[^0-9]", ""));
+    }
+
+    private static boolean documentoEstaCifrado(ContratoSoat.DocumentoDto doc) {
+        return doc != null && Boolean.TRUE.equals(doc.cifrado());
+    }
+
+    private static String aadPoliza(long idSoat) {
+        return "soat|poliza|" + idSoat;
+    }
+
+    private static String aadPolizaVehiculo(long idVehiculo) {
+        return "soat|poliza|v|" + idVehiculo;
+    }
+
+    private static String aadContratante(long idSoat) {
+        return "soat|contratante|" + idSoat;
+    }
+
+    private static String aadContratanteVehiculo(long idVehiculo) {
+        return "soat|contratante|v|" + idVehiculo;
+    }
+
+    private static String aadDoc(String objectKey) {
+        return "soat|doc|" + objectKey;
+    }
+
+    private static String mascarPoliza(String poliza) {
+        if (poliza == null || poliza.isBlank()) {
+            return null;
+        }
+        String digitos = poliza.replaceAll("[^0-9]", "");
+        if (digitos.length() <= 4) {
+            return "****";
+        }
+        return "****" + digitos.substring(digitos.length() - 4);
+    }
+
+    private record CamposSellados(String polizaCifrada, String nombreCifrado, String blind, String keyId) { }
+
+    private record DocumentoResuelto(
+            String objectKey, String contentType, Integer tamanoBytes, String nombreOriginal, boolean documentoCifrado
+    ) { }
 }

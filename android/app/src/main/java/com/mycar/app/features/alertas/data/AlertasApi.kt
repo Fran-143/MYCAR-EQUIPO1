@@ -13,6 +13,12 @@ interface AlertasApi {
     @GET("api/v1/rf22/vehiculos/{idVehiculo}/alertas")
     suspend fun listar(@Path("idVehiculo") idVehiculo: Long): ListaAlertasDto
 
+    @GET("api/v1/rf22/alertas/licencia")
+    suspend fun listarLicencia(): ListaAlertasDto
+
+    @GET("api/v1/rf22/alertas/licencia/{idAlerta}")
+    suspend fun detalleLicencia(@Path("idAlerta") idAlerta: Long): DetalleAlertaDto
+
     @GET("api/v1/rf22/vehiculos/{idVehiculo}/alertas/{idAlerta}")
     suspend fun detalle(
         @Path("idVehiculo") idVehiculo: Long,

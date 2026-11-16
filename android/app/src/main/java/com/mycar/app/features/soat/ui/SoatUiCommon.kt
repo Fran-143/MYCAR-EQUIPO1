@@ -5,8 +5,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -63,6 +70,7 @@ fun SoatScaffold(
 
 @Composable
 fun SoatTarjetaDatos(soat: SoatDto, modifier: Modifier = Modifier) {
+    var polizaVisible by remember(soat.idSoat) { mutableStateOf(false) }
     Card(
         modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -83,7 +91,13 @@ fun SoatTarjetaDatos(soat: SoatDto, modifier: Modifier = Modifier) {
                 }
             }
             FilaSoat("Aseguradora", soat.aseguradora)
-            FilaSoat("Póliza", soat.numeroPoliza)
+            FilaSoatSensibles(
+                etiqueta = "Póliza",
+                valorCompleto = soat.numeroPoliza,
+                valorEnmascarado = SoatFormulario.enmascararPoliza(soat.numeroPoliza),
+                visible = polizaVisible,
+                onToggle = { polizaVisible = !polizaVisible }
+            )
             FilaSoat("Inicio", SoatFormulario.formatearFecha(soat.fechaInicio))
             FilaSoat("Vencimiento", SoatFormulario.formatearFecha(soat.fechaVencimiento))
             soat.fechaEmision?.let { FilaSoat("Emisión", SoatFormulario.formatearFecha(it)) }
@@ -112,6 +126,38 @@ fun FilaSoat(etiqueta: String, valor: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(etiqueta, color = MyCarMuted)
         Text(valor, fontWeight = FontWeight.Medium, color = MyCarNavy, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+@Composable
+fun FilaSoatSensibles(
+    etiqueta: String,
+    valorCompleto: String,
+    valorEnmascarado: String,
+    visible: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(etiqueta, color = MyCarMuted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (visible) valorCompleto else valorEnmascarado,
+                fontWeight = FontWeight.Medium,
+                color = MyCarNavy,
+                modifier = Modifier.padding(start = 12.dp)
+            )
+            IconButton(onClick = onToggle) {
+                Icon(
+                    imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = if (visible) "Ocultar póliza" else "Mostrar póliza",
+                    tint = MyCarBlue
+                )
+            }
+        }
     }
 }
 

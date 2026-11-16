@@ -94,8 +94,15 @@ class NotificacionesViewModel(
                     )
                 }
                 when {
-                    item.categoria == "SOAT" || item.categoria == "LICENCIA" ->
-                        onDestinoInvalido(mensajeDestinoNoDisponible(item.categoria))
+                    lectura.destino == "DETALLE_ALERTA"
+                        && item.categoria == "LICENCIA"
+                        && (lectura.idAlerta ?: 0) > 0 ->
+                        onDestino(lectura)
+                    lectura.destino == "DETALLE_ALERTA"
+                        && item.categoria == "SOAT"
+                        && (lectura.idAlerta ?: 0) > 0
+                        && (lectura.idVehiculo ?: 0) > 0 ->
+                        onDestino(lectura)
                     lectura.destino == "DETALLE_ALERTA"
                         && item.categoria == "MANTENIMIENTO"
                         && (lectura.idAlerta ?: 0) > 0
@@ -178,9 +185,4 @@ class NotificacionesViewModel(
         }
     }
 
-    private fun mensajeDestinoNoDisponible(categoria: String): String = when (categoria) {
-        "SOAT" -> "El detalle de SOAT aún no está disponible en esta versión."
-        "LICENCIA" -> "El detalle de licencia aún no está disponible en esta versión."
-        else -> "Este aviso ya no tiene un detalle disponible. Revisa el historial de alertas."
-    }
 }

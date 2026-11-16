@@ -6,10 +6,14 @@ import backend.vehiculos.seguridad.IdentidadVehiculos;
 import backend.vehiculos.seguridad.SesionVehiculosNoValidada;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/vehiculos/{idVehiculo}/soat")
@@ -64,11 +68,37 @@ public class SoatController {
     }
 
     @GetMapping("/{idSoat}/documento")
-    public ContratoSoat.DocumentoDescargaResponse documento(
+    public ResponseEntity<byte[]> documento(
             Authentication autenticacion,
             @PathVariable long idVehiculo,
             @PathVariable long idSoat) {
-        return servicio.descargarDocumento(usuario(autenticacion), idVehiculo, idSoat);
+        long usuario = usuario(autenticacion);
+        var fila = servicio.obtenerFilaDocumento(usuario, idVehiculo, idSoat);
+        if (fila.storageObjectKey() == null) {
+            throw new backend.soat.model.ErrorSoat("DOCUMENTO_NO_DISPONIBLE", "Este SOAT no tiene documento adjunto.");
+        }
+        byte[] cuerpo = servicio.leerDocumentoBytes(usuario, idVehiculo, idSoat);
+        String tipo = fila.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : fila.contentType();
+        String nombre = fila.nombreOriginal() == null ? "documento" : fila.nombreOriginal();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(tipo))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nombre.replace("\"", "") + "\"")
+                .body(cuerpo);
+    }
+
+    @PostMapping(value = "/documentos/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ContratoSoat.DocumentoDto subirDocumento(
+            Authentication autenticacion,
+            @PathVariable long idVehiculo,
+            @RequestParam("file") MultipartFile archivo,
+            @RequestParam(value = "contentType", required = false) String contentType,
+            @RequestParam("nombreOriginal") String nombreOriginal) throws java.io.IOException {
+        long usuario = usuario(autenticacion);
+        String ct = (contentType == null || contentType.isBlank())
+                ? (archivo.getContentType() == null ? "application/octet-stream" : archivo.getContentType())
+                : contentType;
+        return servicio.subirDocumentoAutenticado(
+                usuario, idVehiculo, ct, nombreOriginal, archivo.getBytes());
     }
 
     @PostMapping("/documentos/presign-upload")

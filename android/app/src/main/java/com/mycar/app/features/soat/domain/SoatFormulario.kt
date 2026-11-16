@@ -62,6 +62,14 @@ object SoatFormulario {
     const val MSG_POLIZA_VACIA = "Indica el número de póliza."
     const val MSG_FECHA_MENOR_HOY = "La fecha no puede ser menor a la fecha actual"
     const val MSG_INICIO_FUTURO = "La fecha de inicio no puede ser posterior a hoy"
+
+    /** Últimos 4 caracteres visibles; el resto enmascarado. No persistir preferencia de revelación. */
+    fun enmascararPoliza(poliza: String?): String {
+        val p = poliza?.trim().orEmpty()
+        if (p.isEmpty()) return ""
+        if (p.length <= 4) return "****"
+        return "****" + p.takeLast(4)
+    }
     const val MSG_VIGENCIA_ANUAL =
         "El SOAT ordinario debe tener vigencia anual (aniversario calendario)"
     const val MSG_RENOV_INICIO =
