@@ -18,7 +18,8 @@ class RemoteRegistroVehiculoRepository(private val api: RegistroVehiculoApi) : R
     }
     override suspend fun cupo(): CupoRegistroDto {
         val c = cuerpo(api.cupo())
-        if (c.plan != "FREE" || c.limite != 1 || c.registrados < 0 ||
+        // Acepta FREE/PREMIUM con el límite real del plan (p. ej. cupo temporal V16 ≠ 1).
+        if (c.plan !in setOf("FREE", "PREMIUM") || c.limite <= 0 || c.registrados < 0 ||
             c.puedeRegistrar != (c.registrados < c.limite)) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
         return c
     }

@@ -51,5 +51,15 @@ services:
         sync: false
       - key: MYCAR_DOCUMENTOS_SUPABASE_BUCKET
         value: mycar-documentos-privados
+      # Cifrado SOAT/Licencia (AES-GCM). Los 4 valores van en Dashboard (sync:false).
+      # Si ENABLED=true sin AES/BLIND el arranque falla; no forzar enabled aquí.
+      - key: MYCAR_DATOS_SENSIBLES_ENABLED
+        sync: false
+      - key: MYCAR_DATOS_SENSIBLES_KEY_ID
+        sync: false
+      - key: MYCAR_DATOS_SENSIBLES_AES_KEY
+        sync: false
+      - key: MYCAR_DATOS_SENSIBLES_BLIND_KEY
+        sync: false
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError"

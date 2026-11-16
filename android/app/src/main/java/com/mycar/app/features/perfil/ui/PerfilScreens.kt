@@ -40,7 +40,11 @@ fun PerfilRoute(
 ) {
     val estado by vm.estado.collectAsState()
     LaunchedEffect(estado.sesionInvalida) { if (estado.sesionInvalida) onSesionInvalida() }
-    BackHandler {
+    // LICENCIA / notificaciones manejan su propio atrás (p. ej. fotos → formulario).
+    BackHandler(
+        enabled = estado.pantalla != PantallaPerfil.LICENCIA &&
+            estado.pantalla != PantallaPerfil.NOTIFICACIONES_EXTERNAS
+    ) {
         when (estado.pantalla) {
             PantallaPerfil.HUB -> onVolver()
             else -> vm.volverAtras()

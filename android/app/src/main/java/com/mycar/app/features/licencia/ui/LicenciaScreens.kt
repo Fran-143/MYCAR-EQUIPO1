@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,14 @@ fun LicenciaRoute(
     LaunchedEffect(estado.pantalla) {
         if (estado.pantalla == PantallaLicencia.SESION) onSesionInvalida()
     }
+    val salirAlPadre = estado.pantalla in setOf(
+        PantallaLicencia.DETALLE, PantallaLicencia.VACIA, PantallaLicencia.CARGANDO,
+        PantallaLicencia.ERROR, PantallaLicencia.SESION, PantallaLicencia.EXITO
+    )
+    val alVolver: () -> Unit = {
+        if (salirAlPadre) onVolver() else vm.volver()
+    }
+    BackHandler(onBack = alVolver)
     Column(
         modifier
             .fillMaxSize()
@@ -61,13 +70,7 @@ fun LicenciaRoute(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = {
-                when (estado.pantalla) {
-                    PantallaLicencia.DETALLE, PantallaLicencia.VACIA, PantallaLicencia.CARGANDO,
-                    PantallaLicencia.ERROR, PantallaLicencia.SESION, PantallaLicencia.EXITO -> onVolver()
-                    else -> vm.volver()
-                }
-            }) { Text("Volver") }
+            TextButton(onClick = alVolver) { Text("Volver") }
             Text("Licencia de conducir", fontWeight = FontWeight.Bold, color = MyCarNavy, modifier = Modifier.weight(1f))
         }
         estado.mensaje?.let { Text(it, color = Color(0xFFC62828)) }

@@ -181,14 +181,38 @@ class LicenciaViewModel(
 
     fun volver() {
         ocultarSensibles()
-        val tiene = _estado.value.consulta?.actual != null
-        _estado.value = _estado.value.copy(
-            pantalla = if (tiene) PantallaLicencia.DETALLE else PantallaLicencia.VACIA,
-            tabHistorial = false,
-            errores = emptyMap(),
-            mensaje = null,
-            mensajeExito = null
-        )
+        val s = _estado.value
+        when (s.pantalla) {
+            // Desde fotos: volver al formulario conservando categoría, número y fechas.
+            PantallaLicencia.REGISTRAR_FOTOS -> {
+                _estado.value = s.copy(
+                    pantalla = PantallaLicencia.REGISTRAR_DATOS,
+                    errores = emptyMap(),
+                    mensaje = null,
+                    mensajeExito = null,
+                    errorFoto = null
+                )
+            }
+            PantallaLicencia.EDITAR_FOTOS -> {
+                _estado.value = s.copy(
+                    pantalla = PantallaLicencia.EDITAR,
+                    errores = emptyMap(),
+                    mensaje = null,
+                    mensajeExito = null,
+                    errorFoto = null
+                )
+            }
+            else -> {
+                val tiene = s.consulta?.actual != null
+                _estado.value = s.copy(
+                    pantalla = if (tiene) PantallaLicencia.DETALLE else PantallaLicencia.VACIA,
+                    tabHistorial = false,
+                    errores = emptyMap(),
+                    mensaje = null,
+                    mensajeExito = null
+                )
+            }
+        }
     }
 
     fun irADetalleTrasExito() {
