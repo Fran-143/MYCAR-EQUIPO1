@@ -35,7 +35,7 @@ fun TiveFormScreen(
 ) {
     SoatScaffold(titulo, onVolver, estado.ocupado, modifier) {
         if (estado.ocupado) LinearProgressIndicator(Modifier.fillMaxWidth(), color = MyCarTeal)
-        if (estado.mensaje != null && estado.errores.isEmpty()) {
+        if (estado.mensaje != null) {
             Text(estado.mensaje, color = Color(0xFFC62828))
         }
         when {
@@ -99,7 +99,13 @@ private fun CamposTiveForm(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Vehículo", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
             CampoSoloLectura("Placa", c.placa)
+            if (estado.errores["placa"] != null) {
+                Text(estado.errores.getValue("placa"), color = Color(0xFFC62828), style = MaterialTheme.typography.bodySmall)
+            }
             CampoSoloLectura("VIN", c.numeroVin.ifBlank { "Sin VIN" })
+            if (estado.errores["numeroVin"] != null) {
+                Text(estado.errores.getValue("numeroVin"), color = Color(0xFFC62828), style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
     Text("Datos de la TIVE", fontWeight = FontWeight.SemiBold, color = MyCarNavy)

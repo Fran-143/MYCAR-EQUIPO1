@@ -55,6 +55,20 @@ public class TiveService {
                     ctx.placa(), null, ctx.numeroMotor(), ctx.numeroSerie(),
                     "VIN_AUSENTE", "Completa el VIN del vehículo antes de registrar la TIVE.");
         }
+        try {
+            ValidadorTive.normalizarVin(ctx.numeroVin());
+        } catch (ErrorTive ex) {
+            return new ContratoTive.PrecheckResponse(false, true, false,
+                    ctx.placa(), ctx.numeroVin(), ctx.numeroMotor(), ctx.numeroSerie(),
+                    ex.codigo(), ex.getMessage());
+        }
+        try {
+            ValidadorTive.normalizarPlaca(ctx.placa());
+        } catch (ErrorTive ex) {
+            return new ContratoTive.PrecheckResponse(false, true, false,
+                    ctx.placa(), ctx.numeroVin(), ctx.numeroMotor(), ctx.numeroSerie(),
+                    "DATOS_INVALIDOS", ex.getMessage());
+        }
         return new ContratoTive.PrecheckResponse(true, true, false,
                 ctx.placa(), ctx.numeroVin(), ctx.numeroMotor(), ctx.numeroSerie(),
                 null, null);
@@ -91,7 +105,12 @@ public class TiveService {
         String sede = blancoNullUpper(req.sedeRegistral());
 
         String huella = HuellaOperacionTive.registrar(vehiculo, req);
-        boolean nueva = operaciones.reservar(req.idOperacion(), usuario, TIPO_REGISTRAR, huella);
+        boolean nueva;
+        try {
+            nueva = operaciones.reservar(req.idOperacion(), usuario, TIPO_REGISTRAR, huella);
+        } catch (DataIntegrityViolationException ex) {
+            throw IntegridadTive.mapear(ex);
+        }
         var op = operaciones.buscarParaActualizar(req.idOperacion(), usuario, TIPO_REGISTRAR)
                 .orElseThrow(() -> new ErrorTive("CONFLICTO_IDEMPOTENCIA", "Operación no disponible."));
         if (!Objects.equals(op.hashSolicitud(), huella)) {
@@ -140,11 +159,13 @@ public class TiveService {
             confirmarOperacion(req.idOperacion(), usuario, TIPO_REGISTRAR, huella, resp);
             return resp;
         } catch (DataIntegrityViolationException ex) {
-            throw new ErrorTive("TIVE_EXISTE", "Este vehículo ya tiene una TIVE registrada.");
+            throw IntegridadTive.mapear(ex);
         } catch (ErrorTive ex) {
             throw ex;
         } catch (DataAccessException ex) {
-            throw new ErrorTive("TIVE_GUARDAR_FALLIDO", "No pudimos guardar la TIVE. Inténtalo de nuevo.");
+            throw new ErrorTive(
+                    "TIVE_GUARDAR_FALLIDO",
+                    "No pudimos guardar la TIVE por un problema interno. Inténtalo de nuevo.");
         }
     }
 

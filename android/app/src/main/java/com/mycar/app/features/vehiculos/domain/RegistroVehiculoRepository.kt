@@ -21,5 +21,6 @@ class FalloRegistroVehiculo(
     val estadoHttp: Int? = null,
     val campos: Set<String> = emptySet(),
     val mensajeServidor: String? = null,
-    val erroresPorCampo: Map<String, String> = emptyMap()
+    val erroresPorCampo: Map<String, String> = emptyMap(),
+    val incierto: Boolean = false
 ) : RuntimeException(codigo)

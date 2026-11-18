@@ -15,8 +15,11 @@ import com.mycar.app.features.tive.domain.CamposTive
 import com.mycar.app.features.tive.domain.TiveFormulario
 import com.mycar.app.features.tive.domain.TiveRepository
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,6 +66,8 @@ class RegistrarTiveViewModel(
 ) : ViewModel() {
     private val _estado = MutableStateFlow(EstadoTiveForm(idVehiculo, TipoFormTive.REGISTRAR))
     val estado = _estado.asStateFlow()
+    /** Reutiliza el UUID si el intento previo quedó incierto (timeout / 409 OPERACION_EN_PROCESO). */
+    private val operacionPendiente = AtomicReference<String?>(null)
 
     init { cargarPrecheck() }
 
@@ -141,7 +146,8 @@ class RegistrarTiveViewModel(
         _estado.value = actual.copy(ocupado = true, mensaje = null, errores = emptyMap())
         viewModelScope.launch {
             try {
-                val op = UUID.randomUUID().toString()
+                val op = operacionPendiente.get() ?: UUID.randomUUID().toString()
+                operacionPendiente.set(op)
                 val doc = actual.adjunto?.let { adj ->
                     val bytes = lectorUri(adj.uri)
                     repository.subirDocumento(idVehiculo, bytes, adj.contentType, adj.nombre)
@@ -164,7 +170,10 @@ class RegistrarTiveViewModel(
                     documento = doc
                 )
                 repository.registrar(idVehiculo, req)
-                _estado.value = _estado.value.copy(ocupado = false, fase = FaseTiveForm.EXITO, exito = true)
+                operacionPendiente.set(null)
+                _estado.value = _estado.value.copy(
+                    ocupado = false, fase = FaseTiveForm.EXITO, exito = true, mensaje = null, errores = emptyMap()
+                )
             } catch (cancelada: CancellationException) {
                 throw cancelada
             } catch (e: Exception) {
@@ -180,10 +189,28 @@ class RegistrarTiveViewModel(
             _estado.value = _estado.value.copy(fase = FaseTiveForm.SESION, sesionRequerida = true)
             return
         }
+        val timeout = e is SocketTimeoutException
+            || (e is IOException && (e.message?.contains("timeout", ignoreCase = true) == true
+                || e.message?.contains("timed out", ignoreCase = true) == true))
+        val incierto = fallo?.incierto == true
+            || fallo?.codigo == "OPERACION_EN_PROCESO"
+            || timeout
+        if (!incierto && fallo?.codigo != null && fallo.codigo != "OPERACION_EN_PROCESO") {
+            // Error definitivo del servidor: el siguiente intento puede usar un UUID nuevo.
+            if (fallo.codigo != "CONFLICTO_IDEMPOTENCIA") {
+                operacionPendiente.set(null)
+            }
+        }
         val porCampo = fallo?.erroresPorCampo.orEmpty()
+        val mensaje = when {
+            timeout -> "La red tardó demasiado. Si reintentas, se consultará la misma operación para evitar duplicados."
+            !fallo?.mensajeServidor.isNullOrBlank() -> fallo!!.mensajeServidor
+            !e.message.isNullOrBlank() -> e.message
+            else -> "No se pudo guardar la TIVE."
+        }
         _estado.value = _estado.value.copy(
-            fase = if (_estado.value.fase == FaseTiveForm.CARGANDO) FaseTiveForm.ERROR else _estado.value.fase,
-            mensaje = fallo?.mensajeServidor ?: e.message,
+            fase = if (_estado.value.fase == FaseTiveForm.CARGANDO) FaseTiveForm.ERROR else FaseTiveForm.FORMULARIO,
+            mensaje = mensaje,
             errores = if (porCampo.isNotEmpty()) porCampo else _estado.value.errores
         )
     }

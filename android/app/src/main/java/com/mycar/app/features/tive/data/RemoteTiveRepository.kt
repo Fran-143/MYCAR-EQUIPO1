@@ -13,7 +13,8 @@ class RemoteTiveRepository(private val api: TiveApi) : TiveRepository {
     private data class ErrorApi(
         val codigo: String?,
         val mensaje: String? = null,
-        val campos: Map<String, String>? = null
+        val campos: Map<String, String>? = null,
+        val incierto: Boolean? = null
     )
 
     override suspend fun precheck(idVehiculo: Long): TivePrecheckResponse {
@@ -34,7 +35,24 @@ class RemoteTiveRepository(private val api: TiveApi) : TiveRepository {
         if (!r.isSuccessful) throw fallo(r)
         val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
         if (body.idTive <= 0) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
-        return exigirTive(idVehiculo)
+        return try {
+            exigirTive(idVehiculo)
+        } catch (_: Exception) {
+            // El POST ya persistió; no marcar fallo de guardado si solo falla la consulta posterior.
+            TiveDto(
+                idTive = body.idTive,
+                numeroTitulo = solicitud.numeroTitulo,
+                codigoVerificacion = solicitud.codigoVerificacion,
+                fechaTitulo = solicitud.fechaTitulo,
+                zonaRegistral = solicitud.zonaRegistral,
+                sedeRegistral = solicitud.sedeRegistral,
+                numeroVin = "",
+                placa = "",
+                numeroMotor = solicitud.numeroMotor,
+                numeroSerie = solicitud.numeroSerie,
+                tieneDocumento = solicitud.documento != null
+            )
+        }
     }
 
     override suspend fun actualizar(
@@ -93,7 +111,8 @@ class RemoteTiveRepository(private val api: TiveApi) : TiveRepository {
             estadoHttp = r.code(),
             campos = parsed?.campos.orEmpty().keys,
             mensajeServidor = parsed?.mensaje,
-            erroresPorCampo = parsed?.campos.orEmpty()
+            erroresPorCampo = parsed?.campos.orEmpty(),
+            incierto = parsed?.incierto == true || r.code() == 408 || r.code() == 504
         )
     }
 }

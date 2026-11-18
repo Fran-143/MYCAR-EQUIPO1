@@ -22,13 +22,14 @@ public class ErroresTiveController {
     public ResponseEntity<Map<String, Object>> funcional(ErrorTive error) {
         HttpStatus estado = switch (error.codigo()) {
             case "DATOS_INVALIDOS", "DOCUMENTO_DEMASIADO_GRANDE", "SIN_CAMBIOS",
-                 "TIVE_GUARDAR_FALLIDO", "VIN_AUSENTE", "VIN_INVALIDO" -> HttpStatus.BAD_REQUEST;
+                 "VIN_AUSENTE", "VIN_INVALIDO" -> HttpStatus.BAD_REQUEST;
             case "VEHICULO_NO_ENCONTRADO", "TIVE_NO_ENCONTRADA", "DOCUMENTO_NO_DISPONIBLE",
                  "DOCUMENTO_NO_ENCONTRADO" -> HttpStatus.NOT_FOUND;
             case "VEHICULO_INACTIVO" -> HttpStatus.FORBIDDEN;
             case "TIVE_EXISTE", "VIN_DUPLICADO", "CONFLICTO_IDEMPOTENCIA", "CONFLICTO_VERSION",
                  "OPERACION_EN_PROCESO", "DOCUMENTO_NO_AUTORIZADO" -> HttpStatus.CONFLICT;
             case "STORAGE_NO_CONFIGURADO", "STORAGE_NO_DISPONIBLE" -> HttpStatus.SERVICE_UNAVAILABLE;
+            case "TIVE_GUARDAR_FALLIDO" -> HttpStatus.INTERNAL_SERVER_ERROR;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
         return respuesta(estado, error.codigo(), error.getMessage(), error.campos(), error.incierto());

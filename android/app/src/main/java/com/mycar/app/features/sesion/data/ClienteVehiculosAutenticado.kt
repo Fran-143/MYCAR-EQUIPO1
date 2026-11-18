@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 object ClientesSesion {
     fun publico(baseUrl: String): Retrofit = Retrofit.Builder().baseUrl(baseUrl)
         .client(OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false)
-            .followSslRedirects(false).callTimeout(20, TimeUnit.SECONDS).build())
+            .followSslRedirects(false).callTimeout(60, TimeUnit.SECONDS).build())
         .addConverterFactory(GsonConverterFactory.create()).build()
 }
 
@@ -25,8 +25,9 @@ class ClienteVehiculosAutenticado(baseUrl: String, autorizacion: () -> String, a
         baseUrl, { try { credenciales.autorizacion() } catch (_: IOException) { throw SessionRequired() } }, alCaducar)
     private val activo = AtomicBoolean(true)
     private val origen = baseUrl.toHttpUrl()
+    // Render Free puede superar 30s en arranque en frío; 90s evita abortar POST TIVE/SOAT a medias.
     private val cliente = OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false)
-        .followSslRedirects(false).callTimeout(30, TimeUnit.SECONDS)
+        .followSslRedirects(false).callTimeout(90, TimeUnit.SECONDS)
         .addInterceptor { cadena ->
             val r = cadena.request()
             if (r.url.scheme != origen.scheme || r.url.host != origen.host || r.url.port != origen.port)
