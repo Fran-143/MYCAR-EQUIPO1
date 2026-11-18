@@ -1,11 +1,15 @@
 package com.mycar.app.features.soporte.data
 
+import com.google.gson.annotations.SerializedName
+
 data class VehiculoElegibleDto(
     val idVehiculo: Long,
     val placa: String,
     val marca: String,
     val modelo: String,
+    @SerializedName(value = "numeroVin", alternate = ["numero_vin"])
     val numeroVin: String?,
+    @SerializedName(value = "tieneTive", alternate = ["tiene_tive"])
     val tieneTive: Boolean
 )
 

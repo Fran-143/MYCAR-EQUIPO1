@@ -13,7 +13,8 @@ class RemoteSoporteRepository(private val api: SoporteApi) : SoporteRepository {
     private data class ErrorApi(
         val codigo: String?,
         val mensaje: String? = null,
-        val campos: Map<String, String>? = null
+        val campos: Map<String, String>? = null,
+        val incierto: Boolean? = null
     )
 
     override suspend fun vehiculosElegibles(): List<VehiculoElegibleDto> {
@@ -80,7 +81,8 @@ class RemoteSoporteRepository(private val api: SoporteApi) : SoporteRepository {
             estadoHttp = r.code(),
             campos = parsed?.campos.orEmpty().keys,
             mensajeServidor = parsed?.mensaje,
-            erroresPorCampo = parsed?.campos.orEmpty()
+            erroresPorCampo = parsed?.campos.orEmpty(),
+            incierto = parsed?.incierto == true || r.code() == 408 || r.code() == 504
         )
     }
 }

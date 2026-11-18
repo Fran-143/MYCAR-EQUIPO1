@@ -20,9 +20,14 @@ public class SoporteJdbcDao {
 
     public List<ContratoSoporte.VehiculoElegibleDto> vehiculosElegibles(long usuario) {
         return jdbc.query("""
-                SELECT v.id_vehiculo, v.placa, v.marca, v.modelo, v.numero_vin,
-                       EXISTS(SELECT 1 FROM mycar.tive t WHERE t.id_vehiculo = v.id_vehiculo) AS tiene_tive
+                SELECT v.id_vehiculo, v.placa, v.marca, v.modelo,
+                       COALESCE(
+                           NULLIF(btrim(t.numero_vin), ''),
+                           NULLIF(btrim(v.numero_vin), '')
+                       ) AS numero_vin,
+                       (t.id_tive IS NOT NULL) AS tiene_tive
                 FROM mycar.vehiculo v
+                LEFT JOIN mycar.tive t ON t.id_vehiculo = v.id_vehiculo
                 WHERE v.id_usuario = ?
                   AND upper(v.estado_vehiculo) = 'ACTIVO'
                 ORDER BY v.es_principal DESC, v.placa
@@ -39,9 +44,14 @@ public class SoporteJdbcDao {
     public Optional<VehiculoCtx> vehiculoPropio(long usuario, long vehiculo) {
         try {
             return Optional.ofNullable(jdbc.queryForObject("""
-                    SELECT v.id_vehiculo, v.placa, v.numero_vin,
-                           EXISTS(SELECT 1 FROM mycar.tive t WHERE t.id_vehiculo = v.id_vehiculo) AS tiene_tive
+                    SELECT v.id_vehiculo, v.placa,
+                           COALESCE(
+                               NULLIF(btrim(t.numero_vin), ''),
+                               NULLIF(btrim(v.numero_vin), '')
+                           ) AS numero_vin,
+                           (t.id_tive IS NOT NULL) AS tiene_tive
                     FROM mycar.vehiculo v
+                    LEFT JOIN mycar.tive t ON t.id_vehiculo = v.id_vehiculo
                     WHERE v.id_vehiculo = ? AND v.id_usuario = ?
                     """, (rs, n) -> new VehiculoCtx(
                     rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4)

@@ -196,6 +196,11 @@ private fun FormularioNueva(estado: EstadoSoporte, vm: SoporteViewModel) {
                 Text(v.placa, fontWeight = FontWeight.Bold, color = MyCarNavy)
                 Text("${v.marca} ${v.modelo}", color = MyCarMuted)
                 Text(
+                    "VIN: ${v.numeroVin?.takeIf { it.isNotBlank() } ?: "Sin VIN"}",
+                    color = MyCarNavy,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
                     if (v.tieneTive) "Con TIVE" else "Sin TIVE — no elegible aún",
                     color = if (v.tieneTive) Color(0xFF2E7D32) else Color(0xFFC62828),
                     style = MaterialTheme.typography.labelMedium
@@ -203,6 +208,7 @@ private fun FormularioNueva(estado: EstadoSoporte, vm: SoporteViewModel) {
             }
         }
     }
+    estado.mensaje?.let { Text(it, color = Color(0xFFC62828)) }
     estado.errores["idVehiculo"]?.let { Text(it, color = Color(0xFFC62828)) }
     val veh = estado.vehiculos.find { it.idVehiculo == estado.idVehiculoSel } ?: return
     Spacer(Modifier.height(4.dp))
@@ -212,10 +218,15 @@ private fun FormularioNueva(estado: EstadoSoporte, vm: SoporteViewModel) {
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${veh.marca} ${veh.modelo}", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
             Text(veh.placa, color = MyCarMuted)
         }
+    }
+    // El VIN registrado se muestra siempre (aunque falte TIVE); el envío sí se bloquea.
+    CampoSoloLectura("VIN registrado actualmente", veh.numeroVin.orEmpty().ifBlank { "Sin VIN" })
+    if (estado.errores["numeroVin"] != null) {
+        Text(estado.errores.getValue("numeroVin"), color = Color(0xFFC62828))
     }
     if (!veh.tieneTive) {
         Text(
@@ -224,7 +235,13 @@ private fun FormularioNueva(estado: EstadoSoporte, vm: SoporteViewModel) {
         )
         return
     }
-    CampoSoloLectura("VIN registrado actualmente", veh.numeroVin.orEmpty().ifBlank { "Sin VIN" })
+    if (veh.numeroVin.isNullOrBlank()) {
+        Text(
+            "Este vehículo no tiene VIN registrado. Completa el VIN o registra la TIVE primero.",
+            color = Color(0xFFC62828)
+        )
+        return
+    }
     CampoValidado(
         etiqueta = "VIN correcto solicitado *",
         valor = estado.vinPropuesto,

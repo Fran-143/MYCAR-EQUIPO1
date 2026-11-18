@@ -13,7 +13,10 @@ import com.mycar.app.features.soporte.domain.SoporteRepository
 import com.mycar.app.features.soat.viewmodel.AdjuntoSoatUi
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
 import com.mycar.app.features.vehiculos.domain.ValidadorVin
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,6 +55,7 @@ data class EstadoSoporte(
             val veh = vehiculos.find { it.idVehiculo == idVehiculoSel }
             if (idVehiculoSel == null || veh == null) return true
             if (!veh.tieneTive) return true
+            if (veh.numeroVin.isNullOrBlank()) return true
             val base = SoporteFormulario.validarNueva(vinPropuesto, veh.numeroVin, motivo, exigirTodos = true)
             val evid = adjunto?.let {
                 SoporteFormulario.validarEvidencia(it.contentType, it.tamanoBytes)?.let { msg -> mapOf("evidencia" to msg) }
@@ -66,6 +70,7 @@ class SoporteViewModel(
 ) : ViewModel() {
     private val _estado = MutableStateFlow(EstadoSoporte())
     val estado = _estado.asStateFlow()
+    private val operacionPendiente = AtomicReference<String?>(null)
 
     init { cargarCentro() }
 
@@ -103,7 +108,28 @@ class SoporteViewModel(
             proximamente = false,
             codigoExito = null
         )
+        refrescarVehiculos()
         if (pestana == PestanaCorreccion.HISTORIAL) refrescarHistorial()
+    }
+
+    fun refrescarVehiculos() {
+        viewModelScope.launch {
+            try {
+                val v = repository.vehiculosElegibles()
+                val sel = _estado.value.idVehiculoSel
+                val selValida = sel != null && v.any { it.idVehiculo == sel }
+                _estado.value = _estado.value.copy(
+                    vehiculos = v,
+                    idVehiculoSel = if (selValida) sel else null,
+                    mensaje = null
+                )
+                if (selValida) revalidar()
+            } catch (cancelada: CancellationException) {
+                throw cancelada
+            } catch (e: Exception) {
+                manejar(e, PantallaSoporte.CORRECCION)
+            }
+        }
     }
 
     fun refrescarHistorial() {
@@ -178,6 +204,9 @@ class SoporteViewModel(
             errores["idVehiculo"] =
                 "Debes registrar la TIVE del vehículo antes de solicitar una corrección de VIN."
         }
+        if (veh != null && veh.numeroVin.isNullOrBlank()) {
+            errores["numeroVin"] = "Este vehículo no tiene VIN registrado."
+        }
         val hints = mutableMapOf<String, String>()
         if ("vinPropuesto" in actual.tocados) {
             ValidadorVin.mensajeFormatoOk(actual.vinPropuesto, veh?.numeroVin)?.let { hints["vinPropuesto"] = it }
@@ -198,7 +227,14 @@ class SoporteViewModel(
                     "idVehiculo" to
                         "Debes registrar la TIVE del vehículo antes de solicitar una corrección de VIN."
                 ),
-                mensaje = null
+                mensaje = "Debes registrar la TIVE del vehículo antes de solicitar una corrección de VIN."
+            )
+            return
+        }
+        if (veh.numeroVin.isNullOrBlank()) {
+            _estado.value = actual.copy(
+                errores = mapOf("numeroVin" to "Este vehículo no tiene VIN registrado."),
+                mensaje = "Este vehículo no tiene VIN registrado."
             )
             return
         }
@@ -217,9 +253,11 @@ class SoporteViewModel(
         _estado.value = actual.copy(ocupado = true, mensaje = null)
         viewModelScope.launch {
             try {
+                val op = operacionPendiente.get() ?: UUID.randomUUID().toString()
+                operacionPendiente.set(op)
                 val bytes = adj?.let { lectorUri(it.uri) }
                 val resp = repository.crearCorreccionVin(
-                    UUID.randomUUID().toString(),
+                    op,
                     veh.idVehiculo,
                     actual.vinPropuesto.trim().uppercase(),
                     SoporteFormulario.normalizarMotivo(actual.motivo),
@@ -227,12 +265,15 @@ class SoporteViewModel(
                     adj?.contentType,
                     adj?.nombre
                 )
+                operacionPendiente.set(null)
                 val lista = runCatching { repository.listarSolicitudes() }.getOrElse { _estado.value.solicitudes }
                 _estado.value = _estado.value.copy(
                     ocupado = false,
                     pantalla = PantallaSoporte.EXITO,
                     codigoExito = resp.codigo,
-                    solicitudes = lista
+                    solicitudes = lista,
+                    mensaje = null,
+                    errores = emptyMap()
                 )
             } catch (cancelada: CancellationException) {
                 throw cancelada
@@ -312,22 +353,36 @@ class SoporteViewModel(
             _estado.value = _estado.value.copy(pantalla = PantallaSoporte.SESION, mensaje = fallo.mensajeServidor)
             return
         }
-        val mensaje = when (fallo?.codigo) {
-            "VIN_DUPLICADO" -> ValidadorVin.MSG_DUPLICADO
-            "VIN_SIN_CAMBIO" -> ValidadorVin.MSG_IGUAL
-            "TIVE_REQUERIDA" ->
+        val timeout = e is SocketTimeoutException
+            || (e is IOException && (e.message?.contains("timeout", ignoreCase = true) == true
+                || e.message?.contains("timed out", ignoreCase = true) == true))
+        val incierto = fallo?.incierto == true || fallo?.codigo == "OPERACION_EN_PROCESO" || timeout
+        if (!incierto && fallo?.codigo != "CONFLICTO_IDEMPOTENCIA") {
+            operacionPendiente.set(null)
+        }
+        val mensaje = when {
+            timeout ->
+                "La red tardó demasiado. Si reintentas, se reutilizará la misma operación para evitar duplicados."
+            fallo?.codigo == "VIN_DUPLICADO" -> ValidadorVin.MSG_DUPLICADO
+            fallo?.codigo == "VIN_SIN_CAMBIO" -> ValidadorVin.MSG_IGUAL
+            fallo?.codigo == "TIVE_REQUERIDA" ->
                 "Debes registrar la TIVE del vehículo antes de solicitar una corrección de VIN."
-            else -> fallo?.mensajeServidor ?: e.message ?: "No se pudo completar la operación."
+            fallo?.codigo == "VIN_AUSENTE" ->
+                fallo.mensajeServidor ?: "El vehículo no tiene VIN registrado."
+            !fallo?.mensajeServidor.isNullOrBlank() -> fallo!!.mensajeServidor
+            !e.message.isNullOrBlank() -> e.message
+            else -> "No se pudo completar la operación."
         }
         val errores = when (fallo?.codigo) {
-            "VIN_DUPLICADO", "VIN_INVALIDO", "VIN_AUSENTE", "VIN_SIN_CAMBIO" ->
-                mapOf("vinPropuesto" to mensaje) + (fallo.erroresPorCampo ?: emptyMap())
-            "TIVE_REQUERIDA" -> mapOf("idVehiculo" to mensaje)
+            "VIN_DUPLICADO", "VIN_INVALIDO", "VIN_SIN_CAMBIO" ->
+                mapOf("vinPropuesto" to mensaje!!) + fallo.erroresPorCampo
+            "VIN_AUSENTE" -> mapOf("numeroVin" to mensaje!!) + fallo.erroresPorCampo
+            "TIVE_REQUERIDA" -> mapOf("idVehiculo" to mensaje!!)
             else -> fallo?.erroresPorCampo ?: emptyMap()
         }
         _estado.value = _estado.value.copy(
             pantalla = pantalla,
-            mensaje = if (errores.isEmpty()) mensaje else null,
+            mensaje = mensaje,
             errores = errores
         )
     }
