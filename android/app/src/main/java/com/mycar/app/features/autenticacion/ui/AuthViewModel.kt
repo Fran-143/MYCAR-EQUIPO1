@@ -56,6 +56,7 @@ class AuthViewModel(
     }
 
     val session = repository.session
+    fun authenticatedContext() = repository.authenticatedContext()
     private val mutableLogin = MutableStateFlow(LoginState())
     val login = mutableLogin.asStateFlow()
 
@@ -87,6 +88,23 @@ class AuthViewModel(
     fun clearErrors() { if (!mutableLogin.value.busy) mutableLogin.value = LoginState() }
     suspend fun maintainSession() = repository.maintainSession()
     fun retry() { viewModelScope.launch { repository.validateSession() } }
+
+    fun mfaStartEnroll() = launchMfa { repository.mfaStartEnroll() }
+    fun mfaContinueFromIntro() = repository.mfaContinueFromIntro()
+    fun mfaContinueToConfirm() = repository.mfaContinueToConfirm()
+    fun mfaConfirmEnroll(code: String) = launchMfa { repository.mfaConfirmEnroll(code) }
+    fun mfaConfirmBackup() = launchMfa { repository.mfaConfirmBackup() }
+    fun mfaVerify(code: String) = launchMfa { repository.mfaVerify(code) }
+    fun mfaRecover(code: String) = launchMfa { repository.mfaRecover(code) }
+    fun mfaGoToRecover() = repository.mfaGoToRecover()
+
+    private fun launchMfa(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try { block() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: AuthProblem) { /* error ya publicado en mfa state */ }
+        }
+    }
 
     class Factory(private val repository: AuthRepository) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {

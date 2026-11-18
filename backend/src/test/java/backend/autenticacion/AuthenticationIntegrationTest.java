@@ -78,7 +78,7 @@ class AuthenticationIntegrationTest {
     }
     @BeforeEach void prepareDisposableFixtures(){
         assertTrue(jdbc.queryForObject("SELECT current_database()",String.class).startsWith("mycar_rf02_test_"));
-        for(String table:new String[]{"sesion","intento_login_fallido","preferencia_notificacion","config_recordatorio_km_usuario","suscripcion","usuario"})jdbc.update("DELETE FROM mycar."+table);
+        for(String table:new String[]{"mfa_auditoria","mfa_codigo_recuperacion","mfa_desafio","mfa_configuracion","sesion","intento_login_fallido","preferencia_notificacion","config_recordatorio_km_usuario","suscripcion","usuario"})jdbc.update("DELETE FROM mycar."+table);
         user=registration.register(new RegistrationCommand("Elsa","Pérez",EMAIL,LocalDate.of(1995,1,1),PASSWORD,PASSWORD,true,"FIXTURE-NO-LEGAL"));
     }
     LoginCommand command(UUID installation,String password){return new LoginCommand(EMAIL,password,installation);}
@@ -324,7 +324,7 @@ class AuthenticationIntegrationTest {
             return read==1?started.minusSeconds(1):started;
         }).when(controlledStore).now();
         var controlled=new SessionAuthentication(validator,controlledStore,credentials,passwords,transactions,
-                registrationStore,false,"1.0");
+                registrationStore,false,"1.0",org.mockito.Mockito.mock(backend.mfa.MfaService.class));
         assertEquals(AuthenticationFailure.Reason.INVALID_SESSION,
                 assertThrows(AuthenticationFailure.class,()->controlled.login(command(installation,PASSWORD))).reason());
 

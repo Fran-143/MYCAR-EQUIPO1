@@ -8,13 +8,17 @@ class StoredTokens(
     val accessToken: String,
     val accessTokenExpiraUtc: String,
     val refreshToken: String,
-    val sesionExpiraUtc: String
+    val sesionExpiraUtc: String,
+    val alcance: String = "USUARIO",
+    val desafioId: String? = null
 ) {
     fun validate(): StoredTokens {
         require(idSesion > 0 && accessToken.isNotBlank() && refreshToken.isNotBlank())
         require(!Instant.parse(accessTokenExpiraUtc).isAfter(Instant.parse(sesionExpiraUtc)))
         return this
     }
+    val isAdmin: Boolean get() = alcance == "ADMIN"
+    val isMfaChallenge: Boolean get() = alcance == "MFA_CHALLENGE" || alcance == "MFA_REENROLL"
 }
 class CredentialVault(val installation: String, val tokens: StoredTokens?) {
     fun validate(): CredentialVault {

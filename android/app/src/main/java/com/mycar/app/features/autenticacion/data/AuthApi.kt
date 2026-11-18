@@ -15,12 +15,38 @@ class TokenResponse(
     val accessToken: String? = null,
     val accessTokenExpiraUtc: String? = null,
     val refreshToken: String? = null,
-    val sesionExpiraUtc: String? = null
+    val sesionExpiraUtc: String? = null,
+    val alcance: String? = null,
+    val desafioId: String? = null
 )
 class SessionResponse(
     val vigente: Boolean = false,
     val idSesion: Long = 0,
-    val sesionExpiraUtc: String? = null
+    val sesionExpiraUtc: String? = null,
+    val alcance: String? = null,
+    val rol: String? = null
+)
+class MfaEnrollStartResponse(
+    val otpauthUri: String? = null,
+    val secretoManual: String? = null
+)
+class MfaCodigoRequest(val codigo: String)
+class MfaRecoveryResponse(
+    val estado: String? = null,
+    val codigosRecuperacion: List<String>? = null,
+    val loteId: String? = null
+)
+class MfaVerificarRequest(val desafioId: String, val codigo: String)
+class MfaRecuperarRequest(val desafioId: String, val codigoRespaldo: String)
+class AdminHubResponse(
+    val titulo: String? = null,
+    val secciones: List<AdminSeccionDto>? = null
+)
+class AdminSeccionDto(
+    val codigo: String? = null,
+    val nombre: String? = null,
+    val disponible: Boolean = false,
+    val estado: String? = null
 )
 
 interface AuthApi {
@@ -48,4 +74,31 @@ interface AuthApi {
     suspend fun renew(@Body request: RenewalRequest): Response<TokenResponse>
     @GET("api/v1/auth/sesion")
     suspend fun session(@Header("Authorization") bearer: String): Response<SessionResponse>
+
+    @POST("api/v1/auth/mfa/enroll/iniciar")
+    suspend fun mfaEnrollStart(@Header("Authorization") bearer: String): Response<MfaEnrollStartResponse>
+
+    @POST("api/v1/auth/mfa/enroll/confirmar")
+    suspend fun mfaEnrollConfirm(
+        @Header("Authorization") bearer: String,
+        @Body body: MfaCodigoRequest
+    ): Response<MfaRecoveryResponse>
+
+    @POST("api/v1/auth/mfa/enroll/confirmar-respaldo")
+    suspend fun mfaEnrollConfirmBackup(@Header("Authorization") bearer: String): Response<TokenResponse>
+
+    @POST("api/v1/auth/mfa/verificar")
+    suspend fun mfaVerify(
+        @Header("Authorization") bearer: String,
+        @Body body: MfaVerificarRequest
+    ): Response<TokenResponse>
+
+    @POST("api/v1/auth/mfa/recuperar")
+    suspend fun mfaRecover(
+        @Header("Authorization") bearer: String,
+        @Body body: MfaRecuperarRequest
+    ): Response<TokenResponse>
+
+    @GET("api/v1/admin/hub")
+    suspend fun adminHub(@Header("Authorization") bearer: String): Response<AdminHubResponse>
 }

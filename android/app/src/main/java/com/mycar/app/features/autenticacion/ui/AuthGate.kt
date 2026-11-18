@@ -61,7 +61,9 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { vm.maintainSession() }
     }
     LaunchedEffect(session.phase, session.contextVersion) {
-        if (session.phase == SessionPhase.AUTHENTICATED) { page = "welcome"; registration.reset() }
+        if (session.phase == SessionPhase.AUTHENTICATED || session.phase == SessionPhase.MFA_FLOW) {
+            page = "welcome"; registration.reset()
+        }
         if (session.phase == SessionPhase.SIGNED_OUT && session.contextVersion > 0) {
             page = "welcome"
             registration.reset()
@@ -70,11 +72,45 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
         }
     }
     when (session.phase) {
+        SessionPhase.MFA_FLOW -> {
+            val mfa = session.mfa
+            if (mfa == null) {
+                LaunchedEffect(Unit) { vm.executeLogout() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                MfaFlowScreen(
+                    state = mfa,
+                    onStartEnroll = vm::mfaStartEnroll,
+                    onContinueIntro = vm::mfaContinueFromIntro,
+                    onContinueToConfirm = vm::mfaContinueToConfirm,
+                    onConfirmEnroll = vm::mfaConfirmEnroll,
+                    onConfirmBackup = vm::mfaConfirmBackup,
+                    onVerify = vm::mfaVerify,
+                    onRecover = vm::mfaRecover,
+                    onGoRecover = vm::mfaGoToRecover,
+                    onLogout = vm::executeLogout
+                )
+            }
+        }
         SessionPhase.AUTHENTICATED -> {
             // RF06: cierre confirmado desde Perfil. Callback estable (no capturar logout.busy en cada recomposición).
             val confirmedLogout = remember(vm) { { vm.executeLogout() } }
             CompositionLocalProvider(LocalConfirmedLogout provides confirmedLogout) {
-                Box(Modifier.fillMaxSize()) { key(session.contextVersion) { content() } }
+                Box(Modifier.fillMaxSize()) {
+                    key(session.contextVersion) {
+                        if (session.isAdminSession) {
+                            val ctx = remember(session.contextVersion) { vm.authenticatedContext() }
+                            if (ctx != null) {
+                                com.mycar.app.features.admin.ui.AdministracionHubScreen(
+                                    authContext = ctx,
+                                    onLogout = confirmedLogout
+                                )
+                            } else content()
+                        } else content()
+                    }
+                }
             }
         }
         SessionPhase.CLEAR_FAILED -> Scaffold { padding ->
