@@ -10,7 +10,8 @@ services:
     region: virginia
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /actuator/health
+    # Liveness (sin JDBC): /actuator/health puede superar el timeout HTTP 5s de Render con Neon cold.
+    healthCheckPath: /actuator/health/liveness
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: neon,render
@@ -60,6 +61,13 @@ services:
       - key: MYCAR_DATOS_SENSIBLES_AES_KEY
         sync: false
       - key: MYCAR_DATOS_SENSIBLES_BLIND_KEY
+        sync: false
+      # MFA TOTP ADMIN (valores solo Dashboard; no regenerar en deploys).
+      - key: MYCAR_MFA_ENABLED
+        value: "true"
+      - key: MYCAR_MFA_KEY_ID
+        sync: false
+      - key: MYCAR_MFA_AES_KEY
         sync: false
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError"
