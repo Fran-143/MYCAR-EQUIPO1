@@ -28,7 +28,7 @@ public record DatosDetalleVehiculo(
         String tipoMotorOtro,
         String combustibleOtro,
         String tipoAceiteOtro,
-        /** MVP: siempre false hasta RF54. */
+        /** true si existe fila en mycar.tive (RF52/53/54 entrega TIVE). */
         boolean tieneTive
 ) {
 }

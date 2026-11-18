@@ -31,6 +31,7 @@ import com.mycar.app.features.sesion.viewmodel.SesionVehiculosViewModel
 import com.mycar.app.features.soat.data.SoatDto
 import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.features.soat.ui.*
+import com.mycar.app.features.tive.ui.*
 import com.mycar.app.features.vehiculos.ui.ActualizarKilometrajeRoute
 import com.mycar.app.features.vehiculos.ui.DetalleVehiculoRoute
 import com.mycar.app.features.vehiculos.ui.VehiculosRoute
@@ -62,6 +63,10 @@ fun MyCarNavigation(
     var soatFechaVencimiento by rememberSaveable { mutableStateOf<String?>(null) }
     /** true si Configurar SOAT se abrió desde Consultar (Volver debe regresar ahí). */
     var soatConfigDesdeConsultar by rememberSaveable { mutableStateOf(false) }
+    var vehiculoTiveId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var tiveSesion by rememberSaveable { mutableIntStateOf(0) }
+    var recargaTive by rememberSaveable { mutableIntStateOf(0) }
+    var tiveVolverRegistrar by rememberSaveable { mutableStateOf(false) }
     var recargaMantenimiento by rememberSaveable { mutableIntStateOf(0) }
     var kmOrigenDetalle by rememberSaveable { mutableStateOf(false) }
     var kmOverlayMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -97,6 +102,12 @@ fun MyCarNavigation(
         if (destino == SecundariaMyCar.SOAT_CONFIGURAR) {
             soatConfigDesdeConsultar = navegacion.secundaria == SecundariaMyCar.SOAT_CONSULTAR
         }
+        navegar(navegacion.abrir(destino))
+    }
+    fun abrirTive(id: Long, destino: SecundariaMyCar) {
+        tiveSesion++
+        vehiculoTiveId = id
+        if (destino != SecundariaMyCar.TIVE_REGISTRAR) tiveVolverRegistrar = false
         navegar(navegacion.abrir(destino))
     }
     fun volverDesdeConfigurarSoat() {
@@ -150,6 +161,7 @@ fun MyCarNavigation(
     }
     LaunchedEffect(cuenta?.ciclo) {
         vehiculoMantenimiento=null; vehiculoDetalleId=null; vehiculoKmId=null; vehiculoSoatId=null
+        vehiculoTiveId=null; tiveVolverRegistrar=false
         kmOverlayMantenimiento=null
         alertasProgramarId=null; formularioAbierto=false; secundariaNombre=null
         detalleAlertaTrasAtencion=null; formularioAtencionAlerta=false
@@ -207,12 +219,16 @@ fun MyCarNavigation(
                                     onRegistrarSoat={ abrirSoat(idDetalle, SecundariaMyCar.SOAT_REGISTRAR) },
                                     onConsultarSoat={ abrirSoat(idDetalle, SecundariaMyCar.SOAT_CONSULTAR) },
                                     onConfigurarSoat={ abrirSoat(idDetalle, SecundariaMyCar.SOAT_CONFIGURAR) },
+                                    onRegistrarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_REGISTRAR) },
+                                    onConsultarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_CONSULTAR) },
+                                    onEditarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_EDITAR) },
                                     onCambioOperativo={
                                         recargaDetalle++
                                         recargaInicio++
                                         recargaSoat++
+                                        recargaTive++
                                     },
-                                    recargaToken = recargaDetalle + recargaSoat,
+                                    recargaToken = recargaDetalle + recargaSoat + recargaTive,
                                     modifier=Modifier.statusBarsPadding())
                             }
                         }
@@ -223,11 +239,24 @@ fun MyCarNavigation(
                             } else {
                                 com.mycar.app.features.vehiculos.ui.EditarVehiculoRoute(
                                     "${cuenta.ciclo}|$idEdicion", idEdicion, cuenta.edicion,
-                                    onVolver={ navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE)) },
+                                    onVolver={
+                                        val destino = if (tiveVolverRegistrar) {
+                                            tiveVolverRegistrar = false
+                                            SecundariaMyCar.TIVE_REGISTRAR
+                                        } else SecundariaMyCar.DETALLE
+                                        navegar(navegacion.copy(secundaria = destino))
+                                    },
                                     onGuardado={
                                         recargaDetalle++
                                         recargaInicio++
-                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE))
+                                        recargaTive++
+                                        val destino = if (tiveVolverRegistrar) {
+                                            SecundariaMyCar.TIVE_REGISTRAR
+                                        } else {
+                                            tiveVolverRegistrar = false
+                                            SecundariaMyCar.DETALLE
+                                        }
+                                        navegar(navegacion.copy(secundaria = destino))
                                     },
                                     onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     modifier=Modifier.statusBarsPadding())
@@ -283,6 +312,7 @@ fun MyCarNavigation(
                                 vm = perfilVm,
                                 preferenciasNotificacion = cuenta.preferenciasNotificacion,
                                 licenciaRepository = cuenta.licencia,
+                                soporteRepository = cuenta.soporte,
                                 onVolver = { navegar(navegacion.atras()) },
                                 onSesionInvalida = { sesion.sesionRequerida(cuenta.ciclo) },
                                 onCerrarSesion = { cerrarSesion?.invoke() },
@@ -513,6 +543,68 @@ fun MyCarNavigation(
                                         navegar(navegacion.copy(secundaria = SecundariaMyCar.SOAT_CONFIGURAR))
                                     },
                                     fechaVencimiento = soatFechaVencimiento,
+                                    modifier = Modifier.statusBarsPadding()
+                                )
+                            }
+                        }
+                        secundaria == SecundariaMyCar.TIVE_REGISTRAR && cuenta != null -> {
+                            val idTive = vehiculoTiveId ?: vehiculoDetalleId
+                            if (idTive == null || idTive <= 0) {
+                                PantallaProximamente("Registrar TIVE", onVolver = { navegar(navegacion.atras()) })
+                            } else {
+                                RegistrarTiveRoute(
+                                    "${cuenta.ciclo}|tive-$idTive|s$tiveSesion|r$recargaTive",
+                                    idTive,
+                                    cuenta.tive,
+                                    onVolver = { navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE)) },
+                                    onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },
+                                    onExito = {
+                                        recargaTive++
+                                        recargaDetalle++
+                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.TIVE_CONSULTAR))
+                                    },
+                                    onCompletarVin = {
+                                        tiveVolverRegistrar = true
+                                        vehiculoDetalleId = idTive
+                                        abrirEdicion(idTive)
+                                    },
+                                    modifier = Modifier.statusBarsPadding()
+                                )
+                            }
+                        }
+                        secundaria == SecundariaMyCar.TIVE_CONSULTAR && cuenta != null -> {
+                            val idTive = vehiculoTiveId ?: vehiculoDetalleId
+                            if (idTive == null || idTive <= 0) {
+                                PantallaProximamente("Consultar TIVE", onVolver = { navegar(navegacion.atras()) })
+                            } else {
+                                ConsultarTiveRoute(
+                                    "${cuenta.ciclo}|tive-cons-$idTive|s$tiveSesion|r$recargaTive",
+                                    idTive,
+                                    cuenta.tive,
+                                    onVolver = { navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE)) },
+                                    onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },
+                                    onEditar = { abrirTive(idTive, SecundariaMyCar.TIVE_EDITAR) },
+                                    onRegistrar = { abrirTive(idTive, SecundariaMyCar.TIVE_REGISTRAR) },
+                                    modifier = Modifier.statusBarsPadding()
+                                )
+                            }
+                        }
+                        secundaria == SecundariaMyCar.TIVE_EDITAR && cuenta != null -> {
+                            val idTive = vehiculoTiveId ?: vehiculoDetalleId
+                            if (idTive == null || idTive <= 0) {
+                                PantallaProximamente("Editar TIVE", onVolver = { navegar(navegacion.atras()) })
+                            } else {
+                                EditarTiveRoute(
+                                    "${cuenta.ciclo}|tive-edit-$idTive|s$tiveSesion|r$recargaTive",
+                                    idTive,
+                                    cuenta.tive,
+                                    onVolver = { navegar(navegacion.copy(secundaria = SecundariaMyCar.TIVE_CONSULTAR)) },
+                                    onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },
+                                    onExito = {
+                                        recargaTive++
+                                        recargaDetalle++
+                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.TIVE_CONSULTAR))
+                                    },
                                     modifier = Modifier.statusBarsPadding()
                                 )
                             }

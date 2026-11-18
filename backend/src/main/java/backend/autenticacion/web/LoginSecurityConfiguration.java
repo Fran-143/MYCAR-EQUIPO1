@@ -47,6 +47,8 @@ public class LoginSecurityConfiguration {
         return stateless(http.securityMatcher("/api/v1/admin/**"))
                 .authorizeHttpRequests(a->a
                         .requestMatchers(HttpMethod.GET,"/api/v1/admin/hub").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/v1/admin/incidencias/vin","/api/v1/admin/incidencias/vin/**")
+                        .hasAuthority("ROLE_ADMIN")
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(authentication,json),AnonymousAuthenticationFilter.class).build();
     }

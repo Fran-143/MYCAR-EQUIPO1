@@ -24,6 +24,12 @@ class RegistrationFlowTest {
     }
     private class Api : AuthApi {
         override suspend fun logout(bearer: String): Response<Unit> = error("Not part of this regression")
+        override suspend fun mfaEnrollStart(bearer: String) = error("Not part of this regression")
+        override suspend fun mfaEnrollConfirm(bearer: String, body: MfaCodigoRequest) = error("Not part of this regression")
+        override suspend fun mfaEnrollConfirmBackup(bearer: String) = error("Not part of this regression")
+        override suspend fun mfaVerify(bearer: String, body: MfaVerificarRequest) = error("Not part of this regression")
+        override suspend fun mfaRecover(bearer: String, body: MfaRecuperarRequest) = error("Not part of this regression")
+        override suspend fun adminHub(bearer: String) = error("Not part of this regression")
         var emitStatus = 202
         var completeStatus = 201
         var emitBody = VerificationEmitResponse(

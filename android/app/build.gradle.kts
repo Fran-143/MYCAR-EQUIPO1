@@ -19,8 +19,8 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "1.1.0-mfa-admins"
+        versionCode = 13
+        versionName = "1.1.1-tive-soporte"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.

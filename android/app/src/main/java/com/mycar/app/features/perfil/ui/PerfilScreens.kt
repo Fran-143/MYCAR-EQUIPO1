@@ -33,6 +33,7 @@ fun PerfilRoute(
     vm: PerfilViewModel,
     preferenciasNotificacion: com.mycar.app.features.preferenciasnotif.domain.PreferenciasNotificacionRepository,
     licenciaRepository: com.mycar.app.features.licencia.domain.LicenciaRepository,
+    soporteRepository: com.mycar.app.features.soporte.domain.SoporteRepository,
     onVolver: () -> Unit,
     onSesionInvalida: () -> Unit,
     onCerrarSesion: () -> Unit,
@@ -43,6 +44,7 @@ fun PerfilRoute(
     // LICENCIA / notificaciones manejan su propio atrás (p. ej. fotos → formulario).
     BackHandler(
         enabled = estado.pantalla != PantallaPerfil.LICENCIA &&
+            estado.pantalla != PantallaPerfil.SOPORTE &&
             estado.pantalla != PantallaPerfil.NOTIFICACIONES_EXTERNAS
     ) {
         when (estado.pantalla) {
@@ -67,6 +69,13 @@ fun PerfilRoute(
             PantallaPerfil.LICENCIA ->
                 com.mycar.app.features.licencia.ui.LicenciaRoute(
                     repository = licenciaRepository,
+                    onVolver = vm::volverAtras,
+                    onSesionInvalida = onSesionInvalida,
+                    modifier = Modifier.fillMaxSize()
+                )
+            PantallaPerfil.SOPORTE ->
+                com.mycar.app.features.soporte.ui.SoporteRoute(
+                    repository = soporteRepository,
                     onVolver = vm::volverAtras,
                     onSesionInvalida = onSesionInvalida,
                     modifier = Modifier.fillMaxSize()
@@ -163,6 +172,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                     Seccion("CUENTA") {
                         FilaAccion("Cambiar contraseña", onClick = vm::abrirCambiarContrasena)
                         FilaAccion("Licencia de conducir", onClick = vm::abrirLicencia)
+                        FilaAccion("Soporte", onClick = vm::abrirSoporte)
                         FilaDeshabilitada("Planes y suscripción")
                     }
                     Seccion("NOTIFICACIONES") {

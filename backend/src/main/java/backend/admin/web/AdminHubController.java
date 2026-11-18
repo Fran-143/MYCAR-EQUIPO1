@@ -19,7 +19,7 @@ public class AdminHubController {
         List<Seccion> secciones=List.of(
                 new Seccion("USUARIOS","Usuarios",false,"PROXIMAMENTE"),
                 new Seccion("SUSCRIPCIONES","Suscripciones",false,"PROXIMAMENTE"),
-                new Seccion("INCIDENCIAS","Incidencias",false,"PROXIMAMENTE"),
+                new Seccion("INCIDENCIAS","Incidencias",true,"DISPONIBLE"),
                 new Seccion("CATALOGOS","Catálogos",false,"PROXIMAMENTE")
         );
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())

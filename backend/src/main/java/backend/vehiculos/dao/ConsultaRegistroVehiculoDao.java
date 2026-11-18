@@ -108,7 +108,8 @@ public class ConsultaRegistroVehiculoDao {
                        CASE WHEN a.codigo='OTRO' THEN v.tipo_aceite_otro
                             WHEN a.id_tipo_aceite IS NOT NULL THEN a.nombre ELSE NULL END AS aceite,
                        v.id_tipo_aceite, v.tipo_aceite_otro,
-                       km.valor_km, km.fecha_lectura_utc
+                       km.valor_km, km.fecha_lectura_utc,
+                       EXISTS(SELECT 1 FROM mycar.tive tv WHERE tv.id_vehiculo = v.id_vehiculo) AS tiene_tive
                 FROM mycar.vehiculo v
                 JOIN mycar.uso_vehiculo u ON u.codigo=v.uso_vehiculo_codigo
                 JOIN mycar.tipo_motor m ON m.id_tipo_motor=v.id_tipo_motor
@@ -135,7 +136,7 @@ public class ConsultaRegistroVehiculoDao {
                 rs.getString("tipo_motor_otro"),
                 rs.getString("combustible_otro"),
                 rs.getString("tipo_aceite_otro"),
-                false
+                rs.getBoolean("tiene_tive")
         ), idUsuario, idVehiculo).stream().findFirst();
     }
 

@@ -19,6 +19,9 @@ enum class SecundariaMyCar(val titulo: String) {
     SOAT_CORREGIR("Corregir SOAT"),
     SOAT_RENOVAR("Renovar SOAT"),
     SOAT_RECORDATORIO("Recordatorio SOAT"),
+    TIVE_REGISTRAR("Registrar TIVE"),
+    TIVE_CONSULTAR("Consultar TIVE"),
+    TIVE_EDITAR("Editar TIVE"),
     DIAGNOSTICO("Conexión")
 }
 data class NavegacionInicio(val seccion: SeccionMyCar=SeccionMyCar.INICIO, val secundaria: SecundariaMyCar?=null) {
@@ -32,6 +35,9 @@ data class NavegacionInicio(val seccion: SeccionMyCar=SeccionMyCar.INICIO, val s
         SecundariaMyCar.SOAT_CONFIGURAR,
         SecundariaMyCar.SOAT_CONSULTAR,
         SecundariaMyCar.SOAT_REGISTRAR,
+        SecundariaMyCar.TIVE_REGISTRAR,
+        SecundariaMyCar.TIVE_CONSULTAR,
+        SecundariaMyCar.TIVE_EDITAR,
         SecundariaMyCar.EDITAR_VEHICULO,
         SecundariaMyCar.KILOMETRAJE -> copy(secundaria = SecundariaMyCar.DETALLE)
         null -> copy(seccion = SeccionMyCar.INICIO)

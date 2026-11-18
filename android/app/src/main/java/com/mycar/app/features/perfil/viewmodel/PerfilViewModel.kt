@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 enum class PantallaPerfil {
-    HUB, DATOS, EDITAR, CAMBIAR_CONTRASENA, CONTRASENA_OK, NOTIFICACIONES_EXTERNAS, LICENCIA
+    HUB, DATOS, EDITAR, CAMBIAR_CONTRASENA, CONTRASENA_OK, NOTIFICACIONES_EXTERNAS, LICENCIA, SOPORTE
 }
 
 data class EstadoPerfil(
@@ -143,6 +143,10 @@ class PerfilViewModel(
         _estado.value = _estado.value.copy(pantalla = PantallaPerfil.LICENCIA, mensaje = null)
     }
 
+    fun abrirSoporte() {
+        _estado.value = _estado.value.copy(pantalla = PantallaPerfil.SOPORTE, mensaje = null)
+    }
+
     fun abrirNotificacionesExternas() {
         _estado.value = _estado.value.copy(
             pantalla = PantallaPerfil.NOTIFICACIONES_EXTERNAS,
@@ -259,7 +263,7 @@ class PerfilViewModel(
         when (_estado.value.pantalla) {
             PantallaPerfil.HUB -> Unit
             PantallaPerfil.DATOS, PantallaPerfil.CAMBIAR_CONTRASENA, PantallaPerfil.CONTRASENA_OK,
-            PantallaPerfil.NOTIFICACIONES_EXTERNAS, PantallaPerfil.LICENCIA ->
+            PantallaPerfil.NOTIFICACIONES_EXTERNAS, PantallaPerfil.LICENCIA, PantallaPerfil.SOPORTE ->
                 _estado.value = _estado.value.copy(pantalla = PantallaPerfil.HUB, exitoDatos = false)
             PantallaPerfil.EDITAR -> cancelarEdicion()
         }

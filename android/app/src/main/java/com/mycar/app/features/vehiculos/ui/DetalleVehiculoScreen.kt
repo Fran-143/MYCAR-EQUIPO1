@@ -48,6 +48,9 @@ fun DetalleVehiculoRoute(
     onRegistrarSoat: (() -> Unit)? = null,
     onConsultarSoat: (() -> Unit)? = null,
     onConfigurarSoat: (() -> Unit)? = null,
+    onRegistrarTive: (() -> Unit)? = null,
+    onConsultarTive: (() -> Unit)? = null,
+    onEditarTive: (() -> Unit)? = null,
     onCambioOperativo: (() -> Unit)? = null,
     recargaToken: Int = 0,
     modifier: Modifier = Modifier
@@ -71,6 +74,9 @@ fun DetalleVehiculoRoute(
         onRegistrarSoat = onRegistrarSoat,
         onConsultarSoat = onConsultarSoat,
         onConfigurarSoat = onConfigurarSoat,
+        onRegistrarTive = onRegistrarTive,
+        onConsultarTive = onConsultarTive,
+        onEditarTive = onEditarTive,
         onEstablecerPrincipal = { vm.establecerPrincipal { onCambioOperativo?.invoke() } },
         onActivar = { vm.activar { onCambioOperativo?.invoke() } },
         onDesactivar = { vm.desactivar { onCambioOperativo?.invoke() } },
@@ -89,6 +95,9 @@ fun DetalleVehiculoScreen(
     onRegistrarSoat: (() -> Unit)? = null,
     onConsultarSoat: (() -> Unit)? = null,
     onConfigurarSoat: (() -> Unit)? = null,
+    onRegistrarTive: (() -> Unit)? = null,
+    onConsultarTive: (() -> Unit)? = null,
+    onEditarTive: (() -> Unit)? = null,
     onEstablecerPrincipal: (() -> Unit)? = null,
     onActivar: (() -> Unit)? = null,
     onDesactivar: (() -> Unit)? = null,
@@ -219,9 +228,13 @@ fun DetalleVehiculoScreen(
                         soatActual = estado.soatActual,
                         soatCargando = estado.soatResumenCargando,
                         vehiculoActivo = det.estadoVehiculo == "ACTIVO",
+                        tieneTive = det.tieneTive,
                         onRegistrarSoat = onRegistrarSoat,
                         onConsultarSoat = onConsultarSoat,
                         onConfigurarSoat = onConfigurarSoat,
+                        onRegistrarTive = onRegistrarTive,
+                        onConsultarTive = onConsultarTive,
+                        onEditarTive = onEditarTive,
                         ocupado = estado.ocupado
                     )
                 }
@@ -446,9 +459,13 @@ private fun SeccionDocumentos(
     soatActual: com.mycar.app.features.soat.data.SoatDto?,
     soatCargando: Boolean,
     vehiculoActivo: Boolean,
+    tieneTive: Boolean,
     onRegistrarSoat: (() -> Unit)?,
     onConsultarSoat: (() -> Unit)?,
     onConfigurarSoat: (() -> Unit)?,
+    onRegistrarTive: (() -> Unit)?,
+    onConsultarTive: (() -> Unit)?,
+    onEditarTive: (() -> Unit)?,
     ocupado: Boolean
 ) {
     Text("Documentos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = AzulDetalle)
@@ -532,9 +549,40 @@ private fun SeccionDocumentos(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("TIVE", fontWeight = FontWeight.Bold, color = AzulDetalle)
-            Text("Próximamente", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+            if (!tieneTive) {
+                Text("Sin TIVE registrada", style = MaterialTheme.typography.bodyMedium, color = MyCarMuted)
+                if (vehiculoActivo && onRegistrarTive != null) {
+                    Button(
+                        onClick = onRegistrarTive,
+                        enabled = !ocupado,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                    ) { Text("Registrar TIVE") }
+                }
+            } else {
+                Text("TIVE registrada", style = MaterialTheme.typography.bodySmall, color = MyCarMuted)
+                if (onConsultarTive != null) {
+                    OutlinedButton(
+                        onClick = onConsultarTive,
+                        enabled = !ocupado,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AzulDetalle)
+                    ) { Text("Consultar TIVE") }
+                }
+                if (vehiculoActivo && onEditarTive != null) {
+                    Button(
+                        onClick = onEditarTive,
+                        enabled = !ocupado,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                    ) { Text("Editar TIVE") }
+                }
+            }
         }
     }
 }
