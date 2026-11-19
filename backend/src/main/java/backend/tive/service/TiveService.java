@@ -163,6 +163,15 @@ public class TiveService {
         } catch (ErrorTive ex) {
             throw ex;
         } catch (DataAccessException ex) {
+            // PSQLException de triggers (p.ej. motor eléctrico) no siempre llega como IntegrityViolation.
+            String detalle = ex.getMostSpecificCause() != null
+                    ? String.valueOf(ex.getMostSpecificCause().getMessage())
+                    : String.valueOf(ex.getMessage());
+            if (detalle != null && detalle.toLowerCase(Locale.ROOT).contains("motor eléctrico")) {
+                throw new ErrorTive(
+                        "DATOS_INVALIDOS",
+                        "En vehículos eléctricos el número de motor no se guarda en la ficha del vehículo.");
+            }
             throw new ErrorTive(
                     "TIVE_GUARDAR_FALLIDO",
                     "No pudimos guardar la TIVE por un problema interno. Inténtalo de nuevo.");

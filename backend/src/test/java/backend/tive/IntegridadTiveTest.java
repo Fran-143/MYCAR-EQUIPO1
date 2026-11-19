@@ -48,6 +48,14 @@ class IntegridadTiveTest {
     }
 
     @Test
+    void motorElectricoNoSeEnmascaraComoInterno() {
+        ErrorTive err = IntegridadTive.mapear(ex(
+                "ERROR: Motor eléctrico: combustible/aceite/número motor no aplican"));
+        assertEquals("DATOS_INVALIDOS", err.codigo());
+        assertTrue(err.getMessage().toLowerCase().contains("eléctric"));
+    }
+
+    @Test
     void noExponeNombresDeConstraintAlUsuario() {
         ErrorTive err = IntegridadTive.mapear(ex(
                 "ERROR: duplicate key value violates unique constraint \"uq_tive_vehiculo\""));

@@ -112,10 +112,18 @@ public class TiveJdbcDao {
                 d.idTive(), d.idVehiculo(), d.versionEsperada());
     }
 
+    /**
+     * Sincroniza serie siempre; motor solo si el vehículo no es eléctrico.
+     * El trigger {@code tr_validar_vehiculo} prohíbe {@code numero_motor} en motores eléctricos.
+     */
     public int sincronizarMotorSerieVehiculo(long idVehiculo, String motor, String serie) {
         return jdbc.update("""
-                UPDATE mycar.vehiculo SET numero_motor = ?, numero_serie = ?
-                WHERE id_vehiculo = ?
+                UPDATE mycar.vehiculo v
+                SET numero_motor = CASE WHEN tm.es_electrico THEN NULL ELSE ? END,
+                    numero_serie = ?
+                FROM mycar.tipo_motor tm
+                WHERE v.id_vehiculo = ?
+                  AND tm.id_tipo_motor = v.id_tipo_motor
                 """, motor, serie, idVehiculo);
     }
 

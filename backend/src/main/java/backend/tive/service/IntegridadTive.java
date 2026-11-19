@@ -67,6 +67,11 @@ public final class IntegridadTive {
                     "DATOS_INVALIDOS",
                     "Uno de los campos supera la longitud permitida.");
         }
+        if (contiene(detalle, "motor eléctrico", "numero motor no aplican")) {
+            return new ErrorTive(
+                    "DATOS_INVALIDOS",
+                    "En vehículos eléctricos el número de motor no se guarda en la ficha del vehículo.");
+        }
         return new ErrorTive(
                 "TIVE_GUARDAR_FALLIDO",
                 "No pudimos guardar la TIVE por un problema interno. Inténtalo de nuevo.");
