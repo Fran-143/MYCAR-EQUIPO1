@@ -72,7 +72,8 @@ public class ConsultaRegistroVehiculoDao {
                        CASE WHEN m.codigo='OTRO' THEN v.tipo_motor_otro ELSE m.nombre END AS motor,
                        CASE WHEN m.es_electrico THEN NULL
                             WHEN c.codigo='OTRO' THEN v.combustible_otro ELSE c.nombre END AS combustible,
-                       v.estado_vehiculo, v.es_principal, km.valor_km
+                       v.estado_vehiculo, v.es_principal, km.valor_km,
+                       (v.foto_storage_object_key IS NOT NULL AND btrim(v.foto_storage_object_key) <> '') AS tiene_foto
                 FROM mycar.vehiculo v
                 JOIN mycar.uso_vehiculo u ON u.codigo=v.uso_vehiculo_codigo
                 JOIN mycar.tipo_motor m ON m.id_tipo_motor=v.id_tipo_motor
@@ -89,7 +90,7 @@ public class ConsultaRegistroVehiculoDao {
                     rs.getString("modelo"), rs.getInt("anio_fabricacion"), rs.getString("uso"),
                     rs.getString("color"), rs.getString("motor"), rs.getString("combustible"),
                     rs.getString("estado_vehiculo"), rs.getBoolean("es_principal"),
-                    rs.getBigDecimal("valor_km")
+                    rs.getBigDecimal("valor_km"), rs.getBoolean("tiene_foto")
                 ), idUsuario);
     }
 
@@ -109,7 +110,8 @@ public class ConsultaRegistroVehiculoDao {
                             WHEN a.id_tipo_aceite IS NOT NULL THEN a.nombre ELSE NULL END AS aceite,
                        v.id_tipo_aceite, v.tipo_aceite_otro,
                        km.valor_km, km.fecha_lectura_utc,
-                       EXISTS(SELECT 1 FROM mycar.tive tv WHERE tv.id_vehiculo = v.id_vehiculo) AS tiene_tive
+                       EXISTS(SELECT 1 FROM mycar.tive tv WHERE tv.id_vehiculo = v.id_vehiculo) AS tiene_tive,
+                       (v.foto_storage_object_key IS NOT NULL AND btrim(v.foto_storage_object_key) <> '') AS tiene_foto
                 FROM mycar.vehiculo v
                 JOIN mycar.uso_vehiculo u ON u.codigo=v.uso_vehiculo_codigo
                 JOIN mycar.tipo_motor m ON m.id_tipo_motor=v.id_tipo_motor
@@ -136,7 +138,8 @@ public class ConsultaRegistroVehiculoDao {
                 rs.getString("tipo_motor_otro"),
                 rs.getString("combustible_otro"),
                 rs.getString("tipo_aceite_otro"),
-                rs.getBoolean("tiene_tive")
+                rs.getBoolean("tiene_tive"),
+                rs.getBoolean("tiene_foto")
         ), idUsuario, idVehiculo).stream().findFirst();
     }
 

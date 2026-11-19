@@ -32,7 +32,7 @@ class ManageProfileTest {
 
     @Test
     void consultReturnsActiveProfile() {
-        var data = new ProfileData("Ana", "Pérez", "ana@example.com", LocalDate.of(1995, 1, 1));
+        var data = new ProfileData("Ana", "Pérez", "ana@example.com", LocalDate.of(1995, 1, 1), false);
         when(store.findActiveProfile(7L)).thenReturn(Optional.of(data));
 
         assertEquals(data, service.consult(7L));
@@ -44,7 +44,7 @@ class ManageProfileTest {
         when(store.updatePersonalData(eq(7L), eq("Marcelo"), eq("Lopez"), eq(LocalDate.of(1998, 8, 15))))
                 .thenReturn(1);
         when(store.findActiveProfile(7L)).thenReturn(Optional.of(
-                new ProfileData("Marcelo", "Lopez", "ana@example.com", LocalDate.of(1998, 8, 15))));
+                new ProfileData("Marcelo", "Lopez", "ana@example.com", LocalDate.of(1998, 8, 15), false)));
 
         ProfileData updated = service.updatePersonalData(7L, "  Marcelo  ", "Lopez", LocalDate.of(1998, 8, 15));
 

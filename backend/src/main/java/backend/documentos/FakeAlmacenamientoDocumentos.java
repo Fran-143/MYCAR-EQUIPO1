@@ -139,8 +139,23 @@ public class FakeAlmacenamientoDocumentos implements AlmacenamientoDocumentos {
             RutasDocumentoSoat.exigirSegmentosValidos(objectKey);
             return;
         } catch (RuntimeException ignored) {
-            // puede ser ruta de licencia
+            // puede ser ruta de licencia / tive / soporte / fotos
         }
-        RutasDocumentoLicencia.exigirSegmentosValidos(objectKey);
+        try {
+            RutasDocumentoLicencia.exigirSegmentosValidos(objectKey);
+            return;
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            RutasDocumentoTive.exigirSegmentosValidos(objectKey);
+            return;
+        } catch (RuntimeException ignored) {
+        }
+        try {
+            RutasDocumentoSoporte.exigirSegmentosValidos(objectKey);
+            return;
+        } catch (RuntimeException ignored) {
+        }
+        backend.fotos.RutasFotoPersonalizada.exigirClaveValida(objectKey);
     }
 }

@@ -2,15 +2,19 @@ package com.mycar.app.features.perfil.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mycar.app.features.fotos.domain.ErrorFotoPersonalizada
+import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
 import com.mycar.app.features.perfil.domain.DatosPerfil
 import com.mycar.app.features.perfil.domain.ErrorPerfil
 import com.mycar.app.features.perfil.domain.FormularioEdicionPerfil
 import com.mycar.app.features.perfil.domain.PerfilRepository
 import com.mycar.app.features.perfil.domain.PerfilValidator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class PantallaPerfil {
     HUB, DATOS, EDITAR, CAMBIAR_CONTRASENA, CONTRASENA_OK, NOTIFICACIONES_EXTERNAS, LICENCIA, SOPORTE
@@ -24,6 +28,10 @@ data class EstadoPerfil(
     val formulario: FormularioEdicionPerfil = FormularioEdicionPerfil(),
     val errores: Map<String, String> = emptyMap(),
     val mensaje: String? = null,
+    val mensajeFoto: String? = null,
+    val errorFoto: Boolean = false,
+    val fotoBytes: ByteArray? = null,
+    val ocupadoFoto: Boolean = false,
     val exitoDatos: Boolean = false,
     val confirmarCierre: Boolean = false,
     val contrasenaActual: String = "",
@@ -36,7 +44,9 @@ data class EstadoPerfil(
 
 class PerfilViewModel(
     private val repository: PerfilRepository,
-    private val onNombreActualizado: (String) -> Unit = {}
+    private val fotos: FotoPersonalizadaRepository? = null,
+    private val onNombreActualizado: (String) -> Unit = {},
+    private val onAvatarActualizado: (ByteArray?) -> Unit = {}
 ) : ViewModel() {
     private val _estado = MutableStateFlow(EstadoPerfil(cargando = true))
     val estado: StateFlow<EstadoPerfil> = _estado.asStateFlow()
@@ -49,12 +59,84 @@ class PerfilViewModel(
             try {
                 val datos = repository.consultar()
                 onNombreActualizado(datos.nombre)
-                _estado.value = _estado.value.copy(cargando = false, perfil = datos, mensaje = null)
+                val bytes = if (datos.tieneFoto && fotos != null) {
+                    withContext(Dispatchers.IO) {
+                        runCatching { fotos.bytesPerfil() }.getOrNull()
+                    }
+                } else null
+                onAvatarActualizado(bytes)
+                _estado.value = _estado.value.copy(
+                    cargando = false,
+                    perfil = datos,
+                    fotoBytes = bytes,
+                    mensaje = null,
+                    mensajeFoto = null
+                )
             } catch (e: ErrorPerfil.Sesion) {
                 _estado.value = _estado.value.copy(cargando = false, sesionInvalida = true, mensaje = e.message)
             } catch (e: Exception) {
                 _estado.value = _estado.value.copy(cargando = false,
                     mensaje = (e as? ErrorPerfil)?.message ?: "No se pudo cargar tu perfil.")
+            }
+        }
+    }
+
+    fun registrarOActualizarFoto(bytes: ByteArray, contentType: String, nombre: String) {
+        val repo = fotos ?: return
+        if (_estado.value.ocupadoFoto) return
+        val tenia = _estado.value.perfil?.tieneFoto == true
+        viewModelScope.launch {
+            _estado.value = _estado.value.copy(ocupadoFoto = true, mensajeFoto = null, errorFoto = false)
+            try {
+                val r = if (tenia) repo.actualizarPerfil(bytes, contentType, nombre)
+                else repo.registrarPerfil(bytes, contentType, nombre)
+                val perfil = _estado.value.perfil?.copy(tieneFoto = true)
+                onAvatarActualizado(bytes)
+                _estado.value = _estado.value.copy(
+                    ocupadoFoto = false,
+                    perfil = perfil,
+                    fotoBytes = bytes,
+                    mensajeFoto = r.mensaje.ifBlank {
+                        if (tenia) "Foto actualizada correctamente" else "Foto registrada correctamente"
+                    },
+                    errorFoto = false
+                )
+            } catch (e: ErrorFotoPersonalizada.Sesion) {
+                _estado.value = _estado.value.copy(ocupadoFoto = false, sesionInvalida = true)
+            } catch (e: Exception) {
+                _estado.value = _estado.value.copy(
+                    ocupadoFoto = false,
+                    mensajeFoto = e.message ?: "No se pudo guardar la foto.",
+                    errorFoto = true
+                )
+            }
+        }
+    }
+
+    fun eliminarFoto() {
+        val repo = fotos ?: return
+        if (_estado.value.ocupadoFoto || _estado.value.perfil?.tieneFoto != true) return
+        viewModelScope.launch {
+            _estado.value = _estado.value.copy(ocupadoFoto = true, mensajeFoto = null, errorFoto = false)
+            try {
+                val r = repo.eliminarPerfil()
+                val perfil = _estado.value.perfil?.copy(tieneFoto = false)
+                onAvatarActualizado(null)
+                _estado.value = _estado.value.copy(
+                    ocupadoFoto = false,
+                    perfil = perfil,
+                    fotoBytes = null,
+                    mensajeFoto = r.mensaje.ifBlank { "Foto eliminada correctamente" },
+                    errorFoto = false
+                )
+            } catch (e: ErrorFotoPersonalizada.Sesion) {
+                _estado.value = _estado.value.copy(ocupadoFoto = false, sesionInvalida = true)
+            } catch (e: Exception) {
+                _estado.value = _estado.value.copy(
+                    ocupadoFoto = false,
+                    mensajeFoto = e.message ?: "No se pudo eliminar la foto.",
+                    errorFoto = true
+                )
             }
         }
     }

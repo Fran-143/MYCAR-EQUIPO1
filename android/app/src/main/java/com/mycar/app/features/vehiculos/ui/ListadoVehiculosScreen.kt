@@ -11,6 +11,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -18,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.R
+import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
+import com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada
+import com.mycar.app.features.fotos.ui.MiniaturaFotoVehiculo
 import com.mycar.app.features.vehiculos.domain.ListadoVehiculosRepository
 import com.mycar.app.features.vehiculos.viewmodel.*
 import com.mycar.app.ui.theme.MyCarStatusActivo
@@ -26,14 +31,17 @@ import com.mycar.app.ui.theme.MyCarStatusActivo
 fun ListadoVehiculosRoute(claveCuenta: String, repository: ListadoVehiculosRepository,
                          onVolver: () -> Unit, onAgregar: () -> Unit, onIniciarSesion: () -> Unit,
                          modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null, estadoEnSistema: Boolean = true,
-                         onNotificaciones: (() -> Unit)? = null, onPerfil: (() -> Unit)? = null) {
+                         onNotificaciones: (() -> Unit)? = null, onPerfil: (() -> Unit)? = null,
+                         fotosRepository: FotoPersonalizadaRepository? = null,
+                         avatarBytes: ByteArray? = null, iniciales: String? = null) {
     val vm: ListadoVehiculosViewModel = viewModel(key = "rf09-$claveCuenta",
         factory = remember(repository, claveCuenta) { ListadoVehiculosViewModel.factory(repository, estadoEnSistema) })
     val estado by vm.estado.collectAsStateWithLifecycle()
     LaunchedEffect(vm) { vm.cargar() }
     ListadoVehiculosScreen(estado, vm::cambiarBusqueda, vm::filtrar, vm::cargar,
         onVolver, onAgregar, onIniciarSesion, modifier = modifier, onVerDetalle = onVerDetalle,
-        onNotificaciones = onNotificaciones, onPerfil = onPerfil)
+        onNotificaciones = onNotificaciones, onPerfil = onPerfil,
+        fotosRepository = fotosRepository, avatarBytes = avatarBytes, iniciales = iniciales)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -42,7 +50,9 @@ fun ListadoVehiculosScreen(estado: EstadoListadoVehiculos, onBusqueda: (String) 
                           onFiltro: (String) -> Unit, onBuscar: () -> Unit,
                           onVolver: () -> Unit, onAgregar: () -> Unit, onIniciarSesion: () -> Unit,
                           modifier: Modifier = Modifier, onVerDetalle: ((Long) -> Unit)? = null,
-                          onNotificaciones: (() -> Unit)? = null, onPerfil: (() -> Unit)? = null) {
+                          onNotificaciones: (() -> Unit)? = null, onPerfil: (() -> Unit)? = null,
+                          fotosRepository: FotoPersonalizadaRepository? = null,
+                          avatarBytes: ByteArray? = null, iniciales: String? = null) {
     val colors = MaterialTheme.colorScheme
     Scaffold(
         modifier = modifier.fillMaxSize().imePadding(),
@@ -51,7 +61,9 @@ fun ListadoVehiculosScreen(estado: EstadoListadoVehiculos, onBusqueda: (String) 
             Column {
                 com.mycar.app.ui.MycarCabeceraApp(
                     onNotificaciones = onNotificaciones,
-                    onPerfil = onPerfil
+                    onPerfil = onPerfil,
+                    avatarBytes = avatarBytes,
+                    iniciales = iniciales
                 )
                 Surface(color = colors.surface, shadowElevation = 1.dp) {
                     Row(
@@ -146,11 +158,21 @@ fun ListadoVehiculosScreen(estado: EstadoListadoVehiculos, onBusqueda: (String) 
                             ) {
                                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Image(
-                                            painterResource(R.drawable.ic_vehiculo_predeterminado_rf08),
-                                            null,
-                                            Modifier.size(72.dp)
-                                        )
+                                        Box(
+                                            Modifier
+                                                .size(76.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                        ) {
+                                            MiniaturaFotoVehiculo(
+                                                idVehiculo = v.idVehiculo,
+                                                tieneFoto = v.tieneFoto,
+                                                fotos = fotosRepository,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentDescription = null
+                                            ) {
+                                                ImagenVehiculoPredeterminada(Modifier.fillMaxSize())
+                                            }
+                                        }
                                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Row(
                                                 Modifier.fillMaxWidth(),

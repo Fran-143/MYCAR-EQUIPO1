@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -147,8 +148,9 @@ fun RegistroVehiculoScreen(
                             modifier = Modifier.fillMaxWidth()) { Text("Reintentar envío") }
                     }
                     FaseRegistro.CONFIRMADA -> {
-                        Image(painterResource(R.drawable.ic_vehiculo_predeterminado_rf08), contentDescription = null,
-                            modifier = Modifier.align(Alignment.CenterHorizontally).height(96.dp))
+                        com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada(
+                            modifier = Modifier.align(Alignment.CenterHorizontally).height(96.dp).clip(RoundedCornerShape(14.dp))
+                        )
                         estado.resultado?.let {
                             Text("${it.placa} · ${it.kilometrajeActual} km", style = MaterialTheme.typography.titleLarge)
                             Text("Tu vehículo se registró correctamente.")
@@ -182,8 +184,9 @@ private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambia
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(R.drawable.ic_vehiculo_predeterminado_rf08), contentDescription = null,
-                modifier = Modifier.size(72.dp))
+            com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada(
+                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(12.dp))
+            )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Tu vehículo, en un solo lugar", style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)

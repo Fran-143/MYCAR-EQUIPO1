@@ -76,6 +76,6 @@ class EstadoOperativoVehiculoServiceTest {
                 5, "A1B234", "Toyota", "Corolla", 2020, "Particular", "Azul",
                 "Combustión", "Gasolina", estado, principal, BigDecimal.valueOf(1000),
                 "2020-01-01T00:00:00Z", null, null, null, null, false,
-                "PARTICULAR", 1L, 1L, null, null, null, null, false);
+                "PARTICULAR", 1L, 1L, null, null, null, null, false, false);
     }
 }

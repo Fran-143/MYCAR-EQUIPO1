@@ -29,6 +29,8 @@ public record DatosDetalleVehiculo(
         String combustibleOtro,
         String tipoAceiteOtro,
         /** true si existe fila en mycar.tive (RF52/53/54 entrega TIVE). */
-        boolean tieneTive
+        boolean tieneTive,
+        /** true si hay imagen principal personalizada vigente. */
+        boolean tieneFoto
 ) {
 }

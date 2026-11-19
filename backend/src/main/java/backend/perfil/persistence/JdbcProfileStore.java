@@ -16,7 +16,9 @@ public class JdbcProfileStore implements ProfileStore {
             r.getString("nombre"),
             r.getString("apellido"),
             r.getString("correo"),
-            r.getObject("fecha_nacimiento", LocalDate.class));
+            r.getObject("fecha_nacimiento", LocalDate.class),
+            r.getString("foto_storage_object_key") != null
+                    && !r.getString("foto_storage_object_key").isBlank());
     private static final RowMapper<Credential> CREDENTIAL = (r, n) -> new Credential(
             r.getLong("id_usuario"),
             r.getString("password_hash"),
@@ -27,7 +29,7 @@ public class JdbcProfileStore implements ProfileStore {
     @Override
     public Optional<ProfileData> findActiveProfile(long userId) {
         return jdbc.query("""
-                SELECT nombre, apellido, correo, fecha_nacimiento
+                SELECT nombre, apellido, correo, fecha_nacimiento, foto_storage_object_key
                   FROM mycar.usuario
                  WHERE id_usuario=? AND estado_cuenta='ACTIVA'
                 """, PROFILE, userId).stream().findFirst();

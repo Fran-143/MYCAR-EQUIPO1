@@ -63,7 +63,7 @@ class ListadoVehiculosControllerTest {
     @Test void detalleUsaPropietarioDeSesion() throws Exception {
         var detalle = new DatosDetalleVehiculo(5, "A1B234", "Toyota", "Corolla", 2020, "Particular", "Gris",
                 "Combustión", "Gasolina", "ACTIVO", true, java.math.BigDecimal.valueOf(50000), "2020-01-01T00:00:00Z",
-                null, null, null, null, false, "PARTICULAR", 1L, 1L, null, null, null, null, false);
+                null, null, null, null, false, "PARTICULAR", 1L, 1L, null, null, null, null, false, false);
         when(consultas.consultarDetalle(17, 5)).thenReturn(detalle);
         mvc.perform(get("/api/v1/vehiculos/5").principal(auth).header("X-Usuario-Id", "999"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.placa").value("A1B234"));

@@ -33,7 +33,8 @@ class RemotePerfilRepository(private val api: PerfilApi) : PerfilRepository {
                 nombre = body.nombre.orEmpty().trim(),
                 apellido = body.apellido.orEmpty().trim(),
                 correo = body.correo.orEmpty().trim(),
-                fechaNacimientoIso = body.fechaNacimiento.orEmpty().trim()
+                fechaNacimientoIso = body.fechaNacimiento.orEmpty().trim(),
+                tieneFoto = body.tieneFoto
             )
         }
         throw errorOf(response)

@@ -11,7 +11,8 @@ data class PerfilDto(
     val apellido: String? = null,
     val correo: String? = null,
     val fechaNacimiento: String? = null,
-    val nombreCompleto: String? = null
+    val nombreCompleto: String? = null,
+    val tieneFoto: Boolean = false
 )
 
 data class ActualizarPerfilRequest(

@@ -24,11 +24,11 @@ public class ProfileController {
     public ProfileController(ManageProfile profiles) { this.profiles = profiles; }
 
     public record ProfileResponse(String nombre, String apellido, String correo, String fechaNacimiento,
-            String nombreCompleto) {
+            String nombreCompleto, boolean tieneFoto) {
         static ProfileResponse from(ProfileData data) {
             return new ProfileResponse(data.nombre(), data.apellido(), data.correo(),
                     data.fechaNacimiento() == null ? null : data.fechaNacimiento().toString(),
-                    data.nombreCompleto());
+                    data.nombreCompleto(), data.tieneFoto());
         }
     }
 

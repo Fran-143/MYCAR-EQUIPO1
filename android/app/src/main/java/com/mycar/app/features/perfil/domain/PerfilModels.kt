@@ -4,7 +4,8 @@ data class DatosPerfil(
     val nombre: String,
     val apellido: String,
     val correo: String,
-    val fechaNacimientoIso: String
+    val fechaNacimientoIso: String,
+    val tieneFoto: Boolean = false
 ) {
     val nombreCompleto: String get() = "$nombre $apellido".trim()
     val iniciales: String get() {

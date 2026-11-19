@@ -9,6 +9,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
@@ -17,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,6 +29,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.R
+import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
+import com.mycar.app.features.fotos.ui.FlujoSelectorFotoPersonalizada
+import com.mycar.app.features.fotos.ui.ImagenBytesFoto
+import com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada
 import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.features.soat.domain.SoatRepository
 import com.mycar.app.features.vehiculos.data.DetalleVehiculoDto
@@ -45,6 +54,7 @@ fun DetalleVehiculoRoute(
     idVehiculo: Long,
     repository: DetalleVehiculosRepository,
     soatRepository: SoatRepository? = null,
+    fotosRepository: FotoPersonalizadaRepository? = null,
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onActualizarKm: (() -> Unit)? = null,
@@ -66,8 +76,8 @@ fun DetalleVehiculoRoute(
 ) {
     val vm: DetalleVehiculoViewModel = viewModel(
         key = "rf10-$claveCuenta-$idVehiculo",
-        factory = remember(repository, soatRepository, idVehiculo) {
-            DetalleVehiculoViewModel.factory(idVehiculo, repository, soatRepository)
+        factory = remember(repository, soatRepository, fotosRepository, idVehiculo) {
+            DetalleVehiculoViewModel.factory(idVehiculo, repository, soatRepository, fotosRepository)
         }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
@@ -94,6 +104,10 @@ fun DetalleVehiculoRoute(
         onEstablecerPrincipal = { vm.establecerPrincipal { onCambioOperativo?.invoke() } },
         onActivar = { vm.activar { onCambioOperativo?.invoke() } },
         onDesactivar = { vm.desactivar { onCambioOperativo?.invoke() } },
+        onRegistrarFoto = { bytes, ct, nombre ->
+            vm.registrarOActualizarFoto(bytes, ct, nombre) { onCambioOperativo?.invoke() }
+        },
+        onEliminarFoto = { vm.eliminarFoto { onCambioOperativo?.invoke() } },
         modifier = modifier
     )
 }
@@ -118,6 +132,8 @@ fun DetalleVehiculoScreen(
     onRegistrarTiveTrasVin: (() -> Unit)? = null,
     onVolverDetalleTrasVin: (() -> Unit)? = null,
     onEstablecerPrincipal: (() -> Unit)? = null,
+    onRegistrarFoto: ((ByteArray, String, String) -> Unit)? = null,
+    onEliminarFoto: (() -> Unit)? = null,
     onActivar: (() -> Unit)? = null,
     onDesactivar: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -196,7 +212,13 @@ fun DetalleVehiculoScreen(
                     }
                 }
                 FaseDetalle.LISTO -> estado.detalle?.let { det ->
-                    CabeceraDetalle(det)
+                    CabeceraDetalle(
+                        v = det,
+                        fotoBytes = estado.fotoBytes,
+                        ocupadoFoto = estado.ocupadoFoto,
+                        onRegistrarFoto = onRegistrarFoto,
+                        onEliminarFoto = onEliminarFoto
+                    )
                     GridEspecificaciones(det)
 
                     if (det.estadoVehiculo == "ACTIVO") {
@@ -413,7 +435,17 @@ private fun BadgeEstado(estado: String) {
 }
 
 @Composable
-private fun CabeceraDetalle(v: DetalleVehiculoDto) {
+private fun CabeceraDetalle(
+    v: DetalleVehiculoDto,
+    fotoBytes: ByteArray?,
+    ocupadoFoto: Boolean,
+    onRegistrarFoto: ((ByteArray, String, String) -> Unit)?,
+    onEliminarFoto: (() -> Unit)?
+) {
+    var menuFoto by remember { mutableStateOf(false) }
+    var selectorActivo by remember { mutableStateOf(false) }
+    var confirmarEliminar by remember { mutableStateOf(false) }
+    val editable = v.estadoVehiculo == "ACTIVO" && onRegistrarFoto != null
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -421,14 +453,67 @@ private fun CabeceraDetalle(v: DetalleVehiculoDto) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Image(
-                painterResource(R.drawable.ic_vehiculo_predeterminado_rf08),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MyCarTile)
-            )
+            Box {
+                Box(
+                    Modifier
+                        .size(104.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MyCarTile)
+                ) {
+                    ImagenBytesFoto(
+                        bytes = fotoBytes,
+                        contentDescription = "Imagen del vehículo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    ) {
+                        ImagenVehiculoPredeterminada(Modifier.fillMaxSize())
+                    }
+                }
+                if (editable) {
+                    Box(Modifier.align(Alignment.BottomEnd)) {
+                        Surface(
+                            onClick = { if (!ocupadoFoto) menuFoto = true },
+                            shape = CircleShape,
+                            color = AzulDetalle,
+                            shadowElevation = 2.dp,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Filled.PhotoCamera,
+                                    contentDescription = "Imagen del vehículo",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        DropdownMenu(expanded = menuFoto, onDismissRequest = { menuFoto = false }) {
+                            if (v.tieneFoto) {
+                                DropdownMenuItem(
+                                    text = { Text("Cambiar imagen") },
+                                    leadingIcon = { Icon(Icons.Filled.SwapHoriz, null, tint = AzulDetalle) },
+                                    onClick = { menuFoto = false; selectorActivo = true }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Eliminar imagen") },
+                                    leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Color(0xFFD32F2F)) },
+                                    onClick = { menuFoto = false; confirmarEliminar = true }
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Agregar imagen") },
+                                    leadingIcon = { Icon(Icons.Filled.AddAPhoto, null, tint = CelesteDetalle) },
+                                    onClick = { menuFoto = false; selectorActivo = true }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Cancelar") },
+                                onClick = { menuFoto = false }
+                            )
+                        }
+                    }
+                }
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     "${v.marca} ${v.modelo}",
@@ -451,8 +536,38 @@ private fun CabeceraDetalle(v: DetalleVehiculoDto) {
                         }
                     }
                 }
+                if (ocupadoFoto) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteDetalle)
+                }
             }
         }
+    }
+    FlujoSelectorFotoPersonalizada(
+        activo = selectorActivo,
+        circular = false,
+        onDismiss = { selectorActivo = false },
+        onConfirmada = { foto ->
+            onRegistrarFoto?.invoke(foto.bytes, foto.contentType, foto.nombre)
+        }
+    )
+    if (confirmarEliminar) {
+        AlertDialog(
+            onDismissRequest = { confirmarEliminar = false },
+            title = { Text("Eliminar imagen") },
+            text = { Text("¿Eliminar la imagen de este vehículo?") },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmarEliminar = false }) { Text("Cancelar") }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmarEliminar = false
+                        onEliminarFoto?.invoke()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) { Text("Eliminar") }
+            }
+        )
     }
 }
 

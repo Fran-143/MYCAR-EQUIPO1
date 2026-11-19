@@ -9,6 +9,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mycar.app.features.autenticacion.domain.RegistrationValidator
+import com.mycar.app.features.fotos.ui.FlujoSelectorFotoPersonalizada
+import com.mycar.app.features.fotos.ui.ImagenBytesFoto
 import com.mycar.app.features.perfil.domain.PerfilValidator
 import com.mycar.app.features.perfil.viewmodel.EstadoPerfil
 import com.mycar.app.features.perfil.viewmodel.PantallaPerfil
@@ -95,8 +102,15 @@ fun PerfilRoute(
 
 @Composable
 private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver: () -> Unit) {
+    var menuFoto by remember { mutableStateOf(false) }
+    var selectorActivo by remember { mutableStateOf(false) }
+    var confirmarEliminar by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
-        com.mycar.app.ui.MycarCabeceraApp(conStatusBars = true)
+        com.mycar.app.ui.MycarCabeceraApp(
+            conStatusBars = true,
+            avatarBytes = estado.fotoBytes,
+            iniciales = estado.perfil?.iniciales
+        )
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onVolver) { Text("Volver", color = PerfilColors.Navy) }
@@ -130,6 +144,19 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                 }
                 else -> {
                     val perfil = estado.perfil!!
+                    estado.mensajeFoto?.let { texto ->
+                        Surface(
+                            Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            color = if (estado.errorFoto) Color(0xFFFFEBEE) else PerfilColors.SuccessBg,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                texto,
+                                Modifier.padding(14.dp),
+                                color = if (estado.errorFoto) PerfilColors.Danger else PerfilColors.SuccessText
+                            )
+                        }
+                    }
                     Surface(
                         Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
@@ -140,15 +167,90 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                             Modifier.padding(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(
-                                Modifier.size(72.dp).clip(CircleShape).background(PerfilColors.Teal),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    perfil.iniciales,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 24.sp
+                            Box(contentAlignment = Alignment.BottomEnd) {
+                                Box(
+                                    Modifier.size(84.dp).clip(CircleShape).background(PerfilColors.Teal),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    ImagenBytesFoto(
+                                        bytes = estado.fotoBytes,
+                                        contentDescription = "Foto de perfil",
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Text(
+                                            perfil.iniciales,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 28.sp,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                }
+                                Box {
+                                    Surface(
+                                        onClick = { if (!estado.ocupadoFoto) menuFoto = true },
+                                        shape = CircleShape,
+                                        color = PerfilColors.Navy,
+                                        shadowElevation = 2.dp,
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Filled.PhotoCamera,
+                                                contentDescription = "Foto de perfil",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                    DropdownMenu(expanded = menuFoto, onDismissRequest = { menuFoto = false }) {
+                                        if (perfil.tieneFoto) {
+                                            DropdownMenuItem(
+                                                text = { Text("Cambiar foto") },
+                                                leadingIcon = {
+                                                    Icon(Icons.Filled.SwapHoriz, null, tint = PerfilColors.Navy)
+                                                },
+                                                onClick = {
+                                                    menuFoto = false
+                                                    selectorActivo = true
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Eliminar foto") },
+                                                leadingIcon = {
+                                                    Icon(Icons.Filled.Delete, null, tint = PerfilColors.Danger)
+                                                },
+                                                onClick = {
+                                                    menuFoto = false
+                                                    confirmarEliminar = true
+                                                }
+                                            )
+                                        } else {
+                                            DropdownMenuItem(
+                                                text = { Text("Agregar foto") },
+                                                leadingIcon = {
+                                                    Icon(Icons.Filled.AddAPhoto, null, tint = PerfilColors.Teal)
+                                                },
+                                                onClick = {
+                                                    menuFoto = false
+                                                    selectorActivo = true
+                                                }
+                                            )
+                                        }
+                                        DropdownMenuItem(
+                                            text = { Text("Cancelar") },
+                                            onClick = { menuFoto = false }
+                                        )
+                                    }
+                                }
+                            }
+                            if (estado.ocupadoFoto) {
+                                Spacer(Modifier.height(8.dp))
+                                CircularProgressIndicator(
+                                    Modifier.size(22.dp),
+                                    color = PerfilColors.Navy,
+                                    strokeWidth = 2.dp
                                 )
                             }
                             Spacer(Modifier.height(12.dp))
@@ -167,6 +269,42 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = PerfilColors.Navy)
                             ) { Text("Datos personales") }
                         }
+                    }
+                    FlujoSelectorFotoPersonalizada(
+                        activo = selectorActivo,
+                        circular = true,
+                        onDismiss = { selectorActivo = false },
+                        onConfirmada = { foto ->
+                            vm.registrarOActualizarFoto(foto.bytes, foto.contentType, foto.nombre)
+                        },
+                        onError = { /* mensaje vía estado al fallar subida; cancelación no marca éxito */ }
+                    )
+                    if (confirmarEliminar) {
+                        AlertDialog(
+                            onDismissRequest = { confirmarEliminar = false },
+                            icon = {
+                                Icon(Icons.Filled.Delete, null, tint = PerfilColors.Danger, modifier = Modifier.size(28.dp))
+                            },
+                            title = { Text("Eliminar foto", color = PerfilColors.Navy, fontWeight = FontWeight.Bold) },
+                            text = { Text("¿Eliminar tu foto de perfil? Se mostrarán tus iniciales.") },
+                            dismissButton = {
+                                OutlinedButton(
+                                    onClick = { confirmarEliminar = false },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Cancelar") }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        confirmarEliminar = false
+                                        vm.eliminarFoto()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Danger),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("Eliminar") }
+                            },
+                            shape = RoundedCornerShape(20.dp)
+                        )
                     }
                     Spacer(Modifier.height(20.dp))
                     Seccion("CUENTA") {

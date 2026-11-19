@@ -2,4 +2,6 @@
 <paths>
     <cache-path name="soat_capture" path="soat_capture/" />
     <cache-path name="soat_adjuntos" path="soat_adjuntos/" />
+    <cache-path name="fotos_capture" path="fotos_capture/" />
+    <cache-path name="fotos_adjuntos" path="fotos_adjuntos/" />
 </paths>

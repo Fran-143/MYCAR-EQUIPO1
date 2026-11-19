@@ -47,6 +47,19 @@ fun MyCarNavigation(
 ) {
     val acceso by sesion.estado.collectAsStateWithLifecycle()
     val cuenta=acceso.cuenta
+    LaunchedEffect(cuenta?.ciclo) {
+        val c = cuenta ?: return@LaunchedEffect
+        runCatching {
+            val perfil = c.perfil.consultar()
+            c.inicialesPresentacion.value = perfil.iniciales
+            c.nombrePresentacion.value = perfil.nombre
+            if (perfil.tieneFoto) {
+                c.avatarPresentacion.value = runCatching { c.fotos.bytesPerfil() }.getOrNull()
+            } else {
+                c.avatarPresentacion.value = null
+            }
+        }
+    }
     var seccionNombre by rememberSaveable { mutableStateOf(SeccionMyCar.INICIO.name) }
     var secundariaNombre by rememberSaveable { mutableStateOf<String?>(null) }
     var vehiculoMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -229,6 +242,7 @@ fun MyCarNavigation(
                                 DetalleVehiculoRoute(
                                     "${cuenta.ciclo}|$idDetalle", idDetalle, cuenta.detalle,
                                     soatRepository = cuenta.soat,
+                                    fotosRepository = cuenta.fotos,
                                     onVolver={ navegar(navegacion.atras()) },
                                     onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     onActualizarKm={ abrirKilometraje(idDetalle, desdeDetalle = true) },
@@ -326,12 +340,23 @@ fun MyCarNavigation(
                                         require(modelClass.isAssignableFrom(PerfilViewModel::class.java))
                                         return PerfilViewModel(
                                             cuenta.perfil,
-                                            onNombreActualizado = { cuenta.nombrePresentacion.value = it }
+                                            fotos = cuenta.fotos,
+                                            onNombreActualizado = { nombre ->
+                                                cuenta.nombrePresentacion.value = nombre
+                                            },
+                                            onAvatarActualizado = { bytes ->
+                                                cuenta.avatarPresentacion.value = bytes
+                                            }
                                         ) as T
                                     }
                                 }
                             }
                             val perfilVm: PerfilViewModel = viewModel(key = "perfil-${cuenta.ciclo}", factory = factoryPerfil)
+                            val estadoPerfilCabecera by perfilVm.estado.collectAsStateWithLifecycle()
+                            LaunchedEffect(estadoPerfilCabecera.perfil?.iniciales, estadoPerfilCabecera.fotoBytes) {
+                                cuenta.inicialesPresentacion.value = estadoPerfilCabecera.perfil?.iniciales
+                                cuenta.avatarPresentacion.value = estadoPerfilCabecera.fotoBytes
+                            }
                             LaunchedEffect(perfilAbrirLicencia) {
                                 if (perfilAbrirLicencia) {
                                     perfilVm.abrirLicencia()
@@ -687,6 +712,8 @@ fun MyCarNavigation(
                                 LaunchedEffect(estado.fase) {
                                     if(estado.fase==FaseInicio.SIN_SESION) sesion.sesionRequerida(cuenta.ciclo)
                                 }
+                                val avatarBytes by cuenta.avatarPresentacion.collectAsStateWithLifecycle()
+                                val iniciales by cuenta.inicialesPresentacion.collectAsStateWithLifecycle()
                                 HomeScreen(estado,vm::seleccionar,
                                     onVehiculos={ navegar(navegacion.abrir(SeccionMyCar.VEHICULOS)) },
                                     onMantenimientos={ id ->
@@ -704,15 +731,23 @@ fun MyCarNavigation(
                                         abrirHistorialEnTalleres=true
                                         navegar(navegacion.abrir(SeccionMyCar.MANTENIMIENTOS))
                                     },
+                                    fotosRepository = cuenta.fotos,
+                                    avatarBytes = avatarBytes,
+                                    iniciales = iniciales,
                                     modifier=Modifier.statusBarsPadding())
                             }
                             SeccionMyCar.VEHICULOS -> Column {
+                                val avatarBytes by cuenta.avatarPresentacion.collectAsStateWithLifecycle()
+                                val iniciales by cuenta.inicialesPresentacion.collectAsStateWithLifecycle()
                                 VehiculosRoute(cuenta.ciclo,cuenta.registro,cuenta.listado,cuenta.pendientes,
                                     onIrInicio={ navegar(navegacion.atras()) },onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     onVerDetalle={ abrirDetalle(it) },
                                     estadoEnSistema=false,modifier=Modifier.weight(1f),onFormularioAbierto={ formularioAbierto=it },
                                     onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
-                                    onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) })
+                                    onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
+                                    fotosRepository = cuenta.fotos,
+                                    avatarBytes = avatarBytes,
+                                    iniciales = iniciales)
                             }
                             SeccionMyCar.MANTENIMIENTOS -> {
                                 val idKmOverlay = kmOverlayMantenimiento

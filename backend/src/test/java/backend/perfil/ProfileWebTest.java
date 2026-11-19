@@ -28,7 +28,7 @@ class ProfileWebTest {
     @Test
     void getReturnsOwnProfile() {
         when(profiles.consult(7L)).thenReturn(
-                new ProfileData("Ana", "Pérez", "ana@example.com", LocalDate.of(1995, 1, 1)));
+                new ProfileData("Ana", "Pérez", "ana@example.com", LocalDate.of(1995, 1, 1), false));
 
         ResponseEntity<ProfileController.ProfileResponse> response = controller.get(principal(7L));
 
@@ -40,7 +40,7 @@ class ProfileWebTest {
     @Test
     void putUpdatesAndReturnsProfile() {
         when(profiles.updatePersonalData(eq(7L), eq("Marcelo"), eq("Lopez"), eq(LocalDate.of(1998, 8, 15))))
-                .thenReturn(new ProfileData("Marcelo", "Lopez", "ana@example.com", LocalDate.of(1998, 8, 15)));
+                .thenReturn(new ProfileData("Marcelo", "Lopez", "ana@example.com", LocalDate.of(1998, 8, 15), false));
 
         ResponseEntity<ProfileController.ProfileResponse> response = controller.put(principal(7L),
                 new ProfileController.UpdateProfileRequest("Marcelo", "Lopez", LocalDate.of(1998, 8, 15)));

@@ -10,8 +10,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -23,7 +25,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mycar.app.R
+import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
+import com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada
+import com.mycar.app.features.fotos.ui.MiniaturaFotoVehiculo
 import com.mycar.app.features.inicio.domain.*
+import com.mycar.app.ui.AvatarCabecera
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -37,6 +43,9 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
     onPerfil: ()->Unit, onNotificaciones: ()->Unit, onRecargar: ()->Unit,
     onVerVehiculo: (Long)->Unit, onActualizarKm: (Long)->Unit,
     onTalleres: (Long?)->Unit = {},
+    fotosRepository: FotoPersonalizadaRepository? = null,
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
     modifier: Modifier=Modifier) {
     var desplegado by remember { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFEAF8FF),Color(0xFFF7FCFF))))
@@ -53,7 +62,7 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
                 Icon(painterResource(R.drawable.ic_inicio_campana),contentDescription="Notificaciones",tint=TintaInicio)
             }
             FilledTonalIconButton(onClick=onPerfil) {
-                Icon(painterResource(R.drawable.ic_inicio_perfil),contentDescription="Perfil",tint=TintaInicio)
+                AvatarCabecera(avatarBytes = avatarBytes, iniciales = iniciales)
             }
         }
         Column {
@@ -115,8 +124,17 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
                                 Text(v.placa,color=Color(0xFF6881A5))
                                 TextButton(onClick={ onVerVehiculo(v.idVehiculo) }) { Text("Ver vehículo →") }
                             }
-                            Image(painterResource(R.drawable.ic_vehiculo_predeterminado_rf08),"Imagen predeterminada del vehículo",
-                                modifier=Modifier.width(110.dp).height(85.dp))
+                            Box(Modifier.width(118.dp).height(90.dp).clip(RoundedCornerShape(12.dp))) {
+                                MiniaturaFotoVehiculo(
+                                    idVehiculo = v.idVehiculo,
+                                    tieneFoto = v.tieneFoto,
+                                    fotos = fotosRepository,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentDescription = "Imagen del vehículo"
+                                ) {
+                                    ImagenVehiculoPredeterminada(Modifier.fillMaxSize())
+                                }
+                            }
                         }
                     }
                     TarjetaInicio {

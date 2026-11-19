@@ -52,6 +52,11 @@ services:
         sync: false
       - key: MYCAR_DOCUMENTOS_SUPABASE_BUCKET
         value: mycar-documentos-privados
+      # Fotos privadas perfil/vehículo (bucket dedicado; URL/SECRET caen a DOCUMENTOS si no se definen).
+      - key: MYCAR_FOTOS_MODO
+        value: supabase
+      - key: MYCAR_FOTOS_SUPABASE_BUCKET
+        value: mycar-fotos-privadas
       # Cifrado SOAT/Licencia (AES-GCM). Los 4 valores van en Dashboard (sync:false).
       # Si ENABLED=true sin AES/BLIND el arranque falla; no forzar enabled aquí.
       - key: MYCAR_DATOS_SENSIBLES_ENABLED

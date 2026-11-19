@@ -20,7 +20,8 @@ data class DetalleVehiculoDto(
     val tipoMotorOtro: String? = null,
     val combustibleOtro: String? = null,
     val tipoAceiteOtro: String? = null,
-    val tieneTive: Boolean = false
+    val tieneTive: Boolean = false,
+    val tieneFoto: Boolean = false
 )
 
 data class SolicitudActualizacionVehiculoDto(

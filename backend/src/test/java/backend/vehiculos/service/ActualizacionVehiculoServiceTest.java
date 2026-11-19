@@ -141,7 +141,7 @@ class ActualizacionVehiculoServiceTest {
         return new DatosDetalleVehiculo(
                 5, "A1B234", "Toyota", "Corolla", 2021, "Particular", "Rojo",
                 "Combustión", "Gasolina", "ACTIVO", true, java.math.BigDecimal.valueOf(50000), "2020-01-01T00:00:00Z",
-                null, null, null, null, false, "PARTICULAR", 1L, 1L, null, null, null, null, false);
+                null, null, null, null, false, "PARTICULAR", 1L, 1L, null, null, null, null, false, false);
     }
 
     private DatosCatalogosVehiculo cats() {

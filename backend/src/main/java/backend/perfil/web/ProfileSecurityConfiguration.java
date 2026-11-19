@@ -31,6 +31,10 @@ public class ProfileSecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/perfil").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/perfil/contrasena").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/perfil/contrasena/verificar").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/perfil/foto").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/perfil/foto").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/perfil/foto").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/perfil/foto").authenticated()
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(sessions, json), AnonymousAuthenticationFilter.class)
                 .build();

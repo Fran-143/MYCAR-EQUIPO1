@@ -29,7 +29,10 @@ fun VehiculosRoute(
     estadoEnSistema: Boolean = true,
     onFormularioAbierto: (Boolean) -> Unit = {},
     onNotificaciones: (() -> Unit)? = null,
-    onPerfil: (() -> Unit)? = null
+    onPerfil: (() -> Unit)? = null,
+    fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null
 ) {
     key(claveCuenta) {
         var pantalla by rememberSaveable(claveCuenta) { mutableStateOf("lista") }
@@ -66,7 +69,8 @@ fun VehiculosRoute(
                 ListadoVehiculosRoute(claveCuenta, listadoRepository, onVolver = onIrInicio,
                     onAgregar = agregar, onIniciarSesion = onIniciarSesion,
                     onVerDetalle = onVerDetalle, modifier = Modifier.weight(1f), estadoEnSistema = estadoEnSistema,
-                    onNotificaciones = onNotificaciones, onPerfil = onPerfil)
+                    onNotificaciones = onNotificaciones, onPerfil = onPerfil,
+                    fotosRepository = fotosRepository, avatarBytes = avatarBytes, iniciales = iniciales)
             }
         }
         mensaje?.let { texto ->
