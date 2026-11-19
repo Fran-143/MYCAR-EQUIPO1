@@ -1,9 +1,15 @@
 package com.mycar.app.features.tive.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -17,6 +23,7 @@ import com.mycar.app.features.soat.ui.SoatVistaDocumento
 import com.mycar.app.features.tive.domain.TiveRepository
 import com.mycar.app.features.tive.viewmodel.ConsultarTiveViewModel
 import com.mycar.app.features.tive.viewmodel.FaseConsultaTive
+import com.mycar.app.ui.theme.MyCarBlue
 import com.mycar.app.ui.theme.MyCarMuted
 import com.mycar.app.ui.theme.MyCarNavy
 import com.mycar.app.ui.theme.MyCarTeal
@@ -82,10 +89,19 @@ fun ConsultarTiveScreen(
                 Card(
                     Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Sin TIVE registrada", fontWeight = FontWeight.Bold, color = MyCarNavy)
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                Modifier.size(40.dp).background(MyCarBlue.copy(alpha = 0.12f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Description, null, tint = MyCarBlue, modifier = Modifier.size(22.dp))
+                            }
+                            Text("Sin TIVE registrada", fontWeight = FontWeight.Bold, color = MyCarNavy)
+                        }
                         Text(
                             estado.consulta?.mensajeDocumento
                                 ?: "Este vehículo aún no tiene título vehicular electrónico.",
@@ -101,11 +117,14 @@ fun ConsultarTiveScreen(
                 if (tive != null) {
                     TiveTarjetaVehiculoDesdeConsulta(estado.consulta, tive)
                     TiveTarjetaDatos(tive)
-                    Text(
-                        "Los datos mostrados son los registrados en MyCar; no constituyen verificación oficial SUNARP.",
-                        color = MyCarMuted,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Outlined.Info, null, tint = MyCarMuted, modifier = Modifier.size(16.dp))
+                        Text(
+                            "Los datos mostrados son los registrados en MyCar; no constituyen verificación oficial SUNARP.",
+                            color = MyCarMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     if (tive.conDocumento) {
                         Text("Documento / evidencia", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
                         SoatVistaDocumento(

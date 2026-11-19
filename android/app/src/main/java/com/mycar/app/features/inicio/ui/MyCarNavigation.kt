@@ -244,7 +244,7 @@ fun MyCarNavigation(
                                     onConsultarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_CONSULTAR) },
                                     onEditarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_EDITAR) },
                                     onCompletarVinParaTive={ completarVinParaTive(idDetalle) },
-                                    onCancelarVinParaTive={ irInicioMyCar() },
+                                    onCancelarVinParaTive={ /* Cierra el modal y permanece en Detalle */ },
                                     mostrarModalVinCompletado = modalVinCompletado,
                                     onRegistrarTiveTrasVin = {
                                         modalVinCompletado = false

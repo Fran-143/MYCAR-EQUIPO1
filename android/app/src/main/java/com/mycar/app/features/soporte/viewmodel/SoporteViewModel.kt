@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 enum class PantallaSoporte {
-    CARGANDO, CENTRO, CORRECCION, DETALLE, EXITO, ERROR, SESION
+    CARGANDO, CENTRO, CORRECCION, FORMULARIO, DETALLE, EXITO, ERROR, SESION
 }
 
 enum class PestanaCorreccion { NUEVA, HISTORIAL }
@@ -159,8 +159,35 @@ class SoporteViewModel(
     }
 
     fun seleccionarVehiculo(id: Long) {
-        _estado.value = _estado.value.copy(idVehiculoSel = id, errores = _estado.value.errores - "idVehiculo")
+        _estado.value = _estado.value.copy(
+            idVehiculoSel = id,
+            pantalla = PantallaSoporte.FORMULARIO,
+            vinPropuesto = "",
+            motivo = "",
+            adjunto = null,
+            errores = emptyMap(),
+            hintsOk = emptyMap(),
+            tocados = emptySet(),
+            mensaje = null
+        )
         revalidar()
+    }
+
+    /** Vuelve del formulario de solicitud a la lista de vehículos. */
+    fun volverAListaVehiculos() {
+        _estado.value = _estado.value.copy(
+            pantalla = PantallaSoporte.CORRECCION,
+            pestana = PestanaCorreccion.NUEVA,
+            idVehiculoSel = null,
+            vinPropuesto = "",
+            motivo = "",
+            adjunto = null,
+            errores = emptyMap(),
+            hintsOk = emptyMap(),
+            tocados = emptySet(),
+            mensaje = null,
+            ocupado = false
+        )
     }
 
     fun actualizarCampo(vin: String? = null, motivo: String? = null, campo: String? = null) {
@@ -333,6 +360,7 @@ class SoporteViewModel(
 
     fun volver() {
         when (_estado.value.pantalla) {
+            PantallaSoporte.FORMULARIO -> volverAListaVehiculos()
             PantallaSoporte.CORRECCION, PantallaSoporte.EXITO -> cargarCentro()
             PantallaSoporte.DETALLE -> {
                 _estado.value = _estado.value.copy(

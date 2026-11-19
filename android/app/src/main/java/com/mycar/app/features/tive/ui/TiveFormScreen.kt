@@ -1,10 +1,16 @@
 package com.mycar.app.features.tive.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -14,6 +20,7 @@ import com.mycar.app.features.soat.ui.*
 import com.mycar.app.features.tive.domain.CamposTive
 import com.mycar.app.features.tive.domain.TiveFormulario
 import com.mycar.app.features.tive.viewmodel.*
+import com.mycar.app.ui.theme.MyCarBlue
 import com.mycar.app.ui.theme.MyCarMuted
 import com.mycar.app.ui.theme.MyCarNavy
 import com.mycar.app.ui.theme.MyCarTeal
@@ -92,7 +99,15 @@ private fun CamposTiveForm(
     onModoDoc: (ModoDocTive) -> Unit
 ) {
     val c = estado.campos
-    Text("Datos de la TIVE", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            Modifier.size(36.dp).background(MyCarBlue.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Outlined.Description, null, tint = MyCarBlue, modifier = Modifier.size(20.dp))
+        }
+        Text("Datos de la TIVE", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+    }
     CampoValidado(
         etiqueta = "Número de título *",
         valor = c.numeroTitulo,
@@ -127,7 +142,15 @@ private fun CamposTiveForm(
         error = estado.errores["fechaTitulo"],
         enabled = !estado.ocupado
     )
-    Text("Evidencia fotográfica (opcional)", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(
+            Modifier.size(36.dp).background(MyCarTeal.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Outlined.PhotoCamera, null, tint = MyCarTeal, modifier = Modifier.size(20.dp))
+        }
+        Text("Evidencia fotográfica (opcional)", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+    }
     Text("JPG, PNG o PDF (máx. 10 MB). La vista previa no certifica autenticidad ante SUNARP.",
         color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
     if (estado.modo == TipoFormTive.EDITAR && estado.tieneDocumentoActual) {

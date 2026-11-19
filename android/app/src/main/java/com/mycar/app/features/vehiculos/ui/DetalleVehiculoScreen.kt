@@ -5,8 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -544,10 +548,19 @@ private fun SeccionDocumentos(
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("SOAT", fontWeight = FontWeight.Bold, color = AzulDetalle)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    Modifier.size(36.dp).background(CelesteDetalle.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.Shield, null, tint = CelesteDetalle, modifier = Modifier.size(20.dp))
+                }
+                Text("SOAT", fontWeight = FontWeight.Bold, color = AzulDetalle)
+            }
             when {
                 soatCargando -> {
                     LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteDetalle)
@@ -619,10 +632,19 @@ private fun SeccionDocumentos(
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("TIVE", fontWeight = FontWeight.Bold, color = AzulDetalle)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    Modifier.size(36.dp).background(AzulDetalle.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Outlined.Description, null, tint = AzulDetalle, modifier = Modifier.size(20.dp))
+                }
+                Text("TIVE", fontWeight = FontWeight.Bold, color = AzulDetalle)
+            }
             if (!tieneTive) {
                 Text("Sin TIVE registrada", style = MaterialTheme.typography.bodyMedium, color = MyCarMuted)
                 if (vehiculoActivo && onRegistrarTive != null) {
