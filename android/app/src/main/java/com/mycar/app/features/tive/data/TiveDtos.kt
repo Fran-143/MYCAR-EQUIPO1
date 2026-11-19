@@ -16,8 +16,8 @@ data class TiveDto(
     val sedeRegistral: String? = null,
     val numeroVin: String,
     val placa: String,
-    val numeroMotor: String,
-    val numeroSerie: String,
+    val numeroMotor: String? = null,
+    val numeroSerie: String? = null,
     val tieneDocumento: Boolean = false,
     val versionFila: Int = 0,
     val documento: TiveDocumentoRefDto? = null
@@ -55,8 +55,8 @@ data class TiveRegistrarRequest(
     val fechaTitulo: String,
     val zonaRegistral: String? = null,
     val sedeRegistral: String? = null,
-    val numeroMotor: String,
-    val numeroSerie: String,
+    val numeroMotor: String? = null,
+    val numeroSerie: String? = null,
     val documento: TiveDocumentoRefDto? = null
 )
 
@@ -72,8 +72,8 @@ data class TiveActualizarRequest(
     val fechaTitulo: String,
     val zonaRegistral: String? = null,
     val sedeRegistral: String? = null,
-    val numeroMotor: String,
-    val numeroSerie: String,
+    val numeroMotor: String? = null,
+    val numeroSerie: String? = null,
     val accionDocumento: String,
     val documento: TiveDocumentoRefDto? = null
 )

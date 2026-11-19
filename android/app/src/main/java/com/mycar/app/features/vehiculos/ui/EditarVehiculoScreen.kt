@@ -8,8 +8,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.border
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -29,6 +33,7 @@ fun EditarVehiculoRoute(
     onVolver: () -> Unit,
     onGuardado: () -> Unit,
     onIniciarSesion: () -> Unit,
+    resaltarVin: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val vm: EditarVehiculoViewModel = viewModel(
@@ -46,6 +51,7 @@ fun EditarVehiculoRoute(
         onVolver = onVolver,
         onIniciarSesion = onIniciarSesion,
         onCerrarAvisoSinCambios = vm::cerrarAvisoSinCambios,
+        resaltarVin = resaltarVin,
         modifier = modifier
     )
 }
@@ -60,8 +66,15 @@ fun EditarVehiculoScreen(
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onCerrarAvisoSinCambios: () -> Unit = {},
+    resaltarVin: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val vinFocus = remember { FocusRequester() }
+    LaunchedEffect(resaltarVin, estado.fase) {
+        if (resaltarVin && estado.fase == FaseEdicion.FORMULARIO && !estado.tieneTive) {
+            vinFocus.requestFocus()
+        }
+    }
     val catalogos = estado.catalogos
     val erroresLocales = catalogos?.let {
         ValidadorFormularioEdicion.validar(estado.formulario, it, estado.tieneTive)
@@ -204,9 +217,24 @@ fun EditarVehiculoScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    CampoEdicion("VIN", f.numeroVin, error = err("numeroVin"),
-                        soloLectura = estado.tieneTive, enabled = !estado.ocupado && !estado.tieneTive,
-                        ayuda = if (estado.tieneTive) null else "17 caracteres; sin I, O ni Q.") {
+                    if (resaltarVin && !estado.tieneTive) {
+                        Text(
+                            "Completa el VIN para poder registrar la TIVE.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF1565C0),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    CampoEdicion(
+                        etiqueta = "VIN",
+                        valor = f.numeroVin,
+                        error = err("numeroVin"),
+                        soloLectura = estado.tieneTive,
+                        enabled = !estado.ocupado && !estado.tieneTive,
+                        ayuda = if (estado.tieneTive) null else "17 caracteres; sin I, O ni Q.",
+                        resaltar = resaltarVin && !estado.tieneTive,
+                        focusRequester = if (resaltarVin) vinFocus else null
+                    ) {
                         onCambiar("numeroVin", it)
                     }
                     CampoEdicion("Número de serie", f.numeroSerie, error = err("numeroSerie"),
@@ -247,12 +275,19 @@ private fun CampoEdicion(
     numerico: Boolean = false,
     soloLectura: Boolean = false,
     enabled: Boolean = true,
+    resaltar: Boolean = false,
+    focusRequester: FocusRequester? = null,
     onCambiar: ((String) -> Unit)? = null
 ) {
+    var mod = Modifier.fillMaxWidth()
+    if (focusRequester != null) mod = mod.focusRequester(focusRequester)
+    if (resaltar) {
+        mod = mod.border(2.dp, Color(0xFF079FDC), RoundedCornerShape(10.dp))
+    }
     OutlinedTextField(
         value = valor,
         onValueChange = { if (!soloLectura) onCambiar?.invoke(it) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = mod,
         enabled = enabled && !soloLectura,
         readOnly = soloLectura,
         singleLine = true,

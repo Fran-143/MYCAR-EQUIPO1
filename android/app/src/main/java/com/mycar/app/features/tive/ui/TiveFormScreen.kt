@@ -70,15 +70,16 @@ fun TiveFormScreen(
             }
         }
     }
+    // El modal de VIN ausente se muestra en Detalle; este diálogo queda como respaldo.
     if (estado.mostrarDialogoVin) {
         AlertDialog(
             onDismissRequest = onCerrarDialogoVin,
-            title = { Text("VIN requerido") },
-            text = { Text("Completa el VIN del vehículo antes de registrar la TIVE.") },
+            title = { Text("Necesitas completar tu vehículo") },
+            text = { Text("Para registrar la TIVE, primero necesitas completar el número VIN de tu vehículo.") },
             confirmButton = {
-                TextButton(onClick = { onCerrarDialogoVin(); onCompletarVin() }) { Text("Completar VIN") }
+                TextButton(onClick = { onCerrarDialogoVin(); onCompletarVin() }) { Text("COMPLETAR") }
             },
-            dismissButton = { TextButton(onClick = onCerrarDialogoVin) { Text("Cancelar") } }
+            dismissButton = { TextButton(onClick = onCerrarDialogoVin) { Text("CANCELAR") } }
         )
     }
 }
@@ -91,23 +92,6 @@ private fun CamposTiveForm(
     onModoDoc: (ModoDocTive) -> Unit
 ) {
     val c = estado.campos
-    Card(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Vehículo", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-            CampoSoloLectura("Placa", c.placa)
-            if (estado.errores["placa"] != null) {
-                Text(estado.errores.getValue("placa"), color = Color(0xFFC62828), style = MaterialTheme.typography.bodySmall)
-            }
-            CampoSoloLectura("VIN", c.numeroVin.ifBlank { "Sin VIN" })
-            if (estado.errores["numeroVin"] != null) {
-                Text(estado.errores.getValue("numeroVin"), color = Color(0xFFC62828), style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
     Text("Datos de la TIVE", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
     CampoValidado(
         etiqueta = "Número de título *",
@@ -143,39 +127,9 @@ private fun CamposTiveForm(
         error = estado.errores["fechaTitulo"],
         enabled = !estado.ocupado
     )
-    CampoValidado(
-        etiqueta = "Zona registral (opcional)",
-        valor = c.zonaRegistral,
-        placeholder = TiveFormulario.PH_ZONA,
-        error = estado.errores["zonaRegistral"],
-        onChange = { v -> onActualizar({ it.copy(zonaRegistral = v.uppercase()) }, "zonaRegistral") }
-    )
-    CampoValidado(
-        etiqueta = "Sede registral (opcional)",
-        valor = c.sedeRegistral,
-        placeholder = TiveFormulario.PH_SEDE,
-        error = estado.errores["sedeRegistral"],
-        onChange = { v -> onActualizar({ it.copy(sedeRegistral = v.uppercase()) }, "sedeRegistral") }
-    )
-    CampoValidado(
-        etiqueta = "Número de motor *",
-        valor = c.numeroMotor,
-        placeholder = TiveFormulario.PH_MOTOR,
-        ayuda = "5 a 15 caracteres permitidos.",
-        error = estado.errores["numeroMotor"],
-        contador = "${c.numeroMotor.length}/15",
-        onChange = { v -> onActualizar({ it.copy(numeroMotor = v.uppercase()) }, "numeroMotor") }
-    )
-    CampoValidado(
-        etiqueta = "Número de serie *",
-        valor = c.numeroSerie,
-        placeholder = TiveFormulario.PH_SERIE,
-        ayuda = "Mínimo 6 caracteres alfanuméricos.",
-        error = estado.errores["numeroSerie"],
-        onChange = { v -> onActualizar({ it.copy(numeroSerie = v.uppercase()) }, "numeroSerie") }
-    )
-    Text("Documento (opcional)", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-    Text("La vista previa no certifica autenticidad ante SUNARP.", color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
+    Text("Evidencia fotográfica (opcional)", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
+    Text("JPG, PNG o PDF (máx. 10 MB). La vista previa no certifica autenticidad ante SUNARP.",
+        color = MyCarMuted, style = MaterialTheme.typography.bodySmall)
     if (estado.modo == TipoFormTive.EDITAR && estado.tieneDocumentoActual) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(ModoDocTive.MANTENER, ModoDocTive.REEMPLAZAR, ModoDocTive.QUITAR).forEach { modo ->
@@ -206,7 +160,7 @@ private fun CamposTiveForm(
             enabled = !estado.ocupado,
             onAdjunto = onAdjunto,
             estiloPdf = true,
-            etiqueta = "Imagen o PDF de la TIVE",
+            etiqueta = "Adjuntar foto o PDF de la TIVE",
             subtituloVacio = "JPG, PNG o PDF (máx. 10 MB)"
         )
     }

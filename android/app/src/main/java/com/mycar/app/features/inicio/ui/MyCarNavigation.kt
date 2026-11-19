@@ -66,7 +66,10 @@ fun MyCarNavigation(
     var vehiculoTiveId by rememberSaveable { mutableStateOf<Long?>(null) }
     var tiveSesion by rememberSaveable { mutableIntStateOf(0) }
     var recargaTive by rememberSaveable { mutableIntStateOf(0) }
-    var tiveVolverRegistrar by rememberSaveable { mutableStateOf(false) }
+    /** Flujo VIN iniciado desde «Registrar TIVE» sin VIN. */
+    var flujoVinDesdeTive by rememberSaveable { mutableStateOf(false) }
+    var resaltarVinEdicion by rememberSaveable { mutableStateOf(false) }
+    var modalVinCompletado by rememberSaveable { mutableStateOf(false) }
     var recargaMantenimiento by rememberSaveable { mutableIntStateOf(0) }
     var kmOrigenDetalle by rememberSaveable { mutableStateOf(false) }
     var kmOverlayMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -107,8 +110,22 @@ fun MyCarNavigation(
     fun abrirTive(id: Long, destino: SecundariaMyCar) {
         tiveSesion++
         vehiculoTiveId = id
-        if (destino != SecundariaMyCar.TIVE_REGISTRAR) tiveVolverRegistrar = false
+        modalVinCompletado = false
         navegar(navegacion.abrir(destino))
+    }
+    fun irInicioMyCar() {
+        modalVinCompletado = false
+        flujoVinDesdeTive = false
+        resaltarVinEdicion = false
+        navegar(NavegacionInicio(SeccionMyCar.INICIO, null))
+    }
+    fun completarVinParaTive(id: Long) {
+        flujoVinDesdeTive = true
+        resaltarVinEdicion = true
+        modalVinCompletado = false
+        vehiculoDetalleId = id
+        vehiculoTiveId = id
+        abrirEdicion(id)
     }
     fun volverDesdeConfigurarSoat() {
         navegar(
@@ -161,7 +178,7 @@ fun MyCarNavigation(
     }
     LaunchedEffect(cuenta?.ciclo) {
         vehiculoMantenimiento=null; vehiculoDetalleId=null; vehiculoKmId=null; vehiculoSoatId=null
-        vehiculoTiveId=null; tiveVolverRegistrar=false
+        vehiculoTiveId=null; flujoVinDesdeTive=false; resaltarVinEdicion=false; modalVinCompletado=false
         kmOverlayMantenimiento=null
         alertasProgramarId=null; formularioAbierto=false; secundariaNombre=null
         detalleAlertaTrasAtencion=null; formularioAtencionAlerta=false
@@ -215,13 +232,25 @@ fun MyCarNavigation(
                                     onVolver={ navegar(navegacion.atras()) },
                                     onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     onActualizarKm={ abrirKilometraje(idDetalle, desdeDetalle = true) },
-                                    onEditarDatos={ abrirEdicion(idDetalle) },
+                                    onEditarDatos={
+                                        flujoVinDesdeTive = false
+                                        resaltarVinEdicion = false
+                                        abrirEdicion(idDetalle)
+                                    },
                                     onRegistrarSoat={ abrirSoat(idDetalle, SecundariaMyCar.SOAT_REGISTRAR) },
                                     onConsultarSoat={ abrirSoat(idDetalle, SecundariaMyCar.SOAT_CONSULTAR) },
                                     onConfigurarSoat={ abrirSoat(idDetalle, SecundariaMyCar.SOAT_CONFIGURAR) },
                                     onRegistrarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_REGISTRAR) },
                                     onConsultarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_CONSULTAR) },
                                     onEditarTive={ abrirTive(idDetalle, SecundariaMyCar.TIVE_EDITAR) },
+                                    onCompletarVinParaTive={ completarVinParaTive(idDetalle) },
+                                    onCancelarVinParaTive={ irInicioMyCar() },
+                                    mostrarModalVinCompletado = modalVinCompletado,
+                                    onRegistrarTiveTrasVin = {
+                                        modalVinCompletado = false
+                                        abrirTive(idDetalle, SecundariaMyCar.TIVE_REGISTRAR)
+                                    },
+                                    onVolverDetalleTrasVin = { modalVinCompletado = false },
                                     onCambioOperativo={
                                         recargaDetalle++
                                         recargaInicio++
@@ -238,25 +267,26 @@ fun MyCarNavigation(
                                 PantallaProximamente("Editar datos", onVolver={ navegar(navegacion.atras()) })
                             } else {
                                 com.mycar.app.features.vehiculos.ui.EditarVehiculoRoute(
-                                    "${cuenta.ciclo}|$idEdicion", idEdicion, cuenta.edicion,
+                                    "${cuenta.ciclo}|$idEdicion|vin=$resaltarVinEdicion", idEdicion, cuenta.edicion,
+                                    resaltarVin = resaltarVinEdicion,
                                     onVolver={
-                                        val destino = if (tiveVolverRegistrar) {
-                                            tiveVolverRegistrar = false
-                                            SecundariaMyCar.TIVE_REGISTRAR
-                                        } else SecundariaMyCar.DETALLE
-                                        navegar(navegacion.copy(secundaria = destino))
+                                        flujoVinDesdeTive = false
+                                        resaltarVinEdicion = false
+                                        modalVinCompletado = false
+                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE))
                                     },
                                     onGuardado={
                                         recargaDetalle++
                                         recargaInicio++
                                         recargaTive++
-                                        val destino = if (tiveVolverRegistrar) {
-                                            SecundariaMyCar.TIVE_REGISTRAR
+                                        resaltarVinEdicion = false
+                                        if (flujoVinDesdeTive) {
+                                            flujoVinDesdeTive = false
+                                            modalVinCompletado = true
                                         } else {
-                                            tiveVolverRegistrar = false
-                                            SecundariaMyCar.DETALLE
+                                            modalVinCompletado = false
                                         }
-                                        navegar(navegacion.copy(secundaria = destino))
+                                        navegar(navegacion.copy(secundaria = SecundariaMyCar.DETALLE))
                                     },
                                     onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     modifier=Modifier.statusBarsPadding())
@@ -563,11 +593,7 @@ fun MyCarNavigation(
                                         recargaDetalle++
                                         navegar(navegacion.copy(secundaria = SecundariaMyCar.TIVE_CONSULTAR))
                                     },
-                                    onCompletarVin = {
-                                        tiveVolverRegistrar = true
-                                        vehiculoDetalleId = idTive
-                                        abrirEdicion(idTive)
-                                    },
+                                    onCompletarVin = { completarVinParaTive(idTive) },
                                     modifier = Modifier.statusBarsPadding()
                                 )
                             }

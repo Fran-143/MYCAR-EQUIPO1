@@ -2,7 +2,6 @@ package com.mycar.app.features.tive.domain
 
 import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.features.tive.data.TiveDto
-import com.mycar.app.features.vehiculos.domain.ValidadorVin
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -51,8 +50,8 @@ object TiveFormulario {
         fechaTitulo = SoatFormulario.fechaIsoAUi(t.fechaTitulo),
         zonaRegistral = t.zonaRegistral.orEmpty(),
         sedeRegistral = t.sedeRegistral.orEmpty(),
-        numeroMotor = t.numeroMotor,
-        numeroSerie = t.numeroSerie
+        numeroMotor = t.numeroMotor.orEmpty(),
+        numeroSerie = t.numeroSerie.orEmpty()
     )
 
     fun validar(
@@ -70,26 +69,7 @@ object TiveFormulario {
         incluir("numeroTitulo", errorTitulo(campos.numeroTitulo, exigirTodos || "numeroTitulo" in tocados))
         incluir("codigoVerificacion", errorCodigo(campos.codigoVerificacion, exigirTodos || "codigoVerificacion" in tocados))
         incluir("fechaTitulo", errorFecha(campos.fechaTitulo, exigirTodos || "fechaTitulo" in tocados))
-
-        val zonaVacia = campos.zonaRegistral.isBlank()
-        val sedeVacia = campos.sedeRegistral.isBlank()
-        if (zonaVacia != sedeVacia) {
-            val msg = "Zona y sede registral deben informarse juntas"
-            incluir("zonaRegistral", msg)
-            incluir("sedeRegistral", msg)
-        } else if (!zonaVacia) {
-            incluir("zonaRegistral", errorRegistral(campos.zonaRegistral, "zona"))
-            incluir("sedeRegistral", errorRegistral(campos.sedeRegistral, "sede"))
-        }
-
-        incluir("numeroMotor", errorMotor(campos.numeroMotor, exigirTodos || "numeroMotor" in tocados))
-        incluir("numeroSerie", errorSerie(campos.numeroSerie, exigirTodos || "numeroSerie" in tocados))
-
-        if (!editar && campos.numeroVin.isNotBlank()) {
-            ValidadorVin.mensajeError(campos.numeroVin, requerido = false)?.let {
-                incluir("numeroVin", it)
-            }
-        }
+        // Motor, serie, zona, sede y VIN ya no forman parte del formulario TIVE.
         return e
     }
 

@@ -134,10 +134,7 @@ class RegistrarTiveViewModel(
 
     fun confirmar() {
         val actual = _estado.value
-        val todos = setOf(
-            "numeroTitulo", "codigoVerificacion", "fechaTitulo",
-            "numeroMotor", "numeroSerie", "zonaRegistral", "sedeRegistral"
-        )
+        val todos = setOf("numeroTitulo", "codigoVerificacion", "fechaTitulo")
         val errores = TiveFormulario.validar(actual.campos, exigirTodos = true)
         if (errores.isNotEmpty() || actual.errorAdjunto != null) {
             _estado.value = actual.copy(errores = errores, tocados = actual.tocados + todos)
@@ -154,19 +151,15 @@ class RegistrarTiveViewModel(
                 }
                 val fechaIso = SoatFormulario.fechaUiAIso(actual.campos.fechaTitulo)
                     ?: throw FalloRegistroVehiculo("DATOS_INVALIDOS", mensajeServidor = "Fecha inválida.")
-                val motor = TiveFormulario.normalizarMotor(actual.campos.numeroMotor)!!
-                val serie = TiveFormulario.normalizarSerie(actual.campos.numeroSerie)!!
                 val req = TiveRegistrarRequest(
                     idOperacion = op,
                     numeroTitulo = actual.campos.numeroTitulo.trim().uppercase(Locale.ROOT),
                     codigoVerificacion = actual.campos.codigoVerificacion.trim().uppercase(Locale.ROOT),
                     fechaTitulo = fechaIso,
-                    zonaRegistral = actual.campos.zonaRegistral.takeIf { it.isNotBlank() }
-                        ?.trim()?.uppercase(Locale.ROOT),
-                    sedeRegistral = actual.campos.sedeRegistral.takeIf { it.isNotBlank() }
-                        ?.trim()?.uppercase(Locale.ROOT),
-                    numeroMotor = motor,
-                    numeroSerie = serie,
+                    zonaRegistral = null,
+                    sedeRegistral = null,
+                    numeroMotor = null,
+                    numeroSerie = null,
                     documento = doc
                 )
                 repository.registrar(idVehiculo, req)
@@ -281,10 +274,7 @@ class EditarTiveViewModel(
     fun confirmar() {
         val actual = _estado.value
         val idTive = actual.idTive ?: return
-        val todos = setOf(
-            "numeroTitulo", "codigoVerificacion", "fechaTitulo",
-            "numeroMotor", "numeroSerie", "zonaRegistral", "sedeRegistral"
-        )
+        val todos = setOf("numeroTitulo", "codigoVerificacion", "fechaTitulo")
         val errores = TiveFormulario.validar(actual.campos, editar = true, exigirTodos = true)
         if (errores.isNotEmpty() || actual.errorAdjunto != null) {
             _estado.value = actual.copy(errores = errores, tocados = actual.tocados + todos)
@@ -311,19 +301,15 @@ class EditarTiveViewModel(
                     repository.subirDocumento(idVehiculo, bytes, adj.contentType, adj.nombre)
                 } else null
                 val fechaIso = SoatFormulario.fechaUiAIso(actual.campos.fechaTitulo)!!
-                val motor = TiveFormulario.normalizarMotor(actual.campos.numeroMotor)!!
-                val serie = TiveFormulario.normalizarSerie(actual.campos.numeroSerie)!!
                 val req = TiveActualizarRequest(
                     versionFila = actual.versionFila,
                     numeroTitulo = actual.campos.numeroTitulo.trim().uppercase(Locale.ROOT),
                     codigoVerificacion = actual.campos.codigoVerificacion.trim().uppercase(Locale.ROOT),
                     fechaTitulo = fechaIso,
-                    zonaRegistral = actual.campos.zonaRegistral.takeIf { it.isNotBlank() }
-                        ?.trim()?.uppercase(Locale.ROOT),
-                    sedeRegistral = actual.campos.sedeRegistral.takeIf { it.isNotBlank() }
-                        ?.trim()?.uppercase(Locale.ROOT),
-                    numeroMotor = motor,
-                    numeroSerie = serie,
+                    zonaRegistral = null,
+                    sedeRegistral = null,
+                    numeroMotor = null,
+                    numeroSerie = null,
                     accionDocumento = accion,
                     documento = doc
                 )

@@ -19,8 +19,8 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 15
-        versionName = "1.1.3-tive-electrico-soporte"
+        versionCode = 16
+        versionName = "1.1.4-tive-documental-vin-nav"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.

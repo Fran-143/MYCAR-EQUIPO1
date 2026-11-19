@@ -51,6 +51,11 @@ fun DetalleVehiculoRoute(
     onRegistrarTive: (() -> Unit)? = null,
     onConsultarTive: (() -> Unit)? = null,
     onEditarTive: (() -> Unit)? = null,
+    onCompletarVinParaTive: (() -> Unit)? = null,
+    onCancelarVinParaTive: (() -> Unit)? = null,
+    mostrarModalVinCompletado: Boolean = false,
+    onRegistrarTiveTrasVin: (() -> Unit)? = null,
+    onVolverDetalleTrasVin: (() -> Unit)? = null,
     onCambioOperativo: (() -> Unit)? = null,
     recargaToken: Int = 0,
     modifier: Modifier = Modifier
@@ -77,6 +82,11 @@ fun DetalleVehiculoRoute(
         onRegistrarTive = onRegistrarTive,
         onConsultarTive = onConsultarTive,
         onEditarTive = onEditarTive,
+        onCompletarVinParaTive = onCompletarVinParaTive,
+        onCancelarVinParaTive = onCancelarVinParaTive,
+        mostrarModalVinCompletado = mostrarModalVinCompletado,
+        onRegistrarTiveTrasVin = onRegistrarTiveTrasVin,
+        onVolverDetalleTrasVin = onVolverDetalleTrasVin,
         onEstablecerPrincipal = { vm.establecerPrincipal { onCambioOperativo?.invoke() } },
         onActivar = { vm.activar { onCambioOperativo?.invoke() } },
         onDesactivar = { vm.desactivar { onCambioOperativo?.invoke() } },
@@ -98,6 +108,11 @@ fun DetalleVehiculoScreen(
     onRegistrarTive: (() -> Unit)? = null,
     onConsultarTive: (() -> Unit)? = null,
     onEditarTive: (() -> Unit)? = null,
+    onCompletarVinParaTive: (() -> Unit)? = null,
+    onCancelarVinParaTive: (() -> Unit)? = null,
+    mostrarModalVinCompletado: Boolean = false,
+    onRegistrarTiveTrasVin: (() -> Unit)? = null,
+    onVolverDetalleTrasVin: (() -> Unit)? = null,
     onEstablecerPrincipal: (() -> Unit)? = null,
     onActivar: (() -> Unit)? = null,
     onDesactivar: (() -> Unit)? = null,
@@ -105,6 +120,15 @@ fun DetalleVehiculoScreen(
 ) {
     var confirmarPrincipal by remember { mutableStateOf(false) }
     var confirmarDesactivar by remember { mutableStateOf(false) }
+    var modalVinRequerido by remember { mutableStateOf(false) }
+    fun intentarRegistrarTive() {
+        val vin = estado.detalle?.numeroVin
+        if (vin.isNullOrBlank()) {
+            modalVinRequerido = true
+        } else {
+            onRegistrarTive?.invoke()
+        }
+    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = FondoDetalle,
@@ -232,7 +256,7 @@ fun DetalleVehiculoScreen(
                         onRegistrarSoat = onRegistrarSoat,
                         onConsultarSoat = onConsultarSoat,
                         onConfigurarSoat = onConfigurarSoat,
-                        onRegistrarTive = onRegistrarTive,
+                        onRegistrarTive = { intentarRegistrarTive() },
                         onConsultarTive = onConsultarTive,
                         onEditarTive = onEditarTive,
                         ocupado = estado.ocupado
@@ -267,6 +291,54 @@ fun DetalleVehiculoScreen(
             dismissButton = {
                 TextButton(onClick = { confirmarPrincipal = false }, enabled = !estado.ocupado) {
                     Text("Cancelar")
+                }
+            }
+        )
+    }
+    if (modalVinRequerido) {
+        AlertDialog(
+            onDismissRequest = { modalVinRequerido = false },
+            title = { Text("Necesitas completar tu vehículo", fontWeight = FontWeight.Bold, color = AzulDetalle) },
+            text = {
+                Text("Para registrar la TIVE, primero necesitas completar el número VIN de tu vehículo.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        modalVinRequerido = false
+                        onCompletarVinParaTive?.invoke()
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                ) { Text("COMPLETAR") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        modalVinRequerido = false
+                        onCancelarVinParaTive?.invoke()
+                    }
+                ) { Text("CANCELAR") }
+            }
+        )
+    }
+    if (mostrarModalVinCompletado) {
+        AlertDialog(
+            onDismissRequest = { onVolverDetalleTrasVin?.invoke() },
+            title = { Text("VIN registrado correctamente", fontWeight = FontWeight.Bold, color = AzulDetalle) },
+            text = {
+                Text("Ya completaste el VIN de tu vehículo. ¿Qué deseas hacer ahora?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onRegistrarTiveTrasVin?.invoke() },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                ) { Text("REGISTRAR TIVE") }
+            },
+            dismissButton = {
+                TextButton(onClick = { onVolverDetalleTrasVin?.invoke() }) {
+                    Text("VOLVER AL DETALLE")
                 }
             }
         )

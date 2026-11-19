@@ -69,15 +69,6 @@ fun TiveTarjetaDatos(tive: TiveDto, modifier: Modifier = Modifier) {
             FilaTive("N.º de título", tive.numeroTitulo)
             FilaTive("Código de verificación", tive.codigoVerificacion)
             FilaTive("Fecha de título", SoatFormulario.formatearFecha(tive.fechaTitulo))
-            FilaTive("VIN", tive.numeroVin)
-            FilaTive("Placa", tive.placa)
-            FilaTive("N.º motor", tive.numeroMotor)
-            FilaTive("N.º serie", tive.numeroSerie)
-            if (!tive.zonaRegistral.isNullOrBlank() || !tive.sedeRegistral.isNullOrBlank()) {
-                Text("Información registral adicional", fontWeight = FontWeight.SemiBold, color = MyCarNavy)
-                tive.zonaRegistral?.takeIf { it.isNotBlank() }?.let { FilaTive("Zona registral", it) }
-                tive.sedeRegistral?.takeIf { it.isNotBlank() }?.let { FilaTive("Sede registral", it) }
-            }
         }
     }
 }

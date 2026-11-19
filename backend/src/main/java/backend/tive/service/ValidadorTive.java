@@ -74,6 +74,14 @@ public final class ValidadorTive {
         return vin;
     }
 
+    /** Opcional: blank → null. Si viene informado, valida formato. */
+    public static String normalizarMotorOpcional(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return normalizarMotor(raw);
+    }
+
     public static String normalizarMotor(String raw) {
         if (raw == null || raw.isBlank()) {
             throw new ErrorTive("DATOS_INVALIDOS", "Ingresa el número de motor", Set.of("numeroMotor"));
@@ -88,6 +96,14 @@ public final class ValidadorTive {
                     "El número de motor contiene caracteres no permitidos", Set.of("numeroMotor"));
         }
         return v;
+    }
+
+    /** Opcional: blank → null. Si viene informado, valida formato. */
+    public static String normalizarSerieOpcional(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return normalizarSerie(raw);
     }
 
     public static String normalizarSerie(String raw) {
@@ -184,6 +200,7 @@ public final class ValidadorTive {
             throw new ErrorTive("DATOS_INVALIDOS",
                     "La fecha no puede ser posterior a la fecha actual", Set.of("fechaTitulo"));
         }
+        // Zona/sede y motor/serie son opcionales: el formulario TIVE ya no los captura.
         boolean zonaVacia = zona == null || zona.isBlank();
         boolean sedeVacia = sede == null || sede.isBlank();
         if (zonaVacia != sedeVacia) {
@@ -195,8 +212,12 @@ public final class ValidadorTive {
             textoRegistral("zonaRegistral", zona);
             textoRegistral("sedeRegistral", sede);
         }
-        normalizarMotor(motor);
-        normalizarSerie(serie);
+        if (motor != null && !motor.isBlank()) {
+            normalizarMotor(motor);
+        }
+        if (serie != null && !serie.isBlank()) {
+            normalizarSerie(serie);
+        }
     }
 
     private static void documentoOpcional(ContratoTive.DocumentoDto doc) {

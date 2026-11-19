@@ -97,8 +97,9 @@ public class TiveService {
     @Transactional
     public ContratoTive.RegistrarResponse registrar(long usuario, long vehiculo, ContratoTive.RegistrarRequest req) {
         ValidadorTive.exigirRegistro(req);
-        String motor = ValidadorTive.normalizarMotor(req.numeroMotor());
-        String serie = ValidadorTive.normalizarSerie(req.numeroSerie());
+        // Motor/serie ya no se capturan en el formulario TIVE ni se sincronizan al vehículo.
+        String motor = ValidadorTive.normalizarMotorOpcional(req.numeroMotor());
+        String serie = ValidadorTive.normalizarSerieOpcional(req.numeroSerie());
         String titulo = req.numeroTitulo().strip().toUpperCase(Locale.ROOT);
         String codigo = req.codigoVerificacion().strip().toUpperCase(Locale.ROOT);
         String zona = blancoNullUpper(req.zonaRegistral());
@@ -154,7 +155,6 @@ public class TiveService {
                     doc == null ? null : doc.contentType(),
                     doc == null ? null : doc.tamanoBytes(),
                     doc == null ? null : doc.nombreOriginal()));
-            dao.sincronizarMotorSerieVehiculo(vehiculo, motor, serie);
             var resp = new ContratoTive.RegistrarResponse(req.idOperacion(), idTive);
             confirmarOperacion(req.idOperacion(), usuario, TIPO_REGISTRAR, huella, resp);
             return resp;
@@ -182,10 +182,9 @@ public class TiveService {
     public ContratoTive.ActualizarResponse actualizar(long usuario, long vehiculo, long idTive,
             ContratoTive.ActualizarRequest req) {
         ValidadorTive.exigirActualizar(req);
-        String motor = ValidadorTive.normalizarMotor(req.numeroMotor());
-        String serie = ValidadorTive.normalizarSerie(req.numeroSerie());
         String titulo = req.numeroTitulo().strip().toUpperCase(Locale.ROOT);
         String codigo = req.codigoVerificacion().strip().toUpperCase(Locale.ROOT);
+        // Zona/sede opcionales; si vienen vacías se limpian. Motor/serie no se editan desde TIVE.
         String zona = blancoNullUpper(req.zonaRegistral());
         String sede = blancoNullUpper(req.sedeRegistral());
 
@@ -202,6 +201,9 @@ public class TiveService {
         dao.bloquearTiveVehiculo(vehiculo);
         var actual = dao.obtenerPropio(usuario, vehiculo, idTive)
                 .orElseThrow(() -> new ErrorTive("TIVE_NO_ENCONTRADA", "TIVE no encontrada."));
+        // Conservar motor/serie históricos; el formulario ya no los captura.
+        String motor = actual.numeroMotor();
+        String serie = actual.numeroSerie();
         DocumentoResuelto doc = resolverDocumentoActualizar(usuario, vehiculo, actual, req);
         if (sinCambios(actual, req, titulo, codigo, zona, sede, motor, serie, doc)) {
             throw new ErrorTive("SIN_CAMBIOS", "No hay cambios para guardar.");
@@ -212,7 +214,6 @@ public class TiveService {
                 titulo, codigo, req.fechaTitulo(), zona, sede, motor, serie,
                 doc.objectKey(), doc.contentType(), doc.tamanoBytes(), doc.nombreOriginal()));
         if (filas != 1) throw new ErrorTive("CONFLICTO_VERSION", "La TIVE cambió. Vuelve a cargar.");
-        dao.sincronizarMotorSerieVehiculo(vehiculo, motor, serie);
         limpiarDocumentoAnteriorSiCorresponde(actual.storageObjectKey(), doc.objectKey(), req.accionDocumento());
         var actualizado = dao.obtenerPropio(usuario, vehiculo, idTive).orElseThrow();
         dao.insertarCambio(idTive, usuario, antes, serializar(actualizado));
