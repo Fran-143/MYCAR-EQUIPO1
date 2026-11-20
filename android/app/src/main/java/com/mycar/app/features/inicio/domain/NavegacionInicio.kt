@@ -11,6 +11,7 @@ enum class SecundariaMyCar(val titulo: String) {
     PERFIL("Perfil"),
     NOTIFICACIONES("Notificaciones"),
     DETALLE("Detalle de vehículo"),
+    COMPARTIR_VEHICULO("Compartir vehículo"),
     EDITAR_VEHICULO("Editar datos"),
     KILOMETRAJE("Actualizar kilometraje"),
     SOAT_REGISTRAR("Registrar SOAT"),

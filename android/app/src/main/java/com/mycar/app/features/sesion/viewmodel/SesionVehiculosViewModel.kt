@@ -6,6 +6,7 @@ import com.mycar.app.BuildConfig
 import com.mycar.app.features.autenticacion.data.*
 import com.mycar.app.features.sesion.data.*
 import com.mycar.app.features.vehiculos.data.*
+import com.mycar.app.features.vehiculos.domain.RemoteCompartirVehiculoRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +21,7 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     override val viewModelStore get() = modelos
     val registro = RemoteRegistroVehiculoRepository(cliente.retrofit.create(RegistroVehiculoApi::class.java))
     val listado = RemoteListadoVehiculosRepository(cliente.retrofit.create(ListadoVehiculosApi::class.java))
+    val compartir = RemoteCompartirVehiculoRepository(cliente.retrofit.create(CompartirVehiculoApi::class.java))
     val detalleApi = cliente.retrofit.create(DetalleVehiculoApi::class.java)
     val detalle = RemoteDetalleVehiculosRepository(detalleApi)
     val edicion = RemoteEditarVehiculoRepository(
@@ -58,7 +60,9 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     val nombrePresentacion = MutableStateFlow<String?>(null)
     val avatarPresentacion = MutableStateFlow<ByteArray?>(null)
     val inicialesPresentacion = MutableStateFlow<String?>(null)
-    val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(listado,historial,mantenimiento)
+    val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(
+        listado, historial, mantenimiento, alertas
+    )
     override fun toString() = "CuentaVehiculos[REDACTED]"
 }
 

@@ -2,18 +2,29 @@ package com.mycar.app.features.vehiculos.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -26,8 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.R
+import com.mycar.app.features.fotos.ui.FlujoSelectorFotoPersonalizada
 import com.mycar.app.features.vehiculos.domain.*
 import com.mycar.app.features.vehiculos.viewmodel.RegistroVehiculoViewModel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** El host aporta repositorio autenticado, almacenamiento por cuenta y navegación reales. */
 @Composable
@@ -40,19 +54,63 @@ fun RegistroVehiculoRoute(
     onVerVehiculos: () -> Unit,
     onIrInicio: () -> Unit,
     modifier: Modifier = Modifier,
-    estadoEnSistema: Boolean = true
+    estadoEnSistema: Boolean = true,
+    fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null
 ) {
     val vm: RegistroVehiculoViewModel = viewModel(key = "rf08-$claveCuenta",
         factory = remember(claveCuenta, repository, pendientes) { RegistroVehiculoViewModel.factory(repository, pendientes, estadoEnSistema) })
     val estado by vm.estado.collectAsStateWithLifecycle()
+    var fotoPendiente by remember(claveCuenta) { mutableStateOf<ByteArray?>(null) }
+    var fotoContentType by remember(claveCuenta) { mutableStateOf("image/jpeg") }
+    var fotoNombre by remember(claveCuenta) { mutableStateOf("vehiculo.jpg") }
+    var avisoFoto by remember { mutableStateOf<String?>(null) }
+    var subiendoFoto by remember { mutableStateOf(false) }
+    var fotoYaIntentada by remember(claveCuenta) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(vm) { vm.cargar() }
+    LaunchedEffect(estado.fase, estado.resultado?.idVehiculo, fotoPendiente) {
+        val id = estado.resultado?.idVehiculo
+        val bytes = fotoPendiente
+        if (estado.fase == FaseRegistro.CONFIRMADA && id != null && id > 0 && bytes != null
+            && fotosRepository != null && !subiendoFoto && !fotoYaIntentada
+        ) {
+            fotoYaIntentada = true
+            subiendoFoto = true
+            scope.launch {
+                try {
+                    withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        fotosRepository.registrarVehiculo(id, bytes, fotoContentType, fotoNombre)
+                    }
+                    fotoPendiente = null
+                    avisoFoto = null
+                } catch (_: Exception) {
+                    avisoFoto = "El vehículo se registró, pero la fotografía no pudo guardarse. Puedes añadirla desde el detalle."
+                } finally {
+                    subiendoFoto = false
+                }
+            }
+        }
+    }
     BackHandler {
-        if (!estado.ocupado) {
+        if (!estado.ocupado && !subiendoFoto) {
             if (estado.fase == FaseRegistro.CONFIRMADA) vm.finalizar(onIrInicio) else onVolver()
         }
     }
-    RegistroVehiculoScreen(estado, vm::cambiar, vm::guardar, vm::cargar, vm::comprobar, vm::reenviar,
-        onVolver, onIniciarSesion, { vm.finalizar(onVerVehiculos) }, { vm.finalizar(onIrInicio) }, modifier)
+    RegistroVehiculoScreen(
+        estado, vm::cambiar, vm::guardar, vm::cargar, vm::comprobar, vm::reenviar,
+        onVolver, onIniciarSesion, { vm.finalizar(onVerVehiculos) }, { vm.finalizar(onIrInicio) },
+        modifier,
+        fotoPendiente = fotoPendiente,
+        onFotoElegida = { bytes, ct, nombre ->
+            fotoPendiente = bytes
+            fotoContentType = ct
+            fotoNombre = nombre
+            avisoFoto = null
+        },
+        onQuitarFoto = { fotoPendiente = null },
+        avisoFoto = avisoFoto,
+        subiendoFoto = subiendoFoto
+    )
 }
 
 @Composable
@@ -67,7 +125,12 @@ fun RegistroVehiculoScreen(
     onIniciarSesion: () -> Unit,
     onVerVehiculos: () -> Unit,
     onIrInicio: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fotoPendiente: ByteArray? = null,
+    onFotoElegida: (ByteArray, String, String) -> Unit = { _, _, _ -> },
+    onQuitarFoto: () -> Unit = {},
+    avisoFoto: String? = null,
+    subiendoFoto: Boolean = false
 ) {
     var camposEditados by rememberSaveable { mutableStateOf(listOf<String>()) }
     val erroresLocales = estado.catalogos?.let { ValidadorFormularioRegistro.validar(estado.formulario, it) }
@@ -86,10 +149,12 @@ fun RegistroVehiculoScreen(
                                 Icon(painterResource(R.drawable.ic_rf08_volver), contentDescription = "Volver")
                             }
                         } else Spacer(Modifier.width(20.dp))
-                        Text(if (estado.fase == FaseRegistro.CONFIRMADA) "Vehículo registrado" else "Agregar vehículo",
+                        Text(
+                            if (estado.fase == FaseRegistro.CONFIRMADA) "¡Vehículo agregado!" else "Agregar vehículo",
                             style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(vertical = 16.dp).semantics { heading() })
+                            color = Color(0xFF003366),
+                            modifier = Modifier.padding(vertical = 16.dp).semantics { heading() }
+                        )
                     }
                 }
             },
@@ -130,7 +195,12 @@ fun RegistroVehiculoScreen(
                         if (!puedeGuardar && !estado.ocupado) Text(
                             "Completa los campos obligatorios y corrige los datos para habilitar Guardar.",
                             style = MaterialTheme.typography.bodySmall)
-                        FormularioRegistroContenido(estadoVisible) { campo, valor ->
+                        FormularioRegistroContenido(
+                            estado = estadoVisible,
+                            fotoPendiente = fotoPendiente,
+                            onFotoElegida = onFotoElegida,
+                            onQuitarFoto = onQuitarFoto
+                        ) { campo, valor ->
                             if (campo !in camposEditados) camposEditados = camposEditados + campo
                             onCambiar(campo, valor)
                         }
@@ -148,15 +218,68 @@ fun RegistroVehiculoScreen(
                             modifier = Modifier.fillMaxWidth()) { Text("Reintentar envío") }
                     }
                     FaseRegistro.CONFIRMADA -> {
-                        com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada(
-                            modifier = Modifier.align(Alignment.CenterHorizontally).height(96.dp).clip(RoundedCornerShape(14.dp))
+                        val azul = Color(0xFF003366)
+                        Box(
+                            Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .size(110.dp)
+                                .background(Color(0xFFE8F5E9), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF43A047),
+                                modifier = Modifier.size(72.dp)
+                            )
+                        }
+                        Text(
+                            "¡Vehículo agregado!",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = azul,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                        Text(
+                            "${estado.formulario.marca} ${estado.formulario.modelo}".trim().ifBlank { "Tu vehículo" },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = azul,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                         estado.resultado?.let {
-                            Text("${it.placa} · ${it.kilometrajeActual} km", style = MaterialTheme.typography.titleLarge)
-                            Text("Tu vehículo se registró correctamente.")
+                            Card(
+                                Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(2.dp)
+                            ) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("Resumen", fontWeight = FontWeight.SemiBold, color = azul)
+                                    Text("Placa: ${it.placa}")
+                                    Text("Kilometraje inicial: ${it.kilometrajeActual} km")
+                                }
+                            }
                         }
-                        Button(onClick = onVerVehiculos, enabled = !estado.ocupado, modifier = Modifier.fillMaxWidth()) { Text("Ver mis vehículos") }
-                        OutlinedButton(onClick = onIrInicio, enabled = !estado.ocupado, modifier = Modifier.fillMaxWidth()) { Text("Ir a inicio") }
+                        avisoFoto?.let {
+                            Text(it, color = Color(0xFFC62828), style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (subiendoFoto) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Text("Guardando fotografía…")
+                        }
+                        Button(
+                            onClick = onVerVehiculos,
+                            enabled = !estado.ocupado && !subiendoFoto,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = azul)
+                        ) { Text("Ver mis vehículos", fontWeight = FontWeight.SemiBold) }
+                        OutlinedButton(
+                            onClick = onIrInicio,
+                            enabled = !estado.ocupado && !subiendoFoto,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) { Text("Ir al inicio") }
                     }
                     FaseRegistro.ERROR -> OutlinedButton(onClick = onRecargar, enabled = !estado.ocupado) { Text("Reintentar") }
                 }
@@ -165,7 +288,13 @@ fun RegistroVehiculoScreen(
 }
 
 @Composable
-private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambiar: (String, String) -> Unit) {
+private fun FormularioRegistroContenido(
+    estado: EstadoRegistroVehiculo,
+    fotoPendiente: ByteArray?,
+    onFotoElegida: (ByteArray, String, String) -> Unit,
+    onQuitarFoto: () -> Unit,
+    onCambiar: (String, String) -> Unit
+) {
     val f = estado.formulario
     val catalogos = estado.catalogos ?: return
     val habilitado = !estado.ocupado
@@ -178,34 +307,84 @@ private fun FormularioRegistroContenido(estado: EstadoRegistroVehiculo, onCambia
     var generales by rememberSaveable { mutableStateOf(true) }
     var identificacion by rememberSaveable { mutableStateOf(false) }
     var motor by rememberSaveable { mutableStateOf(true) }
+    var selectorFoto by remember { mutableStateOf(false) }
     val errorGeneral = estado.errores.keys.any { it in camposGenerales }
     val errorIdentificacion = estado.errores.keys.any { it in camposIdentificacion }
     val errorMotor = estado.errores.keys.any { it in camposMotor }
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada(
-                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(12.dp))
-            )
+    val azul = Color(0xFF003366)
+    val azulClaro = Color(0xFFE8F4FC)
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = azulClaro,
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, azul.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+            .clickable(enabled = habilitado) { selectorFoto = true }
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                if (fotoPendiente != null) {
+                    val bmp = remember(fotoPendiente) {
+                        BitmapFactory.decodeByteArray(fotoPendiente, 0, fotoPendiente.size)
+                    }
+                    if (bmp != null) {
+                        Image(
+                            bitmap = bmp.asImageBitmap(),
+                            contentDescription = "Vista previa",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Filled.AddAPhoto, null, tint = azul)
+                    }
+                } else {
+                    Icon(Icons.Filled.AddAPhoto, null, tint = azul, modifier = Modifier.size(32.dp))
+                }
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Tu vehículo, en un solo lugar", style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
-                Text("Completa los datos para comenzar.", style = MaterialTheme.typography.bodySmall)
+                Text("Agregar imagen", fontWeight = FontWeight.SemiBold, color = azul)
+                Text(
+                    "Opcional · JPG/PNG hasta 5 MiB",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF6B7C93)
+                )
+                if (fotoPendiente != null) {
+                    TextButton(onClick = onQuitarFoto, enabled = habilitado) { Text("Quitar imagen") }
+                }
             }
         }
     }
+    FlujoSelectorFotoPersonalizada(
+        activo = selectorFoto,
+        onDismiss = { selectorFoto = false },
+        onConfirmada = {
+            onFotoElegida(it.bytes, it.contentType, it.nombre)
+            selectorFoto = false
+        },
+        onError = { selectorFoto = false }
+    )
     Text("* Campos obligatorios", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     SeccionRegistro("Información general", R.drawable.ic_rf08_informacion, generales || errorGeneral,
         { generales = if (errorGeneral) true else !generales }, habilitado, errorGeneral) {
-        CampoRegistro("Marca *", "marca", f.marca, estado, onCambiar, ejemplo = "Ej. Toyota")
-        CampoRegistro("Modelo *", "modelo", f.modelo, estado, onCambiar, ejemplo = "Ej. Corolla")
+        CampoRegistro("Marca *", "marca", f.marca, estado, onCambiar, mayusculas = true, ejemplo = "Ej. Toyota")
+        CampoRegistro("Modelo *", "modelo", f.modelo, estado, onCambiar, mayusculas = true, ejemplo = "Ej. Corolla")
         SelectorRegistro("Uso del vehículo *", f.usoVehiculoCodigo,
             catalogos.usos.map { it.codigo to it.nombre }, estado.errores["usoVehiculoCodigo"], habilitado) { onCambiar("usoVehiculoCodigo", it) }
         CampoRegistro("Placa *", "placa", f.placa, estado, onCambiar, mayusculas = true,
             ejemplo = "Ej. A1B234 o ABC123", ayuda = "Dos formatos: A1B234 o ABC123. Sin espacios ni guiones.")
         CampoRegistro("Año de fabricación *", "anioFabricacion", f.anioFabricacion, estado, onCambiar,
             numerico = true, ejemplo = "Ej. 2020", ayuda = "Solo el año, no una fecha completa.")
-        CampoRegistro("Color *", "color", f.color, estado, onCambiar, ejemplo = "Ej. Gris")
+        CampoRegistro("Color *", "color", f.color, estado, onCambiar, mayusculas = true, ejemplo = "Ej. Gris")
     }
     SeccionRegistro("Identificación adicional (opcional)", R.drawable.ic_rf08_identificacion, identificacion || errorIdentificacion,
         { identificacion = if (errorIdentificacion) true else !identificacion }, habilitado, errorIdentificacion) {

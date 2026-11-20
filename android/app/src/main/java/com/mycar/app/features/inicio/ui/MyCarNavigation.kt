@@ -33,6 +33,7 @@ import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.features.soat.ui.*
 import com.mycar.app.features.tive.ui.*
 import com.mycar.app.features.vehiculos.ui.ActualizarKilometrajeRoute
+import com.mycar.app.features.vehiculos.ui.CompartirVehiculoRoute
 import com.mycar.app.features.vehiculos.ui.DetalleVehiculoRoute
 import com.mycar.app.features.vehiculos.ui.VehiculosRoute
 
@@ -65,6 +66,9 @@ fun MyCarNavigation(
     var vehiculoMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
     var abrirHistorialEnTalleres by rememberSaveable { mutableStateOf(false) }
     var vehiculoDetalleId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var vehiculoCompartirId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var vehiculoCompartirMarca by rememberSaveable { mutableStateOf<String?>(null) }
+    var vehiculoCompartirModelo by rememberSaveable { mutableStateOf<String?>(null) }
     var vehiculoKmId by rememberSaveable { mutableStateOf<Long?>(null) }
     var recargaInicio by rememberSaveable { mutableIntStateOf(0) }
     var recargaDetalle by rememberSaveable { mutableIntStateOf(0) }
@@ -111,6 +115,12 @@ fun MyCarNavigation(
         }
     }
     fun abrirDetalle(id: Long) { vehiculoDetalleId = id; navegar(navegacion.abrir(SecundariaMyCar.DETALLE)) }
+    fun abrirCompartir(id: Long, marca: String? = null, modelo: String? = null) {
+        vehiculoCompartirId = id
+        vehiculoCompartirMarca = marca
+        vehiculoCompartirModelo = modelo
+        navegar(navegacion.abrir(SecundariaMyCar.COMPARTIR_VEHICULO))
+    }
     fun abrirEdicion(id: Long) { vehiculoDetalleId = id; navegar(navegacion.abrir(SecundariaMyCar.EDITAR_VEHICULO)) }
     fun abrirSoat(id: Long, destino: SecundariaMyCar) {
         soatSesion++
@@ -190,7 +200,9 @@ fun MyCarNavigation(
         )
     }
     LaunchedEffect(cuenta?.ciclo) {
-        vehiculoMantenimiento=null; vehiculoDetalleId=null; vehiculoKmId=null; vehiculoSoatId=null
+        vehiculoMantenimiento=null; vehiculoDetalleId=null; vehiculoCompartirId=null
+        vehiculoCompartirMarca=null; vehiculoCompartirModelo=null
+        vehiculoKmId=null; vehiculoSoatId=null
         vehiculoTiveId=null; flujoVinDesdeTive=false; resaltarVinEdicion=false; modalVinCompletado=false
         kmOverlayMantenimiento=null
         alertasProgramarId=null; formularioAbierto=false; secundariaNombre=null
@@ -234,6 +246,27 @@ fun MyCarNavigation(
                 if(secundaria!=null) {
                     when {
                         secundaria==SecundariaMyCar.DIAGNOSTICO -> ConexionServidorScreen(Modifier.statusBarsPadding())
+                        secundaria==SecundariaMyCar.COMPARTIR_VEHICULO && cuenta!=null -> {
+                            val idCompartir = vehiculoCompartirId
+                            if (idCompartir == null || idCompartir <= 0) {
+                                PantallaProximamente("Compartir vehículo", onVolver={ navegar(navegacion.atras()) })
+                            } else {
+                                CompartirVehiculoRoute(
+                                    idVehiculo = idCompartir,
+                                    repository = cuenta.compartir,
+                                    onVolver = {
+                                        vehiculoCompartirId = null
+                                        vehiculoCompartirMarca = null
+                                        vehiculoCompartirModelo = null
+                                        navegar(navegacion.atras())
+                                    },
+                                    onIniciarSesion = { sesion.sesionRequerida(cuenta.ciclo) },
+                                    modifier = Modifier.statusBarsPadding(),
+                                    marca = vehiculoCompartirMarca,
+                                    modelo = vehiculoCompartirModelo
+                                )
+                            }
+                        }
                         secundaria==SecundariaMyCar.DETALLE && cuenta!=null -> {
                             val idDetalle = vehiculoDetalleId
                             if (idDetalle == null || idDetalle <= 0) {
@@ -708,7 +741,9 @@ fun MyCarNavigation(
                                 }
                                 val vm:ResumenInicioViewModel=viewModel(key="rf50-${cuenta.ciclo}",factory=factory)
                                 val estado by vm.estado.collectAsStateWithLifecycle()
+                                val nombrePresentacion by cuenta.nombrePresentacion.collectAsStateWithLifecycle()
                                 LaunchedEffect(vm, recargaInicio) { vm.cargar() }
+                                LaunchedEffect(nombrePresentacion) { vm.actualizarNombreUsuario(nombrePresentacion) }
                                 LaunchedEffect(estado.fase) {
                                     if(estado.fase==FaseInicio.SIN_SESION) sesion.sesionRequerida(cuenta.ciclo)
                                 }
@@ -742,6 +777,7 @@ fun MyCarNavigation(
                                 VehiculosRoute(cuenta.ciclo,cuenta.registro,cuenta.listado,cuenta.pendientes,
                                     onIrInicio={ navegar(navegacion.atras()) },onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                     onVerDetalle={ abrirDetalle(it) },
+                                    onCompartir={ id, marca, modelo -> abrirCompartir(id, marca, modelo) },
                                     estadoEnSistema=false,modifier=Modifier.weight(1f),onFormularioAbierto={ formularioAbierto=it },
                                     onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
                                     onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },

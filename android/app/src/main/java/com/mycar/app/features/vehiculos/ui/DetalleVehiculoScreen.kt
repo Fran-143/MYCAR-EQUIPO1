@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.Description
@@ -104,6 +105,7 @@ fun DetalleVehiculoRoute(
         onEstablecerPrincipal = { vm.establecerPrincipal { onCambioOperativo?.invoke() } },
         onActivar = { vm.activar { onCambioOperativo?.invoke() } },
         onDesactivar = { vm.desactivar { onCambioOperativo?.invoke() } },
+        onLimpiarMensajeAccion = vm::limpiarMensajeAccion,
         onRegistrarFoto = { bytes, ct, nombre ->
             vm.registrarOActualizarFoto(bytes, ct, nombre) { onCambioOperativo?.invoke() }
         },
@@ -136,11 +138,14 @@ fun DetalleVehiculoScreen(
     onEliminarFoto: (() -> Unit)? = null,
     onActivar: (() -> Unit)? = null,
     onDesactivar: (() -> Unit)? = null,
+    onLimpiarMensajeAccion: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var confirmarPrincipal by remember { mutableStateOf(false) }
     var confirmarDesactivar by remember { mutableStateOf(false) }
     var modalVinRequerido by remember { mutableStateOf(false) }
+    val modalPrincipalRequiere =
+        estado.codigoAccion == "PRINCIPAL_REQUIERE_REEMPLAZO" && estado.mensajeAccion != null
     fun intentarRegistrarTive() {
         val vin = estado.detalle?.numeroVin
         if (vin.isNullOrBlank()) {
@@ -166,8 +171,6 @@ fun DetalleVehiculoScreen(
                         color = AzulDetalle,
                         modifier = Modifier.weight(1f)
                     )
-                    estado.detalle?.let { BadgeEstado(it.estadoVehiculo) }
-                    Spacer(Modifier.width(8.dp))
                 }
             }
         }
@@ -181,7 +184,7 @@ fun DetalleVehiculoScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (estado.ocupado) LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteDetalle)
-            estado.mensajeAccion?.let { texto ->
+            if (!modalPrincipalRequiere) estado.mensajeAccion?.let { texto ->
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = if (estado.accionError) Color(0xFFFFEBEE) else Color(0xFFE8F5E9),
@@ -218,6 +221,11 @@ fun DetalleVehiculoScreen(
                         ocupadoFoto = estado.ocupadoFoto,
                         onRegistrarFoto = onRegistrarFoto,
                         onEliminarFoto = onEliminarFoto
+                    )
+                    IndicadoresSoatTiveResumen(
+                        soatActual = estado.soatActual,
+                        soatCargando = estado.soatResumenCargando,
+                        tieneTive = det.tieneTive
                     )
                     GridEspecificaciones(det)
 
@@ -410,6 +418,50 @@ fun DetalleVehiculoScreen(
                 OutlinedButton(
                     onClick = { confirmarDesactivar = false },
                     enabled = !estado.ocupado,
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Cancelar") }
+            }
+        )
+    }
+    if (modalPrincipalRequiere) {
+        AlertDialog(
+            onDismissRequest = { onLimpiarMensajeAccion?.invoke() },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(20.dp),
+            icon = {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = null,
+                    tint = CelesteDetalle,
+                    modifier = Modifier.size(40.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Vehículo principal",
+                    fontWeight = FontWeight.Bold,
+                    color = AzulDetalle,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Text(
+                    "Antes de desactivar este vehículo, establece otro como principal",
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onLimpiarMensajeAccion?.invoke() },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { onLimpiarMensajeAccion?.invoke() },
                     shape = RoundedCornerShape(12.dp)
                 ) { Text("Cancelar") }
             }
@@ -639,6 +691,68 @@ private fun SeccionIdentificacion(v: DetalleVehiculoDto) {
                     FilaDetalle("N.º de serie", v.numeroSerie ?: "No registrado")
                     FilaDetalle("N.º de motor", v.numeroMotor ?: "No registrado")
                     v.fechaUltimaLecturaKm?.let { FilaDetalle("Última lectura", formatearFecha(it)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IndicadoresSoatTiveResumen(
+    soatActual: com.mycar.app.features.soat.data.SoatDto?,
+    soatCargando: Boolean,
+    tieneTive: Boolean
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        val soatTexto = when {
+            soatCargando -> "Consultando…"
+            soatActual == null -> "Sin SOAT"
+            else -> SoatFormulario.etiquetaCobertura(soatActual.estadoCobertura.orEmpty())
+        }
+        val soatColor = when {
+            soatCargando -> MyCarMuted
+            soatActual == null -> MyCarMuted
+            else -> Color(SoatFormulario.colorCobertura(soatActual.estadoCobertura.orEmpty()))
+        }
+        Card(
+            Modifier.weight(1f),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Row(
+                Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Outlined.Shield, null, tint = soatColor, modifier = Modifier.size(22.dp))
+                Column {
+                    Text("SOAT", fontWeight = FontWeight.Bold, color = AzulDetalle, style = MaterialTheme.typography.labelMedium)
+                    Text(soatTexto, color = soatColor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        Card(
+            Modifier.weight(1f),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(1.dp)
+        ) {
+            Row(
+                Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val tiveColor = if (tieneTive) MyCarStatusActivo else MyCarMuted
+                Icon(Icons.Outlined.Description, null, tint = tiveColor, modifier = Modifier.size(22.dp))
+                Column {
+                    Text("TIVE", fontWeight = FontWeight.Bold, color = AzulDetalle, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        if (tieneTive) "Registrada" else "Sin TIVE",
+                        color = tiveColor,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

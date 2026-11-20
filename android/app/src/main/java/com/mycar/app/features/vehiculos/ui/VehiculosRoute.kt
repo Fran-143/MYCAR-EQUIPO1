@@ -26,6 +26,7 @@ fun VehiculosRoute(
     onIniciarSesion: () -> Unit,
     modifier: Modifier = Modifier,
     onVerDetalle: ((Long) -> Unit)? = null,
+    onCompartir: ((Long, String, String) -> Unit)? = null,
     estadoEnSistema: Boolean = true,
     onFormularioAbierto: (Boolean) -> Unit = {},
     onNotificaciones: (() -> Unit)? = null,
@@ -62,13 +63,15 @@ fun VehiculosRoute(
         if (pantalla == "registro") {
             RegistroVehiculoRoute(claveCuenta, registroRepository, pendientes,
                 onVolver = { pantalla = "lista" }, onIniciarSesion = onIniciarSesion,
-                onVerVehiculos = { pantalla = "lista" }, onIrInicio = onIrInicio, modifier = modifier, estadoEnSistema = estadoEnSistema)
+                onVerVehiculos = { pantalla = "lista" }, onIrInicio = onIrInicio, modifier = modifier,
+                estadoEnSistema = estadoEnSistema, fotosRepository = fotosRepository)
         } else {
             Column(modifier.fillMaxSize()) {
                 if (comprobando) LinearProgressIndicator(Modifier.fillMaxWidth())
                 ListadoVehiculosRoute(claveCuenta, listadoRepository, onVolver = onIrInicio,
                     onAgregar = agregar, onIniciarSesion = onIniciarSesion,
-                    onVerDetalle = onVerDetalle, modifier = Modifier.weight(1f), estadoEnSistema = estadoEnSistema,
+                    onVerDetalle = onVerDetalle, onCompartir = onCompartir,
+                    modifier = Modifier.weight(1f), estadoEnSistema = estadoEnSistema,
                     onNotificaciones = onNotificaciones, onPerfil = onPerfil,
                     fotosRepository = fotosRepository, avatarBytes = avatarBytes, iniciales = iniciales)
             }

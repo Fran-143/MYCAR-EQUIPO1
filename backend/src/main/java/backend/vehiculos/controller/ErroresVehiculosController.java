@@ -14,7 +14,11 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.util.Set;
 
 /** Alcance exclusivo de este controlador; no altera los módulos de otros integrantes. */
-@RestControllerAdvice(assignableTypes = {VehiculosController.class, KilometrajeVehiculoController.class})
+@RestControllerAdvice(assignableTypes = {
+        VehiculosController.class,
+        KilometrajeVehiculoController.class,
+        CompartirVehiculoController.class
+})
 public class ErroresVehiculosController {
     @ExceptionHandler(SesionVehiculosNoValidada.class)
     public ResponseEntity<ErrorApiVehiculos> sesion(SesionVehiculosNoValidada error) {
@@ -25,8 +29,9 @@ public class ErroresVehiculosController {
     public ResponseEntity<ErrorApiVehiculos> funcional(ErrorRegistroVehiculo error) {
         HttpStatus estado = switch (error.codigo()) {
             case "DATOS_INVALIDOS", "FILTRO_INVALIDO" -> HttpStatus.BAD_REQUEST;
-            case "CUENTA_NO_AUTORIZADA" -> HttpStatus.FORBIDDEN;
+            case "CUENTA_NO_AUTORIZADA", "COMPARTIR_NO_PERMITIDO" -> HttpStatus.FORBIDDEN;
             case "OPERACION_NO_ENCONTRADA", "VEHICULO_NO_ENCONTRADO" -> HttpStatus.NOT_FOUND;
+            case "PDF_NO_GENERADO" -> HttpStatus.UNPROCESSABLE_ENTITY;
             case "PLAN_FREE_NO_DISPONIBLE", "LIMITE_FREE", "LIMITE_ACTIVOS", "PLACA_DUPLICADA",
                  "VIN_DUPLICADO", "VEHICULO_DUPLICADO", "SIN_CAMBIOS", "CONFLICTO_REGISTRO",
                  "CONFLICTO_IDEMPOTENCIA", "OPERACION_EN_PROCESO", "KM_OBSOLETO", "KM_NO_SUPERIOR",
@@ -42,6 +47,8 @@ public class ErroresVehiculosController {
             case "DATOS_INVALIDOS" -> "Revisa los campos señalados.";
             case "FILTRO_INVALIDO" -> "Selecciona Todos, Activos o Inactivos.";
             case "CUENTA_NO_AUTORIZADA" -> "Tu cuenta no tiene acceso a esta operación.";
+            case "COMPARTIR_NO_PERMITIDO" -> "No es posible compartir este vehículo en este momento.";
+            case "PDF_NO_GENERADO" -> "No se pudo generar el documento. Inténtalo nuevamente.";
             case "OPERACION_NO_ENCONTRADA" -> "No se encontró una operación disponible para tu cuenta.";
             case "VEHICULO_NO_ENCONTRADO" -> "No se encontró el vehículo en tu cuenta.";
             case "VEHICULO_INACTIVO" -> "Esta operación solo está disponible para vehículos activos.";

@@ -50,12 +50,23 @@ class CoordinadorInicio(private val repository: ResumenInicioRepository, private
                     throw e
                 }
                 if(turno!=revision) return@launch
-                mutable.value=EstadoResumenInicio(if(elegido==null) FaseInicio.SIN_VEHICULOS else FaseInicio.LISTO,lista,elegido)
+                mutable.value=EstadoResumenInicio(
+                    fase = if(elegido==null) FaseInicio.SIN_VEHICULOS else FaseInicio.LISTO,
+                    vehiculos = lista,
+                    seleccionado = elegido,
+                    nombreUsuario = mutable.value.nombreUsuario
+                )
                 if(elegido!=null) cargarBloques(turno,lista.single { it.idVehiculo==elegido })
             } catch(e: CancellationException) { throw e }
             catch(e: Exception) { if(turno==revision) publicarError(e) }
         }.also { trabajo=it }
     }
+    fun actualizarNombreUsuario(nombre: String?) {
+        val limpio = nombre?.trim()?.takeIf { it.isNotBlank() }
+        if (mutable.value.nombreUsuario == limpio) return
+        mutable.value = mutable.value.copy(nombreUsuario = limpio)
+    }
+
     fun seleccionar(id: Long): Job? {
         val v=mutable.value.vehiculos.firstOrNull { it.idVehiculo==id } ?: return null
         if(mutable.value.seleccionado==id) return null

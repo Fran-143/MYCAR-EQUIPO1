@@ -9,7 +9,10 @@ data class VehiculoResumenDto(
     val anioFabricacion: Int, val usoVehiculo: String, val color: String,
     val tipoMotor: String, val combustible: String?, val estadoVehiculo: String,
     val principal: Boolean, val kilometrajeActual: Int?,
-    val tieneFoto: Boolean = false
+    val tieneFoto: Boolean = false,
+    val tieneTive: Boolean = false,
+    /** null | POR_INICIAR | VIGENTE | PROXIMA | VENCIDA */
+    val estadoSoat: String? = null
 )
 data class ResumenEstadosDto(val todos: Long, val activos: Long, val inactivos: Long)
 data class ListadoVehiculosDto(

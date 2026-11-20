@@ -81,14 +81,14 @@ fun HistorialMantenimientoScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
-                    onClick = {
-                        if (pestana == PestanaHistorial.TALLERES && talleresSubpantalla) {
-                            solicitarVolverTalleres += 1
-                        } else onVolver()
-                    },
-                    modifier = Modifier.testTag("rf18.volver")
-                ) { Text("Volver") }
+                // Solo subpantallas (p. ej. detalle de taller) necesitan Volver; las pestañas
+                // principales usan la barra inferior.
+                if (pestana == PestanaHistorial.TALLERES && talleresSubpantalla) {
+                    TextButton(
+                        onClick = { solicitarVolverTalleres += 1 },
+                        modifier = Modifier.testTag("rf18.volver")
+                    ) { Text("Volver") }
+                }
                 Text(
                     tituloSeccion,
                     Modifier.weight(1f),

@@ -6,11 +6,19 @@ import java.time.Instant
 
 enum class FaseInicio { SIN_SESION, CARGANDO, SIN_VEHICULOS, LISTO, ERROR, INCONSISTENTE }
 enum class DisponibilidadInicio { CARGANDO, DISPONIBLE, NO_DISPONIBLE }
+data class ResumenAlertaInicio(
+    val id: Long,
+    val titulo: String,
+    val estado: String
+)
 data class BloquesInicio(
     val kilometraje: Int?, val fechaLectura: Instant? = null,
     val ultimoMantenimiento: MantenimientoHistorial? = null,
     val historial: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
-    val lectura: DisponibilidadInicio = DisponibilidadInicio.CARGANDO
+    val lectura: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
+    val alertas: List<ResumenAlertaInicio> = emptyList(),
+    val alertasDisponibilidad: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
+    val totalAlertas: Int = 0
 )
 data class EstadoResumenInicio(
     val fase: FaseInicio = FaseInicio.SIN_SESION,

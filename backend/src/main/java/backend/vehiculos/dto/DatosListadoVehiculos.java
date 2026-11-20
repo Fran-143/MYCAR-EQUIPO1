@@ -11,6 +11,13 @@ public record DatosListadoVehiculos(
             long idVehiculo, String placa, String marca, String modelo, int anioFabricacion,
             String usoVehiculo, String color, String tipoMotor, String combustible,
             String estadoVehiculo, boolean principal, java.math.BigDecimal kilometrajeActual,
-            boolean tieneFoto
+            boolean tieneFoto,
+            /** true si existe fila en mycar.tive. */
+            boolean tieneTive,
+            /**
+             * Cobertura SOAT ACTUAL según fechas (America/Lima) o alerta PROXIMA real:
+             * null | POR_INICIAR | VIGENTE | PROXIMA | VENCIDA.
+             */
+            String estadoSoat
     ) {}
 }

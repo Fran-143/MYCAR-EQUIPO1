@@ -154,15 +154,34 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
                         }
                     }
                     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        Text("Mantenimientos por atender",modifier=Modifier.weight(1f).semantics { heading() },
+                        Text("Mantenimientos y alertas",modifier=Modifier.weight(1f).semantics { heading() },
                             color=TintaInicio,fontWeight=FontWeight.Bold)
                         TextButton(onClick=onAlertas) { Text("Ver alertas") }
                     }
                     TarjetaInicio {
-                        Text("Alertas de mantenimiento",color=TintaInicio,fontWeight=FontWeight.SemiBold)
-                        Text("Consulta, atiende o anula alertas desde la pestaña Alertas.",color=Color(0xFF6881A5))
+                        val bAlertas = estado.bloques
+                        Text("Alertas del vehículo",color=TintaInicio,fontWeight=FontWeight.SemiBold)
+                        when {
+                            bAlertas == null || bAlertas.alertasDisponibilidad == DisponibilidadInicio.CARGANDO ->
+                                Text("Consultando alertas…", color=Color(0xFF6881A5))
+                            bAlertas.alertasDisponibilidad == DisponibilidadInicio.NO_DISPONIBLE ->
+                                Text("No se pudieron cargar las alertas. Puedes abrir la pestaña Alertas.", color=Color(0xFF6881A5))
+                            bAlertas.totalAlertas == 0 ->
+                                Text("No hay alertas pendientes para este vehículo.", color=Color(0xFF6881A5))
+                            else -> {
+                                Text(
+                                    "${bAlertas.totalAlertas} alerta(s) activas",
+                                    color=Color(0xFFF9A825),
+                                    fontWeight=FontWeight.SemiBold
+                                )
+                                bAlertas.alertas.forEach { a ->
+                                    Text("• ${a.titulo} · ${a.estado}", color=Color(0xFF6881A5), style=MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(8.dp))
-                        Button(onClick=onAlertas, shape=RoundedCornerShape(12.dp)) { Text("Ir a Alertas") }
+                        Button(onClick=onAlertas, shape=RoundedCornerShape(12.dp),
+                            colors=ButtonDefaults.buttonColors(containerColor=TintaInicio)) { Text("Ir a Alertas") }
                     }
                     TarjetaInicio {
                         Text("Mis talleres",color=TintaInicio,fontWeight=FontWeight.Bold)

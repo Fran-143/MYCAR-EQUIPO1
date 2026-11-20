@@ -73,7 +73,22 @@ public class ConsultaRegistroVehiculoDao {
                        CASE WHEN m.es_electrico THEN NULL
                             WHEN c.codigo='OTRO' THEN v.combustible_otro ELSE c.nombre END AS combustible,
                        v.estado_vehiculo, v.es_principal, km.valor_km,
-                       (v.foto_storage_object_key IS NOT NULL AND btrim(v.foto_storage_object_key) <> '') AS tiene_foto
+                       (v.foto_storage_object_key IS NOT NULL AND btrim(v.foto_storage_object_key) <> '') AS tiene_foto,
+                       EXISTS(SELECT 1 FROM mycar.tive tv WHERE tv.id_vehiculo = v.id_vehiculo) AS tiene_tive,
+                       CASE
+                         WHEN soat.id_soat IS NULL THEN NULL
+                         WHEN EXISTS (
+                              SELECT 1 FROM mycar.alerta a
+                               WHERE a.id_soat = soat.id_soat
+                                 AND a.categoria = 'SOAT'
+                                 AND a.estado = 'PROXIMA'
+                         ) THEN 'PROXIMA'
+                         WHEN (timezone('America/Lima', clock_timestamp()))::date < soat.fecha_inicio
+                           THEN 'POR_INICIAR'
+                         WHEN (timezone('America/Lima', clock_timestamp()))::date <= soat.fecha_vencimiento
+                           THEN 'VIGENTE'
+                         ELSE 'VENCIDA'
+                       END AS estado_soat
                 FROM mycar.vehiculo v
                 JOIN mycar.uso_vehiculo u ON u.codigo=v.uso_vehiculo_codigo
                 JOIN mycar.tipo_motor m ON m.id_tipo_motor=v.id_tipo_motor
@@ -83,6 +98,12 @@ public class ConsultaRegistroVehiculoDao {
                     WHERE l.id_vehiculo=v.id_vehiculo AND l.origen IN ('INICIAL','ACTUALIZACION')
                     ORDER BY l.fecha_lectura_utc DESC, l.id_lectura_km DESC LIMIT 1
                 ) km ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT s.id_soat, s.fecha_inicio, s.fecha_vencimiento
+                      FROM mycar.soat s
+                     WHERE s.id_vehiculo = v.id_vehiculo AND s.vigencia = 'ACTUAL'
+                     LIMIT 1
+                ) soat ON TRUE
                 WHERE v.id_usuario=?
                 ORDER BY v.es_principal DESC, v.id_vehiculo DESC
                 """, (rs, fila) -> new VehiculoResumen(
@@ -90,7 +111,8 @@ public class ConsultaRegistroVehiculoDao {
                     rs.getString("modelo"), rs.getInt("anio_fabricacion"), rs.getString("uso"),
                     rs.getString("color"), rs.getString("motor"), rs.getString("combustible"),
                     rs.getString("estado_vehiculo"), rs.getBoolean("es_principal"),
-                    rs.getBigDecimal("valor_km"), rs.getBoolean("tiene_foto")
+                    rs.getBigDecimal("valor_km"), rs.getBoolean("tiene_foto"),
+                    rs.getBoolean("tiene_tive"), rs.getString("estado_soat")
                 ), idUsuario);
     }
 

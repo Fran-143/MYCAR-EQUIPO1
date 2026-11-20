@@ -29,6 +29,8 @@ data class EstadoDetalleVehiculo(
     val ocupado: Boolean = false,
     val mensajeAccion: String? = null,
     val accionError: Boolean = false,
+    /** Código de fallo de acción operativa; solo para presentación (p. ej. modal). */
+    val codigoAccion: String? = null,
     val soatActual: SoatDto? = null,
     val soatResumenCargando: Boolean = false,
     val fotoBytes: ByteArray? = null,
@@ -182,7 +184,12 @@ class DetalleVehiculoViewModel(
         if (_estado.value.ocupado || _estado.value.fase != FaseDetalle.LISTO) return
         val actual = ++revision
         trabajo?.cancel()
-        _estado.value = _estado.value.copy(ocupado = true, mensajeAccion = null, accionError = false)
+        _estado.value = _estado.value.copy(
+            ocupado = true,
+            mensajeAccion = null,
+            accionError = false,
+            codigoAccion = null
+        )
         trabajo = viewModelScope.launch {
             try {
                 val detalle = bloque()
@@ -192,7 +199,8 @@ class DetalleVehiculoViewModel(
                     detalle = detalle,
                     ocupado = false,
                     mensajeAccion = exitoMensaje,
-                    accionError = false
+                    accionError = false,
+                    codigoAccion = null
                 )
                 onExito()
             } catch (cancelada: CancellationException) {
@@ -207,10 +215,19 @@ class DetalleVehiculoViewModel(
                 _estado.value = _estado.value.copy(
                     ocupado = false,
                     mensajeAccion = mensajeAccion(fallo),
-                    accionError = true
+                    accionError = true,
+                    codigoAccion = fallo?.codigo
                 )
             }
         }
+    }
+
+    fun limpiarMensajeAccion() {
+        _estado.value = _estado.value.copy(
+            mensajeAccion = null,
+            accionError = false,
+            codigoAccion = null
+        )
     }
 
     private fun mensajeAccion(fallo: FalloRegistroVehiculo?): String = when (fallo?.codigo) {
