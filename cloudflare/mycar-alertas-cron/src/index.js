@@ -1,17 +1,21 @@
 /**
- * mycar-alertas-cron — RF23 eval (00:10 Lima) + despacho push (05:00 Lima).
+ * mycar-alertas-cron — Eval 00:10 Lima (RF23 + RF43) + despacho push 05:00 Lima.
  * Worker existente (mycargrupo1); no crear otro.
  *
- * Primera publicación / seguridad: EVAL_MODO=SIMULAR; crons=[];
- * POST /run fuerza SIMULAR en eval. POST /run-push solo encola/despacha si el backend lo permite.
+ * Seguridad vigente (NO desplegar cambios sin autorización):
+ *   EVAL_MODO=SIMULAR
+ *   crons=[]
  *
  * Activación futura (solo con aprobación):
- *  - EVAL_MODO = "COMPLETO"
- *  - crons = ["10 5 * * *", "0 10 * * *"]  # 00:10 y 05:00 America/Lima
- *  - npx wrangler deploy
+ *   EVAL_MODO = "COMPLETO"
+ *   crons = ["10 5 * * *", "0 10 * * *"]  # 00:10 y 05:00 America/Lima
+ *   npx wrangler deploy
+ *
+ * RF23 y RF43 se invocan por separado: un fallo aislado no cancela el otro.
  */
 
-const EVAL_PATH = "/api/v1/interno/alertas/evaluar-programadas";
+const EVAL_ALERTAS_PATH = "/api/v1/interno/alertas/evaluar-programadas";
+const EVAL_RF43_PATH = "/api/v1/interno/recordatorios-km/evaluar";
 const PUSH_PATH = "/api/v1/interno/push/despachar-recordatorios";
 const WORKER_NAME = "mycar-alertas-cron";
 const CRON_EVAL = "10 5 * * *";
@@ -106,10 +110,10 @@ async function runWithWake(env, { origen, path, body, modoLabel }) {
       lastBody = await res.text();
       if (res.status === 401 || res.status === 403) {
         console.log(`${origen} auth FAIL HTTP ${res.status}`);
-        return { ok: false, reason: "AUTH", status: res.status, fase: modoLabel };
+        return { ok: false, reason: "AUTH", status: res.status, fase: modoLabel, body: lastBody };
       }
       if (res.ok) {
-        console.log(`${origen} OK HTTP ${res.status} body=${lastBody.slice(0, 300)}`);
+        console.log(`${origen} OK HTTP ${res.status} body=${lastBody.slice(0, 400)}`);
         return { ok: true, status: res.status, body: lastBody, fase: modoLabel };
       }
       console.log(`${origen} retryable HTTP ${res.status} attempt=${i + 1}`);
@@ -132,14 +136,28 @@ function modoEval(env, modoForzado) {
   return raw === "COMPLETO" ? "COMPLETO" : "SIMULAR";
 }
 
+/** Eval 00:10: RF23 y RF43 independientes; resultados separados. */
 async function runEval(env, { modoForzado, origen }) {
   const modo = modoEval(env, modoForzado);
-  return runWithWake(env, {
-    origen,
-    path: EVAL_PATH,
+  const rf23 = await runWithWake(env, {
+    origen: `${origen}:rf23`,
+    path: EVAL_ALERTAS_PATH,
     body: { modo },
-    modoLabel: `EVAL_${modo}`,
+    modoLabel: `EVAL_RF23_${modo}`,
   });
+  const rf43 = await runWithWake(env, {
+    origen: `${origen}:rf43`,
+    path: EVAL_RF43_PATH,
+    body: { modo },
+    modoLabel: `EVAL_RF43_${modo}`,
+  });
+  return {
+    ok: rf23.ok || rf43.ok,
+    modo,
+    rf23,
+    rf43,
+    nota: "SIMULAR no escribe estados ni RF43; COMPLETO requiere autorización.",
+  };
 }
 
 async function runPush(env, origen) {
@@ -158,7 +176,6 @@ export default {
       ctx.waitUntil(runPush(env, "scheduled-push"));
       return;
     }
-    // Default / CRON_EVAL: evaluación RF23
     ctx.waitUntil(runEval(env, { origen: `scheduled-eval:${cron || CRON_EVAL}` }));
   },
 
@@ -171,11 +188,13 @@ export default {
         accountHint: "mycargrupo1.workers.dev",
         backend: env.BACKEND_URL || null,
         evalModoVars: String(env.EVAL_MODO || "SIMULAR"),
-        cronTriggers: [],
+        cronTriggersEsperados: [CRON_EVAL, CRON_PUSH],
         cronEvalUtc: CRON_EVAL,
         cronPushUtc: CRON_PUSH,
+        evalPaths: [EVAL_ALERTAS_PATH, EVAL_RF43_PATH],
+        pushPath: PUSH_PATH,
         runManualFuerza: "SIMULAR",
-        hint: "POST /run → EVAL SIMULAR. POST /run-push → despacho. Cron vacío hasta aprobación.",
+        hint: "POST /run → EVAL SIMULAR (RF23+RF43). POST /run-push → despacho. Crons Dashboard: 10 5 / 0 10 UTC.",
       });
     }
 
@@ -191,7 +210,6 @@ export default {
       return Response.json(result, { status: result.ok ? 200 : 502 });
     }
     if (request.method === "POST" && url.pathname === "/run-push") {
-      // No fuerza COMPLETO de eval; solo dispara despacho (backend aplica ventana Lima).
       const result = await runPush(env, "run-push");
       return Response.json(result, { status: result.ok ? 200 : 502 });
     }

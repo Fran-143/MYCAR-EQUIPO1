@@ -33,6 +33,8 @@ public class NotificacionesSecurityConfiguration {
                 .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.GET, "/api/v1/notificaciones").authenticated()
+                        // PathPattern: un segmento; /** cubre id y subrutas futuras de lectura.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notificaciones/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/notificaciones/*/leer").authenticated()
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(sesiones, json), AnonymousAuthenticationFilter.class)

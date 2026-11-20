@@ -24,6 +24,7 @@ import com.mycar.app.features.historial.ui.FlujoHistorialMantenimiento
 import com.mycar.app.features.inicio.domain.*
 import com.mycar.app.features.inicio.viewmodel.ResumenInicioViewModel
 import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
+import com.mycar.app.features.notificaciones.domain.NotificacionesBadgeStore
 import com.mycar.app.features.notificaciones.ui.NotificacionesRoute
 import com.mycar.app.features.perfil.ui.PerfilRoute
 import com.mycar.app.features.perfil.viewmodel.PerfilViewModel
@@ -44,7 +45,9 @@ fun MyCarNavigation(
     sesion: SesionVehiculosViewModel = viewModel(),
     solicitudesNotificaciones: Int = 0,
     pushIdVehiculo: Long? = null,
-    pushIdAlerta: Long? = null
+    pushIdAlerta: Long? = null,
+    pushIdNotificacion: Long? = null,
+    pushCategoria: String? = null
 ) {
     val acceso by sesion.estado.collectAsStateWithLifecycle()
     val cuenta=acceso.cuenta
@@ -60,9 +63,22 @@ fun MyCarNavigation(
                 c.avatarPresentacion.value = null
             }
         }
+        runCatching {
+            c.notificaciones.consultarBandeja("PENDIENTES", "TODAS", "TODAS")
+        }
     }
     var seccionNombre by rememberSaveable { mutableStateOf(SeccionMyCar.INICIO.name) }
     var secundariaNombre by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(cuenta?.ciclo, solicitudesNotificaciones, secundariaNombre, seccionNombre) {
+        val c = cuenta
+        if (c == null) {
+            NotificacionesBadgeStore.reiniciar()
+            return@LaunchedEffect
+        }
+        runCatching {
+            c.notificaciones.consultarBandeja("PENDIENTES", "TODAS", "TODAS")
+        }
+    }
     var vehiculoMantenimiento by rememberSaveable { mutableStateOf<Long?>(null) }
     var abrirHistorialEnTalleres by rememberSaveable { mutableStateOf(false) }
     var vehiculoDetalleId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -104,15 +120,15 @@ fun MyCarNavigation(
     val navegacion=NavegacionInicio(SeccionMyCar.valueOf(seccionNombre),secundariaNombre?.let(SecundariaMyCar::valueOf))
     fun navegar(n: NavegacionInicio) { seccionNombre=n.seccion.name; secundariaNombre=n.secundaria?.name; formularioAbierto=false }
     LaunchedEffect(solicitudVehiculos) { if(solicitudVehiculos>0) navegar(navegacion.abrir(SeccionMyCar.VEHICULOS)) }
-    // Deep link FCM: abre alertas del vehículo o la secundaria Notificaciones (placeholder en esta rama).
-    LaunchedEffect(solicitudesNotificaciones, pushIdVehiculo, pushIdAlerta, cuenta?.ciclo) {
+    // Deep link FCM: Push → bandeja Notificaciones (categoría/resumen) → detalle individual.
+    var pushNotifResaltar by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pushNotifCategoria by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(solicitudesNotificaciones, pushIdNotificacion, pushCategoria, cuenta?.ciclo) {
         if (solicitudesNotificaciones <= 0 || cuenta == null) return@LaunchedEffect
-        if (pushIdVehiculo != null) {
-            vehiculoAlertas = pushIdVehiculo
-            navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
-        } else {
-            navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES))
-        }
+        if (pushIdVehiculo != null) vehiculoAlertas = pushIdVehiculo
+        pushNotifResaltar = pushIdNotificacion
+        pushNotifCategoria = pushCategoria
+        navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES))
     }
     fun abrirDetalle(id: Long) { vehiculoDetalleId = id; navegar(navegacion.abrir(SecundariaMyCar.DETALLE)) }
     fun abrirCompartir(id: Long, marca: String? = null, modelo: String? = null) {
@@ -218,13 +234,9 @@ fun MyCarNavigation(
             navegacion.secundaria != null || navegacion.seccion != SeccionMyCar.INICIO -> navegar(navegacion.atras())
         }
     }
-    val esquema=lightColorScheme(primary=Color(0xFF079FDC),onPrimary=Color.White,
-        primaryContainer=Color(0xFFE2F5FF),onPrimaryContainer=Color(0xFF163468),
-        background=Color(0xFFF2FAFF),surface=Color.White,onSurface=Color(0xFF163468))
-    MaterialTheme(colorScheme=esquema) {
-        Scaffold(contentWindowInsets=WindowInsets(0),bottomBar={
+    Scaffold(contentWindowInsets=WindowInsets(0),bottomBar={
             if(navegacion.secundaria==null && !formularioAbierto && !formularioAtencionAlerta && kmOverlayMantenimiento==null && alertasProgramarId==null)
-                NavigationBar(containerColor=Color.White) {
+                NavigationBar(containerColor=MaterialTheme.colorScheme.surface) {
                 SeccionMyCar.entries.forEach { destino ->
                     val icono=when(destino) {
                         SeccionMyCar.INICIO -> R.drawable.ic_inicio_inicio
@@ -399,6 +411,8 @@ fun MyCarNavigation(
                             PerfilRoute(
                                 vm = perfilVm,
                                 preferenciasNotificacion = cuenta.preferenciasNotificacion,
+                                recordatoriosKm = cuenta.recordatoriosKm,
+                                fotosRepository = cuenta.fotos,
                                 licenciaRepository = cuenta.licencia,
                                 soporteRepository = cuenta.soporte,
                                 onVolver = { navegar(navegacion.atras()) },
@@ -696,19 +710,32 @@ fun MyCarNavigation(
                         secundaria==SecundariaMyCar.NOTIFICACIONES && cuenta!=null -> {
                             NotificacionesRoute(
                                 repository = cuenta.notificaciones,
-                                onVolver = { navegar(navegacion.atras()) },
+                                categoriaInicial = pushNotifCategoria,
+                                idResaltar = pushNotifResaltar,
+                                onVolver = {
+                                    pushNotifResaltar = null
+                                    pushNotifCategoria = null
+                                    navegar(navegacion.atras())
+                                },
                                 onAbrirDetalleAlerta = { idVehiculo, idAlerta ->
+                                    pushNotifResaltar = null
                                     vehiculoAlertas = idVehiculo
                                     detalleAlertaTrasAtencion = idAlerta
                                     navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
                                 },
                                 onAbrirSoatDesdeAviso = { idVehiculo ->
+                                    pushNotifResaltar = null
                                     vehiculoDetalleId = idVehiculo
                                     abrirSoat(idVehiculo, SecundariaMyCar.SOAT_CONSULTAR)
                                 },
                                 onAbrirLicenciaDesdeAviso = {
+                                    pushNotifResaltar = null
                                     perfilAbrirLicencia = true
                                     navegar(navegacion.abrir(SecundariaMyCar.PERFIL))
+                                },
+                                onAbrirKilometrajeDesdeAviso = { idVehiculo ->
+                                    pushNotifResaltar = null
+                                    abrirKilometraje(idVehiculo)
                                 },
                                 onPerfil = { navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
                                 modifier = Modifier.fillMaxSize()
@@ -859,6 +886,11 @@ fun MyCarNavigation(
                                             alertasFiltroTodasTrasExito = true
                                             recargaAlertas++
                                         },
+                                        onIrInicio={
+                                            alertasProgramarId = null
+                                            borradorAlertaRf17 = null
+                                            navegar(NavegacionInicio(SeccionMyCar.INICIO, null))
+                                        },
                                         modifier=Modifier.statusBarsPadding())
                                 } else {
                                     AlertasRoute(
@@ -892,9 +924,7 @@ fun MyCarNavigation(
                 }
             }
         }
-
     }
-}
 
 @Composable
 private fun PantallaProximamente(titulo:String,onVolver:()->Unit,mostrarVolver:Boolean=true) {

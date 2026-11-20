@@ -19,8 +19,8 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 26
-        versionName = "1.2.4-rf40-general"
+        versionCode = 34
+        versionName = "1.2.12-alertas-notificaciones-general"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.

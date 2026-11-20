@@ -16,6 +16,16 @@ val MyCarMuted = Color(0xFF53647F)
 val MyCarOutline = Color(0xFF8193AF)
 val MyCarOutlineSoft = Color(0xFFDAE4F1)
 
+/** Superficies modo oscuro (misma familia navy/azul, sin negro puro). */
+val MyCarBgDark = Color(0xFF0E1628)
+val MyCarBgSoftDark = Color(0xFF152238)
+val MyCarSurfaceDark = Color(0xFF1B2A42)
+val MyCarTileDark = Color(0xFF243552)
+val MyCarOnSurfaceDark = Color(0xFFE8EEF8)
+val MyCarMutedDark = Color(0xFFA8B6CC)
+val MyCarOutlineDark = Color(0xFF6B7F9C)
+val MyCarOutlineSoftDark = Color(0xFF2F405C)
+
 val MyCarStatusProgramada = Color(0xFF2E7D32)
 val MyCarStatusProxima = Color(0xFFF9A825)
 val MyCarStatusPendiente = Color(0xFFE53935)

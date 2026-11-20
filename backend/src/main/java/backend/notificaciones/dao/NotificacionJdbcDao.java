@@ -116,9 +116,11 @@ public class NotificacionJdbcDao {
     }
 
     public int marcarGestionSiActiva(long idAlerta, String estadoGestion) {
+        // Al pasar a historial (ATENDIDA/CERRADA) se marca leída: no debe quedar badge fantasma.
         return jdbc.update("""
                 UPDATE mycar.notificacion
                 SET estado_gestion = ?,
+                    leida = TRUE,
                     fecha_actualizacion_utc = clock_timestamp()
                 WHERE id_alerta = ?
                   AND estado_gestion = 'PENDIENTE'
@@ -137,6 +139,7 @@ public class NotificacionJdbcDao {
                         WHEN a.estado = 'REALIZADA' THEN 'ATENDIDA'
                         ELSE 'CERRADA'
                     END,
+                    leida = TRUE,
                     fecha_actualizacion_utc = clock_timestamp()
                 FROM mycar.alerta a
                 WHERE n.id_usuario = ?
@@ -147,11 +150,20 @@ public class NotificacionJdbcDao {
                 + jdbc.update("""
                 UPDATE mycar.notificacion n
                 SET estado_gestion = 'CERRADA',
+                    leida = TRUE,
                     fecha_actualizacion_utc = clock_timestamp()
                 WHERE n.id_usuario = ?
                   AND n.estado_gestion = 'PENDIENTE'
                   AND n.id_alerta IS NOT NULL
                   AND NOT EXISTS (SELECT 1 FROM mycar.alerta a WHERE a.id_alerta = n.id_alerta)
+                """, usuario)
+                + jdbc.update("""
+                UPDATE mycar.notificacion
+                SET leida = TRUE,
+                    fecha_actualizacion_utc = clock_timestamp()
+                WHERE id_usuario = ?
+                  AND leida = FALSE
+                  AND estado_gestion IN ('ATENDIDA', 'CERRADA')
                 """, usuario);
     }
 
@@ -163,11 +175,25 @@ public class NotificacionJdbcDao {
         return n == null ? 0 : n;
     }
 
-    /** Contador global de no leídas del titular (independiente de pestaña/categoría/filtro UI). */
+    /**
+     * No leídas = avisos aún por gestionar que el usuario no ha abierto.
+     * Historial (ATENDIDA/CERRADA) no cuenta para campana ni contador.
+     */
     public int contarNoLeidas(long usuario) {
         Integer n = jdbc.queryForObject("""
                 SELECT count(*) FROM mycar.notificacion
-                WHERE id_usuario = ? AND leida = FALSE
+                WHERE id_usuario = ?
+                  AND leida = FALSE
+                  AND estado_gestion = 'PENDIENTE'
+                """, Integer.class, usuario);
+        return n == null ? 0 : n;
+    }
+
+    /** Leídas globales (cualquier gestión); independiente del filtro de pestaña. */
+    public int contarLeidas(long usuario) {
+        Integer n = jdbc.queryForObject("""
+                SELECT count(*) FROM mycar.notificacion
+                WHERE id_usuario = ? AND leida = TRUE
                 """, Integer.class, usuario);
         return n == null ? 0 : n;
     }
@@ -177,19 +203,20 @@ public class NotificacionJdbcDao {
         boolean pendientes = "PENDIENTES".equals(pestana);
         boolean todasCat = categoria == null || categoria.isBlank() || "TODAS".equals(categoria);
         boolean todasLect = filtroLectura == null || filtroLectura.isBlank() || "TODAS".equals(filtroLectura);
-        Boolean soloLeidas = null;
-        if ("NO_LEIDAS".equals(filtroLectura)) {
-            soloLeidas = false;
-        } else if ("LEIDAS".equals(filtroLectura)) {
-            soloLeidas = true;
-        }
+        // Valor de n.leida cuando el filtro no es TODAS: true=LEIDAS, false=NO_LEIDAS.
+        boolean leidaFiltro = "LEIDAS".equals(filtroLectura);
         String sql = """
                 SELECT n.id_notificacion, n.categoria, n.estado_gestion, n.leida, n.titulo, n.cuerpo, n.destino,
                        n.id_alerta, n.id_vehiculo,
                        to_char(n.fecha_emision_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS emitida,
-                       a.estado AS estado_alerta
+                       a.estado AS estado_alerta,
+                       v.placa,
+                       CASE WHEN v.id_vehiculo IS NOT NULL
+                            THEN trim(both FROM coalesce(v.marca,'') || ' ' || coalesce(v.modelo,''))
+                            ELSE NULL END AS vehiculo_etiqueta
                 FROM mycar.notificacion n
                 LEFT JOIN mycar.alerta a ON a.id_alerta = n.id_alerta
+                LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = n.id_vehiculo
                 WHERE n.id_usuario = ?
                   AND n.estado_gestion %s
                   AND (? OR n.categoria = ?)
@@ -207,10 +234,12 @@ public class NotificacionJdbcDao {
                 (Long) rs.getObject("id_alerta"),
                 (Long) rs.getObject("id_vehiculo"),
                 rs.getString("emitida"),
-                rs.getString("estado_alerta")),
+                rs.getString("estado_alerta"),
+                rs.getString("placa"),
+                rs.getString("vehiculo_etiqueta")),
                 usuario,
                 todasCat, todasCat ? "" : categoria,
-                todasLect, Boolean.TRUE.equals(soloLeidas));
+                todasLect, leidaFiltro);
     }
 
     public Optional<ContratoNotificaciones.NotificacionDto> obtenerPropia(long usuario, long idNotificacion) {
@@ -218,9 +247,14 @@ public class NotificacionJdbcDao {
                 SELECT n.id_notificacion, n.categoria, n.estado_gestion, n.leida, n.titulo, n.cuerpo, n.destino,
                        n.id_alerta, n.id_vehiculo,
                        to_char(n.fecha_emision_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS emitida,
-                       a.estado AS estado_alerta
+                       a.estado AS estado_alerta,
+                       v.placa,
+                       CASE WHEN v.id_vehiculo IS NOT NULL
+                            THEN trim(both FROM coalesce(v.marca,'') || ' ' || coalesce(v.modelo,''))
+                            ELSE NULL END AS vehiculo_etiqueta
                 FROM mycar.notificacion n
                 LEFT JOIN mycar.alerta a ON a.id_alerta = n.id_alerta
+                LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = n.id_vehiculo
                 WHERE n.id_usuario = ? AND n.id_notificacion = ?
                 """, (rs, n) -> new ContratoNotificaciones.NotificacionDto(
                 rs.getLong("id_notificacion"),
@@ -233,8 +267,106 @@ public class NotificacionJdbcDao {
                 (Long) rs.getObject("id_alerta"),
                 (Long) rs.getObject("id_vehiculo"),
                 rs.getString("emitida"),
-                rs.getString("estado_alerta")), usuario, idNotificacion).stream().findFirst();
+                rs.getString("estado_alerta"),
+                rs.getString("placa"),
+                rs.getString("vehiculo_etiqueta")), usuario, idNotificacion).stream().findFirst();
     }
+
+    /** Fila cruda para armar detalle enriquecido (sin textos derivados). */
+    public Optional<DetalleRaw> obtenerDetalleRaw(long usuario, long idNotificacion) {
+        return jdbc.query("""
+                SELECT n.id_notificacion, n.categoria, n.estado_gestion, n.leida, n.titulo, n.cuerpo, n.destino,
+                       n.id_alerta, n.id_vehiculo,
+                       to_char(n.fecha_emision_utc AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS emitida,
+                       a.estado AS estado_alerta, a.criterio, a.fecha_objetivo, a.km_objetivo, a.km_base, a.intervalo_km,
+                       CASE WHEN a.categoria = 'SOAT' THEN 'Vencimiento de SOAT'
+                            WHEN a.categoria = 'LICENCIA' THEN 'Vencimiento de licencia'
+                            ELSE COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre, n.titulo)
+                       END AS nombre_evento,
+                       CASE WHEN v.id_vehiculo IS NOT NULL
+                            THEN trim(both FROM coalesce(v.marca,'') || ' ' || coalesce(v.modelo,''))
+                            ELSE NULL END AS vehiculo_etiqueta,
+                       v.placa,
+                       c.frecuencia AS frecuencia_km,
+                       to_char(
+                         (SELECT max(l.fecha_lectura_utc) FROM mycar.lectura_kilometraje l
+                          WHERE l.id_vehiculo = n.id_vehiculo) AT TIME ZONE 'America/Lima',
+                         'YYYY-MM-DD') AS ultima_km_lima,
+                       to_char(c.proximo_envio_utc AT TIME ZONE 'America/Lima', 'YYYY-MM-DD') AS proximo_km_lima,
+                       (SELECT l.valor_km FROM mycar.lectura_kilometraje l
+                        WHERE l.id_vehiculo = n.id_vehiculo
+                        ORDER BY l.fecha_lectura_utc DESC, l.id_lectura_km DESC LIMIT 1) AS km_actual
+                FROM mycar.notificacion n
+                LEFT JOIN mycar.alerta a ON a.id_alerta = n.id_alerta
+                LEFT JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
+                LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = n.id_vehiculo
+                LEFT JOIN mycar.config_recordatorio_km c ON c.id_vehiculo = n.id_vehiculo
+                WHERE n.id_usuario = ? AND n.id_notificacion = ?
+                """, (rs, i) -> new DetalleRaw(
+                rs.getLong("id_notificacion"),
+                rs.getString("categoria"),
+                rs.getString("estado_gestion"),
+                rs.getBoolean("leida"),
+                rs.getString("titulo"),
+                rs.getString("cuerpo"),
+                rs.getString("destino"),
+                (Long) rs.getObject("id_alerta"),
+                (Long) rs.getObject("id_vehiculo"),
+                rs.getString("emitida"),
+                rs.getString("estado_alerta"),
+                rs.getString("criterio"),
+                rs.getObject("fecha_objetivo", java.time.LocalDate.class),
+                enteroNullable(rs.getObject("km_objetivo")),
+                enteroNullable(rs.getObject("km_base")),
+                enteroNullable(rs.getObject("intervalo_km")),
+                rs.getString("nombre_evento"),
+                rs.getString("vehiculo_etiqueta"),
+                rs.getString("placa"),
+                rs.getString("frecuencia_km"),
+                rs.getString("ultima_km_lima"),
+                rs.getString("proximo_km_lima"),
+                enteroNullable(rs.getObject("km_actual"))), usuario, idNotificacion).stream().findFirst();
+    }
+
+    /** JDBC puede devolver NUMERIC como BigDecimal (p. ej. lectura_kilometraje.valor_km). */
+    private static Integer enteroNullable(Object valor) {
+        if (valor == null) {
+            return null;
+        }
+        if (valor instanceof Integer i) {
+            return i;
+        }
+        if (valor instanceof Number n) {
+            return n.intValue();
+        }
+        throw new IllegalStateException("Valor numérico inesperado: " + valor.getClass().getName());
+    }
+
+    public record DetalleRaw(
+            long idNotificacion,
+            String categoria,
+            String estadoGestion,
+            boolean leida,
+            String titulo,
+            String cuerpo,
+            String destino,
+            Long idAlerta,
+            Long idVehiculo,
+            String fechaEmisionUtc,
+            String estadoAlerta,
+            String criterio,
+            java.time.LocalDate fechaObjetivo,
+            Integer kmObjetivo,
+            Integer kmBase,
+            Integer intervaloKm,
+            String nombreEvento,
+            String vehiculoEtiqueta,
+            String placa,
+            String frecuenciaKm,
+            String ultimaActualizacionKm,
+            String recordatorioCorrespondienteKm,
+            Integer kmActual
+    ) {}
 
     public int marcarLeida(long usuario, long idNotificacion) {
         return jdbc.update("""

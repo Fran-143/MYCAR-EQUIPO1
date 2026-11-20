@@ -209,6 +209,7 @@ fun EntradaHistorialMantenimiento(
                 onRegistrar, modifier, registroDisponible, onIniciarSesion,
                 onVerDetalle = { detalleId = it },
                 onOrdenar = vm::ordenar,
+                onFiltrarTipo = vm::filtrarTipo,
                 onRecargarKm = vm::recargarKilometraje,
                 onActualizarKm = onActualizarKm,
                 onCorregirKm = { idLectura ->

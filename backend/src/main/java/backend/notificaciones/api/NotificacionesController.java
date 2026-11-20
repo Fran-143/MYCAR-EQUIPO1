@@ -37,6 +37,12 @@ public class NotificacionesController {
         return servicio.consultarBandeja(usuario(auth), pestana, categoria, filtroLectura);
     }
 
+    @GetMapping("/{idNotificacion}")
+    public ContratoNotificaciones.DetalleNotificacionDto detalle(
+            Authentication auth, @PathVariable long idNotificacion) {
+        return servicio.consultarDetalle(usuario(auth), idNotificacion);
+    }
+
     @PostMapping("/{idNotificacion}/leer")
     public ContratoNotificaciones.LeerResponse leer(
             Authentication auth, @PathVariable long idNotificacion) {

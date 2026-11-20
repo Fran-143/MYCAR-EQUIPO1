@@ -1,19 +1,30 @@
 package com.mycar.app.features.mantenimiento.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.mycar.app.features.mantenimiento.viewmodel.MantenimientoUiState
 import com.mycar.app.features.mantenimiento.viewmodel.MantenimientoViewModel
+import com.mycar.app.ui.theme.MyCarBg
+import com.mycar.app.ui.theme.MyCarMuted
+import com.mycar.app.ui.theme.MyCarNavy
+import com.mycar.app.ui.theme.MyCarTeal
+import com.mycar.app.ui.theme.MyCarTile
 
 @Composable
 internal fun RegistrarMantenimientoScreen(
@@ -27,6 +38,7 @@ internal fun RegistrarMantenimientoScreen(
         onActualizarKm, onSesionRequerida, onProgramarAlerta)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FormularioRegistroMantenimiento(
     s: MantenimientoUiState, vm: AccionesMantenimiento, modifier: Modifier,
@@ -50,31 +62,130 @@ internal fun FormularioRegistroMantenimiento(
         )
         return
     }
-    Column(modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = {
-                when {
-                    s.requiereSesion || s.incierto -> onCerrar()
-                    else -> vm.solicitarSalir()
+    val tituloForm = if (s.modoDesdeAlerta) "Registrar como realizado" else "Registrar mantenimiento"
+    Scaffold(
+        modifier = modifier.fillMaxSize().background(MyCarBg).imePadding(),
+        containerColor = MyCarBg,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(shape = CircleShape, color = MyCarTile, modifier = Modifier.size(36.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Filled.Build, null, tint = MyCarTeal, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Text(
+                            tituloForm,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MyCarNavy,
+                            maxLines = 2
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = {
+                            when {
+                                s.requiereSesion || s.incierto -> onCerrar()
+                                else -> vm.solicitarSalir()
+                            }
+                        },
+                        enabled = !s.enviando,
+                        modifier = Modifier.testTag("rf17.volver")
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = MyCarNavy
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MyCarBg),
+                windowInsets = WindowInsets.statusBars
+            )
+        },
+        bottomBar = {
+            Surface(color = Color.White, shadowElevation = 6.dp) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val hayRecomendacion = !s.modoDesdeAlerta && (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank())
+                    val puedeGuardar = enabled && s.contexto?.registroDisponible == true
+                    if (hayRecomendacion) {
+                        Button(
+                            onClick = { vm.guardar(programarAlerta = true) },
+                            enabled = puedeGuardar,
+                            modifier = Modifier.fillMaxWidth().testTag("rf17.guardar.alerta"),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
+                        ) {
+                            Text(if (s.enviando && s.programarAlertaTrasExito) "Guardando…" else "Sí, programar alerta")
+                        }
+                        OutlinedButton(
+                            onClick = { vm.guardar(programarAlerta = false) },
+                            enabled = puedeGuardar && !s.enviando,
+                            modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(14.dp)
+                        ) {
+                            Text(if (s.enviando && !s.programarAlertaTrasExito) "Guardando…" else "No, solo guardar")
+                        }
+                    } else {
+                        Button(
+                            onClick = { vm.guardar(programarAlerta = false) },
+                            enabled = puedeGuardar,
+                            modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
+                        ) {
+                            Text(
+                                when {
+                                    s.enviando && s.modoDesdeAlerta -> "Registrando…"
+                                    s.enviando -> "Guardando…"
+                                    s.modoDesdeAlerta -> "Registrar y marcar alerta"
+                                    else -> "Guardar mantenimiento"
+                                }
+                            )
+                        }
+                    }
+                    TextButton(
+                        onClick = { if (s.requiereSesion) onCerrar() else vm.solicitarSalir() },
+                        enabled = !s.enviando && !s.incierto,
+                        modifier = Modifier.testTag("rf17.cancelar")
+                    ) { Text("Cancelar", color = MyCarNavy) }
                 }
-            }, enabled = !s.enviando, modifier = Modifier.testTag("rf17.volver")) { Text("Volver") }
-            Text("Mantenimientos", style = MaterialTheme.typography.titleMedium)
-        }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    if (s.modoDesdeAlerta) "Registrar como realizado" else "Registrar mantenimiento",
-                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    if (s.modoDesdeAlerta)
-                        "Completa el servicio para marcar la alerta como REALIZADA. Se creará un mantenimiento nuevo."
-                    else
-                        "Cuida el historial de tu vehículo. Registra un servicio que ya realizaste.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
+        }
+    ) { padding ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                if (s.modoDesdeAlerta)
+                    "Completa el servicio para marcar la alerta como REALIZADA. Se creará un mantenimiento nuevo."
+                else
+                    "Cuida el historial de tu vehículo. Registra un servicio que ya realizaste.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MyCarMuted
+            )
             if (s.requiereSesion) {
                 AvisoMantenimiento("Inicia sesión para elegir tu vehículo y registrar un mantenimiento.")
                 onSesionRequerida?.let { TextButton(onClick = it) { Text("Iniciar sesión") } }
@@ -103,7 +214,7 @@ internal fun FormularioRegistroMantenimiento(
                 }
             }
             if (!s.requiereSesion) TextButton(onClick = vm::recargar, enabled = !s.enviando) { Text("Actualizar referencias") }
-            SeccionMantenimiento("1", "Tu vehículo") {
+            SeccionMantenimiento("1", "Información obligatoria") {
                 SelectorMantenimiento("Vehículo *", vehiculo?.let { "${it.placa} · ${it.marca} ${it.modelo}" } ?: "Seleccionar vehículo",
                     s.contexto?.vehiculos.orEmpty().map { it.idVehiculo to "${it.placa} · ${it.marca} ${it.modelo}" },
                     enabled && !s.modoDesdeAlerta, s.errores["idVehiculo"], onSelect = vm::solicitarVehiculo)
@@ -163,7 +274,7 @@ internal fun FormularioRegistroMantenimiento(
                         style = MaterialTheme.typography.bodySmall)
                 }
             }
-            SeccionMantenimiento("2", "Detalle del servicio", "Los campos con * son obligatorios.") {
+            SeccionMantenimiento("2", "Detalle del servicio", "Campos con * obligatorios.") {
                 SelectorMantenimiento("Tipo de mantenimiento *",
                     s.contexto?.tipos?.firstOrNull { it.codigo == b.codigoTipo }?.nombre ?: b.codigoTipo.ifBlank { "Seleccionar tipo" },
                     s.contexto?.tipos.orEmpty().map { it.codigo to it.nombre }, enabled && !s.modoDesdeAlerta,
@@ -199,7 +310,7 @@ internal fun FormularioRegistroMantenimiento(
                 }
                 Text("Corresponde al servicio realizado. No modifica el kilometraje vigente.", style = MaterialTheme.typography.bodySmall)
             }
-            SeccionMantenimiento("3", "Costo y observaciones", "Estos datos son opcionales.") {
+            SeccionMantenimiento("3", "Información adicional", "Opcional.") {
                 CampoMantenimiento("Costo total", b.costo, enabled, s.errores["costoTotal"], KeyboardType.Decimal) {
                     v -> vm.actualizar { it.copy(costo = v) }
                 }
@@ -207,7 +318,7 @@ internal fun FormularioRegistroMantenimiento(
                 CampoMantenimiento("Descripción u observaciones", b.observaciones, enabled,
                     s.errores["observaciones"], singleLine = false) { v -> vm.actualizar { it.copy(observaciones = v) } }
             }
-            SeccionMantenimiento("4", "Repuestos", "Añade los repuestos utilizados en este servicio, si los hubo.") {
+            SeccionMantenimiento("4", "Repuestos utilizados (opcional)", "Añade repuestos si los hubo.") {
                 if (b.repuestos.isEmpty()) Text("Aún no agregaste repuestos.", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 b.repuestos.forEach { p ->
@@ -232,7 +343,7 @@ internal fun FormularioRegistroMantenimiento(
                 }
             }
             if (!s.modoDesdeAlerta) {
-                SeccionMantenimiento("5", "Próxima recomendación", "Opcional. Se conserva como referencia para el siguiente servicio.") {
+                SeccionMantenimiento("5", "Próximo mantenimiento (opcional)", "Se conserva como referencia.") {
                     FechaMantenimiento("Próxima fecha sugerida", b.proximaFecha, enabled, null,
                         { v -> vm.actualizar { it.copy(proximaFecha = v) } }, opcional = true,
                         error = s.errores["proximaFechaSugerida"])
@@ -244,57 +355,16 @@ internal fun FormularioRegistroMantenimiento(
                     }
                 }
             }
-            Spacer(Modifier.height(4.dp))
-        }
-        HorizontalDivider()
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            val hayRecomendacion = !s.modoDesdeAlerta && (b.proximaFecha.isNotBlank() || b.proximoKm.isNotBlank())
-            val puedeGuardar = enabled && s.contexto?.registroDisponible == true
-            if (hayRecomendacion) {
-                Button(
-                    onClick = { vm.guardar(programarAlerta = true) },
-                    enabled = puedeGuardar,
-                    modifier = Modifier.fillMaxWidth().testTag("rf17.guardar.alerta"),
-                    shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)
-                ) {
-                    Text(if (s.enviando && s.programarAlertaTrasExito) "Guardando…" else "Sí, programar alerta")
-                }
-                OutlinedButton(
-                    onClick = { vm.guardar(programarAlerta = false) },
-                    enabled = puedeGuardar && !s.enviando,
-                    modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
-                    shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)
-                ) {
-                    Text(if (s.enviando && !s.programarAlertaTrasExito) "Guardando…" else "No, solo guardar")
-                }
-            } else {
-                Button(
-                    onClick = { vm.guardar(programarAlerta = false) },
-                    enabled = puedeGuardar,
-                    modifier = Modifier.fillMaxWidth().testTag("rf17.guardar"),
-                    shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(14.dp)
-                ) {
-                    Text(
-                        when {
-                            s.enviando && s.modoDesdeAlerta -> "Registrando…"
-                            s.enviando -> "Guardando…"
-                            s.modoDesdeAlerta -> "Registrar y marcar alerta"
-                            else -> "Guardar mantenimiento"
-                        }
-                    )
-                }
-            }
-            TextButton(onClick = { if (s.requiereSesion) onCerrar() else vm.solicitarSalir() },
-                enabled = !s.enviando && !s.incierto, modifier = Modifier.testTag("rf17.cancelar")) { Text("Cancelar") }
+            Spacer(Modifier.height(12.dp))
         }
     }
-    if (s.confirmarSalida) AlertDialog(onDismissRequest = vm::seguirEditando,
-        title = { Text("¿Descartar el borrador?") },
-        text = { Text("Se descartará este mantenimiento sin guardar. El kilometraje que ya hayas confirmado permanece.") },
-        confirmButton = { TextButton(onClick = { vm.descartar(); onCerrar() }) { Text("Descartar") } },
-        dismissButton = { TextButton(onClick = vm::seguirEditando) { Text("Seguir editando") } })
+    if (s.confirmarSalida) {
+        com.mycar.app.ui.CambiosSinGuardarDialog(
+            onSeguirEditando = vm::seguirEditando,
+            onDescartar = { vm.descartar(); onCerrar() },
+            mensaje = "Tienes cambios que aún no has guardado. Si sales, se perderán."
+        )
+    }
     if (s.vehiculoPendiente != null) AlertDialog(onDismissRequest = vm::cancelarVehiculo,
         title = { Text("¿Cambiar de vehículo?") }, text = { Text("El nuevo vehículo comenzará con un formulario vacío.") },
         confirmButton = { TextButton(onClick = vm::confirmarVehiculo) { Text("Cambiar") } },

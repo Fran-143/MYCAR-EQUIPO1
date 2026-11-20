@@ -87,9 +87,10 @@ public class NotificacionInternaService {
         dao.conciliarVigencia(usuario);
         int pendientesGestion = dao.contarPendientes(usuario);
         int noLeidas = dao.contarNoLeidas(usuario);
+        int leidas = dao.contarLeidas(usuario);
         var lista = dao.listar(usuario, pestana, categoria, filtroLectura);
         return new ContratoNotificaciones.BandejaResponse(
-                pestana, categoria, filtroLectura, pendientesGestion, noLeidas, lista);
+                pestana, categoria, filtroLectura, pendientesGestion, noLeidas, leidas, lista);
     }
 
     @Transactional
@@ -110,6 +111,16 @@ public class NotificacionInternaService {
                 refresco.destino(),
                 refresco.idAlerta(),
                 refresco.idVehiculo());
+    }
+
+    /** Detalle vigente (relee alerta/KM); no muta LEÍDA. */
+    @Transactional(readOnly = true)
+    public ContratoNotificaciones.DetalleNotificacionDto consultarDetalle(long usuario, long idNotificacion) {
+        var raw = dao.obtenerDetalleRaw(usuario, idNotificacion)
+                .orElseThrow(() -> new ErrorNotificaciones(
+                        "NOTIFICACION_NO_ENCONTRADA", "No se pudo cargar esta notificación."));
+        return DetalleNotificacionAssembler.ensamblar(raw, java.time.LocalDate.now(
+                java.time.ZoneId.of("America/Lima")));
     }
 
     private void sincronizarContexto(NotificacionJdbcDao.AlertaContexto ctx) {

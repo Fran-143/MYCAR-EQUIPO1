@@ -25,10 +25,11 @@ class MycarFirebaseMessagingService : FirebaseMessagingService() {
         val data = message.data
         val titulo = message.notification?.title ?: data["titulo"] ?: "MyCar"
         val cuerpo = message.notification?.body ?: data["cuerpo"] ?: ""
-        val destino = data["destino"] ?: "DETALLE_ALERTA"
+        val destino = data["destino"] ?: "BANDEJA"
         val idAlerta = data["id_alerta"]?.toLongOrNull()
         val idVehiculo = data["id_vehiculo"]?.toLongOrNull()
         val idNotificacion = data["id_notificacion"]?.toLongOrNull()
+        val categoria = data["categoria"]
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -37,6 +38,7 @@ class MycarFirebaseMessagingService : FirebaseMessagingService() {
             if (idAlerta != null) putExtra("id_alerta", idAlerta)
             if (idVehiculo != null) putExtra("id_vehiculo", idVehiculo)
             if (idNotificacion != null) putExtra("id_notificacion", idNotificacion)
+            if (!categoria.isNullOrBlank()) putExtra("categoria", categoria)
         }
         val pending = PendingIntent.getActivity(
             this,

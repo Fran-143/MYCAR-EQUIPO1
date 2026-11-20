@@ -34,6 +34,7 @@ fun ProgramarAlertaRoute(
     borradorInicial: BorradorAlerta?,
     onVolver: () -> Unit,
     onExito: () -> Unit,
+    onIrInicio: () -> Unit = onExito,
     modifier: Modifier = Modifier
 ) {
     val vm: ProgramarAlertaViewModel = viewModel(key = "rf22-$idVehiculo-s$sesionFormulario") {
@@ -51,6 +52,7 @@ fun ProgramarAlertaRoute(
         onRecargar = vm::cargar,
         onVolver = onVolver,
         onExitoVolver = onExito,
+        onIrInicio = onIrInicio,
         modifier = modifier
     )
 }
@@ -67,10 +69,11 @@ fun ProgramarAlertaScreen(
     onRecargar: () -> Unit,
     onVolver: () -> Unit,
     onExitoVolver: () -> Unit,
+    onIrInicio: () -> Unit = onExitoVolver,
     modifier: Modifier = Modifier
 ) {
     when (estado.paso) {
-        PasoProgramar.EXITO -> PantallaExitoAlerta(estado.exito, onExitoVolver, modifier)
+        PasoProgramar.EXITO -> PantallaExitoAlerta(estado.exito, onExitoVolver, onIrInicio, modifier)
         PasoProgramar.REVISION -> PantallaRevisionAlerta(estado, onConfirmar, onVolverFormulario, modifier)
         PasoProgramar.FORMULARIO -> PantallaFormularioAlerta(
             estado, vehiculos, onActualizar, onCambiarVehiculo, onRevisar, onRecargar, onVolver, modifier
@@ -79,18 +82,31 @@ fun ProgramarAlertaScreen(
 }
 
 @Composable
-private fun PantallaExitoAlerta(idAlerta: Long?, onVerAlertas: () -> Unit, modifier: Modifier) {
+private fun PantallaExitoAlerta(
+    idAlerta: Long?,
+    onVerAlertas: () -> Unit,
+    onIrInicio: () -> Unit,
+    modifier: Modifier
+) {
     Column(
-        modifier.fillMaxSize().statusBarsPadding().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Alerta programada", style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.height(24.dp))
+        Text("¡Alerta programada!", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
         Text(
             if (idAlerta != null) "La alerta #$idAlerta quedó registrada."
-            else "La alerta quedó registrada."
+            else "La alerta quedó registrada.",
+            style = MaterialTheme.typography.bodyMedium
         )
-        Button(onClick = onVerAlertas, modifier = Modifier.fillMaxWidth()) {
-            Text("Ver alertas")
+        Button(
+            onClick = onVerAlertas,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = com.mycar.app.ui.theme.MyCarNavy)
+        ) { Text("Ver alertas") }
+        OutlinedButton(onClick = onIrInicio, modifier = Modifier.fillMaxWidth()) {
+            Text("Ir al inicio")
         }
     }
 }

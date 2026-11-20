@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +24,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.mycar.app.features.inicio.ui.MyCarNavigation
+import com.mycar.app.ui.theme.AparienciaPreferencias
+import com.mycar.app.ui.theme.ModoApariencia
 import com.mycar.app.ui.theme.MyCarTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.features.autenticacion.ui.AuthGate
@@ -33,6 +36,8 @@ class MainActivity : ComponentActivity() {
     private var solicitudesNotificaciones by mutableIntStateOf(0)
     private var pushIdVehiculo by mutableStateOf<Long?>(null)
     private var pushIdAlerta by mutableStateOf<Long?>(null)
+    private var pushIdNotificacion by mutableStateOf<Long?>(null)
+    private var pushCategoria by mutableStateOf<String?>(null)
     private var redLocalDisponible by mutableStateOf(true)
     private val permisoRedLocal = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         redLocalDisponible = it
@@ -53,12 +58,17 @@ class MainActivity : ComponentActivity() {
             solicitudesNotificaciones++
             pushIdVehiculo = intent.getLongExtra("id_vehiculo", -1L).takeIf { it > 0 }
             pushIdAlerta = intent.getLongExtra("id_alerta", -1L).takeIf { it > 0 }
+            pushIdNotificacion = intent.getLongExtra("id_notificacion", -1L).takeIf { it > 0 }
+            pushCategoria = intent.getStringExtra("categoria_push")
+                ?: intent.getStringExtra("destino_push")?.takeIf { it in listOf("MANTENIMIENTO", "SOAT", "LICENCIA", "KILOMETRAJE") }
+            intent.getStringExtra("categoria")?.let { pushCategoria = it }
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
+        AparienciaPreferencias.cargar(this)
         aplicarIntentPush(intent)
         comprobarRedLocal()
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -66,7 +76,9 @@ class MainActivity : ComponentActivity() {
             != PackageManager.PERMISSION_GRANTED) {
             permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-        setContent { MyCarTheme(darkTheme = false, dynamicColor = false) {
+        setContent {
+            val modo by AparienciaPreferencias.flujo.collectAsState()
+            MyCarTheme(darkTheme = modo == ModoApariencia.OSCURO, dynamicColor = false) {
             if (redLocalDisponible) {
                 val sesion: SesionVehiculosViewModel = viewModel()
                 AuthGate {
@@ -75,7 +87,9 @@ class MainActivity : ComponentActivity() {
                         sesion,
                         solicitudesNotificaciones = solicitudesNotificaciones,
                         pushIdVehiculo = pushIdVehiculo,
-                        pushIdAlerta = pushIdAlerta
+                        pushIdAlerta = pushIdAlerta,
+                        pushIdNotificacion = pushIdNotificacion,
+                        pushCategoria = pushCategoria
                     )
                 }
             } else PermisoRedLocalScreen(

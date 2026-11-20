@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,12 +25,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mycar.app.R
 import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
 import com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada
 import com.mycar.app.features.fotos.ui.MiniaturaFotoVehiculo
 import com.mycar.app.features.inicio.domain.*
+import com.mycar.app.features.notificaciones.domain.NotificacionesBadgeStore
 import com.mycar.app.ui.AvatarCabecera
+import com.mycar.app.ui.BadgeNoLeidas
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -48,7 +52,9 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
     iniciales: String? = null,
     modifier: Modifier=Modifier) {
     var desplegado by remember { mutableStateOf(false) }
-    Column(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFFEAF8FF),Color(0xFFF7FCFF))))
+    val fondoInicio = MaterialTheme.colorScheme.background
+    Column(modifier.fillMaxSize().background(fondoInicio)
+        .statusBarsPadding()
         .verticalScroll(rememberScrollState()).padding(horizontal=16.dp,vertical=12.dp),
         verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -58,8 +64,17 @@ fun HomeScreen(estado: EstadoResumenInicio, onSeleccionar: (Long)->Unit,
                 withStyle(SpanStyle(color=TintaInicio,fontWeight=FontWeight.ExtraBold)) { append("My") }
                 withStyle(SpanStyle(color=AzulInicio,fontWeight=FontWeight.ExtraBold)) { append("Car") }
             },fontSize=27.sp,modifier=Modifier.weight(1f))
+            val noLeidas by NotificacionesBadgeStore.noLeidas.collectAsStateWithLifecycle()
             IconButton(onClick=onNotificaciones) {
-                Icon(painterResource(R.drawable.ic_inicio_campana),contentDescription="Notificaciones",tint=TintaInicio)
+                Box(contentAlignment = Alignment.TopEnd) {
+                    Icon(
+                        painterResource(R.drawable.ic_inicio_campana),
+                        contentDescription = "Notificaciones",
+                        tint = TintaInicio,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    BadgeNoLeidas(noLeidas, Modifier.offset(x = 6.dp, y = (-4).dp))
+                }
             }
             FilledTonalIconButton(onClick=onPerfil) {
                 AvatarCabecera(avatarBytes = avatarBytes, iniciales = iniciales)

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,6 +35,7 @@ class OutboxPushServiceTest {
     PushNotificationSender sender;
     PreferenciaNotificacionJdbcDao preferencias;
     AlertaPushControlJdbcDao control;
+    JdbcTemplate jdbc;
     OutboxPushService servicio;
 
     @BeforeEach
@@ -44,14 +46,17 @@ class OutboxPushServiceTest {
         sender = mock(PushNotificationSender.class);
         preferencias = mock(PreferenciaNotificacionJdbcDao.class);
         control = mock(AlertaPushControlJdbcDao.class);
+        jdbc = mock(JdbcTemplate.class);
         ObjectProvider<AlertaPushControlJdbcDao> ctrlProv = mock(ObjectProvider.class);
         when(ctrlProv.getIfAvailable()).thenReturn(control);
         when(sender.proveedor()).thenReturn("FCM");
         when(preferencias.consultar(anyLong())).thenReturn(Optional.of(
                 new ContratoPreferenciasNotificacion.PreferenciasResponse(
                         true, true, true, "CONCEDIDO")));
+        when(jdbc.query(contains("SELECT estado FROM mycar.alerta"), any(org.springframework.jdbc.core.ResultSetExtractor.class), anyLong()))
+                .thenReturn("PENDIENTE");
         servicio = new OutboxPushService(
-                outbox, dispositivos, sender, mock(JdbcTemplate.class), preferencias,
+                outbox, dispositivos, sender, jdbc, preferencias,
                 ctrlProv, new VentanaPushLima(), false);
     }
 
@@ -68,7 +73,7 @@ class OutboxPushServiceTest {
 
         assertEquals(1, servicio.procesarLote(10));
         verify(outbox).marcar(1L, "ENVIADO", null);
-        verify(control).upsertEnvio(eq(5L), anyString(), any(), eq("ENTRADA_ESTADO"));
+        verify(control).upsertEnvio(eq(5L), eq("PENDIENTE"), any(), eq("ENTRADA_ESTADO"));
     }
 
     @Test

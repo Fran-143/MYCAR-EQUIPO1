@@ -1,6 +1,7 @@
 package com.mycar.app.features.notificaciones
 
 import com.mycar.app.features.notificaciones.domain.BandejaNotificaciones
+import com.mycar.app.features.notificaciones.domain.DetalleNotificacion
 import com.mycar.app.features.notificaciones.domain.NotificacionItem
 import com.mycar.app.features.notificaciones.domain.NotificacionesRepository
 import com.mycar.app.features.notificaciones.domain.ResultadoLectura
@@ -35,6 +36,7 @@ class NotificacionesViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(2, vm.estado.value.contadorPendientesGlobal)
         assertEquals(1, vm.estado.value.contadorNoLeidasGlobal)
+        assertEquals(1, vm.estado.value.contadorLeidasGlobal)
         vm.seleccionarFiltroLectura(FiltroLecturaNotificaciones.NO_LEIDAS)
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals("NO_LEIDAS", repo.ultimoFiltroLectura)
@@ -55,33 +57,34 @@ class NotificacionesViewModelTest {
     }
 
     @Test
-    fun marcarLeidaNoCambiaGestionAAtendida() = runTest {
+    fun abrirDetalleMarcaLeidaYConservaGestionPendiente() = runTest {
         val repo = FakeRepo()
         val vm = NotificacionesViewModel(repo)
         dispatcher.scheduler.advanceUntilIdle()
-        var destino: ResultadoLectura? = null
         val mant = repo.items.first { it.categoria == "MANTENIMIENTO" }
-        vm.abrir(mant, onDestino = { destino = it }, onDestinoInvalido = {})
+        vm.abrirDetalle(mant)
         dispatcher.scheduler.advanceUntilIdle()
-        assertTrue(destino?.leida == true)
-        assertEquals("PENDIENTE", destino?.estadoGestion)
+        assertEquals(true, vm.estado.value.detalle?.leida)
+        assertEquals("PENDIENTE", vm.estado.value.detalle?.estadoGestion)
+        assertTrue(repo.marcarLeidaLlamado)
     }
 
     @Test
-    fun soatNoAbreDetalleRf24() = runTest {
+    fun accionDetalleSoatNavegaConDestino() = runTest {
         val repo = FakeRepo()
         val vm = NotificacionesViewModel(repo)
         dispatcher.scheduler.advanceUntilIdle()
+        val soat = repo.items.first { it.categoria == "SOAT" }
+        vm.abrirDetalle(soat)
+        dispatcher.scheduler.advanceUntilIdle()
         var destinoOk = false
         var msg: String? = null
-        vm.abrir(
-            repo.items.first { it.categoria == "SOAT" },
+        vm.ejecutarAccionDetalle(
             onDestino = { destinoOk = true },
             onDestinoInvalido = { msg = it }
         )
-        dispatcher.scheduler.advanceUntilIdle()
-        assertTrue(!destinoOk)
-        assertTrue(msg?.contains("SOAT") == true)
+        assertTrue(destinoOk)
+        assertEquals(null, msg)
     }
 
     @Test
@@ -96,17 +99,20 @@ class NotificacionesViewModelTest {
         val items: List<NotificacionItem> = listOf(
             NotificacionItem(
                 1, "SOAT", "PENDIENTE", false, "SOAT por vencer", "AVB456",
-                "DETALLE_ALERTA", null, null, "2026-11-08T00:00:00.000Z"
+                "DETALLE_ALERTA", null, 8, "2026-11-08T00:00:00.000Z",
+                placa = "AVB456", vehiculoEtiqueta = "Toyota Corolla"
             ),
             NotificacionItem(
                 2, "MANTENIMIENTO", "PENDIENTE", true, "Aceite", "AUD146",
-                "DETALLE_ALERTA", 21, 8, "2026-11-08T00:00:00.000Z"
+                "DETALLE_ALERTA", 21, 8, "2026-11-08T00:00:00.000Z",
+                placa = "AUD146", vehiculoEtiqueta = "Hyundai Accent"
             )
         )
     ) : NotificacionesRepository {
         var ultimaPestana: String = "PENDIENTES"
         var ultimaCategoria: String = "TODAS"
         var ultimoFiltroLectura: String = "TODAS"
+        var marcarLeidaLlamado = false
         override suspend fun consultarBandeja(
             pestana: String,
             categoria: String,
@@ -121,9 +127,41 @@ class NotificacionesViewModelTest {
                 "LEIDAS" -> filtrados.filter { it.leida }
                 else -> filtrados
             }
-            return BandejaNotificaciones(pestana, categoria, filtroLectura, 2, 1, filtrados)
+            return BandejaNotificaciones(pestana, categoria, filtroLectura, 2, 1, 1, filtrados)
+        }
+        override suspend fun consultarDetalle(idNotificacion: Long): DetalleNotificacion {
+            val n = items.first { it.id == idNotificacion }
+            return DetalleNotificacion(
+                id = n.id,
+                categoria = n.categoria,
+                estadoGestion = n.estadoGestion,
+                leida = n.leida,
+                titulo = n.titulo,
+                cuerpo = n.cuerpo,
+                destino = n.destino,
+                idAlerta = n.idAlerta,
+                idVehiculo = n.idVehiculo,
+                fechaEmisionUtc = n.fechaEmisionUtc,
+                nombreEvento = n.titulo,
+                vehiculoEtiqueta = n.vehiculoEtiqueta,
+                estadoActual = "PROXIMA",
+                fechaObjetivo = null,
+                diasRestantes = null,
+                diasTranscurridos = null,
+                kmRestantes = null,
+                kmExcedidos = null,
+                kmObjetivo = null,
+                frecuenciaKm = null,
+                ultimaActualizacionKm = null,
+                recordatorioCorrespondienteKm = null,
+                textoTemporal = null,
+                textoKilometraje = null,
+                accionDisponible = if (n.categoria == "SOAT") "Ver SOAT" else "Ver alerta",
+                accionHabilitada = true
+            )
         }
         override suspend fun marcarLeida(idNotificacion: Long): ResultadoLectura {
+            marcarLeidaLlamado = true
             val n = items.first { it.id == idNotificacion }
             return ResultadoLectura(n.id, true, "PENDIENTE", n.destino, n.idAlerta, n.idVehiculo)
         }

@@ -32,6 +32,8 @@ data class EstadoAlertas(
     val sincronizadas: Int = 0,
     val alertas: List<DatosAlerta> = emptyList(),
     val visibles: List<DatosAlerta> = emptyList(),
+    /** Mapa idAlerta → idVehiculo (útil con «Todos mis vehículos»). */
+    val alertaPorVehiculo: Map<Long, Long> = emptyMap(),
     val filtro: FiltroAlertas = FiltroAlertas.TODAS,
     val mensaje: String? = null,
     val avisoAccion: String? = null,
@@ -44,7 +46,13 @@ data class EstadoAlertas(
     val sincronizadasLicencia: Int = 0,
     val generacionLicencia: Int = 0
 ) {
+    val esTodosVehiculos: Boolean get() = vehiculoId == ID_TODOS_VEHICULOS
+    fun idVehiculoDeAlerta(idAlerta: Long): Long? =
+        alertaPorVehiculo[idAlerta] ?: vehiculoId?.takeIf { it != ID_TODOS_VEHICULOS }
+
     companion object {
+        /** Selector «Todos mis vehículos»: agrega listados autorizados en cliente. */
+        const val ID_TODOS_VEHICULOS = -1L
         const val MENSAJE_SIN_ALERTAS_LICENCIA =
             "No tienes alertas de licencia configuradas. Puedes activarlas desde Perfil → Licencia."
         const val TITULO_SIN_ALERTAS_LICENCIA = "Sin alertas de licencia"
@@ -53,6 +61,8 @@ data class EstadoAlertas(
         const val TITULO_SIN_VEHICULOS = "No hay vehículos activos disponibles"
         const val MENSAJE_SIN_ALERTAS_VEHICULO =
             "No se encontraron alertas para este vehículo."
+        const val MENSAJE_SIN_ALERTAS_TODOS =
+            "No se encontraron alertas en tus vehículos."
     }
 }
 
@@ -97,9 +107,10 @@ class AlertasViewModel(
             vehiculoId = id,
             fase = FaseAlertas.CARGANDO,
             filtro = if (cambioVehiculo) FiltroAlertas.TODAS else mutable.value.filtro,
-            mensaje = null
+            mensaje = null,
+            alertaPorVehiculo = emptyMap()
         )
-        cargar(id)
+        if (id == EstadoAlertas.ID_TODOS_VEHICULOS) cargarTodos() else cargar(id)
     }
 
     fun cambiarFiltro(filtro: FiltroAlertas) {
@@ -138,12 +149,13 @@ class AlertasViewModel(
                         fase = FaseAlertas.VACIO,
                         mensaje = EstadoAlertas.MENSAJE_SIN_VEHICULOS,
                         alertas = emptyList(),
-                        visibles = emptyList()
+                        visibles = emptyList(),
+                        alertaPorVehiculo = emptyMap()
                     )
                     return
                 }
                 mutable.value = mutable.value.copy(vehiculoId = id, fase = FaseAlertas.CARGANDO, mensaje = null)
-                cargar(id)
+                if (id == EstadoAlertas.ID_TODOS_VEHICULOS) cargarTodos() else cargar(id)
             }
         }
     }
@@ -151,7 +163,7 @@ class AlertasViewModel(
     fun atender(idAlerta: Long, kmServicio: Int, fechaServicio: String = LocalDate.now().toString(),
                 costo: String? = null, observaciones: String? = null) {
         if (mutable.value.ambito != AmbitoAlertas.VEHICULOS) return
-        val vehiculo = mutable.value.vehiculoId ?: return
+        val vehiculo = mutable.value.idVehiculoDeAlerta(idAlerta) ?: return
         if (mutable.value.ocupadoAccion || kmServicio <= 0) return
         mutable.value = mutable.value.copy(ocupadoAccion = true, avisoAccion = null)
         viewModelScope.launch {
@@ -179,7 +191,7 @@ class AlertasViewModel(
 
     fun anular(idAlerta: Long, motivo: String) {
         if (mutable.value.ambito != AmbitoAlertas.VEHICULOS) return
-        val vehiculo = mutable.value.vehiculoId ?: return
+        val vehiculo = mutable.value.idVehiculoDeAlerta(idAlerta) ?: return
         if (mutable.value.ocupadoAccion) return
         val motivoOk = motivo.trim()
         if (motivoOk.isEmpty()) {
@@ -253,12 +265,55 @@ class AlertasViewModel(
                     sincronizadas = sync,
                     alertas = sinAnuladas,
                     visibles = visibles,
+                    alertaPorVehiculo = sinAnuladas.associate { it.id to id },
                     fase = if (visibles.isEmpty()) FaseAlertas.VACIO else FaseAlertas.LISTO,
                     mensaje = if (visibles.isEmpty()) EstadoAlertas.MENSAJE_SIN_ALERTAS_VEHICULO else null
                 )
             } catch (e: Exception) {
                 val s = mutable.value
                 if (s.vehiculoId != id || s.generacion != gen) return@launch
+                mutable.value = s.copy(
+                    fase = FaseAlertas.ERROR,
+                    mensaje = e.message ?: "No se pudieron cargar las alertas"
+                )
+            }
+        }
+    }
+
+    /** Agrega alertas de todos los vehículos autorizados ya conocidos (sin cambiar reglas RF23). */
+    private fun cargarTodos() {
+        val gen = mutable.value.generacion + 1
+        mutable.value = mutable.value.copy(generacion = gen)
+        viewModelScope.launch {
+            try {
+                var syncTotal = 0
+                val acumuladas = LinkedHashMap<Long, DatosAlerta>()
+                val mapa = LinkedHashMap<Long, Long>()
+                for ((idVehiculo, _) in vehiculos) {
+                    val (sync, lista) = repository.listar(idVehiculo)
+                    syncTotal += sync
+                    lista.filter { it.estado != "ANULADA" }.forEach { a ->
+                        if (!acumuladas.containsKey(a.id)) {
+                            acumuladas[a.id] = a
+                            mapa[a.id] = idVehiculo
+                        }
+                    }
+                }
+                val s = mutable.value
+                if (s.vehiculoId != EstadoAlertas.ID_TODOS_VEHICULOS || s.generacion != gen) return@launch
+                val sinAnuladas = acumuladas.values.toList()
+                val visibles = filtrar(sinAnuladas, s.filtro)
+                mutable.value = s.copy(
+                    sincronizadas = syncTotal,
+                    alertas = sinAnuladas,
+                    visibles = visibles,
+                    alertaPorVehiculo = mapa,
+                    fase = if (visibles.isEmpty()) FaseAlertas.VACIO else FaseAlertas.LISTO,
+                    mensaje = if (visibles.isEmpty()) EstadoAlertas.MENSAJE_SIN_ALERTAS_TODOS else null
+                )
+            } catch (e: Exception) {
+                val s = mutable.value
+                if (s.vehiculoId != EstadoAlertas.ID_TODOS_VEHICULOS || s.generacion != gen) return@launch
                 mutable.value = s.copy(
                     fase = FaseAlertas.ERROR,
                     mensaje = e.message ?: "No se pudieron cargar las alertas"

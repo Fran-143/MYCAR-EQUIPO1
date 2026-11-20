@@ -159,19 +159,21 @@ fun AlertasRoute(
                 modifier = modifier
             )
         }
-        estado.ambito == AmbitoAlertas.VEHICULOS && idDetalle != null && idVehiculo != null -> {
+        estado.ambito == AmbitoAlertas.VEHICULOS && idDetalle != null &&
+            (estado.idVehiculoDeAlerta(idDetalle) ?: idVehiculo) != null -> {
+            val idVehiculoDetalle = estado.idVehiculoDeAlerta(idDetalle) ?: idVehiculo!!
             DetalleAlertaRoute(
                 repository = repository,
-                idVehiculo = idVehiculo,
+                idVehiculo = idVehiculoDetalle,
                 idAlerta = idDetalle,
                 onVolver = {
                     detalleId = null
                     vm.recargar()
                 },
                 onRegistrarComoRealizado = { d ->
-                    abrirRegistro(d.id, idVehiculo, d.codigoTipo, d.servicioOtro)
+                    abrirRegistro(d.id, idVehiculoDetalle, d.codigoTipo, d.servicioOtro)
                 },
-                onAbrirSoat = onAbrirSoatDesdeAlerta?.let { cb -> { cb(idVehiculo) } },
+                onAbrirSoat = onAbrirSoatDesdeAlerta?.let { cb -> { cb(idVehiculoDetalle) } },
                 talleresRepository = talleresRepository,
                 modifier = modifier
             )
@@ -186,7 +188,7 @@ fun AlertasRoute(
                 onRecargar = vm::recargar,
                 onProgramar = onProgramar,
                 onAtenderDesdeFormulario = { idAlerta, codigo, servicio ->
-                    val v = estado.vehiculoId ?: return@AlertasScreen
+                    val v = estado.idVehiculoDeAlerta(idAlerta) ?: return@AlertasScreen
                     abrirRegistro(idAlerta, v, codigo, servicio)
                 },
                 onAnular = vm::anular,
@@ -235,14 +237,17 @@ fun AlertasScreen(
             )
             if (enVehiculos) {
                 val id = estado.vehiculoId
-                if (id != null && vehiculos.isNotEmpty()) {
+                val puedeProgramar = id != null &&
+                    id != EstadoAlertas.ID_TODOS_VEHICULOS &&
+                    vehiculos.isNotEmpty()
+                if (vehiculos.isNotEmpty()) {
                     Button(
-                        onClick = { onProgramar(id) },
-                        enabled = estado.fase != FaseAlertas.CARGANDO,
+                        onClick = { id?.let(onProgramar) },
+                        enabled = puedeProgramar && estado.fase != FaseAlertas.CARGANDO,
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Celeste),
+                        colors = ButtonDefaults.buttonColors(containerColor = Azul),
                         modifier = Modifier.testTag("rf23.programar")
-                    ) { Text("+ Programar", fontWeight = FontWeight.SemiBold) }
+                    ) { Text("Programar alerta", fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
@@ -323,42 +328,48 @@ private fun ColumnScope.ContenidoVehiculos(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Vehículo seleccionado", style = MaterialTheme.typography.labelMedium, color = Color(0xFF6881A5))
-            if (vehiculos.size > 1) {
-                var expandido by remember { mutableStateOf(false) }
-                Box {
-                    OutlinedButton(
-                        onClick = { expandido = true },
-                        modifier = Modifier.fillMaxWidth().testTag("rf23.selectorVehiculo"),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            vehiculos.firstOrNull { it.first == estado.vehiculoId }?.second ?: "Elegir vehículo",
-                            modifier = Modifier.weight(1f),
-                            color = Azul
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Vehículo", style = MaterialTheme.typography.labelMedium, color = Color(0xFF6881A5))
+            var expandido by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(
+                    onClick = { expandido = true },
+                    modifier = Modifier.fillMaxWidth().testTag("rf23.selectorVehiculo"),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        when {
+                            estado.esTodosVehiculos -> "Todos mis vehículos"
+                            else -> vehiculos.firstOrNull { it.first == estado.vehiculoId }?.second
+                                ?: "Elegir vehículo"
+                        },
+                        modifier = Modifier.weight(1f),
+                        color = Azul,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text("⌄")
+                }
+                DropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
+                    if (vehiculos.size > 1) {
+                        DropdownMenuItem(
+                            text = { Text("Todos mis vehículos") },
+                            onClick = {
+                                expandido = false
+                                onSeleccionar(EstadoAlertas.ID_TODOS_VEHICULOS)
+                            },
+                            modifier = Modifier.testTag("rf23.vehiculo.todos")
                         )
-                        Text("⌄")
                     }
-                    DropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
-                        vehiculos.forEach { (id, etiqueta) ->
-                            DropdownMenuItem(
-                                text = { Text(etiqueta) },
-                                onClick = { expandido = false; onSeleccionar(id) }
-                            )
-                        }
+                    vehiculos.forEach { (id, etiqueta) ->
+                        DropdownMenuItem(
+                            text = { Text(etiqueta) },
+                            onClick = { expandido = false; onSeleccionar(id) }
+                        )
                     }
                 }
-            } else {
-                Text(
-                    vehiculos.first().second,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Azul
-                )
             }
         }
     }

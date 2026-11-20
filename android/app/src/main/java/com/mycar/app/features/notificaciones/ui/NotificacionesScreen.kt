@@ -19,15 +19,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,11 +47,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mycar.app.features.notificaciones.domain.DetalleNotificacion
 import com.mycar.app.features.notificaciones.domain.NotificacionItem
 import com.mycar.app.features.notificaciones.domain.NotificacionesRepository
 import com.mycar.app.features.notificaciones.domain.ResultadoLectura
@@ -61,6 +68,7 @@ import com.mycar.app.features.notificaciones.viewmodel.PestanaNotificaciones
 private val Fondo = Color(0xFFF0F5FA)
 private val Azul = Color(0xFF12285F)
 private val Celeste = Color(0xFF007E98)
+private val AzulPlaca = Color(0xFF0B5F8A)
 
 @Composable
 fun NotificacionesRoute(
@@ -69,11 +77,17 @@ fun NotificacionesRoute(
     onAbrirDetalleAlerta: (idVehiculo: Long, idAlerta: Long) -> Unit,
     onAbrirSoatDesdeAviso: ((idVehiculo: Long) -> Unit)? = null,
     onAbrirLicenciaDesdeAviso: (() -> Unit)? = null,
+    onAbrirKilometrajeDesdeAviso: ((idVehiculo: Long) -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
+    categoriaInicial: String? = null,
+    idResaltar: Long? = null,
     modifier: Modifier = Modifier
 ) {
-    val vm: NotificacionesViewModel = viewModel(key = "rf46-bandeja") {
-        NotificacionesViewModel(repository)
+    val catInit = CategoriaNotificaciones.entries.firstOrNull {
+        it.api.equals(categoriaInicial, ignoreCase = true)
+    }
+    val vm: NotificacionesViewModel = viewModel(key = "rf46-bandeja-${catInit?.api}-$idResaltar") {
+        NotificacionesViewModel(repository, catInit, idResaltar)
     }
     val estado by vm.estado.collectAsStateWithLifecycle()
     var avisoDestino by remember { mutableStateOf<String?>(null) }
@@ -85,6 +99,32 @@ fun NotificacionesRoute(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    fun navegarDesdeLectura(lectura: ResultadoLectura, categoria: String) {
+        when {
+            categoria == "KILOMETRAJE" || lectura.destino == "ACTUALIZAR_KILOMETRAJE" -> {
+                val idV = lectura.idVehiculo
+                if (idV != null && idV > 0) {
+                    onAbrirKilometrajeDesdeAviso?.invoke(idV)
+                        ?: run { avisoDestino = "No se pudo abrir el kilometraje." }
+                } else avisoDestino = "No se pudo abrir el kilometraje."
+            }
+            categoria == "LICENCIA" -> onAbrirLicenciaDesdeAviso?.invoke()
+                ?: run { avisoDestino = "No se pudo abrir la licencia." }
+            categoria == "SOAT" -> {
+                val idV = lectura.idVehiculo
+                if (idV != null && idV > 0) {
+                    onAbrirSoatDesdeAviso?.invoke(idV)
+                        ?: onAbrirDetalleAlerta(idV, lectura.idAlerta ?: 0)
+                } else avisoDestino = "No se pudo abrir el SOAT."
+            }
+            else -> {
+                val idV = lectura.idVehiculo
+                val idA = lectura.idAlerta
+                if (idV != null && idA != null) onAbrirDetalleAlerta(idV, idA)
+                else avisoDestino = "No se pudo abrir el aviso."
+            }
+        }
+    }
     NotificacionesScreen(
         estado = estado,
         avisoDestino = avisoDestino,
@@ -95,28 +135,13 @@ fun NotificacionesRoute(
         onRecargar = vm::recargar,
         onAbrir = { item ->
             avisoDestino = null
-            vm.abrir(
-                item,
-                onDestino = { lectura: ResultadoLectura ->
-                    when (item.categoria) {
-                        "LICENCIA" -> onAbrirLicenciaDesdeAviso?.invoke()
-                            ?: run { avisoDestino = "No se pudo abrir la licencia." }
-                        "SOAT" -> {
-                            val idV = lectura.idVehiculo
-                            if (idV != null && idV > 0) {
-                                onAbrirSoatDesdeAviso?.invoke(idV)
-                                    ?: onAbrirDetalleAlerta(idV, lectura.idAlerta ?: 0)
-                            } else {
-                                avisoDestino = "No se pudo abrir el SOAT."
-                            }
-                        }
-                        else -> {
-                            val idV = lectura.idVehiculo
-                            val idA = lectura.idAlerta
-                            if (idV != null && idA != null) onAbrirDetalleAlerta(idV, idA)
-                        }
-                    }
-                },
+            vm.abrirDetalle(item)
+        },
+        onCerrarDetalle = vm::cerrarDetalle,
+        onAccionDetalle = {
+            val cat = estado.detalle?.categoria ?: return@NotificacionesScreen
+            vm.ejecutarAccionDetalle(
+                onDestino = { lectura -> navegarDesdeLectura(lectura, cat) },
                 onDestinoInvalido = { avisoDestino = it }
             )
         },
@@ -136,10 +161,20 @@ fun NotificacionesScreen(
     onFiltroLectura: (FiltroLecturaNotificaciones) -> Unit,
     onRecargar: () -> Unit,
     onAbrir: (NotificacionItem) -> Unit,
+    onCerrarDetalle: () -> Unit = {},
+    onAccionDetalle: () -> Unit = {},
     onCerrarAviso: () -> Unit,
     onPerfil: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val detalle = estado.detalle
+    if (detalle != null) {
+        DetalleNotificacionModal(
+            detalle = detalle,
+            onCerrar = onCerrarDetalle,
+            onAccion = onAccionDetalle
+        )
+    }
     Column(modifier.fillMaxSize().background(Fondo)) {
         com.mycar.app.ui.MycarCabeceraApp(onPerfil = onPerfil, conStatusBars = true)
         Column(
@@ -164,7 +199,7 @@ fun NotificacionesScreen(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                "Pendientes de gestión: ${estado.contadorPendientesGlobal}",
+                "Por gestionar: ${estado.contadorPendientesGlobal}",
                 style = MaterialTheme.typography.labelLarge,
                 color = Celeste,
                 fontWeight = FontWeight.SemiBold,
@@ -177,19 +212,37 @@ fun NotificacionesScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.testTag("rf46.contadorNoLeidas")
             )
+            Text(
+                "Leídas: ${estado.contadorLeidasGlobal}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF6881A5),
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.testTag("rf46.contadorLeidas")
+            )
         }
-        PestanasBandeja(activa = estado.pestana, onCambiar = onPestana)
+        PestanasBandeja(
+            activa = estado.pestana,
+            pendientes = estado.contadorPendientesGlobal,
+            onCambiar = onPestana
+        )
         Text("Lectura", style = MaterialTheme.typography.labelMedium, color = Color(0xFF6881A5))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             FiltroLecturaNotificaciones.entries.forEach { f ->
+                val etiqueta = when (f) {
+                    FiltroLecturaNotificaciones.TODAS -> f.etiqueta
+                    FiltroLecturaNotificaciones.NO_LEIDAS ->
+                        "${f.etiqueta} (${estado.contadorNoLeidasGlobal})"
+                    FiltroLecturaNotificaciones.LEIDAS ->
+                        "${f.etiqueta} (${estado.contadorLeidasGlobal})"
+                }
                 FilterChip(
                     selected = estado.filtroLectura == f,
                     onClick = { onFiltroLectura(f) },
                     enabled = estado.fase != FaseNotificaciones.CARGANDO,
-                    label = { Text(f.etiqueta) },
+                    label = { Text(etiqueta) },
                     modifier = Modifier.testTag("rf46.lectura.${f.api}"),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = Celeste,
@@ -272,6 +325,7 @@ fun NotificacionesScreen(
                         NotificacionCard(
                             item = item,
                             abriendo = estado.abriendoId == item.id,
+                            resaltar = estado.idResaltar == item.id,
                             onAbrir = { onAbrir(item) }
                         )
                     }
@@ -283,10 +337,19 @@ fun NotificacionesScreen(
 }
 
 @Composable
-private fun PestanasBandeja(activa: PestanaNotificaciones, onCambiar: (PestanaNotificaciones) -> Unit) {
+private fun PestanasBandeja(
+    activa: PestanaNotificaciones,
+    pendientes: Int,
+    onCambiar: (PestanaNotificaciones) -> Unit
+) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         PestanaNotificaciones.entries.forEach { p ->
             val seleccionada = p == activa
+            val etiqueta = if (p == PestanaNotificaciones.PENDIENTES) {
+                "${p.etiqueta} ($pendientes)"
+            } else {
+                p.etiqueta
+            }
             OutlinedButton(
                 onClick = { onCambiar(p) },
                 modifier = Modifier.weight(1f).testTag("rf46.tab.${p.api}"),
@@ -299,7 +362,7 @@ private fun PestanasBandeja(activa: PestanaNotificaciones, onCambiar: (PestanaNo
                 )
             ) {
                 Text(
-                    p.etiqueta.uppercase(),
+                    etiqueta.uppercase(),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (seleccionada) FontWeight.Bold else FontWeight.Normal,
                     textAlign = TextAlign.Center
@@ -314,15 +377,20 @@ private fun PestanasBandeja(activa: PestanaNotificaciones, onCambiar: (PestanaNo
 private fun NotificacionCard(
     item: NotificacionItem,
     abriendo: Boolean,
+    resaltar: Boolean = false,
     onAbrir: () -> Unit
 ) {
+    val lineaVehiculo = lineaVehiculo(item.placa, item.vehiculoEtiqueta)
     Card(
         onClick = onAbrir,
         enabled = !abriendo,
         modifier = Modifier.fillMaxWidth().testTag("rf46.item.${item.id}"),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = if (resaltar) Color(0xFFE8F4F8) else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (resaltar) 3.dp else 1.dp),
+        border = if (resaltar) BorderStroke(2.dp, Celeste) else null
     ) {
         Row(
             Modifier.padding(14.dp),
@@ -334,25 +402,29 @@ private fun NotificacionCard(
                     .padding(top = 4.dp)
                     .size(10.dp)
                     .background(
-                        if (!item.leida && item.estadoGestion == "PENDIENTE") Celeste else Color(0xFFB0BEC5),
+                        if (!item.leida) Celeste else Color(0xFFB0BEC5),
                         CircleShape
                     )
             )
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    item.titulo,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (item.leida) FontWeight.Medium else FontWeight.Bold,
+                    color = Azul,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (lineaVehiculo != null) {
                     Text(
-                        item.titulo,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = if (item.leida) FontWeight.Medium else FontWeight.Bold,
-                        color = Azul,
-                        maxLines = 2,
+                        lineaVehiculo,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        color = AzulPlaca,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        item.categoria.take(4),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF6881A5)
+                        modifier = Modifier.testTag("rf46.placa.${item.id}")
                     )
                 }
                 Text(
@@ -366,26 +438,18 @@ private fun NotificacionCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
+                    ChipEstado(
                         if (item.leida) "Leída" else "No leída",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (item.leida) Color(0xFF6881A5) else Celeste
+                        if (item.leida) Color(0xFF6881A5) else Celeste
                     )
-                    Text("·", color = Color(0xFFB0BEC5))
-                    Text(
+                    ChipEstado(
                         etiquetaGestionNotificacion(item.estadoGestion),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Azul,
-                        modifier = Modifier.testTag("rf45.gestion.${item.id}")
+                        Azul
                     )
                     item.estadoAlerta?.takeIf { it.isNotBlank() }?.let { estado ->
-                        Text("·", color = Color(0xFFB0BEC5))
-                        Text(
-                            "Alerta: ${etiquetaEstadoAlertaNotif(estado)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colorEstadoAlertaNotif(estado),
-                            modifier = Modifier.testTag("rf45.estadoAlerta.${item.id}")
+                        ChipEstado(
+                            etiquetaEstadoAlertaNotif(estado),
+                            colorEstadoAlertaNotif(estado)
                         )
                     }
                 }
@@ -395,6 +459,156 @@ private fun NotificacionCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ChipEstado(texto: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = color.copy(alpha = 0.12f)
+    ) {
+        Text(
+            texto,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = color
+        )
+    }
+}
+
+@Composable
+private fun DetalleNotificacionModal(
+    detalle: DetalleNotificacion,
+    onCerrar: () -> Unit,
+    onAccion: () -> Unit
+) {
+    val vehiculoTexto = detalle.vehiculoEtiqueta?.takeIf { it.isNotBlank() }
+    Dialog(onDismissRequest = onCerrar) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            tonalElevation = 4.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("rf46.detalle.modal")
+        ) {
+            Column(
+                Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    detalle.nombreEvento ?: detalle.titulo,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Azul
+                )
+                if (vehiculoTexto != null) {
+                    Text(
+                        vehiculoTexto,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 17.sp,
+                        color = AzulPlaca
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChipEstado(detalle.categoria, Celeste)
+                    ChipEstado(
+                        if (detalle.leida) "Leída" else "No leída",
+                        if (detalle.leida) Color(0xFF6881A5) else Celeste
+                    )
+                    detalle.estadoActual?.let {
+                        ChipEstado(etiquetaEstadoAlertaNotif(it), colorEstadoAlertaNotif(it))
+                    }
+                }
+                HorizontalDivider(color = Color(0xFFE3ECF4))
+                BloqueDetalle("Información") {
+                    detalle.fechaObjetivo?.let { FilaDetalle("Fecha objetivo", it) }
+                    detalle.textoTemporal?.let { FilaDetalle("Plazo", it) }
+                    detalle.textoKilometraje?.let { FilaDetalle("Kilometraje", it) }
+                    detalle.kmObjetivo?.let { FilaDetalle("Objetivo", "$it km") }
+                    detalle.frecuenciaKm?.let { FilaDetalle("Frecuencia", it) }
+                    detalle.ultimaActualizacionKm?.let { FilaDetalle("Última actualización", it) }
+                    detalle.recordatorioCorrespondienteKm?.let { FilaDetalle("Recordatorio", it) }
+                }
+                Text(
+                    detalle.cuerpo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF4A5F7A)
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)
+                ) {
+                    OutlinedButton(
+                        onClick = onCerrar,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Azul.copy(alpha = 0.3f))
+                    ) {
+                        Text("Cerrar", color = Azul)
+                    }
+                    if (detalle.accionHabilitada && !detalle.accionDisponible.isNullOrBlank()) {
+                        Button(
+                            onClick = onAccion,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Celeste,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text(detalle.accionDisponible!!)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BloqueDetalle(titulo: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            titulo,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = Celeste
+        )
+        content()
+    }
+}
+
+@Composable
+private fun FilaDetalle(etiqueta: String, valor: String) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(etiqueta, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
+        Text(
+            valor,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = Azul,
+            textAlign = TextAlign.End,
+            modifier = Modifier.padding(start = 12.dp).weight(1f, fill = false)
+        )
+    }
+}
+
+private fun lineaVehiculo(placa: String?, etiqueta: String?): String? {
+    val p = placa?.trim()?.takeIf { it.isNotEmpty() }
+    val e = etiqueta?.trim()?.takeIf { it.isNotEmpty() }
+    return when {
+        p != null && e != null && !e.contains(p, ignoreCase = true) -> "$p · $e"
+        p != null && e != null -> e
+        p != null -> p
+        e != null -> e
+        else -> null
     }
 }
 

@@ -73,7 +73,8 @@ class PreferenciasNotificacionViewModel(
             )
             _estado.value = antes.copy(guardando = true, mensajeError = null, mensajeExito = null, avisoPermiso = null)
             try {
-                val algunaOn = snapshotUi.mantenimiento || snapshotUi.soat || snapshotUi.kilometraje
+                // Kilometraje ya no se configura aquí (RF43); solo mantenimiento/SOAT piden permiso OS.
+                val algunaOn = snapshotUi.mantenimiento || snapshotUi.soat
                 val permiso = if (!algunaOn) {
                     // EA01: no solicitar permiso nuevo; conservar el almacenado/OS actual.
                     consultarPermisoOs().takeIf { it != PermisoDispositivo.NO_SOLICITADO }

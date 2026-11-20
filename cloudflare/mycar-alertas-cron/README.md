@@ -1,42 +1,33 @@
 # mycar-alertas-cron
 
-Worker Cloudflare Free → RF23 + despacho push en Render. **Reutilizar** el Worker
-`mycar-alertas-cron` (cuenta `mycargrupo1`). No crear otro. Presupuesto US$0.
+Worker Cloudflare existente. **No desplegar ni activar crons sin autorización.**
 
-## Estado seguro actual
+## Horarios aprobados (UTC, America/Lima UTC−5)
 
-| Ajuste | Valor |
-|--------|--------|
-| `EVAL_MODO` | `SIMULAR` |
-| `[triggers] crons` | `[]` (sin programación) |
-| `POST /run` | eval **SIMULAR** forzado |
-| `POST /run-push` | dispara despacho (backend aplica ventana Lima) |
-| Tick FCM 15s en Render | **apagado** (`worker-habilitado=false`) |
+| Cron UTC | Hora Lima | Acción |
+|----------|-----------|--------|
+| `10 5 * * *` | 00:10 | Eval RF23 + RF43 (separados) |
+| `0 10 * * *` | 05:00 | Despacho push (ventana 05:00–21:59) |
 
-## Fases (activación futura, solo con aprobación)
+## Seguridad actual (conservar)
 
-| Cron UTC | Lima | Acción |
-|----------|------|--------|
-| `10 5 * * *` | 00:10 | `POST .../alertas/evaluar-programadas` |
-| `0 10 * * *` | 05:00 | `POST .../push/despachar-recordatorios` |
-
-El Worker usa `event.cron` para ramificar. Mismo secreto `X-MyCar-Cron-Secret`.
-
-## Frecuencias push (mantenimiento)
-
-- PROGRAMADA: sin push
-- PROXIMA: 1× al entrar
-- PENDIENTE: 1× + cada 3 días
-- VENCIDA: 1× + diario (varias → 1 resumen/usuario)
-- REALIZADA/ANULADA: detiene
-- Máx. 1 push/alerta/día Lima; RF48 revalidado al enviar
-
-Recordatorios de actualizar km (**categoría KILOMETRAJE**): no implementados; esquema extensible.
-
-## Deploy sin activar horarios
-
-```powershell
-cd cloudflare\mycar-alertas-cron
-npx wrangler secret put CRON_SECRET
-npx wrangler deploy   # crons siguen []
+```toml
+EVAL_MODO = "SIMULAR"
+crons = []
 ```
+
+- `POST /run` fuerza **SIMULAR** (sin escrituras).
+- No ejecutar `wrangler deploy` en esta fase.
+- No apuntar pruebas locales a Render/Neon productivos.
+
+## Rutas backend
+
+- `POST /api/v1/interno/alertas/evaluar-programadas` body `{ "modo": "SIMULAR"|"COMPLETO" }`
+- `POST /api/v1/interno/recordatorios-km/evaluar` body `{ "modo": "SIMULAR"|"COMPLETO" }`
+- `POST /api/v1/interno/push/despachar-recordatorios`
+
+## Prueba local sugerida
+
+1. Backend local `:8081` con `MYCAR_CRON_SECRET`.
+2. `BACKEND_URL=http://127.0.0.1:8081` solo en entorno de desarrollo (no en wrangler productivo).
+3. Invocar endpoints con curl + secreto; revisar conteos RF23/RF43 por separado.

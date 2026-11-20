@@ -16,7 +16,12 @@ class RecordatorioPushElegibilidadTest {
     private final LocalDate hoy = LocalDate.of(2026, 11, 12);
 
     private static AlertaActiva alerta(String estado) {
-        return new AlertaActiva(1L, 2L, 3L, estado, "ABC123", "Aceite");
+        return new AlertaActiva(1L, 2L, 3L, "MANTENIMIENTO", estado, "ABC123", "Aceite",
+                LocalDate.of(2026, 11, 20));
+    }
+
+    private static AlertaActiva soat(String estado, LocalDate objetivo) {
+        return new AlertaActiva(10L, 2L, 3L, "SOAT", estado, "XYZ999", "SOAT", objetivo);
     }
 
     @Test
@@ -36,13 +41,14 @@ class RecordatorioPushElegibilidadTest {
     }
 
     @Test
-    void vencidaDiariaSinRafaga() {
+    void vencidaCada3DiasSinRafaga() {
         assertEquals(Motivo.ENTRADA_ESTADO, svc.evaluar(alerta("VENCIDA"), null, hoy).motivo());
         Control ayer = new Control(1L, "VENCIDA", hoy.minusDays(1), "ENTRADA_ESTADO", null);
-        assertEquals(Motivo.RECORDATORIO, svc.evaluar(alerta("VENCIDA"), ayer, hoy).motivo());
+        assertNull(svc.evaluar(alerta("VENCIDA"), ayer, hoy));
+        Control d3 = new Control(1L, "VENCIDA", hoy.minusDays(3), "ENTRADA_ESTADO", null);
+        assertEquals(Motivo.RECORDATORIO, svc.evaluar(alerta("VENCIDA"), d3, hoy).motivo());
         Control hoyYa = new Control(1L, "VENCIDA", hoy, "RECORDATORIO", null);
         assertNull(svc.evaluar(alerta("VENCIDA"), hoyYa, hoy));
-        // 10 días sin envío → un solo elegible hoy (no 10 atrasados)
         Control viejo = new Control(1L, "VENCIDA", hoy.minusDays(10), "RECORDATORIO", null);
         assertEquals(Motivo.RECORDATORIO, svc.evaluar(alerta("VENCIDA"), viejo, hoy).motivo());
     }
@@ -51,5 +57,26 @@ class RecordatorioPushElegibilidadTest {
     void maxUnoPorDiaLocal() {
         Control hoyYa = new Control(1L, "PENDIENTE", hoy, "ENTRADA_ESTADO", null);
         assertNull(svc.evaluar(alerta("VENCIDA"), hoyYa, hoy));
+    }
+
+    @Test
+    void soatHitosYSemanal() {
+        LocalDate venc = LocalDate.of(2026, 11, 20);
+        // Entrada PROXIMA
+        assertEquals(Motivo.HITO_SOAT,
+                svc.evaluarSoat(soat("PROXIMA", venc), null, venc.minusDays(25)).motivo());
+        // Día siguiente al vencimiento
+        LocalDate diaDespues = venc.plusDays(1);
+        assertEquals(Motivo.HITO_SOAT,
+                svc.evaluarSoat(soat("VENCIDA", venc), null, diaDespues).motivo());
+        Control yaVencida = new Control(10L, "VENCIDA", diaDespues, "HITO_SOAT", null);
+        assertNull(svc.evaluarSoat(soat("VENCIDA", venc), yaVencida, diaDespues.plusDays(3)));
+        Control hace7 = new Control(10L, "VENCIDA", diaDespues, "HITO_SOAT", null);
+        assertEquals(Motivo.RECORDATORIO,
+                svc.evaluarSoat(soat("VENCIDA", venc), hace7, diaDespues.plusDays(7)).motivo());
+        // 1 día antes
+        Control enPendiente = new Control(10L, "PENDIENTE", venc.minusDays(7), "HITO_SOAT", null);
+        assertEquals(Motivo.HITO_SOAT,
+                svc.evaluarSoat(soat("PENDIENTE", venc), enPendiente, venc.minusDays(1)).motivo());
     }
 }

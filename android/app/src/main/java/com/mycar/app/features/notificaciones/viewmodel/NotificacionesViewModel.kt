@@ -2,6 +2,7 @@ package com.mycar.app.features.notificaciones.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mycar.app.features.notificaciones.domain.DetalleNotificacion
 import com.mycar.app.features.notificaciones.domain.NotificacionItem
 import com.mycar.app.features.notificaciones.domain.NotificacionesRepository
 import com.mycar.app.features.notificaciones.domain.ResultadoLectura
@@ -40,15 +41,25 @@ data class EstadoNotificaciones(
     val filtroLectura: FiltroLecturaNotificaciones = FiltroLecturaNotificaciones.TODAS,
     val contadorPendientesGlobal: Int = 0,
     val contadorNoLeidasGlobal: Int = 0,
+    val contadorLeidasGlobal: Int = 0,
     val items: List<NotificacionItem> = emptyList(),
     val mensaje: String? = null,
-    val abriendoId: Long? = null
+    val abriendoId: Long? = null,
+    val detalle: DetalleNotificacion? = null,
+    val idResaltar: Long? = null
 )
 
 class NotificacionesViewModel(
-    private val repository: NotificacionesRepository
+    private val repository: NotificacionesRepository,
+    categoriaInicial: CategoriaNotificaciones? = null,
+    idResaltar: Long? = null
 ) : ViewModel() {
-    private val _estado = MutableStateFlow(EstadoNotificaciones())
+    private val _estado = MutableStateFlow(
+        EstadoNotificaciones(
+            categoria = categoriaInicial ?: CategoriaNotificaciones.TODAS,
+            idResaltar = idResaltar
+        )
+    )
     val estado = _estado.asStateFlow()
 
     init { cargar() }
@@ -74,45 +85,22 @@ class NotificacionesViewModel(
 
     fun recargar() = cargar()
 
-    fun abrir(
-        item: NotificacionItem,
-        onDestino: (ResultadoLectura) -> Unit,
-        onDestinoInvalido: (String) -> Unit
-    ) {
+    /** Abre ficha de detalle (marca LEÍDA solo ese aviso; no navega aún). */
+    fun abrirDetalle(item: NotificacionItem) {
         if (_estado.value.abriendoId != null) return
         viewModelScope.launch {
             _estado.update { it.copy(abriendoId = item.id, mensaje = null) }
             try {
-                val lectura = repository.marcarLeida(item.id)
+                val detalle = repository.consultarDetalle(item.id)
+                runCatching { repository.marcarLeida(item.id) }
                 _estado.update { actual ->
                     actual.copy(
                         abriendoId = null,
-                        items = actual.items.map { n ->
-                            if (n.id == lectura.id) n.copy(leida = lectura.leida, estadoGestion = lectura.estadoGestion)
-                            else n
-                        }
+                        detalle = detalle.copy(leida = true),
+                        idResaltar = item.id
                     )
                 }
-                when {
-                    lectura.destino == "DETALLE_ALERTA"
-                        && item.categoria == "LICENCIA"
-                        && (lectura.idAlerta ?: 0) > 0 ->
-                        onDestino(lectura)
-                    lectura.destino == "DETALLE_ALERTA"
-                        && item.categoria == "SOAT"
-                        && (lectura.idAlerta ?: 0) > 0
-                        && (lectura.idVehiculo ?: 0) > 0 ->
-                        onDestino(lectura)
-                    lectura.destino == "DETALLE_ALERTA"
-                        && item.categoria == "MANTENIMIENTO"
-                        && (lectura.idAlerta ?: 0) > 0
-                        && (lectura.idVehiculo ?: 0) > 0 ->
-                        onDestino(lectura)
-                    else ->
-                        onDestinoInvalido(
-                            "Este aviso ya no tiene un detalle disponible. Revisa el historial de alertas."
-                        )
-                }
+                // Recarga silenciosa: contadores globales + listado según filtro (LEÍDAS/NO LEÍDAS).
                 cargar(silencioso = true)
             } catch (e: Exception) {
                 _estado.update {
@@ -123,6 +111,46 @@ class NotificacionesViewModel(
                 }
             }
         }
+    }
+
+    fun cerrarDetalle() {
+        _estado.update { it.copy(detalle = null) }
+        cargar(silencioso = true)
+    }
+
+    fun ejecutarAccionDetalle(
+        onDestino: (ResultadoLectura) -> Unit,
+        onDestinoInvalido: (String) -> Unit
+    ) {
+        val d = _estado.value.detalle ?: return
+        val lectura = ResultadoLectura(
+            id = d.id,
+            leida = true,
+            estadoGestion = d.estadoGestion,
+            destino = d.destino,
+            idAlerta = d.idAlerta,
+            idVehiculo = d.idVehiculo
+        )
+        _estado.update { it.copy(detalle = null) }
+        when {
+            d.categoria == "KILOMETRAJE" && (d.idVehiculo ?: 0) > 0 -> onDestino(lectura)
+            d.categoria == "LICENCIA" -> onDestino(lectura)
+            d.categoria == "SOAT" && (d.idVehiculo ?: 0) > 0 -> onDestino(lectura)
+            d.categoria == "MANTENIMIENTO" && (d.idAlerta ?: 0) > 0 && (d.idVehiculo ?: 0) > 0 ->
+                onDestino(lectura)
+            else -> onDestinoInvalido(
+                "Este aviso ya no tiene una acción disponible. Revisa el historial."
+            )
+        }
+    }
+
+    /** Compat: flujo anterior directo a destino. */
+    fun abrir(
+        item: NotificacionItem,
+        onDestino: (ResultadoLectura) -> Unit,
+        onDestinoInvalido: (String) -> Unit
+    ) {
+        abrirDetalle(item)
     }
 
     private fun cargar(silencioso: Boolean = false) {
@@ -143,7 +171,10 @@ class NotificacionesViewModel(
                         filtroLectura = filtroLectura,
                         contadorPendientesGlobal = bandeja.contadorPendientesGlobal,
                         contadorNoLeidasGlobal = bandeja.contadorNoLeidasGlobal,
+                        contadorLeidasGlobal = bandeja.contadorLeidasGlobal,
                         items = bandeja.items,
+                        // Conserva el modal abierto tras recarga silenciosa.
+                        detalle = it.detalle,
                         mensaje = if (bandeja.items.isEmpty()) {
                             mensajeVacio(pestana, categoria, filtroLectura)
                         } else null

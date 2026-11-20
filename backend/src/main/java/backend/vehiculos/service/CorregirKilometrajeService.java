@@ -1,5 +1,6 @@
 package backend.vehiculos.service;
 
+import backend.recordatorioskm.service.RecordatorioKmService;
 import backend.vehiculos.dao.CondicionesRegistroVehiculoDao;
 import backend.vehiculos.dao.ConsultaRegistroVehiculoDao;
 import backend.vehiculos.dao.CorregirKilometrajeDao;
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ public class CorregirKilometrajeService {
     private final ConsultaRegistroVehiculoDao consultas;
     private final HuellaCorregirKilometraje huellas;
     private final ObjectMapper json;
+    private final ObjectProvider<RecordatorioKmService> recordatoriosKm;
 
     public CorregirKilometrajeService(
             CondicionesRegistroVehiculoDao condiciones,
@@ -36,7 +39,8 @@ public class CorregirKilometrajeService {
             OperacionVehiculoDao operaciones,
             ConsultaRegistroVehiculoDao consultas,
             HuellaCorregirKilometraje huellas,
-            ObjectMapper json
+            ObjectMapper json,
+            ObjectProvider<RecordatorioKmService> recordatoriosKm
     ) {
         this.condiciones = condiciones;
         this.correccion = correccion;
@@ -44,6 +48,7 @@ public class CorregirKilometrajeService {
         this.consultas = consultas;
         this.huellas = huellas;
         this.json = json;
+        this.recordatoriosKm = recordatoriosKm;
     }
 
     @Transactional(readOnly = true)
@@ -190,6 +195,11 @@ public class CorregirKilometrajeService {
                 "CONFIRMADA");
         if (!operaciones.confirmar(datos.idOperacion(), idUsuario, TIPO, hash, serializar(resultado))) {
             throw new IllegalStateException("No se pudo confirmar la operación RF16");
+        }
+        var rf43 = recordatoriosKm.getIfAvailable();
+        if (rf43 != null) {
+            // RF16: usar fecha efectiva de la lectura, no la de rectificación.
+            rf43.recalcularTrasLectura(idVehiculo, resultado.fechaLecturaOriginal());
         }
         return resultado;
     }

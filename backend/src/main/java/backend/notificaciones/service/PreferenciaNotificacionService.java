@@ -11,6 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * RF48: consultar/guardar preferencias de envío externo.
  * No crea notificaciones, no modifica alertas, no silencia bandeja RF46.
+ * {@code kilometraje_on} es campo heredado de API (compatibilidad UI antigua).
+ * Autoridad funcional RF43 = interruptor en Perfil → Recordatorios de kilometraje;
+ * el outbox push de KM no usa {@code kilometraje_on} para autorizar envío.
  */
 @Service
 public class PreferenciaNotificacionService {
@@ -36,6 +39,8 @@ public class PreferenciaNotificacionService {
                 || req.mantenimiento() == null
                 || req.soat() == null
                 || req.kilometraje() == null) {
+            // kilometraje_on es campo heredado de API (compatibilidad).
+            // Autoridad funcional de RF43 = interruptor en Perfil → Recordatorios de kilometraje.
             throw new ErrorNotificaciones(
                     "DATOS_INVALIDOS", "Indica mantenimiento, SOAT y kilometraje (ON/OFF).");
         }

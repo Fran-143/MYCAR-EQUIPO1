@@ -98,13 +98,15 @@ fun DetalleMantenimientoScreen(
 ) {
     var confirmarAnular by remember { mutableStateOf(false) }
     val editando = estado.fase == FaseDetalle.EDITANDO
-    Column(modifier.fillMaxSize().background(Fondo).testTag("rf19.pantalla")) {
-        Surface(color = Color.White, shadowElevation = 1.dp) {
+    Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag("rf19.pantalla")) {
+        Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 1.dp) {
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 10.dp),
+                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onVolver, modifier = Modifier.testTag("rf19.volver")) { Text("Volver") }
+                IconButton(onClick = onVolver, modifier = Modifier.testTag("rf19.volver")) {
+                    Text("←", color = Azul, style = MaterialTheme.typography.titleLarge)
+                }
                 Text(
                     "Detalle de mantenimiento",
                     Modifier.weight(1f),
@@ -235,17 +237,33 @@ fun DetalleMantenimientoScreen(
 
 @Composable
 private fun CardInfoMantenimiento(d: DetalleMantenimientoHistorial) {
-    SeccionCard(titulo = "Información del mantenimiento", chipSoloLectura = true) {
-        CampoLectura("Vehículo", d.etiquetaVehiculo)
-        CampoLectura(
-            "Tipo de mantenimiento",
-            if (d.codigoTipo == "OTRO") "Otro — ${d.servicioOtro}" else d.tipo
+    val realizado = d.estado == "REALIZADO"
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = if (realizado) Color(0xFFDBF8E7) else Color(0xFFFCE4E4)
+        ) {
+            Text(
+                d.estado,
+                Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                color = if (realizado) Color(0xFF146943) else Color(0xFF943535),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text(
+            if (d.codigoTipo == "OTRO") d.servicioOtro.orEmpty().ifBlank { d.tipo } else d.tipo,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = Azul
         )
-        CampoLectura("Fecha del mantenimiento", d.fecha.format(fmtFecha))
-        CampoLectura("Kilometraje al momento del servicio", "${fmtKm(d.kmServicio)} km")
-        CampoLectura("Estado", d.estado)
-        if (d.estado == "ANULADO" && !d.anuladoUtc.isNullOrBlank()) {
-            CampoLectura("Anulado el", d.anuladoUtc)
+        SeccionCard(titulo = "Información del mantenimiento", chipSoloLectura = true) {
+            CampoLectura("Vehículo", d.etiquetaVehiculo)
+            CampoLectura("Fecha del mantenimiento", d.fecha.format(fmtFecha))
+            CampoLectura("Kilometraje al momento del servicio", "${fmtKm(d.kmServicio)} km")
+            if (d.estado == "ANULADO" && !d.anuladoUtc.isNullOrBlank()) {
+                CampoLectura("Anulado el", d.anuladoUtc)
+            }
         }
     }
 }

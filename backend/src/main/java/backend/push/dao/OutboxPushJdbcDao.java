@@ -47,10 +47,33 @@ public class OutboxPushJdbcDao {
         }
     }
 
+    public void vincularNotificaciones(long idOutbox, List<Long> idNotificaciones) {
+        if (idNotificaciones == null) {
+            return;
+        }
+        for (Long idNotif : idNotificaciones) {
+            if (idNotif == null) {
+                continue;
+            }
+            jdbc.update("""
+                    INSERT INTO mycar.outbox_push_notificacion(id_outbox, id_notificacion)
+                    VALUES (?, ?)
+                    ON CONFLICT DO NOTHING
+                    """, idOutbox, idNotif);
+        }
+    }
+
     public List<Long> alertasDeOutbox(long idOutbox) {
         return jdbc.queryForList("""
                 SELECT id_alerta FROM mycar.outbox_push_alerta WHERE id_outbox = ?
                 ORDER BY id_alerta
+                """, Long.class, idOutbox);
+    }
+
+    public List<Long> notificacionesDeOutbox(long idOutbox) {
+        return jdbc.queryForList("""
+                SELECT id_notificacion FROM mycar.outbox_push_notificacion WHERE id_outbox = ?
+                ORDER BY id_notificacion
                 """, Long.class, idOutbox);
     }
 

@@ -59,7 +59,8 @@ public class OutboxPushService {
             long usuario, Long idAlerta, String categoria, String titulo, String cuerpo,
             String destino, String claveIdempotencia) {
         Runnable accion = () -> encolarAhora(
-                usuario, idAlerta, categoria, titulo, cuerpo, destino, claveIdempotencia, List.of());
+                usuario, idAlerta, categoria, titulo, cuerpo, destino, claveIdempotencia,
+                List.of(), List.of());
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -72,19 +73,37 @@ public class OutboxPushService {
         }
     }
 
+    /** Compat: solo alertas en el resumen. */
+    public Optional<Long> encolarAhora(
+            long usuario, Long idAlerta, String categoria, String titulo, String cuerpo,
+            String destino, String claveIdempotencia, List<Long> alertasResumen) {
+        return encolarAhora(usuario, idAlerta, categoria, titulo, cuerpo, destino,
+                claveIdempotencia, alertasResumen, List.of());
+    }
+
     /**
      * @return id_outbox si se insertó fila nueva; empty si ya existía la clave (no es entrega).
      */
     public Optional<Long> encolarAhora(
             long usuario, Long idAlerta, String categoria, String titulo, String cuerpo,
-            String destino, String claveIdempotencia, List<Long> alertasResumen) {
-        Long idNotif = resolverIdNotificacion(usuario, idAlerta);
+            String destino, String claveIdempotencia,
+            List<Long> alertasResumen, List<Long> notificacionesResumen) {
+        Long idNotif = idAlerta != null ? resolverIdNotificacion(usuario, idAlerta) : null;
+        if (idNotif == null && notificacionesResumen != null && notificacionesResumen.size() == 1) {
+            idNotif = notificacionesResumen.get(0);
+        }
         Optional<Long> id = outbox.encolarSiNuevo(
                 usuario, idAlerta, idNotif, categoria, titulo, cuerpo, destino, claveIdempotencia);
-        if (id.isPresent() && alertasResumen != null && !alertasResumen.isEmpty()) {
+        if (id.isEmpty()) {
+            return id;
+        }
+        if (alertasResumen != null && !alertasResumen.isEmpty()) {
             outbox.vincularAlertas(id.get(), alertasResumen);
-        } else if (id.isPresent() && idAlerta != null) {
+        } else if (idAlerta != null) {
             outbox.vincularAlertas(id.get(), List.of(idAlerta));
+        }
+        if (notificacionesResumen != null && !notificacionesResumen.isEmpty()) {
+            outbox.vincularNotificaciones(id.get(), notificacionesResumen);
         }
         return id;
     }
@@ -103,7 +122,7 @@ public class OutboxPushService {
     /**
      * Despacha lote PENDIENTE/ERROR (todas las categorías).
      * ENVIADO ≠ encolado: solo tras FCM OK (o simular-envio) se actualiza control.
-     * Concurrencia: FOR UPDATE SKIP LOCKED + intentos &lt; 8.
+     * Preferencias se revalidan aquí (no memoria stale).
      */
     @Transactional
     public int procesarLote(int limite) {
@@ -132,7 +151,8 @@ public class OutboxPushService {
             boolean temporal = false;
             for (var t : tokens) {
                 ResultadoEnvio r = sender.enviar(new MensajePush(
-                        t.token(), f.titulo(), f.cuerpo(), f.destino(),
+                        t.token(), f.titulo(), f.cuerpo(),
+                        f.destino() == null ? "BANDEJA" : f.destino(),
                         f.idAlerta(), f.idNotificacion(), null, f.categoria()));
                 switch (r) {
                     case ENVIADO -> algunOk = true;
@@ -146,7 +166,6 @@ public class OutboxPushService {
                 registrarControlTrasEnvio(f);
                 enviados++;
             } else if (temporal) {
-                // Sigue reclamable: no se considera entregado; reintento sin nueva clave.
                 outbox.marcar(f.idOutbox(), "ERROR", "temporal");
             } else {
                 outbox.marcar(f.idOutbox(), "OMITIDO", "sin_entrega");
@@ -156,7 +175,8 @@ public class OutboxPushService {
     }
 
     private void registrarControlTrasEnvio(OutboxFila f) {
-        if (!"MANTENIMIENTO".equals(f.categoria())) {
+        String cat = f.categoria();
+        if (!"MANTENIMIENTO".equals(cat) && !"SOAT".equals(cat)) {
             return;
         }
         AlertaPushControlJdbcDao ctrl = pushControl.getIfAvailable();
@@ -169,7 +189,7 @@ public class OutboxPushService {
         if (ids.isEmpty() && f.idAlerta() != null) {
             ids = List.of(f.idAlerta());
         }
-        String estadoCiclo = estadoCicloDesdeMotivo(motivo);
+        String estadoCiclo = estadoCicloDesdeMotivo(motivo, cat);
         for (Long idAlerta : ids) {
             String estado = estadoCiclo != null ? estadoCiclo : estadoAlerta(idAlerta);
             if (estado != null) {
@@ -188,11 +208,15 @@ public class OutboxPushService {
         if (clave == null) {
             return "ENTRADA_ESTADO";
         }
-        if (clave.contains(":VENCIDAS:")) {
-            return "RESUMEN_VENCIDAS";
+        if (clave.contains(":VENCIDAS:") || clave.startsWith("MANTENIMIENTO:USR:")
+                || clave.startsWith("SOAT:USR:") || clave.startsWith("KILOMETRAJE:USR:")) {
+            return clave.contains(":VENCIDAS:") ? "RESUMEN_VENCIDAS" : "RESUMEN_CATEGORIA";
         }
         if (clave.endsWith(":INMEDIATO_KM")) {
             return "INMEDIATO_KM";
+        }
+        if (clave.endsWith(":HITO_SOAT")) {
+            return "HITO_SOAT";
         }
         if (clave.endsWith(":RECORDATORIO")) {
             return "RECORDATORIO";
@@ -206,13 +230,17 @@ public class OutboxPushService {
         return "ENTRADA_ESTADO";
     }
 
-    private static String estadoCicloDesdeMotivo(String motivo) {
+    private static String estadoCicloDesdeMotivo(String motivo, String categoria) {
         if ("RESUMEN_VENCIDAS".equals(motivo)) {
             return "VENCIDA";
         }
         return null;
     }
 
+    /**
+     * Revalidación inmediata antes de envío.
+     * KILOMETRAJE: interruptor RF43 (config_recordatorio_km_usuario), no kilometraje_on heredado.
+     */
     private boolean rf48Permite(long usuario, String categoria) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
@@ -222,9 +250,17 @@ public class OutboxPushService {
         return switch (categoria == null ? "" : categoria) {
             case "MANTENIMIENTO" -> pref.mantenimiento();
             case "SOAT" -> pref.soat();
-            case "KILOMETRAJE" -> pref.kilometraje();
+            case "KILOMETRAJE" -> rf43GlobalActivo(usuario);
             case "LICENCIA" -> true;
             default -> false;
         };
+    }
+
+    private boolean rf43GlobalActivo(long usuario) {
+        Boolean on = jdbc.query("""
+                SELECT estado_recordatorios = 'ACTIVO'
+                FROM mycar.config_recordatorio_km_usuario WHERE id_usuario = ?
+                """, rs -> rs.next() && rs.getBoolean(1), usuario);
+        return Boolean.TRUE.equals(on);
     }
 }

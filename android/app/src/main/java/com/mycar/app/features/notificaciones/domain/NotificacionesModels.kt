@@ -12,7 +12,9 @@ data class NotificacionItem(
     val idVehiculo: Long?,
     val fechaEmisionUtc: String,
     /** Estado RF23 de la alerta; distinto de estadoGestion (bandeja). */
-    val estadoAlerta: String? = null
+    val estadoAlerta: String? = null,
+    val placa: String? = null,
+    val vehiculoEtiqueta: String? = null
 )
 
 data class BandejaNotificaciones(
@@ -21,6 +23,7 @@ data class BandejaNotificaciones(
     val filtroLectura: String,
     val contadorPendientesGlobal: Int,
     val contadorNoLeidasGlobal: Int,
+    val contadorLeidasGlobal: Int = 0,
     val items: List<NotificacionItem>
 )
 
@@ -33,12 +36,43 @@ data class ResultadoLectura(
     val idVehiculo: Long?
 )
 
+data class DetalleNotificacion(
+    val id: Long,
+    val categoria: String,
+    val estadoGestion: String,
+    val leida: Boolean,
+    val titulo: String,
+    val cuerpo: String,
+    val destino: String,
+    val idAlerta: Long?,
+    val idVehiculo: Long?,
+    val fechaEmisionUtc: String,
+    val nombreEvento: String?,
+    val vehiculoEtiqueta: String?,
+    val estadoActual: String?,
+    val fechaObjetivo: String?,
+    val diasRestantes: Int?,
+    val diasTranscurridos: Int?,
+    val kmRestantes: Int?,
+    val kmExcedidos: Int?,
+    val kmObjetivo: Int?,
+    val frecuenciaKm: String?,
+    val ultimaActualizacionKm: String?,
+    val recordatorioCorrespondienteKm: String?,
+    val textoTemporal: String?,
+    val textoKilometraje: String?,
+    val accionDisponible: String?,
+    val accionHabilitada: Boolean
+)
+
 interface NotificacionesRepository {
     suspend fun consultarBandeja(
         pestana: String,
         categoria: String,
         filtroLectura: String
     ): BandejaNotificaciones
+
+    suspend fun consultarDetalle(idNotificacion: Long): DetalleNotificacion
 
     suspend fun marcarLeida(idNotificacion: Long): ResultadoLectura
 }

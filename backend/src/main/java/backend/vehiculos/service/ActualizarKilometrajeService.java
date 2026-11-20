@@ -1,5 +1,6 @@
 package backend.vehiculos.service;
 
+import backend.recordatorioskm.service.RecordatorioKmService;
 import backend.vehiculos.dao.CondicionesRegistroVehiculoDao;
 import backend.vehiculos.dao.ConsultaRegistroVehiculoDao;
 import backend.vehiculos.dao.KilometrajeVehiculoDao;
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ public class ActualizarKilometrajeService {
     private final HuellaActualizarKilometraje huellas;
     private final ObjectMapper json;
     private final KilometrajePushHook pushHook;
+    private final ObjectProvider<RecordatorioKmService> recordatoriosKm;
 
     public ActualizarKilometrajeService(
             CondicionesRegistroVehiculoDao condiciones,
@@ -38,7 +41,8 @@ public class ActualizarKilometrajeService {
             ConsultaRegistroVehiculoDao consultas,
             HuellaActualizarKilometraje huellas,
             ObjectMapper json,
-            KilometrajePushHook pushHook
+            KilometrajePushHook pushHook,
+            ObjectProvider<RecordatorioKmService> recordatoriosKm
     ) {
         this.condiciones = condiciones;
         this.kilometraje = kilometraje;
@@ -47,6 +51,7 @@ public class ActualizarKilometrajeService {
         this.huellas = huellas;
         this.json = json;
         this.pushHook = pushHook;
+        this.recordatoriosKm = recordatoriosKm;
     }
 
     @Transactional(readOnly = true)
@@ -147,6 +152,10 @@ public class ActualizarKilometrajeService {
             throw new IllegalStateException("No se pudo confirmar la operación RF14");
         }
         pushHook.afterKmActualizado(idUsuario, idVehiculo);
+        var rf43 = recordatoriosKm.getIfAvailable();
+        if (rf43 != null) {
+            rf43.recalcularTrasLectura(idVehiculo, resultado.fechaServidor());
+        }
         return resultado;
     }
 

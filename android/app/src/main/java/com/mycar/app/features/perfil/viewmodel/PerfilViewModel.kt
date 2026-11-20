@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class PantallaPerfil {
-    HUB, DATOS, EDITAR, CAMBIAR_CONTRASENA, CONTRASENA_OK, NOTIFICACIONES_EXTERNAS, LICENCIA, SOPORTE
+    HUB, DATOS, EDITAR, CAMBIAR_CONTRASENA, CONTRASENA_OK,
+    NOTIFICACIONES_EXTERNAS, RECORDATORIOS_KM, LICENCIA, SOPORTE
 }
 
 data class EstadoPerfil(
@@ -236,6 +237,13 @@ class PerfilViewModel(
         )
     }
 
+    fun abrirRecordatoriosKm() {
+        _estado.value = _estado.value.copy(
+            pantalla = PantallaPerfil.RECORDATORIOS_KM,
+            mensaje = null
+        )
+    }
+
     fun editarContrasena(actual: String? = null, nueva: String? = null, confirmacion: String? = null) {
         val max = com.mycar.app.features.autenticacion.domain.RegistrationValidator.MAX_CONTRASENA
         val limit = com.mycar.app.features.autenticacion.domain.RegistrationValidator::limitCodePoints
@@ -345,7 +353,8 @@ class PerfilViewModel(
         when (_estado.value.pantalla) {
             PantallaPerfil.HUB -> Unit
             PantallaPerfil.DATOS, PantallaPerfil.CAMBIAR_CONTRASENA, PantallaPerfil.CONTRASENA_OK,
-            PantallaPerfil.NOTIFICACIONES_EXTERNAS, PantallaPerfil.LICENCIA, PantallaPerfil.SOPORTE ->
+            PantallaPerfil.NOTIFICACIONES_EXTERNAS, PantallaPerfil.RECORDATORIOS_KM,
+            PantallaPerfil.LICENCIA, PantallaPerfil.SOPORTE ->
                 _estado.value = _estado.value.copy(pantalla = PantallaPerfil.HUB, exitoDatos = false)
             PantallaPerfil.EDITAR -> cancelarEdicion()
         }

@@ -52,6 +52,8 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
         cliente.retrofit.create(com.mycar.app.features.perfil.data.PerfilApi::class.java))
     val preferenciasNotificacion = com.mycar.app.features.preferenciasnotif.data.RemotePreferenciasNotificacionRepository(
         cliente.retrofit.create(com.mycar.app.features.preferenciasnotif.data.PreferenciasNotificacionApi::class.java))
+    val recordatoriosKm = com.mycar.app.features.recordatorioskm.data.RemoteRecordatoriosKmRepository(
+        cliente.retrofit.create(com.mycar.app.features.recordatorioskm.data.RecordatoriosKmApi::class.java))
     val fotos = com.mycar.app.features.fotos.data.RemoteFotoPersonalizadaRepository(
         cliente.retrofit.create(com.mycar.app.features.fotos.data.FotoPerfilApi::class.java),
         cliente.retrofit.create(com.mycar.app.features.fotos.data.FotoVehiculoApi::class.java),

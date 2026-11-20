@@ -31,6 +31,7 @@ import com.mycar.app.features.autenticacion.domain.RegistrationValidator
 import com.mycar.app.features.fotos.ui.FlujoSelectorFotoPersonalizada
 import com.mycar.app.features.fotos.ui.ImagenBytesFoto
 import com.mycar.app.features.perfil.domain.PerfilValidator
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mycar.app.features.perfil.viewmodel.EstadoPerfil
 import com.mycar.app.features.perfil.viewmodel.PantallaPerfil
 import com.mycar.app.features.perfil.viewmodel.PerfilViewModel
@@ -39,6 +40,8 @@ import com.mycar.app.features.perfil.viewmodel.PerfilViewModel
 fun PerfilRoute(
     vm: PerfilViewModel,
     preferenciasNotificacion: com.mycar.app.features.preferenciasnotif.domain.PreferenciasNotificacionRepository,
+    recordatoriosKm: com.mycar.app.features.recordatorioskm.domain.RecordatoriosKmRepository,
+    fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
     licenciaRepository: com.mycar.app.features.licencia.domain.LicenciaRepository,
     soporteRepository: com.mycar.app.features.soporte.domain.SoporteRepository,
     onVolver: () -> Unit,
@@ -48,11 +51,12 @@ fun PerfilRoute(
 ) {
     val estado by vm.estado.collectAsState()
     LaunchedEffect(estado.sesionInvalida) { if (estado.sesionInvalida) onSesionInvalida() }
-    // LICENCIA / notificaciones manejan su propio atrás (p. ej. fotos → formulario).
+    // LICENCIA / notificaciones / RF43 manejan su propio atrás.
     BackHandler(
         enabled = estado.pantalla != PantallaPerfil.LICENCIA &&
             estado.pantalla != PantallaPerfil.SOPORTE &&
-            estado.pantalla != PantallaPerfil.NOTIFICACIONES_EXTERNAS
+            estado.pantalla != PantallaPerfil.NOTIFICACIONES_EXTERNAS &&
+            estado.pantalla != PantallaPerfil.RECORDATORIOS_KM
     ) {
         when (estado.pantalla) {
             PantallaPerfil.HUB -> onVolver()
@@ -69,6 +73,14 @@ fun PerfilRoute(
             PantallaPerfil.NOTIFICACIONES_EXTERNAS ->
                 com.mycar.app.features.preferenciasnotif.ui.PreferenciasNotificacionRoute(
                     repository = preferenciasNotificacion,
+                    onVolver = vm::volverAtras,
+                    onSesionInvalida = onSesionInvalida,
+                    modifier = Modifier.fillMaxSize()
+                )
+            PantallaPerfil.RECORDATORIOS_KM ->
+                com.mycar.app.features.recordatorioskm.ui.RecordatoriosKmRoute(
+                    repository = recordatoriosKm,
+                    fotos = fotosRepository,
                     onVolver = vm::volverAtras,
                     onSesionInvalida = onSesionInvalida,
                     modifier = Modifier.fillMaxSize()
@@ -313,12 +325,15 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                         FilaAccion("Soporte", onClick = vm::abrirSoporte)
                         FilaDeshabilitada("Planes y suscripción")
                     }
-                    Seccion("NOTIFICACIONES") {
+                    Seccion("VEHÍCULO") {
+                        FilaAccion(
+                            "Recordatorios de kilometraje",
+                            onClick = vm::abrirRecordatoriosKm
+                        )
                         FilaAccion("Notificaciones externas", onClick = vm::abrirNotificacionesExternas)
-                        FilaDeshabilitada("Recordatorios de km")
                     }
                     Seccion("APARIENCIA") {
-                        FilaDeshabilitada("Modo claro")
+                        AparienciaSelector()
                     }
                     Seccion("SESIÓN") {
                         FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
@@ -528,6 +543,34 @@ private fun FilaDeshabilitada(texto: String, peligro: Boolean = false) {
         verticalAlignment = Alignment.CenterVertically) {
         Text(texto, Modifier.weight(1f), color = if (peligro) PerfilColors.Danger.copy(alpha = 0.55f) else PerfilColors.Mute)
         Text("Próximamente", color = PerfilColors.Mute, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun AparienciaSelector() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val modo by com.mycar.app.ui.theme.AparienciaPreferencias.flujo.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Tema de la aplicación", color = PerfilColors.Navy, fontWeight = FontWeight.Medium)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                com.mycar.app.ui.theme.ModoApariencia.CLARO to "Claro",
+                com.mycar.app.ui.theme.ModoApariencia.OSCURO to "Oscuro"
+            ).forEach { (valor, etiqueta) ->
+                val seleccionado = modo == valor
+                FilterChip(
+                    selected = seleccionado,
+                    onClick = {
+                        com.mycar.app.ui.theme.AparienciaPreferencias.guardar(context, valor)
+                    },
+                    label = { Text(etiqueta) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = PerfilColors.Navy,
+                        selectedLabelColor = Color.White
+                    )
+                )
+            }
+        }
     }
 }
 

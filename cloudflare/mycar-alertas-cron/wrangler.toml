@@ -7,17 +7,16 @@ workers_dev = true
 
 [vars]
 BACKEND_URL = "https://mycar-backend-1dxi.onrender.com"
-# Primera publicación / pruebas: SIMULAR (sin escrituras Neon/FCM).
-# Activación futura COMPLETO (tras aprobación): cambiar a "COMPLETO" y redeploy.
+# Tras validar backend en Render: COMPLETO. SIMULAR no escribe estados/FCM.
+# No desplegar con crons=[]: borraría los triggers del Dashboard.
 EVAL_MODO = "SIMULAR"
 MAX_ATTEMPTS = "4"
 RETRY_BASE_MS = "8000"
 FETCH_TIMEOUT_MS = "25000"
 
-# Sin programación hasta autorización.
-# Futuro: crons = ["10 5 * * *", "0 10 * * *"]  # 00:10 eval + 05:00 push (America/Lima = UTC-5)
+# Conservar exactamente: 00:10 eval (RF23+RF43) + 05:00 push (America/Lima = UTC-5).
 [triggers]
-crons = []
+crons = ["10 5 * * *", "0 10 * * *"]
 
 # Secretos (NO en este archivo):
 #   npx wrangler secret put CRON_SECRET

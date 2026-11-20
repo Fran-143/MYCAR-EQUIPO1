@@ -315,9 +315,10 @@ public class SoatJdbcDao {
         }
     }
 
+    /** Estado inicial SOAT: VENCIDA desde el día siguiente al vencimiento (no +15). */
     public String calcularEstadoInicial(LocalDate fechaObjetivo, LocalDate hoy) {
         return jdbc.queryForObject(
-                "SELECT mycar.calcular_estado_alerta('POR_TIEMPO', ?, ?, NULL, NULL, 0)",
+                "SELECT mycar.estado_por_tiempo_soat(?, ?)",
                 String.class, fechaObjetivo, hoy);
     }
 
