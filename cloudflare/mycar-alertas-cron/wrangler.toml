@@ -7,9 +7,9 @@ workers_dev = true
 
 [vars]
 BACKEND_URL = "https://mycar-backend-1dxi.onrender.com"
-# Tras validar backend en Render: COMPLETO. SIMULAR no escribe estados/FCM.
+# Producción autorizada: COMPLETO (Dashboard ya activo). No bajar a SIMULAR.
 # No desplegar con crons=[]: borraría los triggers del Dashboard.
-EVAL_MODO = "SIMULAR"
+EVAL_MODO = "COMPLETO"
 MAX_ATTEMPTS = "4"
 RETRY_BASE_MS = "8000"
 FETCH_TIMEOUT_MS = "25000"
