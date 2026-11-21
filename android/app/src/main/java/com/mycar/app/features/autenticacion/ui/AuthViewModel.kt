@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 
 data class LoginState(
     val busy: Boolean = false, val error: String? = null,
+    val errorCodigo: String? = null,
     val emailError: String? = null, val passwordError: String? = null
 )
 
@@ -80,7 +81,9 @@ class AuthViewModel(
                 if (contextVersion == session.value.contextVersion) mutableLogin.value = LoginState()
             } catch (cancelled: CancellationException) { throw cancelled
             } catch (failure: AuthProblem) {
-                if (contextVersion == session.value.contextVersion) mutableLogin.value = LoginState(error = failure.message)
+                if (contextVersion == session.value.contextVersion) {
+                    mutableLogin.value = LoginState(error = failure.message, errorCodigo = failure.codigo)
+                }
             }
         }
     }

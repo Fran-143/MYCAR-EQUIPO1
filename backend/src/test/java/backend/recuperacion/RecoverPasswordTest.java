@@ -1,5 +1,7 @@
 package backend.recuperacion;
 
+import backend.cuentas.RestriccionRecuperacionService;
+import backend.cuentas.SesionRevocacion;
 import backend.registro.RegistrationConfiguration;
 import backend.registro.verificacion.DevMailGateway;
 import backend.registro.verificacion.MailGateway;
@@ -33,7 +35,11 @@ class RecoverPasswordTest {
             lastCode.set(message.code());
             return new MailGateway.Accepted("test");
         };
-        service = new RecoverPassword(store, encoder, mail, provider, true);
+        RestriccionRecuperacionService restriccion = mock(RestriccionRecuperacionService.class);
+        SesionRevocacion sesiones = mock(SesionRevocacion.class);
+        ObjectProvider<backend.localtest.SimulatedMailInbox> inbox = mock(ObjectProvider.class);
+        when(inbox.getIfAvailable()).thenReturn(null);
+        service = new RecoverPassword(store, encoder, mail, provider, inbox, restriccion, sesiones, true);
         when(store.now()).thenReturn(NOW);
         when(store.findLatest(anyLong())).thenReturn(Optional.empty());
     }
@@ -110,7 +116,11 @@ class RecoverPasswordTest {
         ObjectProvider<DevMailGateway> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
         MailGateway failing = message -> new MailGateway.Rejected(true);
-        service = new RecoverPassword(store, encoder, failing, provider, false);
+        RestriccionRecuperacionService restriccion = mock(RestriccionRecuperacionService.class);
+        SesionRevocacion sesiones = mock(SesionRevocacion.class);
+        ObjectProvider<backend.localtest.SimulatedMailInbox> inbox = mock(ObjectProvider.class);
+        when(inbox.getIfAvailable()).thenReturn(null);
+        service = new RecoverPassword(store, encoder, failing, provider, inbox, restriccion, sesiones, false);
         when(store.findByEmail("ana@example.com"))
                 .thenReturn(Optional.of(new RecoveryStore.Account(7L, "ana@example.com", "ACTIVA",
                         encoder.encode("ViejaClave1!"))));

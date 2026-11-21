@@ -38,7 +38,10 @@ class LoginFlowTest {
         when(manager.getTransaction(any())).thenAnswer(call->new SimpleTransactionStatus());
         when(passwords.encode(any())).thenReturn("dummy-test-hash");
         when(validator.validate(command)).thenReturn(command);when(store.now()).thenReturn(now);
-        auth=new SessionAuthentication(validator,store,credentials,passwords,manager,registrationStore,false,"1.0",mfaService);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<backend.cuentas.AlertaLoginSeguridad> alertaLogin =
+                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        auth=new SessionAuthentication(validator,store,credentials,passwords,manager,registrationStore,false,"1.0",mfaService,alertaLogin);
         clearInvocations(passwords);
     }
     @Test void failedPasswordIsCommittedBeforeAuthenticationIsRejected(){
@@ -67,7 +70,10 @@ class LoginFlowTest {
     void nonActiveCorrectPasswordIsDeniedBeforeSuccessOperations(String state){
         when(store.lockAccount(command.correo())).thenReturn(Optional.of(account(state,null)));
         when(passwords.matches(command.contrasena(),"stored-hash")).thenReturn(true);
-        assertEquals(AuthenticationFailure.Reason.ACCOUNT_NOT_ENABLED,assertThrows(AuthenticationFailure.class,()->auth.login(command)).reason());
+        var expected = "SUSPENDIDA".equals(state)
+                ? AuthenticationFailure.Reason.ACCOUNT_SUSPENDED
+                : AuthenticationFailure.Reason.ACCOUNT_PENDING_DELETION;
+        assertEquals(expected,assertThrows(AuthenticationFailure.class,()->auth.login(command)).reason());
         verify(passwords).matches(command.contrasena(),"stored-hash");
         verify(store,never()).recordFailure(anyLong());verify(store,never()).resetFailures(anyLong());
         verify(store,never()).replaceInstallation(anyLong(),any(),any());
@@ -103,7 +109,10 @@ class LoginFlowTest {
         doReturn(refresh).when(realCredentials).newRefresh();
         when(store.createSession(eq(1L),eq(command.idInstalacion()),eq(SessionCredentials.hashRefresh(refresh)),eq(deadline),eq(started),eq("USUARIO"),isNull()))
                 .thenAnswer(call->{clock.set(issued);return 12L;});
-        var service=new SessionAuthentication(validator,store,realCredentials,passwords,manager,registrationStore,false,"1.0",mfaService);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<backend.cuentas.AlertaLoginSeguridad> alertaLogin =
+                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        var service=new SessionAuthentication(validator,store,realCredentials,passwords,manager,registrationStore,false,"1.0",mfaService,alertaLogin);
 
         var result=service.login(command);
         var jwt=SignedJWT.parse(result.accessToken()).getJWTClaimsSet();

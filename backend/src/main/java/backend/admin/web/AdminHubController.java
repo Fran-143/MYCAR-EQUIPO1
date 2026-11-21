@@ -17,7 +17,7 @@ public class AdminHubController {
     @GetMapping(value="/hub",produces="application/json")
     public ResponseEntity<Map<String,Object>> hub(){
         List<Seccion> secciones=List.of(
-                new Seccion("USUARIOS","Usuarios",false,"PROXIMAMENTE"),
+                new Seccion("USUARIOS","Usuarios",true,"DISPONIBLE"),
                 new Seccion("SUSCRIPCIONES","Suscripciones",false,"PROXIMAMENTE"),
                 new Seccion("INCIDENCIAS","Incidencias",true,"DISPONIBLE"),
                 new Seccion("CATALOGOS","Catálogos",false,"PROXIMAMENTE")

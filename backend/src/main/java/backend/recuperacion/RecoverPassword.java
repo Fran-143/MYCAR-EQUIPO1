@@ -1,5 +1,8 @@
 package backend.recuperacion;
 
+import backend.cuentas.RestriccionRecuperacionService;
+import backend.cuentas.SesionRevocacion;
+import backend.localtest.SimulatedMailInbox;
 import backend.registro.RegistrationValidator;
 import backend.registro.verificacion.DevMailGateway;
 import backend.registro.verificacion.MailGateway;
@@ -33,7 +36,10 @@ public class RecoverPassword {
     private final PasswordEncoder passwords;
     private final MailGateway mail;
     private final ObjectProvider<DevMailGateway> devMail;
+    private final ObjectProvider<SimulatedMailInbox> inbox;
     private final boolean desarrollo;
+    private final RestriccionRecuperacionService restriccion;
+    private final SesionRevocacion sesiones;
     private final SecureRandom random = new SecureRandom();
     /** Códigos de desarrollo indexados por correo normalizado (solo perfil local/dev). */
     private final ConcurrentHashMap<String, String> lastDevCodes = new ConcurrentHashMap<>();
@@ -42,11 +48,17 @@ public class RecoverPassword {
             @Qualifier("registrationPasswordEncoder") PasswordEncoder passwords,
             MailGateway mail,
             ObjectProvider<DevMailGateway> devMail,
+            ObjectProvider<SimulatedMailInbox> inbox,
+            RestriccionRecuperacionService restriccion,
+            SesionRevocacion sesiones,
             @Value("${mycar.recuperacion.desarrollo:false}") boolean desarrollo) {
         this.store = store;
         this.passwords = passwords;
         this.mail = mail;
         this.devMail = devMail;
+        this.inbox = inbox;
+        this.restriccion = restriccion;
+        this.sesiones = sesiones;
         this.desarrollo = desarrollo;
     }
 
@@ -65,6 +77,8 @@ public class RecoverPassword {
                     "La cuenta no está activa. No se puede recuperar la contraseña."));
         }
         Instant now = store.now();
+        // RF03 Elsa: límites progresivos persistidos (no impiden login).
+        restriccion.registrarSolicitudOBloquear(account.get().userId(), correo, now, "emit");
         var latest = store.findLatest(account.get().userId());
         if (latest.isPresent() && latest.get().createdAt() != null
                 && now.isBefore(latest.get().createdAt().plus(RESEND_COOLDOWN))) {
@@ -99,6 +113,19 @@ public class RecoverPassword {
             if (gateway != null) {
                 gateway.send(new MailGateway.Message(correo, code, "rf03/" + account.get().userId()));
             }
+        }
+        SimulatedMailInbox bandeja = inbox.getIfAvailable();
+        if (bandeja != null && bandeja.enabled()) {
+            bandeja.registrar(
+                    correo,
+                    "RECUPERAR_CONTRASENA",
+                    "MyCar — Código de recuperación de contraseña",
+                    "Usa este código de un solo uso para restablecer tu contraseña.",
+                    code,
+                    "RECUPERAR_CONTRASENA",
+                    account.get().userId(),
+                    now,
+                    now.plus(TTL));
         }
         return new EmitResult("CODIGO_ENVIADO_SI_APLICA", debug);
     }
@@ -156,6 +183,8 @@ public class RecoverPassword {
         }
         store.markConsumed(row.id(), now);
         store.invalidateActive(account.userId());
+        restriccion.reiniciarTrasRestablecimiento(account.userId(), now);
+        sesiones.revocarTodas(account.userId(), now);
         lastDevCodes.remove(correo);
     }
 

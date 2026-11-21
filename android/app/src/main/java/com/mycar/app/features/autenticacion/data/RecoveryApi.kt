@@ -24,7 +24,10 @@ data class RecoverySimpleResponse(val resultado: String? = null, val destino: St
 data class RecoveryErrorDto(
     val codigo: String? = null,
     val mensaje: String? = null,
-    val erroresPorCampo: Map<String, String>? = null
+    val erroresPorCampo: Map<String, String>? = null,
+    val bloqueadoHastaUtc: String? = null,
+    val loginPermitido: Boolean? = null,
+    val nivelBloqueo: Int? = null
 )
 
 interface RecoveryApi {

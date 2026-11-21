@@ -35,6 +35,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.R
 import com.mycar.app.BuildConfig
+import com.mycar.app.core.SoporteMyCar
 import com.mycar.app.features.autenticacion.domain.PrivacyPolicyConfiguration
 import com.mycar.app.features.autenticacion.domain.RegistrationValidator
 import com.mycar.app.features.autenticacion.data.AuthGraph
@@ -143,7 +144,26 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
         SessionPhase.SIGNED_OUT -> when (page) {
             "login" -> LoginScreen(login, onBack = { vm.clearErrors(); page = "welcome" },
                 onSubmit = vm::signIn, onEdit = vm::clearErrors,
-                onForgot = { recovery.reset(); page = "recovery" })
+                onForgot = { recovery.reset(); page = "recovery" },
+                onRecuperarCuenta = { page = "reactivar" },
+                onPruebasLocales = if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
+                    { page = "pruebas_locales" }
+                } else null)
+            "reactivar" -> com.mycar.app.features.cuenta.ui.ReactivarCuentaRoute(
+                onBack = { page = "login" },
+                onIrLogin = { page = "login" },
+                onAbrirBandeja = if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
+                    { page = "pruebas_bandeja_rf51" }
+                } else null
+            )
+            "pruebas_locales" -> com.mycar.app.features.localtest.PruebasLocalesRoute(
+                onVolver = { page = "login" }
+            )
+            "pruebas_bandeja_rf51" -> com.mycar.app.features.localtest.PruebasLocalesRoute(
+                onVolver = { page = "reactivar" },
+                destinatarioInicial = null,
+                finalidadInicial = "REACTIVAR_CUENTA"
+            )
             "recovery" -> RecoveryFlow(
                 state = recoveryState,
                 onEditEmail = recovery::editEmail,
@@ -153,9 +173,12 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
                 onEditPassword = { n, c -> recovery.editPassword(n, c) },
                 onReset = recovery::restablecer,
                 onBack = {
-                    if (recoveryState.step == RecoveryStep.EMAIL || recoveryState.step == RecoveryStep.SUCCESS) {
-                        recovery.reset(); page = "login"
-                    } else recovery.back()
+                    when (recoveryState.step) {
+                        RecoveryStep.EMAIL, RecoveryStep.SUCCESS, RecoveryStep.BLOQUEADO -> {
+                            recovery.reset(); page = "login"
+                        }
+                        else -> recovery.back()
+                    }
                 },
                 onLogin = { recovery.reset(); page = "login" })
             "registration" -> RegistrationContent(
@@ -259,7 +282,9 @@ private fun WelcomeScreen(message: String?, onLogin: () -> Unit, onRegister: () 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LoginScreen(state: LoginState, onBack: () -> Unit,
-    onSubmit: (String, String) -> Unit, onEdit: () -> Unit, onForgot: () -> Unit) {
+    onSubmit: (String, String) -> Unit, onEdit: () -> Unit, onForgot: () -> Unit,
+    onRecuperarCuenta: () -> Unit = {},
+    onPruebasLocales: (() -> Unit)? = null) {
     // Nunca rememberSaveable: la contraseña no entra en Bundle, rutas ni estado persistente.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -323,10 +348,37 @@ private fun LoginScreen(state: LoginState, onBack: () -> Unit,
             TextButton(onClick = onForgot, enabled = !state.busy, modifier = Modifier.align(Alignment.End)) {
                 Text("Olvidé mi contraseña")
             }
+            TextButton(onClick = onRecuperarCuenta, enabled = !state.busy, modifier = Modifier.align(Alignment.End)) {
+                Text("Recuperar cuenta pendiente de eliminación")
+            }
+            if (onPruebasLocales != null) {
+                TextButton(onClick = onPruebasLocales, enabled = !state.busy, modifier = Modifier.align(Alignment.End)) {
+                    Text("Pruebas locales")
+                }
+            }
             state.error?.let {
                 Spacer(Modifier.height(16.dp))
                 Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp)) {
-                    Text(it, modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(it, color = MaterialTheme.colorScheme.onErrorContainer)
+                        val codigo = state.errorCodigo.orEmpty()
+                        if (codigo == "CUENTA_PENDIENTE_ELIMINACION"
+                            || it.contains("PENDIENTE", ignoreCase = true)
+                            || it.contains("eliminación", ignoreCase = true)
+                        ) {
+                            TextButton(onClick = onRecuperarCuenta) { Text("Recuperar cuenta") }
+                        }
+                        if (codigo == "CUENTA_SUSPENDIDA"
+                            || codigo == "CUENTA_BLOQUEADA"
+                            || codigo == "LOGIN_BLOQUEADO"
+                            || it.contains("SUSPENDIDA", ignoreCase = true)
+                            || it.contains("BLOQUEADA", ignoreCase = true)
+                        ) {
+                            TextButton(onClick = { SoporteMyCar.abrirCorreo(context) }) {
+                                Text("Contactar soporte")
+                            }
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -339,7 +391,7 @@ private fun LoginScreen(state: LoginState, onBack: () -> Unit,
                 }
                 Text(if (state.busy) "Ingresando…" else "Ingresar")
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(32.dp))
         }
     }
 }

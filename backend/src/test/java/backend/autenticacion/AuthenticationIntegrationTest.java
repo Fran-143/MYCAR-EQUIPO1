@@ -323,8 +323,11 @@ class AuthenticationIntegrationTest {
             }
             return read==1?started.minusSeconds(1):started;
         }).when(controlledStore).now();
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<backend.cuentas.AlertaLoginSeguridad> alertaLogin =
+                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
         var controlled=new SessionAuthentication(validator,controlledStore,credentials,passwords,transactions,
-                registrationStore,false,"1.0",org.mockito.Mockito.mock(backend.mfa.MfaService.class));
+                registrationStore,false,"1.0",org.mockito.Mockito.mock(backend.mfa.MfaService.class),alertaLogin);
         assertEquals(AuthenticationFailure.Reason.INVALID_SESSION,
                 assertThrows(AuthenticationFailure.class,()->controlled.login(command(installation,PASSWORD))).reason());
 

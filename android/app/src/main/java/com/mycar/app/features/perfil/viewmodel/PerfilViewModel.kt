@@ -18,7 +18,8 @@ import kotlinx.coroutines.withContext
 
 enum class PantallaPerfil {
     HUB, DATOS, EDITAR, CAMBIAR_CONTRASENA, CONTRASENA_OK,
-    NOTIFICACIONES_EXTERNAS, RECORDATORIOS_KM, LICENCIA, SOPORTE
+    NOTIFICACIONES_EXTERNAS, RECORDATORIOS_KM, LICENCIA, SOPORTE,
+    ELIMINAR_CUENTA
 }
 
 data class EstadoPerfil(
@@ -230,6 +231,10 @@ class PerfilViewModel(
         _estado.value = _estado.value.copy(pantalla = PantallaPerfil.SOPORTE, mensaje = null)
     }
 
+    fun abrirEliminarCuenta() {
+        _estado.value = _estado.value.copy(pantalla = PantallaPerfil.ELIMINAR_CUENTA, mensaje = null)
+    }
+
     fun abrirNotificacionesExternas() {
         _estado.value = _estado.value.copy(
             pantalla = PantallaPerfil.NOTIFICACIONES_EXTERNAS,
@@ -354,7 +359,7 @@ class PerfilViewModel(
             PantallaPerfil.HUB -> Unit
             PantallaPerfil.DATOS, PantallaPerfil.CAMBIAR_CONTRASENA, PantallaPerfil.CONTRASENA_OK,
             PantallaPerfil.NOTIFICACIONES_EXTERNAS, PantallaPerfil.RECORDATORIOS_KM,
-            PantallaPerfil.LICENCIA, PantallaPerfil.SOPORTE ->
+            PantallaPerfil.LICENCIA, PantallaPerfil.SOPORTE, PantallaPerfil.ELIMINAR_CUENTA ->
                 _estado.value = _estado.value.copy(pantalla = PantallaPerfil.HUB, exitoDatos = false)
             PantallaPerfil.EDITAR -> cancelarEdicion()
         }

@@ -1,5 +1,6 @@
 package backend.recuperacion.web;
 
+import backend.cuentas.CuentaException;
 import backend.recuperacion.RecoveryException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,11 +8,34 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestControllerAdvice(assignableTypes = RecoveryController.class)
 public class RecoveryErrorHandler {
-    public record RecoveryError(String codigo, String mensaje, Map<String, String> erroresPorCampo) { }
+    public record RecoveryError(String codigo, String mensaje, Map<String, String> erroresPorCampo,
+            Object bloqueadoHastaUtc, Object loginPermitido) {
+        public RecoveryError(String codigo, String mensaje, Map<String, String> erroresPorCampo) {
+            this(codigo, mensaje, erroresPorCampo, null, null);
+        }
+    }
+
+    @ExceptionHandler(CuentaException.class)
+    public ResponseEntity<Map<String, Object>> handleCuenta(CuentaException ex) {
+        if (ex.reason() == CuentaException.Reason.BLOQUEO_RECUPERACION) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("codigo", "BLOQUEO_RECUPERACION");
+            body.put("mensaje", ex.getMessage());
+            body.put("erroresPorCampo", Map.of());
+            body.putAll(ex.extras());
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(body);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("codigo", ex.codigo());
+        body.put("mensaje", ex.getMessage());
+        body.put("erroresPorCampo", ex.fields());
+        return ResponseEntity.badRequest().body(body);
+    }
 
     @ExceptionHandler(RecoveryException.class)
     public ResponseEntity<RecoveryError> handle(RecoveryException ex) {

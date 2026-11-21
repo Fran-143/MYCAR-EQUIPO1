@@ -42,14 +42,16 @@ public class JdbcRecoveryStore implements RecoveryStore {
         jdbc.update("""
                 UPDATE mycar.codigo_recuperacion SET estado='INVALIDADO'
                  WHERE id_usuario=? AND estado='ACTIVO'
+                   AND finalidad='RECUPERAR_CONTRASENA'
                 """, userId);
     }
 
     @Override
     public long insertCode(long userId, String codeHash, Instant expiresAt, Instant now) {
         Long id = jdbc.queryForObject("""
-                INSERT INTO mycar.codigo_recuperacion(id_usuario, codigo_hash, estado, expira_utc, creado_utc)
-                VALUES (?, ?, 'ACTIVO', ?, ?) RETURNING id_codigo
+                INSERT INTO mycar.codigo_recuperacion(
+                    id_usuario, codigo_hash, estado, expira_utc, creado_utc, finalidad)
+                VALUES (?, ?, 'ACTIVO', ?, ?, 'RECUPERAR_CONTRASENA') RETURNING id_codigo
                 """, Long.class, userId, codeHash, utc(expiresAt), utc(now));
         if (id == null) throw new IllegalStateException("No se pudo registrar el código");
         return id;
@@ -60,7 +62,7 @@ public class JdbcRecoveryStore implements RecoveryStore {
         return jdbc.query("""
                 SELECT id_codigo, id_usuario, codigo_hash, estado, expira_utc, creado_utc, intentos_fallidos
                   FROM mycar.codigo_recuperacion
-                 WHERE id_usuario=? AND estado='ACTIVO'
+                 WHERE id_usuario=? AND estado='ACTIVO' AND finalidad='RECUPERAR_CONTRASENA'
                  ORDER BY creado_utc DESC
                  LIMIT 1
                  FOR UPDATE
@@ -72,7 +74,7 @@ public class JdbcRecoveryStore implements RecoveryStore {
         return jdbc.query("""
                 SELECT id_codigo, id_usuario, codigo_hash, estado, expira_utc, creado_utc, intentos_fallidos
                   FROM mycar.codigo_recuperacion
-                 WHERE id_usuario=?
+                 WHERE id_usuario=? AND finalidad='RECUPERAR_CONTRASENA'
                  ORDER BY creado_utc DESC
                  LIMIT 1
                 """, CODE, userId).stream().findFirst();

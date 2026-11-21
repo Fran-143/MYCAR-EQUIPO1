@@ -33,7 +33,30 @@ fun AdministracionHubScreen(
     val adminRepo = remember(authContext.sessionId) {
         com.mycar.app.features.admin.data.adminVinRepository(context, authContext)
     }
+    val usuariosRepo = remember(authContext.sessionId) {
+        com.mycar.app.features.admin.data.adminUsuariosRepository(context, authContext)
+    }
     when (subpantalla) {
+        "pruebas_locales" -> {
+            if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
+                com.mycar.app.features.localtest.PruebasLocalesRoute(
+                    onVolver = { subpantalla = null },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            return
+        }
+        "usuarios" -> {
+            UsuariosAdminRoute(
+                repository = usuariosRepo,
+                onVolver = { subpantalla = null },
+                onAbrirPruebas = if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
+                    { subpantalla = "pruebas_locales" }
+                } else null,
+                modifier = Modifier.fillMaxSize()
+            )
+            return
+        }
         "incidencias_vin" -> {
             IncidenciasVinRoute(
                 repository = adminRepo,
@@ -105,12 +128,22 @@ fun AdministracionHubScreen(
             } else {
                 secciones.forEach { seccion ->
                     AdminSectionCard(seccion) {
-                        if (seccion.codigo == "INCIDENCIAS" || seccion.nombre == "Incidencias") {
-                            subpantalla = "incidencias_hub"
+                        when {
+                            seccion.codigo == "INCIDENCIAS" || seccion.nombre == "Incidencias" ->
+                                subpantalla = "incidencias_hub"
+                            seccion.codigo == "USUARIOS" || seccion.nombre == "Usuarios" ->
+                                subpantalla = "usuarios"
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                 }
+            }
+            if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
+                OutlinedButton(
+                    onClick = { subpantalla = "pruebas_locales" },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Pruebas locales") }
+                Spacer(Modifier.height(12.dp))
             }
             Spacer(Modifier.height(24.dp))
             OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {
@@ -167,14 +200,16 @@ private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
 
 @Composable
 private fun AdminSectionCard(seccion: AdminSeccionDto, onClick: (() -> Unit)? = null) {
-    val incidencias = seccion.codigo == "INCIDENCIAS" || seccion.nombre == "Incidencias"
+    val disponible = seccion.disponible ||
+        seccion.codigo == "INCIDENCIAS" || seccion.nombre == "Incidencias" ||
+        seccion.codigo == "USUARIOS" || seccion.nombre == "Usuarios"
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         tonalElevation = 1.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (incidencias && onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .then(if (disponible && onClick != null) Modifier.clickable { onClick() } else Modifier)
     ) {
         Column(Modifier.padding(20.dp)) {
             Text(
@@ -185,12 +220,8 @@ private fun AdminSectionCard(seccion: AdminSeccionDto, onClick: (() -> Unit)? = 
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                when {
-                    incidencias -> "Disponible"
-                    seccion.disponible -> "Disponible"
-                    else -> "Próximamente"
-                },
-                color = if (incidencias || seccion.disponible) Teal else Mute
+                if (disponible) "Disponible" else "Próximamente",
+                color = if (disponible) Teal else Mute
             )
         }
     }

@@ -19,7 +19,11 @@ public final class AuthenticationErrors {
                 case INVALID_INPUT -> body(400,"VALIDACION",failure.getMessage(),failure.fields());
                 case INVALID_CREDENTIALS -> body(401,"CREDENCIALES_INVALIDAS",failure.getMessage(),Map.of());
                 case INVALID_SESSION -> body(401,"SESION_INVALIDA",failure.getMessage(),Map.of());
-                case ACCOUNT_NOT_ENABLED -> body(403,"CUENTA_NO_HABILITADA",failure.getMessage(),Map.of());
+                case ACCOUNT_NOT_ENABLED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case ACCOUNT_SUSPENDED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case ACCOUNT_BLOCKED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case ACCOUNT_PENDING_DELETION -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case LOGIN_TEMPORARILY_LOCKED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
                 case UNAVAILABLE -> body(503,"AUTENTICACION_NO_DISPONIBLE","Autenticación no disponible.",Map.of());
             };
         }

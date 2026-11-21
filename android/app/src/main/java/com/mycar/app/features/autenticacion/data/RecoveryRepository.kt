@@ -7,7 +7,13 @@ class RecoveryRepository(private val api: RecoveryApi) {
     private val gson = Gson()
 
     data class Emitido(val mensaje: String, val codigoDesarrollo: String?)
-    class RecoveryProblem(message: String, val campos: Map<String, String> = emptyMap()) : Exception(message)
+    class RecoveryProblem(
+        message: String,
+        val campos: Map<String, String> = emptyMap(),
+        val codigo: String? = null,
+        val bloqueadoHastaUtc: String? = null,
+        val loginPermitido: Boolean = false
+    ) : Exception(message)
 
     suspend fun emitir(correo: String): Emitido {
         val response = api.emitir(RecoveryEmailRequest(correo.trim().lowercase()))
@@ -36,11 +42,19 @@ class RecoveryRepository(private val api: RecoveryApi) {
         val parsed = runCatching { gson.fromJson(raw, RecoveryErrorDto::class.java) }.getOrNull()
         val campos = parsed?.erroresPorCampo.orEmpty()
         val mensaje = when (parsed?.codigo) {
+            "BLOQUEO_RECUPERACION" -> parsed.mensaje
+                ?: "La recuperación de contraseña está BLOQUEADA temporalmente. Puedes iniciar sesión con tu contraseña actual."
             "CODIGO_EXPIRADO" -> parsed.mensaje ?: "El código expiró. Solicita uno nuevo."
             "CODIGO_INVALIDO" -> parsed.mensaje ?: "El código no es válido."
             "VALIDACION" -> campos.values.firstOrNull() ?: parsed.mensaje ?: "Revisa los datos ingresados."
             else -> parsed?.mensaje ?: "No se pudo completar la recuperación."
         }
-        return RecoveryProblem(mensaje, campos)
+        return RecoveryProblem(
+            mensaje,
+            campos,
+            codigo = parsed?.codigo,
+            bloqueadoHastaUtc = parsed?.bloqueadoHastaUtc,
+            loginPermitido = parsed?.loginPermitido == true
+        )
     }
 }

@@ -6,9 +6,13 @@ import java.util.UUID;
 
 /** Lock order for commands: user first, then session. All writes share the caller's transaction. */
 public interface AuthenticationStore {
-    record Account(long id,String hash,String state,Instant blockedUntil,String role) {
+    record Account(long id,String hash,String state,Instant blockedUntil,String role,
+                   Instant adminBlockedUntil,Instant eliminacionVence) {
         public Account(long id,String hash,String state,Instant blockedUntil){
-            this(id,hash,state,blockedUntil,"USUARIO");
+            this(id,hash,state,blockedUntil,"USUARIO",null,null);
+        }
+        public Account(long id,String hash,String state,Instant blockedUntil,String role){
+            this(id,hash,state,blockedUntil,role,null,null);
         }
         @Override public String toString(){return "Account[REDACTED]";}
         public boolean isAdmin(){return "ADMIN".equals(role);}
@@ -31,6 +35,8 @@ public interface AuthenticationStore {
     Optional<Account> lockAccount(long userId);
     void recordFailure(long userId);
     void resetFailures(long userId);
+    /** Bloqueo administrativo vencido → ACTIVA. No usar si hay suspensión independiente. */
+    default void clearAdminBlockToActiva(long userId) { }
     void replaceInstallation(long userId,UUID installation,Instant now);
     long createSession(long userId,UUID installation,String refreshHash,Instant expiresAt,Instant now);
     long createSession(long userId,UUID installation,String refreshHash,Instant expiresAt,Instant now,

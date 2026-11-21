@@ -19,8 +19,8 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 34
-        versionName = "1.2.12-alertas-notificaciones-general"
+        versionCode = 41
+        versionName = "1.2.19-rf07-otp-teclado"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.
@@ -29,6 +29,7 @@ android {
             legalConfigString(providers.gradleProperty("mycar.privacy.version").getOrElse("")))
         buildConfigField("String", "PRIVACY_DOCUMENT_URL",
             legalConfigString(providers.gradleProperty("mycar.privacy.documentUrl").getOrElse("")))
+        buildConfigField("boolean", "LOCAL_TEST_TOOLS", "false")
     }
 
     buildTypes {
@@ -36,9 +37,11 @@ android {
             // Sufijo solo si -Pmycar.hotfixSidecar=true (coexistencia con Release en el mismo dispositivo).
             // Por defecto (emulador) conserva com.mycar.app para no pelear con google-services.json.
             // Nota: com.mycar.app.hotfix exige cliente en google-services.json (FCM puede fallar; sesión no).
-            if (providers.gradleProperty("mycar.hotfixSidecar").orNull == "true") {
+            val hotfix = providers.gradleProperty("mycar.hotfixSidecar").orNull == "true"
+            if (hotfix) {
                 applicationIdSuffix = ".hotfix"
             }
+            buildConfigField("boolean", "LOCAL_TEST_TOOLS", if (hotfix) "true" else "false")
             buildConfigField("String", "PRIVACY_SOURCE",
                 legalConfigString(providers.gradleProperty("mycar.privacy.source").getOrElse("local-academic")))
             buildConfigField(
@@ -51,6 +54,7 @@ android {
         release {
             // HTTPS público (Render). Override: -Pmycar.apiBaseUrl=https://otro-host/
             // Debug local sigue en 10.0.2.2:8081 (no se altera).
+            buildConfigField("boolean", "LOCAL_TEST_TOOLS", "false")
             buildConfigField(
                 "String",
                 "API_BASE_URL",

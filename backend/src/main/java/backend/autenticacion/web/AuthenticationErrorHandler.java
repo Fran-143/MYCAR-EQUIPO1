@@ -15,5 +15,9 @@ public class AuthenticationErrorHandler {
         return AuthenticationErrors.response(AuthenticationFailure.invalid(Map.of("solicitud","JSON o UUID inválido.")));
     }
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<AuthenticationErrors.ErrorBody> handle(Exception ex){return AuthenticationErrors.response(ex);}
+    public ResponseEntity<AuthenticationErrors.ErrorBody> handle(Exception ex){
+        org.slf4j.LoggerFactory.getLogger(AuthenticationErrorHandler.class)
+                .error("auth_error type={} msg={}", ex.getClass().getName(), ex.getMessage(), ex);
+        return AuthenticationErrors.response(ex);
+    }
 }

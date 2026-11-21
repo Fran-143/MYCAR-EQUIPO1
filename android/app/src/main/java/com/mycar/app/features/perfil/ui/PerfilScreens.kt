@@ -99,6 +99,12 @@ fun PerfilRoute(
                     onSesionInvalida = onSesionInvalida,
                     modifier = Modifier.fillMaxSize()
                 )
+            PantallaPerfil.ELIMINAR_CUENTA ->
+                com.mycar.app.features.cuenta.ui.EliminarCuentaRoute(
+                    onCancel = vm::volverAtras,
+                    onCompletadoLogout = onCerrarSesion,
+                    modifier = Modifier.fillMaxSize()
+                )
         }
         if (estado.confirmarCierre) {
             CerrarSesionDialog(
@@ -339,7 +345,11 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                         FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
                     }
                     Seccion("ZONA DE PELIGRO") {
-                        FilaDeshabilitada("Eliminar cuenta", peligro = true)
+                        FilaAccion(
+                            "Eliminar cuenta",
+                            onClick = vm::abrirEliminarCuenta,
+                            peligro = true
+                        )
                     }
                     Spacer(Modifier.height(24.dp))
                 }
@@ -529,11 +539,11 @@ private fun Seccion(titulo: String, content: @Composable ColumnScope.() -> Unit)
 }
 
 @Composable
-private fun FilaAccion(texto: String, onClick: () -> Unit) {
+private fun FilaAccion(texto: String, onClick: () -> Unit, peligro: Boolean = false) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(texto, Modifier.weight(1f), color = PerfilColors.Navy)
-        Text("›", color = PerfilColors.Mute)
+        Text(texto, Modifier.weight(1f), color = if (peligro) PerfilColors.Danger else PerfilColors.Navy)
+        Text("›", color = if (peligro) PerfilColors.Danger else PerfilColors.Mute)
     }
 }
 

@@ -1,9 +1,11 @@
 package backend.autenticacion;
 
+import backend.cuentas.AlertaLoginSeguridad;
 import backend.mfa.MfaService;
 import backend.registro.RegistrationData;
 import backend.registro.RegistrationException;
 import backend.registro.RegistrationStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -57,16 +59,18 @@ public class SessionAuthentication {
     private final RegistrationStore registrationStore;
     private final String privacyVersion;
     private final MfaService mfaService;
+    private final ObjectProvider<AlertaLoginSeguridad> alertaLogin;
 
     public SessionAuthentication(LoginValidator validator,AuthenticationStore store,SessionCredentials credentials,
             @Qualifier("registrationPasswordEncoder") PasswordEncoder passwords,PlatformTransactionManager manager,
             RegistrationStore registrationStore,
             @Value("${mycar.auth.login-auto-alta:false}") boolean loginAutoAlta,
             @Value("${mycar.registro.privacidad.version-vigente:1.0}") String privacyVersion,
-            MfaService mfaService){
+            MfaService mfaService,
+            ObjectProvider<AlertaLoginSeguridad> alertaLogin){
         this.validator=validator;this.store=store;this.credentials=credentials;this.passwords=passwords;
         this.registrationStore=registrationStore;this.loginAutoAlta=loginAutoAlta;this.privacyVersion=privacyVersion;
-        this.mfaService=mfaService;
+        this.mfaService=mfaService;this.alertaLogin=alertaLogin;
         this.tx=new TransactionTemplate(manager);
         this.tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.dummyHash=passwords.encode(UUID.randomUUID().toString());
@@ -89,12 +93,59 @@ public class SessionAuthentication {
             }
             if(account==null){passwords.matches(command.contrasena(),dummyHash);return new Outcome(null,true);}
             Instant checkedAt=store.now();
-            if(account.blockedUntil()!=null && checkedAt.isBefore(account.blockedUntil()))return new Outcome(null,true);
+            boolean loginLockActivo=account.blockedUntil()!=null && checkedAt.isBefore(account.blockedUntil());
             if(!passwords.matches(command.contrasena(),account.hash())){
-                if("ACTIVA".equals(account.state()))store.recordFailure(account.id());
+                // Con bloqueo de acceso activo no acumular más fallos ni filtrar el estado al atacante.
+                if(loginLockActivo)return new Outcome(null,true);
+                if("ACTIVA".equals(account.state()) || "BLOQUEADA".equals(account.state())){
+                    store.recordFailure(account.id());
+                    var after=store.lockAccount(account.id()).orElse(null);
+                    if(after!=null && after.blockedUntil()!=null && checkedAt.isBefore(after.blockedUntil())){
+                        AlertaLoginSeguridad alerta=alertaLogin.getIfAvailable();
+                        if(alerta!=null){
+                            alerta.notificarSiNuevoBloqueo(after.id(),command.correo(),after.blockedUntil(),store.now());
+                        }
+                    }
+                }
                 return new Outcome(null,true);
             }
-            if(!"ACTIVA".equals(account.state()))throw AuthenticationFailure.accountNotEnabled();
+            // Credenciales OK: si solo hay bloqueo de acceso (10 min), informar de forma tipada.
+            if(loginLockActivo){
+                throw AuthenticationFailure.loginTemporarilyLocked(account.blockedUntil().toString());
+            }
+            // Credenciales OK: mensajes tipados por estado (sin enumerar en fallos previos).
+            String estado=account.state();
+            if("ELIMINADA".equals(estado))throw AuthenticationFailure.accountNotEnabled();
+            if("SUSPENDIDA".equals(estado))throw AuthenticationFailure.suspended();
+            if("PENDIENTE_ELIMINACION".equals(estado)){
+                Instant vence=account.eliminacionVence();
+                String dias=null;
+                if(vence!=null){
+                    long d=java.time.Duration.between(checkedAt,vence).toDays();
+                    dias=String.valueOf(Math.max(0,d));
+                }
+                throw AuthenticationFailure.pendingDeletion(vence==null?null:vence.toString(),dias);
+            }
+            if("BLOQUEADA".equals(estado)){
+                Instant adminHasta=account.adminBlockedUntil();
+                if(adminHasta!=null && !checkedAt.isBefore(adminHasta)){
+                    // Bloqueo admin vencido: restaurar ACTIVA (no había suspensión coexistente).
+                    store.clearAdminBlockToActiva(account.id());
+                }else{
+                    Instant hasta=adminHasta!=null?adminHasta:account.blockedUntil();
+                    throw AuthenticationFailure.blocked(hasta==null?null:hasta.toString());
+                }
+            }
+            if(!"ACTIVA".equals(estado) && !"BLOQUEADA".equals(estado))throw AuthenticationFailure.accountNotEnabled();
+            // Releer tras posible clearAdminBlock
+            account=store.lockAccount(account.id()).orElse(account);
+            if(!"ACTIVA".equals(account.state())){
+                if("BLOQUEADA".equals(account.state())){
+                    Instant hasta=account.adminBlockedUntil()!=null?account.adminBlockedUntil():account.blockedUntil();
+                    throw AuthenticationFailure.blocked(hasta==null?null:hasta.toString());
+                }
+                throw AuthenticationFailure.accountNotEnabled();
+            }
             store.resetFailures(account.id());
             if(account.isAdmin()){
                 // MFA fuera de esta TX (REQUIRES_NEW en MfaService) tras commit de fallos/reset.

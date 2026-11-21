@@ -49,7 +49,7 @@ data class SessionState(
     val isAdminSession: Boolean get() = phase == SessionPhase.AUTHENTICATED && alcance == "ADMIN"
 }
 
-class AuthProblem(message: String) : Exception(message)
+class AuthProblem(message: String, val codigo: String? = null) : Exception(message)
 
 /** Identifica un ciclo validado; no contiene credenciales ni autoriza al backend por sí mismo. */
 data class AuthenticatedContext(val sessionId: Long, val version: Long)
@@ -318,13 +318,31 @@ class AuthRepository(
                     synchronized(localLock) { ensureCurrent(expected) }
                     val response = api.login(LoginRequest(email.trim(), password, load().installation))
                     if (!response.isSuccessful) {
-                        response.errorBody()?.close()
-                        throw AuthProblem(when (response.code()) {
-                            400 -> "Revisa el correo y la contraseña."
-                            401 -> "Correo o contraseña incorrectos."
-                            403 -> "La cuenta no está habilitada para iniciar sesión."
+                        val raw = response.errorBody()?.string()
+                        val json = try { org.json.JSONObject(raw ?: "{}") } catch (_: Exception) { null }
+                        val codigo = json?.optString("codigo").orEmpty()
+                        val mensaje = json?.optString("mensaje")?.takeIf { it.isNotBlank() }
+                        // Priorizar codigo tipado antes que HTTP genérico (401/403).
+                        // No anexar timestamps UTC ni contadores exactos a la UI de login.
+                        throw AuthProblem(when {
+                            codigo == "CUENTA_SUSPENDIDA" ->
+                                mensaje ?: "Tu cuenta está SUSPENDIDA por Administración."
+                            codigo == "LOGIN_BLOQUEADO" ->
+                                mensaje
+                                    ?: "Tu cuenta está bloqueada temporalmente por seguridad. Podrás volver a intentarlo en unos minutos."
+                            codigo == "CUENTA_BLOQUEADA" ->
+                                mensaje
+                                    ?: "Tu cuenta está bloqueada temporalmente por Administración. Contacta con Soporte MyCar si necesitas asistencia."
+                            codigo == "CUENTA_PENDIENTE_ELIMINACION" ->
+                                mensaje
+                                    ?: "Tu cuenta está PENDIENTE DE ELIMINACIÓN. Puedes recuperarla dentro del plazo establecido."
+                            codigo == "CREDENCIALES_INVALIDAS" || response.code() == 401 ->
+                                "Correo o contraseña incorrectos."
+                            response.code() == 400 -> mensaje ?: "Revisa el correo y la contraseña."
+                            response.code() == 403 ->
+                                mensaje ?: "La cuenta no está habilitada para iniciar sesión."
                             else -> "No se pudo iniciar sesión. Inténtalo de nuevo."
-                        })
+                        }, codigo = codigo.ifBlank { null })
                     }
                     val body = response.body()
                     val estado = body?.estado

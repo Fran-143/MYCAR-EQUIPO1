@@ -10,8 +10,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.Instant
 
-enum class RecoveryStep { EMAIL, CODE, PASSWORD, SUCCESS }
+enum class RecoveryStep { EMAIL, CODE, PASSWORD, SUCCESS, BLOQUEADO }
 
 data class RecoveryState(
     val step: RecoveryStep = RecoveryStep.EMAIL,
@@ -24,7 +26,10 @@ data class RecoveryState(
     val codigoDesarrollo: String? = null,
     val errors: Map<String, String> = emptyMap(),
     /** Segundos restantes antes de poder reenviar (anti-spam SMTP / RF03). */
-    val reenvioEnSegundos: Int = 0
+    val reenvioEnSegundos: Int = 0,
+    /** Instant ISO del servidor; fuente de verdad del bloqueo Elsa. */
+    val bloqueadoHastaUtc: String? = null,
+    val segundosBloqueoRestantes: Int = 0
 ) {
     val puedeReenviar: Boolean get() = reenvioEnSegundos <= 0 && !busy
 }
@@ -33,9 +38,11 @@ class RecoveryViewModel(private val repository: RecoveryRepository) : ViewModel(
     private val mutable = MutableStateFlow(RecoveryState())
     val state = mutable.asStateFlow()
     private var cooldownJob: Job? = null
+    private var bloqueoJob: Job? = null
 
     fun reset() {
         cooldownJob?.cancel()
+        bloqueoJob?.cancel()
         mutable.value = RecoveryState()
     }
 
@@ -62,6 +69,7 @@ class RecoveryViewModel(private val repository: RecoveryRepository) : ViewModel(
 
     fun emitir() {
         if (mutable.value.busy) return
+        if (mutable.value.step == RecoveryStep.BLOQUEADO) return
         if (mutable.value.step == RecoveryStep.CODE && !mutable.value.puedeReenviar) return
         val correo = mutable.value.correo.trim().lowercase()
         if (correo.isBlank() || correo.length > 254
@@ -81,9 +89,13 @@ class RecoveryViewModel(private val repository: RecoveryRepository) : ViewModel(
                 )
                 startCooldown(60)
             } catch (e: RecoveryRepository.RecoveryProblem) {
-                val wait = cooldownSecondsFromMessage(e.message) ?: cooldownSecondsFromMessage(e.campos["correo"])
-                if (wait != null) startCooldown(wait)
-                mutable.value = mutable.value.copy(busy = false, errors = e.campos, message = e.message)
+                if (e.codigo == "BLOQUEO_RECUPERACION") {
+                    enterBloqueo(e.bloqueadoHastaUtc, e.message)
+                } else {
+                    val wait = cooldownSecondsFromMessage(e.message) ?: cooldownSecondsFromMessage(e.campos["correo"])
+                    if (wait != null) startCooldown(wait)
+                    mutable.value = mutable.value.copy(busy = false, errors = e.campos, message = e.message)
+                }
             } catch (_: Exception) {
                 mutable.value = mutable.value.copy(busy = false, message = "No se pudo enviar el código.")
             }
@@ -129,9 +141,11 @@ class RecoveryViewModel(private val repository: RecoveryRepository) : ViewModel(
             try {
                 repository.restablecer(s.correo, s.codigo, s.nueva, s.confirmacion)
                 cooldownJob?.cancel()
+                bloqueoJob?.cancel()
                 mutable.value = mutable.value.copy(
                     busy = false, step = RecoveryStep.SUCCESS,
-                    nueva = "", confirmacion = "", codigo = "", codigoDesarrollo = null, reenvioEnSegundos = 0
+                    nueva = "", confirmacion = "", codigo = "", codigoDesarrollo = null, reenvioEnSegundos = 0,
+                    bloqueadoHastaUtc = null, segundosBloqueoRestantes = 0
                 )
             } catch (e: RecoveryRepository.RecoveryProblem) {
                 mutable.value = mutable.value.copy(busy = false, errors = e.campos, message = e.message)
@@ -146,12 +160,58 @@ class RecoveryViewModel(private val repository: RecoveryRepository) : ViewModel(
         if (s.busy) return
         mutable.value = when (s.step) {
             RecoveryStep.EMAIL -> s
+            RecoveryStep.BLOQUEADO -> {
+                // La navegación a Login la hace AuthGate/onLogin; aquí solo limpia estado.
+                bloqueoJob?.cancel()
+                RecoveryState()
+            }
             RecoveryStep.CODE -> {
                 cooldownJob?.cancel()
                 s.copy(step = RecoveryStep.EMAIL, codigo = "", codigoDesarrollo = null, reenvioEnSegundos = 0)
             }
             RecoveryStep.PASSWORD -> s.copy(step = RecoveryStep.CODE, nueva = "", confirmacion = "")
             RecoveryStep.SUCCESS -> RecoveryState()
+        }
+    }
+
+    private fun enterBloqueo(hastaUtc: String?, mensaje: String?) {
+        cooldownJob?.cancel()
+        mutable.value = mutable.value.copy(
+            busy = false,
+            step = RecoveryStep.BLOQUEADO,
+            message = mensaje
+                ?: "La recuperación de contraseña está BLOQUEADA temporalmente. Puedes iniciar sesión con tu contraseña actual.",
+            bloqueadoHastaUtc = hastaUtc,
+            codigoDesarrollo = null,
+            reenvioEnSegundos = 0
+        )
+        startBloqueoCountdown(hastaUtc)
+    }
+
+    private fun startBloqueoCountdown(hastaUtc: String?) {
+        bloqueoJob?.cancel()
+        if (hastaUtc.isNullOrBlank()) {
+            mutable.value = mutable.value.copy(segundosBloqueoRestantes = 0)
+            return
+        }
+        bloqueoJob = viewModelScope.launch {
+            while (true) {
+                val left = runCatching {
+                    val until = Instant.parse(hastaUtc)
+                    Duration.between(Instant.now(), until).seconds.coerceAtLeast(0).toInt()
+                }.getOrDefault(0)
+                mutable.value = mutable.value.copy(segundosBloqueoRestantes = left)
+                if (left <= 0) {
+                    // Venció: volver a correo para reintentar (servidor es la fuente de verdad).
+                    mutable.value = mutable.value.copy(
+                        step = RecoveryStep.EMAIL,
+                        bloqueadoHastaUtc = null,
+                        message = "El bloqueo de recuperación finalizó. Puedes solicitar un nuevo código."
+                    )
+                    break
+                }
+                delay(1_000)
+            }
         }
     }
 
