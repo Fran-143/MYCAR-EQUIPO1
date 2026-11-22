@@ -1,15 +1,19 @@
 package backend.soat.service;
 
+import backend.catalogos.service.AseguradoraCatalogoService;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Catálogo SOAT Perú alineado a APESEG + perfiles de validación.
- * Sin longitudes/regex inventadas por compañía (SBS: cada aseguradora define su identificador).
+ * Catálogo SOAT Perú: fallback hardcodeado + delegación a {@link AseguradoraCatalogoService} (DB)
+ * cuando está enlazado tras el arranque de Spring.
  */
 public final class CatalogoAseguradorasSoat {
+
+    private static volatile AseguradoraCatalogoService runtime;
 
     public record PerfilValidacionPoliza(
             String id,
@@ -79,6 +83,19 @@ public final class CatalogoAseguradorasSoat {
 
     private CatalogoAseguradorasSoat() { }
 
+    public static void bind(AseguradoraCatalogoService service) {
+        runtime = service;
+    }
+
+    /** Fallback para tests sin DB V44. */
+    public static List<Entrada> activasFallback() {
+        Map<String, Entrada> unicas = new LinkedHashMap<>();
+        for (Entrada e : POR_CLAVE.values()) {
+            if (e.activo()) unicas.putIfAbsent(e.codigo(), e);
+        }
+        return List.copyOf(unicas.values());
+    }
+
     private static Entrada activa(String id, String codigo, String nombre, Set<String> alias,
             String ayuda, String ejemplo, String fuente, String fecha) {
         return new Entrada(id, codigo, nombre, alias, true,
@@ -117,26 +134,53 @@ public final class CatalogoAseguradorasSoat {
     }
 
     public static Entrada resolver(String codigoONombre) {
+        if (runtime != null && runtime.tieneDatosDb()) {
+            var e = runtime.resolver(codigoONombre);
+            if (e == null) return null;
+            return new Entrada(e.codigo(), e.codigo(), e.nombre(), Set.of(), e.activo() && !e.permiteNombreLibre(),
+                    runtime.perfil(codigoONombre));
+        }
         String n = normalizar(codigoONombre);
         return n == null ? null : POR_CLAVE.get(n);
     }
 
     public static boolean esActiva(String codigoONombre) {
+        if (runtime != null && runtime.tieneDatosDb()) {
+            // Activa de catálogo (no OTRA) O nombre libre permitido cuando OTRA está activa.
+            if (runtime.esActiva(codigoONombre)) return true;
+            String alta = runtime.codigoParaAlta(codigoONombre);
+            return alta != null;
+        }
         Entrada e = resolver(codigoONombre);
         return e != null && e.activo();
     }
 
     public static boolean esReconocida(String codigoONombre) {
+        if (runtime != null && runtime.tieneDatosDb()) {
+            if (runtime.esReconocida(codigoONombre)) {
+                var e = runtime.resolver(codigoONombre);
+                return e != null && !e.permiteNombreLibre();
+            }
+            return runtime.codigoParaCorregir(codigoONombre) != null;
+        }
         return resolver(codigoONombre) != null;
     }
 
-    /** Código canónico para persistir (sin tildes). */
+    /** Código canónico para persistir (sin tildes); admite nombre libre si OTRA está activa. */
     public static String codigoParaGuardar(String codigoONombre) {
+        if (runtime != null && runtime.tieneDatosDb()) {
+            String alta = runtime.codigoParaAlta(codigoONombre);
+            if (alta != null) return alta;
+            return runtime.codigoParaCorregir(codigoONombre);
+        }
         Entrada e = resolver(codigoONombre);
         return e == null ? null : e.codigo();
     }
 
     public static PerfilValidacionPoliza perfil(String codigoONombre) {
+        if (runtime != null && runtime.tieneDatosDb()) {
+            return runtime.perfil(codigoONombre);
+        }
         Entrada e = resolver(codigoONombre);
         return e == null ? null : e.perfil();
     }

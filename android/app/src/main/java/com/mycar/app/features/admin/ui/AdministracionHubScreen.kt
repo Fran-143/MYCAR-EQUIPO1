@@ -1,15 +1,26 @@
 package com.mycar.app.features.admin.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Report
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,6 +47,9 @@ fun AdministracionHubScreen(
     val usuariosRepo = remember(authContext.sessionId) {
         com.mycar.app.features.admin.data.adminUsuariosRepository(context, authContext)
     }
+    val catalogosRepo = remember(authContext.sessionId) {
+        com.mycar.app.features.admin.data.adminCatalogosRepository(context, authContext)
+    }
     when (subpantalla) {
         "pruebas_locales" -> {
             if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
@@ -53,6 +67,14 @@ fun AdministracionHubScreen(
                 onAbrirPruebas = if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
                     { subpantalla = "pruebas_locales" }
                 } else null,
+                modifier = Modifier.fillMaxSize()
+            )
+            return
+        }
+        "catalogos" -> {
+            CatalogosAdminRoute(
+                repository = catalogosRepo,
+                onVolver = { subpantalla = null },
                 modifier = Modifier.fillMaxSize()
             )
             return
@@ -93,7 +115,7 @@ fun AdministracionHubScreen(
         AdminSeccionDto("USUARIOS", "Usuarios", false, "PROXIMAMENTE"),
         AdminSeccionDto("SUSCRIPCIONES", "Suscripciones", false, "PROXIMAMENTE"),
         AdminSeccionDto("INCIDENCIAS", "Incidencias", true, "DISPONIBLE"),
-        AdminSeccionDto("CATALOGOS", "Catálogos", false, "PROXIMAMENTE")
+        AdminSeccionDto("CATALOGOS", "Catálogos", true, "DISPONIBLE")
     )
 
     Scaffold(containerColor = Bg) { padding ->
@@ -133,6 +155,8 @@ fun AdministracionHubScreen(
                                 subpantalla = "incidencias_hub"
                             seccion.codigo == "USUARIOS" || seccion.nombre == "Usuarios" ->
                                 subpantalla = "usuarios"
+                            seccion.codigo == "CATALOGOS" || seccion.nombre == "Catálogos" ->
+                                subpantalla = "catalogos"
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -161,7 +185,11 @@ private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TextButton(onClick = onVolver) { Text("Volver", color = Navy) }
+            TextButton(onClick = onVolver) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, tint = Navy, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Volver", color = Navy)
+            }
             Text("Incidencias", fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleLarge)
             Text("Gestión de incidencias", color = Mute)
             Card(
@@ -169,10 +197,18 @@ private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Incidencias de VIN", fontWeight = FontWeight.SemiBold, color = Navy)
-                    Text("Solicitudes de corrección de VIN de vehículos.", color = Mute)
-                    Text("Disponible", color = Teal, fontWeight = FontWeight.Medium)
+                Row(
+                    Modifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HubIconBadge(Icons.Outlined.Report, Navy)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Incidencias de VIN", fontWeight = FontWeight.SemiBold, color = Navy)
+                        Text("Solicitudes de corrección de VIN de vehículos.", color = Mute)
+                        Text("Disponible", color = Teal, fontWeight = FontWeight.Medium)
+                    }
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Mute)
                 }
             }
             Card(
@@ -180,10 +216,17 @@ private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Otras incidencias", fontWeight = FontWeight.SemiBold, color = Navy)
-                    Text("Otros reportes y solicitudes.", color = Mute)
-                    Text("Próximamente", color = Mute, fontWeight = FontWeight.Medium)
+                Row(
+                    Modifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HubIconBadge(Icons.Outlined.SupportAgent, Mute)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Otras incidencias", fontWeight = FontWeight.SemiBold, color = Navy)
+                        Text("Otros reportes y solicitudes.", color = Mute)
+                        Text("Próximamente", color = Mute, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
         }
@@ -202,7 +245,20 @@ private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
 private fun AdminSectionCard(seccion: AdminSeccionDto, onClick: (() -> Unit)? = null) {
     val disponible = seccion.disponible ||
         seccion.codigo == "INCIDENCIAS" || seccion.nombre == "Incidencias" ||
-        seccion.codigo == "USUARIOS" || seccion.nombre == "Usuarios"
+        seccion.codigo == "USUARIOS" || seccion.nombre == "Usuarios" ||
+        seccion.codigo == "CATALOGOS" || seccion.nombre == "Catálogos"
+    val icon = when (seccion.codigo?.uppercase()) {
+        "USUARIOS" -> Icons.Outlined.People
+        "SUSCRIPCIONES" -> Icons.Outlined.CreditCard
+        "INCIDENCIAS" -> Icons.Outlined.Report
+        "CATALOGOS" -> Icons.Outlined.Category
+        else -> Icons.Outlined.Category
+    }
+    val accent = when {
+        !disponible -> Mute
+        seccion.codigo.equals("CATALOGOS", true) -> Teal
+        else -> Navy
+    }
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
@@ -211,18 +267,45 @@ private fun AdminSectionCard(seccion: AdminSeccionDto, onClick: (() -> Unit)? = 
             .fillMaxWidth()
             .then(if (disponible && onClick != null) Modifier.clickable { onClick() } else Modifier)
     ) {
-        Column(Modifier.padding(20.dp)) {
-            Text(
-                seccion.nombre ?: seccion.codigo.orEmpty(),
-                color = Navy,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                if (disponible) "Disponible" else "Próximamente",
-                color = if (disponible) Teal else Mute
-            )
+        Row(
+            Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            HubIconBadge(icon, accent)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    seccion.nombre ?: seccion.codigo.orEmpty(),
+                    color = Navy,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (disponible) "Disponible" else "Próximamente",
+                    color = if (disponible) Teal else Mute
+                )
+            }
+            if (disponible) {
+                Icon(
+                    Icons.AutoMirrored.Outlined.ArrowForward,
+                    contentDescription = null,
+                    tint = Mute,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun HubIconBadge(icon: ImageVector, tint: Color) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .background(tint.copy(alpha = 0.12f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
     }
 }

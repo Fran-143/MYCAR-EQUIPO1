@@ -43,7 +43,13 @@ object ValidacionFormularioMantenimiento {
     fun formulario(b: BorradorMantenimiento, c: ContextoRf17Dto?): Map<String,String> = buildMap {
         if (c == null) { put("contexto", "Carga los datos antes de guardar"); return@buildMap }
         if (c.vehiculos.none { it.idVehiculo == b.idVehiculo }) put("idVehiculo", "Selecciona un vehículo disponible")
-        if (c.tipos.none { it.codigo == b.codigoTipo }) put("codigoTipoMantenimiento", "Selecciona un tipo disponible")
+        if (c.tipos.none { it.codigo == b.codigoTipo }) {
+            put(
+                "codigoTipoMantenimiento",
+                if (b.codigoTipo.isBlank()) "Selecciona un tipo disponible"
+                else "Ese tipo ya no está activo. Elige otro del catálogo."
+            )
+        }
         val fecha = runCatching { LocalDate.parse(b.fecha) }.getOrNull()
         val hoy = runCatching { LocalDate.parse(c.fechaServidor) }.getOrNull()
         if (fecha == null || hoy == null || fecha > hoy) put("fechaServicio", "Selecciona una fecha válida no futura")

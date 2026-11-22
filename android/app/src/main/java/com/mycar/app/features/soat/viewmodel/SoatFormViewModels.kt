@@ -80,6 +80,16 @@ abstract class SoatFormViewModelBase(
     )
     val estado = _estado.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            try {
+                AseguradoraCatalogoVivo.actualizar(repository.listarAseguradoras())
+            } catch (_: Exception) {
+                // Fallback al enum embebido si la API no está disponible.
+            }
+        }
+    }
+
     private fun exigirVencimientoFuturo(): Boolean =
         modo == TipoFormSoat.REGISTRAR || modo == TipoFormSoat.RENOVAR
 
@@ -374,7 +384,7 @@ abstract class SoatFormViewModelBase(
             }
             else -> null
         }
-        val aseg = AseguradoraSoat.normalizarParaGuardar(c.aseguradora) ?: c.aseguradora.trim()
+        val aseg = AseguradoraCatalogoVivo.normalizarParaGuardar(c.aseguradora) ?: c.aseguradora.trim()
         return SoatMutacionDto(
             idOperacion = if (s.modo == TipoFormSoat.CORREGIR) null else UUID.randomUUID().toString(),
             idSoatAnterior = if (s.modo == TipoFormSoat.RENOVAR) s.idSoat else null,

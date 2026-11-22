@@ -4,6 +4,7 @@ import com.mycar.app.features.soat.data.*
 
 interface SoatRepository {
     suspend fun consultar(idVehiculo: Long): SoatConsultaResponse
+    suspend fun listarAseguradoras(): List<AseguradoraSoatDto>
     suspend fun registrar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto
     suspend fun corregir(idVehiculo: Long, idSoat: Long, solicitud: SoatMutacionDto): SoatDto
     suspend fun renovar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto

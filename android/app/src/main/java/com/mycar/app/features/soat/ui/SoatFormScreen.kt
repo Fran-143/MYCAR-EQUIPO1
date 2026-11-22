@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.mycar.app.features.soat.domain.AseguradoraSoat
+import com.mycar.app.features.soat.domain.AseguradoraCatalogoVivo
 import com.mycar.app.features.soat.domain.CamposSoat
 import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.features.soat.viewmodel.*
@@ -171,14 +171,14 @@ private fun FormularioCamposSoat(
             etiqueta = "Número de póliza / certificado *",
             valor = c.numeroPoliza,
             onChange = { t -> onActualizar { it.copy(numeroPoliza = SoatFormulario.limitarPoliza(t)) } },
-            placeholder = "Ej. ${AseguradoraSoat.ejemploPoliza(c.aseguradora)}",
+            placeholder = "Ej. ${AseguradoraCatalogoVivo.ejemploPoliza(c.aseguradora)}",
             error = estado.errores["numeroPoliza"],
             enabled = !estado.ocupado,
             keyboard = KeyboardType.Text,
             mayusculas = true
         )
         Text(
-            AseguradoraSoat.ayudaPoliza(c.aseguradora),
+            AseguradoraCatalogoVivo.ayudaPoliza(c.aseguradora),
             color = MyCarMuted,
             style = MaterialTheme.typography.bodySmall
         )

@@ -13,6 +13,9 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 
 interface SoatApi {
+    @GET("api/v1/soat/aseguradoras")
+    suspend fun listarAseguradoras(): Response<AseguradorasSoatListaDto>
+
     @GET("api/v1/vehiculos/{idVehiculo}/soat")
     suspend fun consultar(@Path("idVehiculo") idVehiculo: Long): Response<SoatConsultaResponse>
 

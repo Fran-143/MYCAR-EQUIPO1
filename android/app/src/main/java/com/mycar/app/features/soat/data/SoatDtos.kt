@@ -32,6 +32,20 @@ data class SoatRecordatorioEstadoDto(
     val estadoAlerta: String? = null
 )
 
+data class AseguradoraSoatDto(
+    val id: Long = 0,
+    val codigo: String? = null,
+    val nombre: String? = null,
+    val permiteNombreLibre: Boolean = false,
+    val ayudaPoliza: String? = null,
+    val ejemploPoliza: String? = null
+)
+
+data class AseguradorasSoatListaDto(
+    val items: List<AseguradoraSoatDto> = emptyList(),
+    val total: Int = 0
+)
+
 data class SoatConsultaResponse(
     val actual: SoatDto? = null,
     val historial: List<SoatDto> = emptyList(),

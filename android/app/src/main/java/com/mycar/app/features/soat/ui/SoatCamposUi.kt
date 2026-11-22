@@ -33,6 +33,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.mycar.app.features.soat.domain.AseguradoraCatalogoItem
+import com.mycar.app.features.soat.domain.AseguradoraCatalogoVivo
 import com.mycar.app.features.soat.domain.AseguradoraSoat
 import com.mycar.app.features.soat.domain.SoatFormulario
 import com.mycar.app.ui.theme.MyCarMuted
@@ -165,15 +167,48 @@ fun SoatSelectorAseguradora(
 ) {
     var abierto by remember { mutableStateOf(false) }
     var filtro by remember { mutableStateOf("") }
-    val seleccion = AseguradoraSoat.porCodigo(valor)
-    val opciones = remember(filtro) {
+    var modoOtra by remember { mutableStateOf(false) }
+    var nombreLibre by remember { mutableStateOf("") }
+    val catalogo = AseguradoraCatalogoVivo.activas()
+    val seleccion: AseguradoraCatalogoItem? = remember(valor, catalogo, modoOtra) {
+        val match = AseguradoraCatalogoVivo.resolver(valor)
+        when {
+            match != null && !match.permiteNombreLibre -> match
+            modoOtra || (match?.permiteNombreLibre == true) ->
+                catalogo.firstOrNull { it.permiteNombreLibre }
+            match == null && valor.isNotBlank() && AseguradoraCatalogoVivo.otraActiva() &&
+                AseguradoraSoat.porCodigo(valor) == null ->
+                catalogo.firstOrNull { it.permiteNombreLibre }
+            else -> match
+        }
+    }
+    LaunchedEffect(valor, catalogo) {
+        val match = AseguradoraCatalogoVivo.resolver(valor)
+        if (match?.permiteNombreLibre == true) {
+            modoOtra = true
+        } else if (match == null && valor.isNotBlank() && AseguradoraCatalogoVivo.otraActiva() &&
+            AseguradoraSoat.porCodigo(valor) == null
+        ) {
+            modoOtra = true
+            nombreLibre = valor
+        } else if (match != null && !match.permiteNombreLibre) {
+            modoOtra = false
+            nombreLibre = ""
+        }
+    }
+    val opciones = remember(filtro, catalogo) {
         val f = AseguradoraSoat.normalizar(filtro).orEmpty()
-        AseguradoraSoat.activas().filter {
+        catalogo.filter {
             f.isEmpty() ||
                 AseguradoraSoat.normalizar(it.nombre)?.contains(f) == true ||
-                AseguradoraSoat.normalizar(it.codigo)?.contains(f) == true ||
-                AseguradoraSoat.normalizar(it.id)?.contains(f) == true
+                AseguradoraSoat.normalizar(it.codigo)?.contains(f) == true
         }
+    }
+    val etiqueta = when {
+        modoOtra -> seleccion?.nombre ?: "Otra aseguradora"
+        seleccion != null -> seleccion.nombre
+        valor.isNotBlank() -> valor
+        else -> null
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("Aseguradora *", style = MaterialTheme.typography.labelLarge, color = MyCarMuted)
@@ -193,9 +228,9 @@ fun SoatSelectorAseguradora(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    seleccion?.nombre ?: "Selecciona una aseguradora",
-                    color = if (seleccion == null) MyCarMuted.copy(alpha = 0.75f) else MyCarNavy,
-                    fontWeight = if (seleccion == null) FontWeight.Normal else FontWeight.Medium
+                    etiqueta ?: "Selecciona una aseguradora",
+                    color = if (etiqueta == null) MyCarMuted.copy(alpha = 0.75f) else MyCarNavy,
+                    fontWeight = if (etiqueta == null) FontWeight.Normal else FontWeight.Medium
                 )
                 Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = MyCarMuted)
             }
@@ -215,7 +250,15 @@ fun SoatSelectorAseguradora(
                 DropdownMenuItem(
                     text = { Text(a.nombre) },
                     onClick = {
-                        onChange(a.nombre)
+                        if (a.permiteNombreLibre) {
+                            modoOtra = true
+                            nombreLibre = ""
+                            onChange("")
+                        } else {
+                            modoOtra = false
+                            nombreLibre = ""
+                            onChange(a.nombre)
+                        }
                         abierto = false
                         filtro = ""
                     }
@@ -228,6 +271,20 @@ fun SoatSelectorAseguradora(
                     enabled = false
                 )
             }
+        }
+        if (modoOtra) {
+            OutlinedTextField(
+                value = nombreLibre.ifBlank { if (!AseguradoraCatalogoVivo.esOtra(valor)) valor else "" },
+                onValueChange = {
+                    nombreLibre = SoatFormulario.aMayusculasConservandoCursor(it)
+                    onChange(nombreLibre.trim())
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Nombre de la aseguradora *") },
+                singleLine = true,
+                enabled = enabled,
+                shape = RoundedCornerShape(12.dp)
+            )
         }
         error?.let { Text(it, color = Color(0xFFC62828), style = MaterialTheme.typography.bodySmall) }
     }

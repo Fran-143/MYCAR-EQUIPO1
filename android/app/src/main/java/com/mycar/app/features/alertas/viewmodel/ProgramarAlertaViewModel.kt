@@ -135,7 +135,7 @@ class ProgramarAlertaViewModel(
             return
         }
         val refs = referenciasElegibles(s.borrador, ctx)
-        val errores = validarBorrador(s.borrador, ctx.kmActual, refs)
+        val errores = validarBorrador(s.borrador, ctx.kmActual, refs, ctx.tipos.map { it.codigo })
         if (errores.isNotEmpty()) {
             mutable.value = s.copy(errores = errores, mensaje = errores.values.firstOrNull())
             return
@@ -343,9 +343,13 @@ class ProgramarAlertaViewModel(
         fun validarBorrador(
             b: BorradorAlerta,
             kmActual: Int? = null,
-            refs: List<ReferenciaMantenimientoAlerta> = emptyList()
+            refs: List<ReferenciaMantenimientoAlerta> = emptyList(),
+            tiposActivos: List<String> = emptyList()
         ): Map<String, String> = buildMap {
             if (b.codigoTipo.isBlank()) put("codigoTipo", "Selecciona un tipo de servicio")
+            else if (tiposActivos.isNotEmpty() && b.codigoTipo !in tiposActivos) {
+                put("codigoTipo", "Ese tipo ya no está activo. Elige otro del catálogo.")
+            }
             if (b.origenCalculo !in setOf("DESDE_HOY", "DESDE_MANTENIMIENTO")) {
                 put("origenCalculo", "Elige desde cuándo calcular")
             }

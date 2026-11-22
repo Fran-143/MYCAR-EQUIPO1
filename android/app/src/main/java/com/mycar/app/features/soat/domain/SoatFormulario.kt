@@ -101,12 +101,16 @@ object SoatFormulario {
     ): Map<String, String> {
         val errores = mutableMapOf<String, String>()
         val asegOk = if (exigirCatalogoActivo) {
-            AseguradoraSoat.esValidaParaAlta(aseguradora)
+            AseguradoraCatalogoVivo.esValidaParaAlta(aseguradora)
         } else {
-            AseguradoraSoat.esReconocida(aseguradora)
+            AseguradoraCatalogoVivo.esReconocida(aseguradora)
         }
         if (!asegOk) {
-            errores["aseguradora"] = if (aseguradora.isBlank()) "Indica la aseguradora." else MSG_ASEGURADORA
+            errores["aseguradora"] = when {
+                aseguradora.isBlank() -> "Indica la aseguradora."
+                AseguradoraCatalogoVivo.esOtra(aseguradora) -> "Indica el nombre de la aseguradora."
+                else -> MSG_ASEGURADORA
+            }
         }
         val polizaErr = validarPoliza(numeroPoliza, aseguradora)
         if (polizaErr != null) errores["numeroPoliza"] = polizaErr

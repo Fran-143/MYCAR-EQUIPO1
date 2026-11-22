@@ -28,6 +28,12 @@ class RemoteSoatRepository(
         return normalizar(r.body() ?: SoatConsultaResponse())
     }
 
+    override suspend fun listarAseguradoras(): List<AseguradoraSoatDto> {
+        val r = api.listarAseguradoras()
+        if (!r.isSuccessful) throw fallo(r)
+        return r.body()?.items.orEmpty()
+    }
+
     override suspend fun registrar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto {
         val r = api.registrar(idVehiculo, solicitud.copy(idSoatAnterior = null, accionDocumento = null))
         if (!r.isSuccessful) throw fallo(r)
