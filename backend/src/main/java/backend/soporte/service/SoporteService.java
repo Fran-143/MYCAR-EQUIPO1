@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SoporteService {
-    private static final String TIPO = "CORRECCION_VIN";
-    private static final String OP = "SOLICITAR_CORRECCION_VIN";
+    private static final String TIPO_VIN = "CORRECCION_VIN";
+    private static final String TIPO_GENERAL = "INCIDENCIA_GENERAL";
+    private static final String OP_VIN = "SOLICITAR_CORRECCION_VIN";
+    private static final String OP_GENERAL = "CREAR_INCIDENCIA_GENERAL";
 
     private final SoporteJdbcDao dao;
     private final TiveJdbcDao tiveDao;
@@ -49,6 +52,11 @@ public class SoporteService {
     @Transactional(readOnly = true)
     public List<ContratoSoporte.SolicitudResumenDto> listar(long usuario) {
         return dao.listarPropias(usuario);
+    }
+
+    @Transactional(readOnly = true)
+    public ContratoSoporte.ResumenSoporteDto resumen(long usuario) {
+        return dao.resumenPropio(usuario);
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +87,7 @@ public class SoporteService {
         if (!ctx.tieneTive()) {
             throw new ErrorSoporte("TIVE_REQUERIDA",
                     "Debes registrar la TIVE del vehículo antes de solicitar una corrección de VIN.",
-                    java.util.Set.of("idVehiculo"));
+                    Set.of("idVehiculo"));
         }
         if (ctx.numeroVin() == null || ctx.numeroVin().isBlank()) {
             throw new ErrorSoporte("VIN_AUSENTE", "El vehículo no tiene VIN registrado.");
@@ -88,7 +96,7 @@ public class SoporteService {
         String vinProp = ValidadorSoporte.normalizarVinPropuesto(vinPropuestoRaw, vinReg);
         if (dao.vinUsadoPorOtro(vinProp, idVehiculo)) {
             throw new ErrorSoporte("VIN_DUPLICADO", "El VIN propuesto ya está en otro vehículo.",
-                    java.util.Set.of("vinPropuesto"));
+                    Set.of("vinPropuesto"));
         }
 
         var huellaMap = new java.util.LinkedHashMap<String, Object>();
@@ -99,8 +107,8 @@ public class SoporteService {
         huellaMap.put("tamano", conEvidencia ? bytes.length : 0);
         huellaMap.put("conEvidencia", conEvidencia);
         String huella = hash(huellaMap);
-        boolean nueva = operaciones.reservar(idOperacion, usuario, OP, huella);
-        var op = operaciones.buscarParaActualizar(idOperacion, usuario, OP)
+        boolean nueva = operaciones.reservar(idOperacion, usuario, OP_VIN, huella);
+        var op = operaciones.buscarParaActualizar(idOperacion, usuario, OP_VIN)
                 .orElseThrow(() -> new ErrorSoporte("CONFLICTO_IDEMPOTENCIA", "Operación no disponible."));
         if (!Objects.equals(op.hashSolicitud(), huella)) {
             throw new ErrorSoporte("CONFLICTO_IDEMPOTENCIA", "Esta operación ya existe con otros datos.");
@@ -113,11 +121,11 @@ public class SoporteService {
         }
 
         dao.bloquearVehiculo(idVehiculo);
-        if (dao.existeAbierta(idVehiculo, TIPO)) {
-            String codigo = dao.codigoAbierta(idVehiculo, TIPO).orElse("?");
+        if (dao.existeAbierta(idVehiculo, TIPO_VIN)) {
+            String codigo = dao.codigoAbierta(idVehiculo, TIPO_VIN).orElse("?");
             throw new ErrorSoporte("SOLICITUD_ABIERTA",
                     "Ya existe una solicitud abierta para este vehículo: " + codigo,
-                    java.util.Set.of("idVehiculo"));
+                    Set.of("idVehiculo"));
         }
 
         String key = null;
@@ -139,14 +147,14 @@ public class SoporteService {
             }
         }
 
-        String codigo = nuevoCodigo();
+        String codigo = nuevoCodigoVin();
         try {
-            long id = dao.insertarSolicitud(codigo, TIPO, usuario, idVehiculo);
+            long id = dao.insertarSolicitud(codigo, TIPO_VIN, usuario, idVehiculo);
             dao.insertarCorreccionVin(id, vinReg, vinProp, motivo, key, ct, tamano,
                     nombreOriginal == null || nombreOriginal.isBlank() ? nombre : nombreOriginal);
             dao.insertarEvento(id, null, "PENDIENTE", usuario, "Solicitud creada por el titular");
             var resp = new ContratoSoporte.CrearResponse(idOperacion, codigo, "PENDIENTE");
-            confirmar(idOperacion, usuario, huella, resp);
+            confirmar(idOperacion, usuario, OP_VIN, huella, resp);
             return resp;
         } catch (DataIntegrityViolationException ex) {
             if (key != null) {
@@ -156,9 +164,90 @@ public class SoporteService {
         }
     }
 
+    @Transactional
+    public ContratoSoporte.CrearResponse crearIncidenciaGeneral(
+            long usuario, UUID idOperacion, String categoriaRaw, String temaOtroRaw,
+            String asuntoRaw, String descripcionRaw,
+            String contentType, String nombreOriginal, byte[] bytes) {
+        ValidadorSoporte.exigirIdOperacion(idOperacion);
+        String categoria = ValidadorIncidenciaGeneral.categoria(categoriaRaw);
+        String temaOtro = ValidadorIncidenciaGeneral.temaOtro(categoria, temaOtroRaw);
+        String asunto = ValidadorIncidenciaGeneral.asunto(asuntoRaw);
+        String descripcion = ValidadorIncidenciaGeneral.descripcion(descripcionRaw);
+        ValidadorSoporte.validarEvidenciaOpcional(contentType, bytes);
+        boolean conEvidencia = bytes != null && bytes.length > 0;
+
+        var huellaMap = new java.util.LinkedHashMap<String, Object>();
+        huellaMap.put("contrato", "CREAR_INCIDENCIA_GENERAL_V1");
+        huellaMap.put("categoria", categoria);
+        huellaMap.put("temaOtro", temaOtro == null ? "" : temaOtro);
+        huellaMap.put("asunto", asunto);
+        huellaMap.put("descripcion", descripcion);
+        huellaMap.put("tamano", conEvidencia ? bytes.length : 0);
+        huellaMap.put("conEvidencia", conEvidencia);
+        String huella = hash(huellaMap);
+        boolean nueva = operaciones.reservar(idOperacion, usuario, OP_GENERAL, huella);
+        var op = operaciones.buscarParaActualizar(idOperacion, usuario, OP_GENERAL)
+                .orElseThrow(() -> new ErrorSoporte("CONFLICTO_IDEMPOTENCIA", "Operación no disponible."));
+        if (!Objects.equals(op.hashSolicitud(), huella)) {
+            throw new ErrorSoporte("CONFLICTO_IDEMPOTENCIA", "Esta operación ya existe con otros datos.");
+        }
+        if ("CONFIRMADA".equals(op.estado())) {
+            return leerCreacion(op.respuestaJson());
+        }
+        if (!nueva || !"EN_PROCESO".equals(op.estado())) {
+            throw new ErrorSoporte("OPERACION_EN_PROCESO", "La operación sigue en proceso.", true);
+        }
+
+        String key = null;
+        String ct = null;
+        Integer tamano = null;
+        String nombre = null;
+        if (conEvidencia) {
+            nombre = RutasDocumentoSoporte.nombreSeguro(nombreOriginal);
+            key = RutasDocumentoSoporte.claveTempIncidencia(usuario, nombre);
+            ct = contentType;
+            tamano = bytes.length;
+            try {
+                almacenamiento.guardar(key, bytes, contentType);
+                if (!almacenamiento.confirmarExistencia(key)) {
+                    throw new ErrorSoporte("DOCUMENTO_NO_ENCONTRADO", "No se pudo confirmar la evidencia.");
+                }
+            } catch (ErrorAlmacenamiento ex) {
+                throw new ErrorSoporte(ex.codigo(), ex.getMessage());
+            }
+        }
+
+        String codigo = nuevoCodigoIncidencia();
+        try {
+            long id = dao.insertarSolicitud(codigo, TIPO_GENERAL, usuario, null);
+            dao.insertarIncidenciaGeneral(id, categoria, temaOtro, asunto, descripcion, key, ct, tamano,
+                    nombreOriginal == null || nombreOriginal.isBlank() ? nombre : nombreOriginal);
+            dao.insertarEvento(id, null, "PENDIENTE", usuario, "Incidencia registrada por el usuario");
+            var resp = new ContratoSoporte.CrearResponse(idOperacion, codigo, "PENDIENTE");
+            confirmar(idOperacion, usuario, OP_GENERAL, huella, resp);
+            return resp;
+        } catch (DataIntegrityViolationException ex) {
+            if (key != null) {
+                try { almacenamiento.borrarLogicoHuerfano(key); } catch (Exception ignored) { }
+            }
+            throw new ErrorSoporte("CONFLICTO", "No se pudo registrar la incidencia. Intenta de nuevo.");
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<ContratoSoporte.SolicitudResumenDto> listarAdmin(String estado, String q) {
         return dao.listarAdmin(estado, q);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ContratoSoporte.SolicitudResumenDto> listarAdminGenerales(String estado, String q) {
+        return dao.listarAdminGenerales(estado, q);
+    }
+
+    @Transactional(readOnly = true)
+    public ContratoSoporte.ContadoresIncidenciaDto contadoresGenerales() {
+        return dao.contadoresGenerales();
     }
 
     @Transactional(readOnly = true)
@@ -169,9 +258,29 @@ public class SoporteService {
     }
 
     @Transactional(readOnly = true)
+    public ContratoSoporte.SolicitudDetalleDto detalleAdminGeneral(String codigo) {
+        var fila = dao.porCodigo(codigo)
+                .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        if (!TIPO_GENERAL.equals(fila.tipo())) {
+            throw new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada.");
+        }
+        return aDetalle(fila);
+    }
+
+    @Transactional(readOnly = true)
     public ContratoSoporte.EvidenciaPayload evidenciaAdmin(String codigo) {
         var fila = dao.porCodigo(codigo)
                 .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        return leerEvidencia(fila);
+    }
+
+    @Transactional(readOnly = true)
+    public ContratoSoporte.EvidenciaPayload evidenciaAdminGeneral(String codigo) {
+        var fila = dao.porCodigo(codigo)
+                .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        if (!TIPO_GENERAL.equals(fila.tipo())) {
+            throw new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada.");
+        }
         return leerEvidencia(fila);
     }
 
@@ -179,6 +288,7 @@ public class SoporteService {
     public ContratoSoporte.AccionResponse iniciarRevision(long adminId, String codigo) {
         var fila = dao.bloquearPorCodigo(codigo)
                 .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        exigirTipo(fila, TIPO_VIN);
         if (!"PENDIENTE".equals(fila.estado())) {
             throw new ErrorSoporte("ESTADO_INVALIDO", "Solo se puede iniciar revisión desde PENDIENTE.");
         }
@@ -194,6 +304,7 @@ public class SoporteService {
         String motivo = ValidadorSoporte.motivo(motivoRaw);
         var fila = dao.bloquearPorCodigo(codigo)
                 .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        exigirTipo(fila, TIPO_VIN);
         if ("APROBADA".equals(fila.estado()) || "RECHAZADA".equals(fila.estado())) {
             throw new ErrorSoporte("CASO_CERRADO", "El caso ya está cerrado.");
         }
@@ -212,27 +323,29 @@ public class SoporteService {
     public ContratoSoporte.AccionResponse aprobar(long adminId, String codigo) {
         var fila = dao.bloquearPorCodigo(codigo)
                 .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        exigirTipo(fila, TIPO_VIN);
         if ("APROBADA".equals(fila.estado()) || "RECHAZADA".equals(fila.estado())) {
             throw new ErrorSoporte("CASO_CERRADO", "El caso ya está cerrado.");
         }
         if (!"EN_REVISION".equals(fila.estado())) {
             throw new ErrorSoporte("ESTADO_INVALIDO", "Debes iniciar revisión antes de aprobar.");
         }
-        dao.bloquearVehiculo(fila.idVehiculo());
-        var veh = tiveDao.vehiculoPropio(fila.idUsuario(), fila.idVehiculo())
+        long idVehiculo = fila.idVehiculo() == null ? 0L : fila.idVehiculo();
+        dao.bloquearVehiculo(idVehiculo);
+        var veh = tiveDao.vehiculoPropio(fila.idUsuario(), idVehiculo)
                 .orElseThrow(() -> new ErrorSoporte("VEHICULO_NO_ENCONTRADO", "Vehículo no encontrado."));
         String vinActual = veh.numeroVin() == null ? "" : veh.numeroVin().strip().toUpperCase(Locale.ROOT);
         if (!vinActual.equals(fila.vinRegistrado())) {
             throw new ErrorSoporte("VIN_ACTUAL_CAMBIO",
                     "El VIN del vehículo ya no coincide con el de la solicitud.");
         }
-        if (!tiveDao.existeParaVehiculo(fila.idVehiculo())) {
+        if (!tiveDao.existeParaVehiculo(idVehiculo)) {
             throw new ErrorSoporte("TIVE_INCONSISTENTE", "No hay TIVE asociada al vehículo.");
         }
-        if (dao.vinUsadoPorOtro(fila.vinPropuesto(), fila.idVehiculo())) {
+        if (dao.vinUsadoPorOtro(fila.vinPropuesto(), idVehiculo)) {
             throw new ErrorSoporte("VIN_DUPLICADO", "El VIN propuesto ya está en uso.");
         }
-        int sync = tiveDao.actualizarVinVehiculoYTive(fila.idVehiculo(), fila.vinPropuesto());
+        int sync = tiveDao.actualizarVinVehiculoYTive(idVehiculo, fila.vinPropuesto());
         if (sync < 2) {
             throw new ErrorSoporte("APROBACION_FALLIDA", "No se pudo sincronizar el VIN.");
         }
@@ -244,6 +357,88 @@ public class SoporteService {
         return new ContratoSoporte.AccionResponse(codigo, "APROBADA", fila.versionFila() + 1);
     }
 
+    @Transactional
+    public ContratoSoporte.AccionResponse aceptarGeneral(long adminId, String codigo, String observacionRaw) {
+        String obs = ValidadorIncidenciaGeneral.observacionOpcional(observacionRaw);
+        var fila = dao.bloquearPorCodigo(codigo)
+                .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        exigirTipo(fila, TIPO_GENERAL);
+        if (!"PENDIENTE".equals(fila.estado())) {
+            throw new ErrorSoporte("ESTADO_INVALIDO", "Solo se puede aceptar desde PENDIENTE.");
+        }
+        if (dao.actualizarEstado(fila.idSolicitud(), "ACEPTADA", null, fila.versionFila()) != 1) {
+            throw new ErrorSoporte("CONFLICTO_VERSION", "El caso cambió. Recarga.");
+        }
+        String eventoObs = obs == null || obs.isBlank() ? "Solicitud aceptada" : obs;
+        dao.insertarEvento(fila.idSolicitud(), "PENDIENTE", "ACEPTADA", adminId, eventoObs);
+        return new ContratoSoporte.AccionResponse(codigo, "ACEPTADA", fila.versionFila() + 1);
+    }
+
+    @Transactional
+    public ContratoSoporte.AccionResponse iniciarAtencionGeneral(long adminId, String codigo, String observacionRaw) {
+        String obs = ValidadorIncidenciaGeneral.observacionOpcional(observacionRaw);
+        var fila = dao.bloquearPorCodigo(codigo)
+                .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        exigirTipo(fila, TIPO_GENERAL);
+        if (!"ACEPTADA".equals(fila.estado())) {
+            throw new ErrorSoporte("ESTADO_INVALIDO", "Solo se puede iniciar atención desde ACEPTADA.");
+        }
+        if (dao.actualizarEstado(fila.idSolicitud(), "EN_PROCESO", null, fila.versionFila()) != 1) {
+            throw new ErrorSoporte("CONFLICTO_VERSION", "El caso cambió. Recarga.");
+        }
+        String eventoObs = obs == null || obs.isBlank()
+                ? "Atención iniciada"
+                : obs;
+        dao.insertarEvento(fila.idSolicitud(), "ACEPTADA", "EN_PROCESO", adminId, eventoObs);
+        return new ContratoSoporte.AccionResponse(codigo, "EN_PROCESO", fila.versionFila() + 1);
+    }
+
+    @Transactional
+    public ContratoSoporte.AccionResponse terminarGeneral(long adminId, String codigo, String respuestaRaw) {
+        String respuesta = ValidadorIncidenciaGeneral.respuestaAdmin(respuestaRaw);
+        var fila = dao.bloquearPorCodigo(codigo)
+                .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        exigirTipo(fila, TIPO_GENERAL);
+        if (!"EN_PROCESO".equals(fila.estado())) {
+            throw new ErrorSoporte("ESTADO_INVALIDO", "Solo se puede terminar desde EN_PROCESO.");
+        }
+        if (dao.actualizarEstado(fila.idSolicitud(), "RESUELTA", null, fila.versionFila()) != 1) {
+            throw new ErrorSoporte("CONFLICTO_VERSION", "El caso cambió. Recarga.");
+        }
+        dao.cerrarIncidenciaGeneral(fila.idSolicitud(), respuesta);
+        dao.insertarEvento(fila.idSolicitud(), "EN_PROCESO", "RESUELTA", adminId, respuesta);
+        return new ContratoSoporte.AccionResponse(codigo, "RESUELTA", fila.versionFila() + 1);
+    }
+
+    @Transactional
+    public ContratoSoporte.AccionResponse rechazarGeneral(long adminId, String codigo, String motivoRaw) {
+        String motivo = ValidadorIncidenciaGeneral.motivoRechazo(motivoRaw);
+        var fila = dao.bloquearPorCodigo(codigo)
+                .orElseThrow(() -> new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada."));
+        exigirTipo(fila, TIPO_GENERAL);
+        if ("RESUELTA".equals(fila.estado()) || "RECHAZADA".equals(fila.estado())) {
+            throw new ErrorSoporte("CASO_CERRADO", "El caso ya está cerrado.");
+        }
+        if (!"PENDIENTE".equals(fila.estado())
+                && !"ACEPTADA".equals(fila.estado())
+                && !"EN_PROCESO".equals(fila.estado())) {
+            throw new ErrorSoporte("ESTADO_INVALIDO", "Estado no permite rechazo.");
+        }
+        String ant = fila.estado();
+        if (dao.actualizarEstado(fila.idSolicitud(), "RECHAZADA", motivo, fila.versionFila()) != 1) {
+            throw new ErrorSoporte("CONFLICTO_VERSION", "El caso cambió. Recarga.");
+        }
+        dao.cerrarIncidenciaGeneral(fila.idSolicitud(), null);
+        dao.insertarEvento(fila.idSolicitud(), ant, "RECHAZADA", adminId, motivo);
+        return new ContratoSoporte.AccionResponse(codigo, "RECHAZADA", fila.versionFila() + 1);
+    }
+
+    private static void exigirTipo(SoporteJdbcDao.FilaSolicitud fila, String tipo) {
+        if (!tipo.equals(fila.tipo())) {
+            throw new ErrorSoporte("SOLICITUD_NO_ENCONTRADA", "Solicitud no encontrada.");
+        }
+    }
+
     private ContratoSoporte.SolicitudDetalleDto aDetalle(SoporteJdbcDao.FilaSolicitud fila) {
         return new ContratoSoporte.SolicitudDetalleDto(
                 fila.codigo(), fila.tipo(), fila.estado(), fila.idVehiculo(), fila.placa(),
@@ -251,7 +446,9 @@ public class SoporteService {
                 fila.vinRegistrado(), fila.vinPropuesto(), fila.motivo(), fila.motivoRechazo(),
                 fila.storageObjectKey() != null, fila.contentType(), fila.nombreOriginal(),
                 fila.tamanoBytes(), fila.versionFila(),
-                fila.creadoUtc(), fila.actualizadoUtc(), dao.eventos(fila.idSolicitud()));
+                fila.creadoUtc(), fila.actualizadoUtc(), dao.eventos(fila.idSolicitud()),
+                fila.categoria(), fila.temaOtro(), fila.asunto(), fila.descripcion(),
+                fila.respuestaAdmin(), fila.cerradoUtc());
     }
 
     private ContratoSoporte.EvidenciaPayload leerEvidencia(SoporteJdbcDao.FilaSolicitud fila) {
@@ -272,16 +469,22 @@ public class SoporteService {
         }
     }
 
-    private String nuevoCodigo() {
+    private String nuevoCodigoVin() {
         String dia = LocalDate.now(ZoneId.of("America/Lima")).format(DateTimeFormatter.BASIC_ISO_DATE);
         int n = ThreadLocalRandom.current().nextInt(1000, 9999);
         return "VIN-" + dia + "-" + n;
     }
 
-    private void confirmar(UUID idOperacion, long usuario, String huella, Object resp) {
+    private String nuevoCodigoIncidencia() {
+        String dia = LocalDate.now(ZoneId.of("America/Lima")).format(DateTimeFormatter.BASIC_ISO_DATE);
+        int n = ThreadLocalRandom.current().nextInt(1000, 9999);
+        return "INC-" + dia + "-" + n;
+    }
+
+    private void confirmar(UUID idOperacion, long usuario, String op, String huella, Object resp) {
         try {
             String payload = json.writeValueAsString(resp);
-            if (!operaciones.confirmar(idOperacion, usuario, OP, huella, payload)) {
+            if (!operaciones.confirmar(idOperacion, usuario, op, huella, payload)) {
                 throw new ErrorSoporte("OPERACION_EN_PROCESO", "No se pudo confirmar.", true);
             }
         } catch (ErrorSoporte ex) {

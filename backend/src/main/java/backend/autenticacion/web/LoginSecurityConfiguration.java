@@ -49,6 +49,8 @@ public class LoginSecurityConfiguration {
                         .requestMatchers(HttpMethod.GET,"/api/v1/admin/hub").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/admin/incidencias/vin","/api/v1/admin/incidencias/vin/**")
                         .hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/v1/admin/incidencias/generales","/api/v1/admin/incidencias/generales/**")
+                        .hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/admin/usuarios","/api/v1/admin/usuarios/**")
                         .hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/admin/catalogos","/api/v1/admin/catalogos/**")

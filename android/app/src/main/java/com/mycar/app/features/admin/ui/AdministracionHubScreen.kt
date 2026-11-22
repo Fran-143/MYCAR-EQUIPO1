@@ -41,8 +41,11 @@ fun AdministracionHubScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var subpantalla by remember { mutableStateOf<String?>(null) }
-    val adminRepo = remember(authContext.sessionId) {
+    val adminVinRepo = remember(authContext.sessionId) {
         com.mycar.app.features.admin.data.adminVinRepository(context, authContext)
+    }
+    val adminGeneralesRepo = remember(authContext.sessionId) {
+        com.mycar.app.features.admin.data.adminGeneralesRepository(context, authContext)
     }
     val usuariosRepo = remember(authContext.sessionId) {
         com.mycar.app.features.admin.data.adminUsuariosRepository(context, authContext)
@@ -81,7 +84,15 @@ fun AdministracionHubScreen(
         }
         "incidencias_vin" -> {
             IncidenciasVinRoute(
-                repository = adminRepo,
+                repository = adminVinRepo,
+                onVolver = { subpantalla = "incidencias_hub" },
+                modifier = Modifier.fillMaxSize()
+            )
+            return
+        }
+        "incidencias_generales" -> {
+            IncidenciasGeneralesRoute(
+                repository = adminGeneralesRepo,
                 onVolver = { subpantalla = "incidencias_hub" },
                 modifier = Modifier.fillMaxSize()
             )
@@ -90,7 +101,8 @@ fun AdministracionHubScreen(
         "incidencias_hub" -> {
             IncidenciasHubScreen(
                 onVolver = { subpantalla = null },
-                onVin = { subpantalla = "incidencias_vin" }
+                onVin = { subpantalla = "incidencias_vin" },
+                onGenerales = { subpantalla = "incidencias_generales" }
             )
             return
         }
@@ -178,8 +190,7 @@ fun AdministracionHubScreen(
 }
 
 @Composable
-private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
-    var proximamente by remember { mutableStateOf(false) }
+private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit, onGenerales: () -> Unit) {
     Scaffold(containerColor = Bg) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp),
@@ -212,7 +223,7 @@ private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
                 }
             }
             Card(
-                Modifier.fillMaxWidth().clickable { proximamente = true },
+                Modifier.fillMaxWidth().clickable(onClick = onGenerales),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
@@ -220,24 +231,17 @@ private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit) {
                     Modifier.padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    HubIconBadge(Icons.Outlined.SupportAgent, Mute)
+                    HubIconBadge(Icons.Outlined.SupportAgent, Navy)
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Otras incidencias", fontWeight = FontWeight.SemiBold, color = Navy)
-                        Text("Otros reportes y solicitudes.", color = Mute)
-                        Text("Próximamente", color = Mute, fontWeight = FontWeight.Medium)
+                        Text("Incidencias generales", fontWeight = FontWeight.SemiBold, color = Navy)
+                        Text("Reportes de usuarios sobre la aplicación y servicios.", color = Mute)
+                        Text("Disponible", color = Teal, fontWeight = FontWeight.Medium)
                     }
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Mute)
                 }
             }
         }
-    }
-    if (proximamente) {
-        AlertDialog(
-            onDismissRequest = { proximamente = false },
-            title = { Text("Próximamente") },
-            text = { Text("Las incidencias varias se habilitarán en una entrega posterior.") },
-            confirmButton = { TextButton(onClick = { proximamente = false }) { Text("Entendido") } }
-        )
     }
 }
 

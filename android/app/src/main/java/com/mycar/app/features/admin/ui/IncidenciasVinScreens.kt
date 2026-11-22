@@ -137,7 +137,7 @@ private fun ListaIncidencias(estado: com.mycar.app.features.admin.viewmodel.Esta
                     overflow = TextOverflow.Ellipsis
                 )
                 ChipEstado(s.estado)
-                Text("Placa: ${s.placa}", color = Mute)
+                Text("Placa: ${s.placa.orEmpty()}", color = Mute)
                 s.creadoUtc?.let {
                     Text(it.take(10), color = Mute, style = MaterialTheme.typography.bodySmall)
                 }

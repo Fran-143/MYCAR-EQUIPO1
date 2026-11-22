@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mycar.app.features.soporte.data.SolicitudDetalleDto
+import com.mycar.app.features.soporte.domain.IncidenciaGeneralFormulario
 import com.mycar.app.features.soporte.domain.SoporteFormulario
 import com.mycar.app.features.soat.ui.SoatVistaDocumento
 import com.mycar.app.ui.theme.MyCarMuted
@@ -72,7 +73,7 @@ fun CamposDetalleSolicitudVin(
                 if (correo != null) "$nombre ($correo)" else nombre
             )
         }
-        FilaIconoDetalle(Icons.Outlined.DirectionsCar, "Vehículo", d.vehiculoEtiqueta.ifBlank { d.placa })
+        FilaIconoDetalle(Icons.Outlined.DirectionsCar, "Vehículo", d.vehiculoEtiqueta.ifBlank { d.placa.orEmpty() })
         d.vinRegistrado?.let {
             FilaIconoDetalle(
                 Icons.Outlined.QrCode2,
@@ -129,6 +130,127 @@ fun CamposDetalleSolicitudVin(
             }
         }
         BannerEstadoSolicitud(d.estado)
+    }
+}
+
+@Composable
+fun CamposDetalleIncidenciaGeneral(
+    d: SolicitudDetalleDto,
+    mostrarUsuario: Boolean,
+    evidenciaBytes: ByteArray? = null,
+    evidenciaCargando: Boolean = false,
+    evidenciaError: String? = null,
+    evidenciaRevelada: Boolean = false,
+    onRevelarEvidencia: (() -> Unit)? = null,
+    onOcultarEvidencia: (() -> Unit)? = null
+) {
+    val resuelta = d.estado.equals("RESUELTA", ignoreCase = true)
+    val rechazada = d.estado.equals("RECHAZADA", ignoreCase = true)
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        FilaIconoDetalle(Icons.Outlined.Info, "Tipo", SoporteFormulario.etiquetaTipo(d.tipo))
+        if (mostrarUsuario) {
+            val nombre = d.nombreUsuario?.takeIf { it.isNotBlank() } ?: "Usuario"
+            val correo = d.correoUsuario?.takeIf { it.isNotBlank() }
+            FilaIconoDetalle(
+                Icons.Outlined.Person,
+                "Usuario",
+                if (correo != null) "$nombre ($correo)" else nombre
+            )
+        }
+        d.categoria?.let {
+            val tema = IncidenciaGeneralFormulario.etiquetaCategoria(it)
+            val valor = if (it.equals("OTROS", true) && !d.temaOtro.isNullOrBlank()) {
+                "$tema — ${d.temaOtro}"
+            } else tema
+            FilaIconoDetalle(Icons.Outlined.Info, "Tema", valor)
+        }
+        d.asunto?.takeIf { it.isNotBlank() }?.let {
+            FilaIconoDetalle(Icons.Outlined.ChatBubbleOutline, "Asunto", it)
+        }
+        d.descripcion?.takeIf { it.isNotBlank() }?.let {
+            FilaIconoDetalle(Icons.Outlined.ChatBubbleOutline, "Descripción", it)
+        }
+        if (d.idVehiculo != null || !d.placa.isNullOrBlank()) {
+            FilaIconoDetalle(
+                Icons.Outlined.DirectionsCar,
+                "Vehículo",
+                d.vehiculoEtiqueta.ifBlank { d.placa.orEmpty() }
+            )
+        }
+        when {
+            resuelta -> {
+                d.respuestaAdmin?.takeIf { it.isNotBlank() }?.let {
+                    FilaIconoDetalle(Icons.Outlined.ChatBubbleOutline, "Respuesta al usuario", it)
+                }
+            }
+            rechazada -> {
+                d.motivoRechazo?.takeIf { it.isNotBlank() }?.let {
+                    FilaIconoDetalle(Icons.Outlined.ChatBubbleOutline, "Motivo de rechazo", it)
+                }
+            }
+        }
+        if (d.tieneEvidencia) {
+            val peso = d.tamanoEvidenciaBytes?.let { bytes ->
+                val mb = bytes / (1024.0 * 1024.0)
+                if (mb >= 0.1) String.format("%.1f MB", mb) else "${bytes / 1024} KB"
+            }
+            val etiquetaArchivo = listOfNotNull(
+                d.nombreEvidencia?.takeIf { it.isNotBlank() } ?: "Evidencia",
+                peso?.let { "($it)" }
+            ).joinToString(" ")
+            FilaIconoDetalle(Icons.Outlined.AttachFile, "Evidencia", etiquetaArchivo)
+            if (onRevelarEvidencia != null && onOcultarEvidencia != null) {
+                SoatVistaDocumento(
+                    bytes = evidenciaBytes,
+                    esPdf = SoporteFormulario.esPdf(d.contentTypeEvidencia, d.nombreEvidencia),
+                    cargando = evidenciaCargando,
+                    error = evidenciaError,
+                    revelado = evidenciaRevelada,
+                    onRevelar = onRevelarEvidencia,
+                    onOcultar = onOcultarEvidencia,
+                    tieneDocumento = true
+                )
+            }
+        }
+        BannerEstadoIncidenciaGeneral(d.estado)
+    }
+}
+
+@Composable
+fun BannerEstadoIncidenciaGeneral(estado: String) {
+    val (bg, fg, icono, texto) = when (estado.uppercase()) {
+        "PENDIENTE" -> Quad(
+            BannerPendiente, Color(0xFFF9A825), Icons.Outlined.Info,
+            "La incidencia está pendiente de revisión por el equipo de soporte."
+        )
+        "ACEPTADA" -> Quad(
+            BannerRevision, Color(0xFF007E98), Icons.Outlined.Info,
+            "La solicitud fue aceptada y está en cola de atención."
+        )
+        "EN_PROCESO", "EN PROCESO" -> Quad(
+            BannerRevision, Color(0xFF1E88E5), Icons.Outlined.Info,
+            "Un administrador está atendiendo esta incidencia."
+        )
+        "RESUELTA" -> Quad(
+            BannerAprobada, Color(0xFF2E7D32), Icons.Outlined.CheckCircle,
+            "La incidencia fue resuelta. Revisa la respuesta del equipo de soporte."
+        )
+        "RECHAZADA" -> Quad(
+            BannerRechazada, Color(0xFFC62828), Icons.Outlined.WarningAmber,
+            "La incidencia fue rechazada. Puedes registrar un nuevo reporte si corresponde."
+        )
+        else -> Quad(Color(0xFFF0F5FA), MyCarMuted, Icons.Outlined.Info, SoporteFormulario.etiquetaEstado(estado))
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(bg, RoundedCornerShape(12.dp))
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(icono, contentDescription = null, tint = fg)
+        Text(texto, color = fg, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

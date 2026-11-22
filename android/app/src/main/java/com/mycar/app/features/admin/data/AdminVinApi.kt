@@ -12,6 +12,10 @@ import retrofit2.http.Query
 
 data class AdminRechazarBody(val motivo: String)
 
+data class AdminObservacionBody(val observacion: String? = null)
+
+data class AdminTerminarBody(val respuesta: String)
+
 data class AdminAccionResponse(
     val codigo: String,
     val estado: String,

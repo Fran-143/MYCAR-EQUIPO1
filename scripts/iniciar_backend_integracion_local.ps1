@@ -6,6 +6,21 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $raizMyCar = Split-Path -Parent $PSScriptRoot
+# MFA local: cargar MYCAR_MFA_* desde .env del repo si el proceso no las trae (sin imprimir secretos).
+$envLocalMyCar = Join-Path $raizMyCar ".env"
+if (Test-Path -LiteralPath $envLocalMyCar) {
+    Get-Content -LiteralPath $envLocalMyCar | ForEach-Object {
+        $linea = $_.Trim()
+        if ($linea -and -not $linea.StartsWith("#") -and $linea.Contains("=")) {
+            $i = $linea.IndexOf("=")
+            $k = $linea.Substring(0, $i).Trim()
+            $v = $linea.Substring($i + 1).Trim().Trim('"')
+            if ($k -like "MYCAR_MFA_*" -and -not [string]::IsNullOrWhiteSpace($v)) {
+                Set-Item -Path "Env:$k" -Value $v
+            }
+        }
+    }
+}
 # Clave solo para DESARROLLO LOCAL. Se conserva fuera del repositorio y nunca se imprime.
 $directorioClaveMyCar = Join-Path $env:LOCALAPPDATA "MyCar\desarrollo-local"
 $archivoClaveMyCar = Join-Path $directorioClaveMyCar "autenticacion.properties"
@@ -23,7 +38,8 @@ if ($VersionPrivacidad -match '[\r\n]') { throw "Versión de privacidad inválid
 # Perfil de ejecución efímero. Las duraciones son de prueba local, no una política de despliegue.
 $configMyCar = @{
     "spring.config.additional-location" = "file:" + $archivoClaveMyCar.Replace('\','/')
-    "mycar.auth.access-ttl" = "PT5M"
+    # RF60 pruebas Samsung: access más largo para no cortar el flujo admin/usuario a mitad.
+    "mycar.auth.access-ttl" = "PT2H"
     "mycar.auth.session-ttl" = "P1D"
     "server.port" = $Puerto
     "mycar.rf17.api-habilitada" = "true"

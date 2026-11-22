@@ -37,6 +37,11 @@ public class SoporteController {
         return servicio.listar(usuario(auth));
     }
 
+    @GetMapping("/resumen")
+    public ContratoSoporte.ResumenSoporteDto resumen(Authentication auth) {
+        return servicio.resumen(usuario(auth));
+    }
+
     @GetMapping("/solicitudes/{codigo}")
     public ContratoSoporte.SolicitudDetalleDto detalle(Authentication auth, @PathVariable String codigo) {
         return servicio.detalle(usuario(auth), codigo);
@@ -77,6 +82,34 @@ public class SoporteController {
         }
         return servicio.crearCorreccionVin(
                 usuario(auth), idOperacion, idVehiculo, vinPropuesto, motivo,
+                ct, nombre, bytes);
+    }
+
+    @PostMapping(value = "/incidencias-generales", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ContratoSoporte.CrearResponse crearIncidenciaGeneral(
+            Authentication auth,
+            @RequestParam("idOperacion") UUID idOperacion,
+            @RequestParam("categoria") String categoria,
+            @RequestParam(value = "temaOtro", required = false) String temaOtro,
+            @RequestParam("asunto") String asunto,
+            @RequestParam("descripcion") String descripcion,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "contentType", required = false) String contentType
+    ) throws Exception {
+        boolean conArchivo = file != null && !file.isEmpty();
+        String ct = null;
+        String nombre = null;
+        byte[] bytes = null;
+        if (conArchivo) {
+            ct = (contentType == null || contentType.isBlank())
+                    ? (file.getContentType() == null ? "application/octet-stream" : file.getContentType())
+                    : contentType;
+            nombre = file.getOriginalFilename() == null ? "evidencia" : file.getOriginalFilename();
+            bytes = file.getBytes();
+        }
+        return servicio.crearIncidenciaGeneral(
+                usuario(auth), idOperacion, categoria, temaOtro, asunto, descripcion,
                 ct, nombre, bytes);
     }
 

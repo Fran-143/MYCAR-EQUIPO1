@@ -20,8 +20,10 @@ public final class ContratoSoporte {
             String codigo,
             String tipo,
             String estado,
-            long idVehiculo,
+            Long idVehiculo,
             String placa,
+            String asunto,
+            String categoria,
             Instant creadoUtc,
             Instant actualizadoUtc
     ) { }
@@ -37,7 +39,7 @@ public final class ContratoSoporte {
             String codigo,
             String tipo,
             String estado,
-            long idVehiculo,
+            Long idVehiculo,
             String placa,
             String marca,
             String modelo,
@@ -54,7 +56,13 @@ public final class ContratoSoporte {
             int versionFila,
             Instant creadoUtc,
             Instant actualizadoUtc,
-            List<EventoDto> eventos
+            List<EventoDto> eventos,
+            String categoria,
+            String temaOtro,
+            String asunto,
+            String descripcion,
+            String respuestaAdmin,
+            Instant cerradoUtc
     ) { }
 
     public record EvidenciaPayload(byte[] bytes, String contentType, String nombreOriginal) { }
@@ -63,5 +71,19 @@ public final class ContratoSoporte {
 
     public record RechazarRequest(String motivo) { }
 
+    public record ObservacionRequest(String observacion) { }
+
+    public record TerminarRequest(String respuesta) { }
+
     public record AccionResponse(String codigo, String estado, int versionFila) { }
+
+    public record ResumenSoporteDto(boolean tieneSolicitudes, int total, int pendientes) { }
+
+    public record ContadoresIncidenciaDto(
+            int pendientes,
+            int aceptadas,
+            int enProceso,
+            int resueltas,
+            int rechazadas
+    ) { }
 }

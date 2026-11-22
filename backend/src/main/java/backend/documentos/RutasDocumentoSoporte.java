@@ -14,6 +14,11 @@ public final class RutasDocumentoSoporte {
         return "soporte/" + idUsuario + "/" + idVehiculo + "/temp/" + UUID.randomUUID() + "_" + nombreSeguro;
     }
 
+    /** Evidencia RF60 (sin vehículo asociado). */
+    public static String claveTempIncidencia(long idUsuario, String nombreSeguro) {
+        return "soporte/" + idUsuario + "/incidencia/temp/" + UUID.randomUUID() + "_" + nombreSeguro;
+    }
+
     public static boolean perteneceAUsuarioVehiculo(String objectKey, long idUsuario, long idVehiculo) {
         if (objectKey == null || objectKey.isBlank()) return false;
         return objectKey.startsWith("soporte/" + idUsuario + "/" + idVehiculo + "/");

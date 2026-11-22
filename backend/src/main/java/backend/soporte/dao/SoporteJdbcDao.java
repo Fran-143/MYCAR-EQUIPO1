@@ -92,7 +92,7 @@ public class SoporteJdbcDao {
         return n != null && n > 0;
     }
 
-    public long insertarSolicitud(String codigo, String tipo, long usuario, long vehiculo) {
+    public long insertarSolicitud(String codigo, String tipo, long usuario, Long vehiculo) {
         return jdbc.queryForObject("""
                 INSERT INTO mycar.solicitud_soporte(codigo, tipo, estado, id_usuario, id_vehiculo)
                 VALUES (?, ?, 'PENDIENTE', ?, ?)
@@ -110,6 +110,18 @@ public class SoporteJdbcDao {
                 """, idSolicitud, vinReg, vinProp, motivo, key, contentType, tamano, nombre);
     }
 
+    public void insertarIncidenciaGeneral(long idSolicitud, String categoria, String temaOtro,
+            String asunto, String descripcion, String key, String contentType, Integer tamano,
+            String nombre) {
+        jdbc.update("""
+                INSERT INTO mycar.solicitud_incidencia_general(
+                    id_solicitud, categoria, tema_otro, asunto, descripcion,
+                    storage_object_key, content_type, tamano_bytes, nombre_original)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """, idSolicitud, categoria, temaOtro, asunto, descripcion,
+                key, contentType, tamano, nombre);
+    }
+
     public void insertarEvento(long idSolicitud, String ant, String neu, Long actor, String obs) {
         jdbc.update("""
                 INSERT INTO mycar.solicitud_soporte_evento(
@@ -120,16 +132,31 @@ public class SoporteJdbcDao {
 
     public List<ContratoSoporte.SolicitudResumenDto> listarPropias(long usuario) {
         return jdbc.query("""
-                SELECT s.codigo, s.tipo, s.estado, s.id_vehiculo, v.placa, s.creado_utc, s.actualizado_utc
+                SELECT s.codigo, s.tipo, s.estado, s.id_vehiculo, v.placa,
+                       COALESCE(g.asunto, c.motivo, s.codigo) AS asunto,
+                       g.categoria,
+                       s.creado_utc, s.actualizado_utc
                 FROM mycar.solicitud_soporte s
-                JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo
+                LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo
+                LEFT JOIN mycar.solicitud_correccion_vin c ON c.id_solicitud = s.id_solicitud
+                LEFT JOIN mycar.solicitud_incidencia_general g ON g.id_solicitud = s.id_solicitud
                 WHERE s.id_usuario = ?
                 ORDER BY s.creado_utc DESC
-                """, (rs, n) -> new ContratoSoporte.SolicitudResumenDto(
-                rs.getString("codigo"), rs.getString("tipo"), rs.getString("estado"),
-                rs.getLong("id_vehiculo"), rs.getString("placa"),
-                ts(rs.getTimestamp("creado_utc")), ts(rs.getTimestamp("actualizado_utc"))
-        ), usuario);
+                """, MAPPER_RESUMEN, usuario);
+    }
+
+    public ContratoSoporte.ResumenSoporteDto resumenPropio(long usuario) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*)::int AS total,
+                       COUNT(*) FILTER (
+                           WHERE estado IN ('PENDIENTE','EN_REVISION','ACEPTADA','EN_PROCESO')
+                       )::int AS pendientes
+                FROM mycar.solicitud_soporte
+                WHERE id_usuario = ?
+                """, (rs, n) -> {
+            int total = rs.getInt("total");
+            return new ContratoSoporte.ResumenSoporteDto(total > 0, total, rs.getInt("pendientes"));
+        }, usuario);
     }
 
     public Optional<FilaSolicitud> porCodigoPropia(long usuario, String codigo) {
@@ -144,17 +171,23 @@ public class SoporteJdbcDao {
         }
     }
 
+    /** Detalle unificado (VIN + incidencia general). No usa INNER JOIN a corrección VIN. */
     private static final String SQL_DETALLE = """
             SELECT s.id_solicitud, s.codigo, s.tipo, s.estado, s.id_usuario, s.id_vehiculo,
                    s.version_fila, s.motivo_rechazo, s.creado_utc, s.actualizado_utc,
                    v.placa, v.marca, v.modelo,
                    u.nombre AS nombre_usuario, u.apellido AS apellido_usuario, u.correo AS correo_usuario,
                    c.vin_registrado, c.vin_propuesto, c.motivo,
-                   c.storage_object_key, c.content_type, c.tamano_bytes, c.nombre_original
+                   COALESCE(c.storage_object_key, g.storage_object_key) AS storage_object_key,
+                   COALESCE(c.content_type, g.content_type) AS content_type,
+                   COALESCE(c.tamano_bytes, g.tamano_bytes) AS tamano_bytes,
+                   COALESCE(c.nombre_original, g.nombre_original) AS nombre_original,
+                   g.categoria, g.tema_otro, g.asunto, g.descripcion, g.respuesta_admin, g.cerrado_utc
             FROM mycar.solicitud_soporte s
-            JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo
             JOIN mycar.usuario u ON u.id_usuario = s.id_usuario
-            JOIN mycar.solicitud_correccion_vin c ON c.id_solicitud = s.id_solicitud
+            LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo
+            LEFT JOIN mycar.solicitud_correccion_vin c ON c.id_solicitud = s.id_solicitud
+            LEFT JOIN mycar.solicitud_incidencia_general g ON g.id_solicitud = s.id_solicitud
             WHERE s.codigo = ?
             """;
 
@@ -162,18 +195,35 @@ public class SoporteJdbcDao {
         String nombre = rs.getString("nombre_usuario");
         String apellido = rs.getString("apellido_usuario");
         String nombreCompleto = ((nombre == null ? "" : nombre) + " " + (apellido == null ? "" : apellido)).strip();
+        Long idVehiculo = (Long) rs.getObject("id_vehiculo");
         return new FilaSolicitud(
                 rs.getLong("id_solicitud"), rs.getString("codigo"), rs.getString("tipo"),
-                rs.getString("estado"), rs.getLong("id_usuario"), rs.getLong("id_vehiculo"),
+                rs.getString("estado"), rs.getLong("id_usuario"), idVehiculo,
                 rs.getInt("version_fila"), rs.getString("motivo_rechazo"),
                 ts(rs.getTimestamp("creado_utc")), ts(rs.getTimestamp("actualizado_utc")),
                 rs.getString("placa"), rs.getString("marca"), rs.getString("modelo"),
                 nombreCompleto.isBlank() ? null : nombreCompleto, rs.getString("correo_usuario"),
                 rs.getString("vin_registrado"), rs.getString("vin_propuesto"),
                 rs.getString("motivo"), rs.getString("storage_object_key"), rs.getString("content_type"),
-                (Integer) rs.getObject("tamano_bytes"), rs.getString("nombre_original")
+                (Integer) rs.getObject("tamano_bytes"), rs.getString("nombre_original"),
+                rs.getString("categoria"), rs.getString("tema_otro"), rs.getString("asunto"),
+                rs.getString("descripcion"), rs.getString("respuesta_admin"),
+                ts(rs.getTimestamp("cerrado_utc"))
         );
     };
+
+    private static final org.springframework.jdbc.core.RowMapper<ContratoSoporte.SolicitudResumenDto> MAPPER_RESUMEN =
+            (rs, n) -> new ContratoSoporte.SolicitudResumenDto(
+                    rs.getString("codigo"),
+                    rs.getString("tipo"),
+                    rs.getString("estado"),
+                    (Long) rs.getObject("id_vehiculo"),
+                    rs.getString("placa"),
+                    rs.getString("asunto"),
+                    rs.getString("categoria"),
+                    ts(rs.getTimestamp("creado_utc")),
+                    ts(rs.getTimestamp("actualizado_utc"))
+            );
 
     public List<ContratoSoporte.EventoDto> eventos(long idSolicitud) {
         return jdbc.query("""
@@ -187,20 +237,53 @@ public class SoporteJdbcDao {
     }
 
     public List<ContratoSoporte.SolicitudResumenDto> listarAdmin(String estado, String q) {
+        return listarAdminPorTipo("CORRECCION_VIN", estado, q);
+    }
+
+    public List<ContratoSoporte.SolicitudResumenDto> listarAdminGenerales(String estado, String q) {
+        return listarAdminPorTipo("INCIDENCIA_GENERAL", estado, q);
+    }
+
+    private List<ContratoSoporte.SolicitudResumenDto> listarAdminPorTipo(String tipo, String estado, String q) {
         String like = (q == null || q.isBlank()) ? null : "%" + q.strip().toUpperCase() + "%";
         return jdbc.query("""
-                SELECT s.codigo, s.tipo, s.estado, s.id_vehiculo, v.placa, s.creado_utc, s.actualizado_utc
+                SELECT s.codigo, s.tipo, s.estado, s.id_vehiculo, v.placa,
+                       COALESCE(g.asunto, c.motivo, s.codigo) AS asunto,
+                       g.categoria,
+                       s.creado_utc, s.actualizado_utc
                 FROM mycar.solicitud_soporte s
-                JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo
-                WHERE (?::text IS NULL OR s.estado = ?)
-                  AND (?::text IS NULL OR upper(s.codigo) LIKE ? OR upper(v.placa) LIKE ?)
+                LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = s.id_vehiculo
+                LEFT JOIN mycar.solicitud_correccion_vin c ON c.id_solicitud = s.id_solicitud
+                LEFT JOIN mycar.solicitud_incidencia_general g ON g.id_solicitud = s.id_solicitud
+                WHERE s.tipo = ?
+                  AND (?::text IS NULL OR s.estado = ?)
+                  AND (?::text IS NULL
+                       OR upper(s.codigo) LIKE ?
+                       OR upper(COALESCE(v.placa, '')) LIKE ?
+                       OR upper(COALESCE(g.asunto, '')) LIKE ?
+                       OR upper(COALESCE(g.categoria, '')) LIKE ?)
                 ORDER BY s.actualizado_utc DESC
                 LIMIT 200
-                """, (rs, n) -> new ContratoSoporte.SolicitudResumenDto(
-                rs.getString("codigo"), rs.getString("tipo"), rs.getString("estado"),
-                rs.getLong("id_vehiculo"), rs.getString("placa"),
-                ts(rs.getTimestamp("creado_utc")), ts(rs.getTimestamp("actualizado_utc"))
-        ), estado, estado, like, like, like);
+                """, MAPPER_RESUMEN, tipo, estado, estado, like, like, like, like, like);
+    }
+
+    public ContratoSoporte.ContadoresIncidenciaDto contadoresGenerales() {
+        return jdbc.queryForObject("""
+                SELECT
+                    COUNT(*) FILTER (WHERE estado = 'PENDIENTE')::int AS pendientes,
+                    COUNT(*) FILTER (WHERE estado = 'ACEPTADA')::int AS aceptadas,
+                    COUNT(*) FILTER (WHERE estado = 'EN_PROCESO')::int AS en_proceso,
+                    COUNT(*) FILTER (WHERE estado = 'RESUELTA')::int AS resueltas,
+                    COUNT(*) FILTER (WHERE estado = 'RECHAZADA')::int AS rechazadas
+                FROM mycar.solicitud_soporte
+                WHERE tipo = 'INCIDENCIA_GENERAL'
+                """, (rs, n) -> new ContratoSoporte.ContadoresIncidenciaDto(
+                rs.getInt("pendientes"),
+                rs.getInt("aceptadas"),
+                rs.getInt("en_proceso"),
+                rs.getInt("resueltas"),
+                rs.getInt("rechazadas")
+        ));
     }
 
     public Optional<FilaSolicitud> bloquearPorCodigo(String codigo) {
@@ -221,6 +304,14 @@ public class SoporteJdbcDao {
                 """, estado, motivoRechazo, id, versionEsperada);
     }
 
+    public int cerrarIncidenciaGeneral(long idSolicitud, String respuestaAdmin) {
+        return jdbc.update("""
+                UPDATE mycar.solicitud_incidencia_general SET
+                    respuesta_admin = ?, cerrado_utc = clock_timestamp()
+                WHERE id_solicitud = ?
+                """, respuestaAdmin, idSolicitud);
+    }
+
     private static Instant ts(Timestamp t) {
         return t == null ? null : t.toInstant();
     }
@@ -234,10 +325,12 @@ public class SoporteJdbcDao {
     public record VehiculoCtx(long idVehiculo, String placa, String numeroVin, boolean tieneTive) { }
 
     public record FilaSolicitud(
-            long idSolicitud, String codigo, String tipo, String estado, long idUsuario, long idVehiculo,
+            long idSolicitud, String codigo, String tipo, String estado, long idUsuario, Long idVehiculo,
             int versionFila, String motivoRechazo, Instant creadoUtc, Instant actualizadoUtc,
             String placa, String marca, String modelo, String nombreUsuario, String correoUsuario,
             String vinRegistrado, String vinPropuesto, String motivo,
-            String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal
+            String storageObjectKey, String contentType, Integer tamanoBytes, String nombreOriginal,
+            String categoria, String temaOtro, String asunto, String descripcion,
+            String respuestaAdmin, Instant cerradoUtc
     ) { }
 }

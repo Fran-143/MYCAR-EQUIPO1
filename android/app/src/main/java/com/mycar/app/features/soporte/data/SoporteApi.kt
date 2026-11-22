@@ -17,6 +17,9 @@ interface SoporteApi {
     @GET("api/v1/soporte/solicitudes")
     suspend fun listarSolicitudes(): Response<List<SolicitudResumenDto>>
 
+    @GET("api/v1/soporte/resumen")
+    suspend fun resumen(): Response<ResumenSoporteDto>
+
     @GET("api/v1/soporte/solicitudes/{codigo}")
     suspend fun detalle(@Path("codigo") codigo: String): Response<SolicitudDetalleDto>
 
@@ -30,6 +33,18 @@ interface SoporteApi {
         @Part("idVehiculo") idVehiculo: RequestBody,
         @Part("vinPropuesto") vinPropuesto: RequestBody,
         @Part("motivo") motivo: RequestBody,
+        @Part file: MultipartBody.Part? = null,
+        @Part("contentType") contentType: RequestBody? = null
+    ): Response<CrearSolicitudResponse>
+
+    @Multipart
+    @POST("api/v1/soporte/incidencias-generales")
+    suspend fun crearIncidencia(
+        @Part("idOperacion") idOperacion: RequestBody,
+        @Part("categoria") categoria: RequestBody,
+        @Part("temaOtro") temaOtro: RequestBody?,
+        @Part("asunto") asunto: RequestBody,
+        @Part("descripcion") descripcion: RequestBody,
         @Part file: MultipartBody.Part? = null,
         @Part("contentType") contentType: RequestBody? = null
     ): Response<CrearSolicitudResponse>

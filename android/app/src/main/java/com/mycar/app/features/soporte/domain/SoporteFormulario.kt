@@ -51,7 +51,16 @@ object SoporteFormulario {
         "EN_REVISION", "EN REVISIÓN" -> "En revisión"
         "APROBADA" -> "Aprobada"
         "RECHAZADA" -> "Rechazada"
+        "ACEPTADA" -> "Aceptada"
+        "EN_PROCESO", "EN PROCESO" -> "En proceso"
+        "RESUELTA" -> "Resuelta"
         else -> estado
+    }
+
+    fun etiquetaTipo(tipo: String?): String = when (tipo?.uppercase(Locale.ROOT)) {
+        "CORRECCION_VIN" -> "Corrección de VIN"
+        "INCIDENCIA_GENERAL" -> "Incidencia general"
+        else -> tipo.orEmpty()
     }
 
     fun esPdf(contentType: String?, nombre: String?): Boolean {

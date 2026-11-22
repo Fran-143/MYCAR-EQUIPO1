@@ -19,8 +19,8 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 43
-        versionName = "1.2.20-catalogos-admin"
+        versionCode = 45
+        versionName = "1.2.21-rf60-incidencias"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.

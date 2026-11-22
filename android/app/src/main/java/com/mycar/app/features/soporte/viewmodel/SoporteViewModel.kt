@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mycar.app.features.soporte.data.SolicitudDetalleDto
 import com.mycar.app.features.soporte.data.SolicitudResumenDto
 import com.mycar.app.features.soporte.data.VehiculoElegibleDto
+import com.mycar.app.features.soporte.domain.IncidenciaGeneralFormulario
 import com.mycar.app.features.soporte.domain.SoporteFormulario
 import com.mycar.app.features.soporte.domain.SoporteRepository
 import com.mycar.app.features.soat.viewmodel.AdjuntoSoatUi
@@ -23,10 +24,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 enum class PantallaSoporte {
-    CARGANDO, CENTRO, CORRECCION, FORMULARIO, DETALLE, EXITO, ERROR, SESION
+    CARGANDO, CENTRO, CORRECCION, FORMULARIO, INCIDENCIA_FORM, HISTORIAL,
+    DETALLE, EXITO, EXITO_INCIDENCIA, ERROR, SESION
 }
 
 enum class PestanaCorreccion { NUEVA, HISTORIAL }
+
+enum class FiltroTipoHistorial { TODAS, VIN, GENERALES }
 
 data class EstadoSoporte(
     val pantalla: PantallaSoporte = PantallaSoporte.CARGANDO,
@@ -37,6 +41,10 @@ data class EstadoSoporte(
     val idVehiculoSel: Long? = null,
     val vinPropuesto: String = "",
     val motivo: String = "",
+    val categoria: String? = null,
+    val temaOtro: String = "",
+    val asunto: String = "",
+    val descripcion: String = "",
     val adjunto: AdjuntoSoatUi? = null,
     val errores: Map<String, String> = emptyMap(),
     val hintsOk: Map<String, String> = emptyMap(),
@@ -48,8 +56,30 @@ data class EstadoSoporte(
     val evidenciaError: String? = null,
     val evidenciaRevelada: Boolean = false,
     val codigoExito: String? = null,
-    val proximamente: Boolean = false
+    val categoriaExito: String? = null,
+    val asuntoExito: String? = null,
+    val fechaExito: String? = null,
+    val filtroTipoHistorial: FiltroTipoHistorial = FiltroTipoHistorial.TODAS,
+    val filtroEstadoHistorial: String? = null,
+    val origenDetalle: PantallaSoporte = PantallaSoporte.HISTORIAL,
+    val sugerirVin: Boolean = false
 ) {
+    val tieneSolicitudes: Boolean get() = solicitudes.isNotEmpty()
+
+    val solicitudesFiltradas: List<SolicitudResumenDto>
+        get() {
+            var lista = when (filtroTipoHistorial) {
+                FiltroTipoHistorial.TODAS -> solicitudes
+                FiltroTipoHistorial.VIN -> solicitudes.filter { it.esCorreccionVin }
+                FiltroTipoHistorial.GENERALES -> solicitudes.filter { it.esIncidenciaGeneral }
+            }
+            val est = filtroEstadoHistorial
+            if (!est.isNullOrBlank()) {
+                lista = lista.filter { it.estado.equals(est, ignoreCase = true) }
+            }
+            return lista
+        }
+
     val formularioIncompleto: Boolean
         get() {
             val veh = vehiculos.find { it.idVehiculo == idVehiculoSel }
@@ -57,6 +87,17 @@ data class EstadoSoporte(
             if (!veh.tieneTive) return true
             if (veh.numeroVin.isNullOrBlank()) return true
             val base = SoporteFormulario.validarNueva(vinPropuesto, veh.numeroVin, motivo, exigirTodos = true)
+            val evid = adjunto?.let {
+                SoporteFormulario.validarEvidencia(it.contentType, it.tamanoBytes)?.let { msg -> mapOf("evidencia" to msg) }
+            } ?: emptyMap()
+            return base.isNotEmpty() || evid.isNotEmpty()
+        }
+
+    val incidenciaIncompleta: Boolean
+        get() {
+            val base = IncidenciaGeneralFormulario.validar(
+                categoria, temaOtro, asunto, descripcion, exigirTodos = true
+            )
             val evid = adjunto?.let {
                 SoporteFormulario.validarEvidencia(it.contentType, it.tamanoBytes)?.let { msg -> mapOf("evidencia" to msg) }
             } ?: emptyMap()
@@ -105,11 +146,40 @@ class SoporteViewModel(
             hintsOk = emptyMap(),
             tocados = emptySet(),
             mensaje = null,
-            proximamente = false,
-            codigoExito = null
+            codigoExito = null,
+            sugerirVin = false
         )
         refrescarVehiculos()
         if (pestana == PestanaCorreccion.HISTORIAL) refrescarHistorial()
+    }
+
+    fun abrirIncidenciaGeneral() {
+        _estado.value = _estado.value.copy(
+            pantalla = PantallaSoporte.INCIDENCIA_FORM,
+            categoria = null,
+            temaOtro = "",
+            asunto = "",
+            descripcion = "",
+            adjunto = null,
+            errores = emptyMap(),
+            tocados = emptySet(),
+            mensaje = null,
+            codigoExito = null,
+            sugerirVin = false,
+            ocupado = false
+        )
+    }
+
+    fun abrirHistorialUnificado() {
+        if (!_estado.value.tieneSolicitudes) return
+        _estado.value = _estado.value.copy(
+            pantalla = PantallaSoporte.HISTORIAL,
+            filtroTipoHistorial = FiltroTipoHistorial.TODAS,
+            filtroEstadoHistorial = null,
+            mensaje = null,
+            detalle = null
+        )
+        refrescarHistorial(PantallaSoporte.HISTORIAL)
     }
 
     fun refrescarVehiculos() {
@@ -123,7 +193,7 @@ class SoporteViewModel(
                     idVehiculoSel = if (selValida) sel else null,
                     mensaje = null
                 )
-                if (selValida) revalidar()
+                if (selValida) revalidarVin()
             } catch (cancelada: CancellationException) {
                 throw cancelada
             } catch (e: Exception) {
@@ -132,7 +202,7 @@ class SoporteViewModel(
         }
     }
 
-    fun refrescarHistorial() {
+    fun refrescarHistorial(pantallaFallback: PantallaSoporte = PantallaSoporte.CORRECCION) {
         viewModelScope.launch {
             try {
                 val s = repository.listarSolicitudes()
@@ -140,22 +210,22 @@ class SoporteViewModel(
             } catch (cancelada: CancellationException) {
                 throw cancelada
             } catch (e: Exception) {
-                manejar(e, PantallaSoporte.CORRECCION)
+                manejar(e, pantallaFallback)
             }
         }
-    }
-
-    fun abrirProximamente() {
-        _estado.value = _estado.value.copy(proximamente = true, mensaje = null)
-    }
-
-    fun cerrarProximamente() {
-        _estado.value = _estado.value.copy(proximamente = false)
     }
 
     fun setPestana(p: PestanaCorreccion) {
         _estado.value = _estado.value.copy(pestana = p, mensaje = null)
         if (p == PestanaCorreccion.HISTORIAL) refrescarHistorial()
+    }
+
+    fun setFiltroTipoHistorial(f: FiltroTipoHistorial) {
+        _estado.value = _estado.value.copy(filtroTipoHistorial = f, filtroEstadoHistorial = null)
+    }
+
+    fun setFiltroEstadoHistorial(estado: String?) {
+        _estado.value = _estado.value.copy(filtroEstadoHistorial = estado)
     }
 
     fun seleccionarVehiculo(id: Long) {
@@ -170,10 +240,9 @@ class SoporteViewModel(
             tocados = emptySet(),
             mensaje = null
         )
-        revalidar()
+        revalidarVin()
     }
 
-    /** Vuelve del formulario de solicitud a la lista de vehículos. */
     fun volverAListaVehiculos() {
         _estado.value = _estado.value.copy(
             pantalla = PantallaSoporte.CORRECCION,
@@ -201,7 +270,30 @@ class SoporteViewModel(
             tocados = _estado.value.tocados + setOfNotNull(campo),
             mensaje = null
         )
-        revalidar()
+        revalidarVin()
+    }
+
+    fun actualizarIncidencia(
+        categoria: String? = null,
+        temaOtro: String? = null,
+        asunto: String? = null,
+        descripcion: String? = null,
+        campo: String? = null
+    ) {
+        val cat = categoria ?: _estado.value.categoria
+        val tema = temaOtro ?: _estado.value.temaOtro
+        val asu = asunto ?: _estado.value.asunto
+        val des = descripcion ?: _estado.value.descripcion
+        _estado.value = _estado.value.copy(
+            categoria = cat,
+            temaOtro = if (cat.equals("OTROS", true)) tema else "",
+            asunto = asu.take(IncidenciaGeneralFormulario.MAX_ASUNTO + 20),
+            descripcion = des.take(IncidenciaGeneralFormulario.MAX_DESCRIPCION + 50),
+            tocados = _estado.value.tocados + setOfNotNull(campo),
+            sugerirVin = IncidenciaGeneralFormulario.sugiereCorreccionVin(asu, des),
+            mensaje = null
+        )
+        revalidarIncidencia()
     }
 
     fun setAdjunto(adj: AdjuntoSoatUi?) {
@@ -213,10 +305,10 @@ class SoporteViewModel(
             errores = errores,
             tocados = _estado.value.tocados + "evidencia"
         )
-        revalidar()
+        if (_estado.value.pantalla == PantallaSoporte.INCIDENCIA_FORM) revalidarIncidencia() else revalidarVin()
     }
 
-    private fun revalidar() {
+    private fun revalidarVin() {
         val actual = _estado.value
         val veh = actual.vehiculos.find { it.idVehiculo == actual.idVehiculoSel }
         val errores = SoporteFormulario.validarNueva(
@@ -239,6 +331,19 @@ class SoporteViewModel(
             ValidadorVin.mensajeFormatoOk(actual.vinPropuesto, veh?.numeroVin)?.let { hints["vinPropuesto"] = it }
         }
         _estado.value = actual.copy(errores = errores, hintsOk = hints)
+    }
+
+    private fun revalidarIncidencia() {
+        val actual = _estado.value
+        val errores = IncidenciaGeneralFormulario.validar(
+            actual.categoria, actual.temaOtro, actual.asunto, actual.descripcion,
+            tocados = actual.tocados, exigirTodos = false
+        ).toMutableMap()
+        if ("evidencia" in actual.tocados && actual.adjunto != null) {
+            SoporteFormulario.validarEvidencia(actual.adjunto.contentType, actual.adjunto.tamanoBytes)
+                ?.let { errores["evidencia"] = it }
+        }
+        _estado.value = actual.copy(errores = errores)
     }
 
     fun enviar() {
@@ -306,14 +411,69 @@ class SoporteViewModel(
                 throw cancelada
             } catch (e: Exception) {
                 _estado.value = _estado.value.copy(ocupado = false)
-                manejar(e, PantallaSoporte.CORRECCION)
+                manejar(e, PantallaSoporte.FORMULARIO)
             }
         }
     }
 
-    fun abrirDetalle(codigo: String) {
+    fun enviarIncidencia() {
+        val actual = _estado.value
+        val errores = IncidenciaGeneralFormulario.validar(
+            actual.categoria, actual.temaOtro, actual.asunto, actual.descripcion
+        ).toMutableMap()
+        val adj = actual.adjunto
+        if (adj != null) {
+            SoporteFormulario.validarEvidencia(adj.contentType, adj.tamanoBytes)?.let { errores["evidencia"] = it }
+        }
+        if (errores.isNotEmpty()) {
+            _estado.value = actual.copy(
+                errores = errores,
+                tocados = actual.tocados + setOf("categoria", "temaOtro", "asunto", "descripcion", "evidencia")
+            )
+            return
+        }
+        _estado.value = actual.copy(ocupado = true, mensaje = null)
+        viewModelScope.launch {
+            try {
+                val op = operacionPendiente.get() ?: UUID.randomUUID().toString()
+                operacionPendiente.set(op)
+                val bytes = adj?.let { lectorUri(it.uri) }
+                val cat = actual.categoria!!
+                val asuntoNorm = IncidenciaGeneralFormulario.normalizarEspacios(actual.asunto)
+                val descNorm = actual.descripcion.trim()
+                val tema = if (cat.equals("OTROS", true)) {
+                    IncidenciaGeneralFormulario.normalizarEspacios(actual.temaOtro)
+                } else null
+                val resp = repository.crearIncidenciaGeneral(
+                    op, cat, tema, asuntoNorm, descNorm,
+                    bytes, adj?.contentType, adj?.nombre
+                )
+                operacionPendiente.set(null)
+                val lista = runCatching { repository.listarSolicitudes() }.getOrElse { _estado.value.solicitudes }
+                _estado.value = _estado.value.copy(
+                    ocupado = false,
+                    pantalla = PantallaSoporte.EXITO_INCIDENCIA,
+                    codigoExito = resp.codigo,
+                    categoriaExito = cat,
+                    asuntoExito = asuntoNorm,
+                    fechaExito = java.time.Instant.now().toString(),
+                    solicitudes = lista,
+                    mensaje = null,
+                    errores = emptyMap()
+                )
+            } catch (cancelada: CancellationException) {
+                throw cancelada
+            } catch (e: Exception) {
+                _estado.value = _estado.value.copy(ocupado = false)
+                manejar(e, PantallaSoporte.INCIDENCIA_FORM)
+            }
+        }
+    }
+
+    fun abrirDetalle(codigo: String, origen: PantallaSoporte = PantallaSoporte.HISTORIAL) {
         _estado.value = _estado.value.copy(
             pantalla = PantallaSoporte.CARGANDO,
+            origenDetalle = origen,
             evidenciaBytes = null,
             evidenciaRevelada = false,
             evidenciaError = null
@@ -361,15 +521,31 @@ class SoporteViewModel(
     fun volver() {
         when (_estado.value.pantalla) {
             PantallaSoporte.FORMULARIO -> volverAListaVehiculos()
-            PantallaSoporte.CORRECCION, PantallaSoporte.EXITO -> cargarCentro()
+            PantallaSoporte.INCIDENCIA_FORM, PantallaSoporte.EXITO,
+            PantallaSoporte.EXITO_INCIDENCIA, PantallaSoporte.HISTORIAL,
+            PantallaSoporte.CORRECCION -> cargarCentro()
             PantallaSoporte.DETALLE -> {
-                _estado.value = _estado.value.copy(
-                    pantalla = PantallaSoporte.CORRECCION,
-                    pestana = PestanaCorreccion.HISTORIAL,
-                    detalle = null,
-                    evidenciaBytes = null,
-                    evidenciaRevelada = false
-                )
+                val origen = _estado.value.origenDetalle
+                when (origen) {
+                    PantallaSoporte.CORRECCION -> {
+                        _estado.value = _estado.value.copy(
+                            pantalla = PantallaSoporte.CORRECCION,
+                            pestana = PestanaCorreccion.HISTORIAL,
+                            detalle = null,
+                            evidenciaBytes = null,
+                            evidenciaRevelada = false
+                        )
+                    }
+                    else -> {
+                        _estado.value = _estado.value.copy(
+                            pantalla = PantallaSoporte.HISTORIAL,
+                            detalle = null,
+                            evidenciaBytes = null,
+                            evidenciaRevelada = false
+                        )
+                        refrescarHistorial(PantallaSoporte.HISTORIAL)
+                    }
+                }
             }
             else -> Unit
         }
@@ -406,6 +582,7 @@ class SoporteViewModel(
                 mapOf("vinPropuesto" to mensaje!!) + fallo.erroresPorCampo
             "VIN_AUSENTE" -> mapOf("numeroVin" to mensaje!!) + fallo.erroresPorCampo
             "TIVE_REQUERIDA" -> mapOf("idVehiculo" to mensaje!!)
+            "DATOS_INVALIDOS" -> fallo.erroresPorCampo.ifEmpty { emptyMap() }
             else -> fallo?.erroresPorCampo ?: emptyMap()
         }
         _estado.value = _estado.value.copy(

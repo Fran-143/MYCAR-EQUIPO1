@@ -29,6 +29,12 @@ class RemoteSoporteRepository(private val api: SoporteApi) : SoporteRepository {
         return r.body().orEmpty()
     }
 
+    override suspend fun resumen(): ResumenSoporteDto {
+        val r = api.resumen()
+        if (!r.isSuccessful) throw fallo(r)
+        return r.body() ?: ResumenSoporteDto()
+    }
+
     override suspend fun detalle(codigo: String): SolicitudDetalleDto {
         val r = api.detalle(codigo)
         if (!r.isSuccessful) throw fallo(r)
@@ -44,14 +50,7 @@ class RemoteSoporteRepository(private val api: SoporteApi) : SoporteRepository {
         contentType: String?,
         nombreOriginal: String?
     ): CrearSolicitudResponse = withContext(Dispatchers.IO) {
-        val filePart = if (bytes != null && bytes.isNotEmpty() && !contentType.isNullOrBlank()) {
-            val media = contentType.toMediaType()
-            MultipartBody.Part.createFormData(
-                "file",
-                nombreOriginal ?: "evidencia",
-                bytes.toRequestBody(media)
-            )
-        } else null
+        val filePart = partArchivo(bytes, contentType, nombreOriginal)
         val ctPart = contentType?.takeIf { it.isNotBlank() }
             ?.toRequestBody("text/plain".toMediaType())
         val r = api.crear(
@@ -66,10 +65,52 @@ class RemoteSoporteRepository(private val api: SoporteApi) : SoporteRepository {
         r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
     }
 
+    override suspend fun crearIncidenciaGeneral(
+        idOperacion: String,
+        categoria: String,
+        temaOtro: String?,
+        asunto: String,
+        descripcion: String,
+        bytes: ByteArray?,
+        contentType: String?,
+        nombreOriginal: String?
+    ): CrearSolicitudResponse = withContext(Dispatchers.IO) {
+        val filePart = partArchivo(bytes, contentType, nombreOriginal)
+        val ctPart = contentType?.takeIf { it.isNotBlank() }
+            ?.toRequestBody("text/plain".toMediaType())
+        val temaPart = temaOtro?.takeIf { it.isNotBlank() }
+            ?.toRequestBody("text/plain".toMediaType())
+        val r = api.crearIncidencia(
+            idOperacion.toRequestBody("text/plain".toMediaType()),
+            categoria.toRequestBody("text/plain".toMediaType()),
+            temaPart,
+            asunto.toRequestBody("text/plain".toMediaType()),
+            descripcion.toRequestBody("text/plain".toMediaType()),
+            filePart,
+            ctPart
+        )
+        if (!r.isSuccessful) throw fallo(r)
+        r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+    }
+
     override suspend fun descargarEvidencia(codigo: String): ByteArray = withContext(Dispatchers.IO) {
         val r = api.evidencia(codigo)
         if (!r.isSuccessful) throw fallo(r)
         r.body()?.bytes() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+    }
+
+    private fun partArchivo(
+        bytes: ByteArray?,
+        contentType: String?,
+        nombreOriginal: String?
+    ): MultipartBody.Part? {
+        if (bytes == null || bytes.isEmpty() || contentType.isNullOrBlank()) return null
+        val media = contentType.toMediaType()
+        return MultipartBody.Part.createFormData(
+            "file",
+            nombreOriginal ?: "evidencia",
+            bytes.toRequestBody(media)
+        )
     }
 
     private fun fallo(r: retrofit2.Response<*>): FalloRegistroVehiculo {
