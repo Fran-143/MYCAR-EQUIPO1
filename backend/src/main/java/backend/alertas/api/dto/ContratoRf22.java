@@ -21,7 +21,7 @@ public final class ContratoRf22 {
             @NotBlank String codigoTipoMantenimiento,
             @NotBlank @Pattern(regexp = "POR_TIEMPO|POR_KILOMETRAJE|AMBOS") String criterio,
             @NotBlank @Pattern(regexp = "DESDE_HOY|DESDE_MANTENIMIENTO") String origenCalculo,
-            @Pattern(regexp = "SEMANAS|MESES") String unidadTiempo,
+            @Pattern(regexp = "SEMANAS|MESES|DIAS") String unidadTiempo,
             @Positive Integer cantidadTiempo,
             @Positive Integer intervaloKm,
             @Size(max = 160) String servicioOtro,

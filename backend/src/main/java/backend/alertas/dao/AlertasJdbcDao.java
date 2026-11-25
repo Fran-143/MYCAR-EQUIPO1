@@ -55,6 +55,10 @@ public class AlertasJdbcDao {
     }
 
     public LocalDate calcularFechaObjetivo(LocalDate base, String unidad, int cantidad) {
+        if ("DIAS".equals(unidad)) {
+            return jdbc.queryForObject(
+                    "SELECT (?::date + make_interval(days => ?))::date", LocalDate.class, base, cantidad);
+        }
         if ("SEMANAS".equals(unidad)) {
             return jdbc.queryForObject("SELECT ?::date + ? * 7", LocalDate.class, base, cantidad);
         }
