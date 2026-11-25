@@ -40,9 +40,10 @@ class MycarFirebaseMessagingService : FirebaseMessagingService() {
             if (idNotificacion != null) putExtra("id_notificacion", idNotificacion)
             if (!categoria.isNullOrBlank()) putExtra("categoria", categoria)
         }
+        val requestCode = (idNotificacion ?: idAlerta ?: (System.currentTimeMillis() and 0x7fffffff)).toInt()
         val pending = PendingIntent.getActivity(
             this,
-            (idNotificacion ?: idAlerta ?: 0L).toInt(),
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

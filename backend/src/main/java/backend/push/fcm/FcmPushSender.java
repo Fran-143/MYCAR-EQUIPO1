@@ -2,12 +2,10 @@ package backend.push.fcm;
 
 import backend.push.PushNotificationSender;
 import com.google.firebase.messaging.AndroidConfig;
-import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
-import com.google.firebase.messaging.Notification;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -46,19 +44,15 @@ public class FcmPushSender implements PushNotificationSender {
         if (mensaje.categoria() != null) {
             data.put("categoria", mensaje.categoria());
         }
+        // Data-only: si va notification+data, en background Android muestra el tray del sistema
+        // y NO llama onMessageReceived → sin PendingIntent (tap no abre MainActivity).
+        // El cliente (MycarFirebaseMessagingService) ya construye la notificación con intent.
         Message msg = Message.builder()
                 .setToken(mensaje.token())
-                .setNotification(Notification.builder()
-                        .setTitle(mensaje.titulo())
-                        .setBody(mensaje.cuerpo())
-                        .build())
+                .putAllData(data)
                 .setAndroidConfig(AndroidConfig.builder()
                         .setPriority(AndroidConfig.Priority.HIGH)
-                        .setNotification(AndroidNotification.builder()
-                                .setChannelId(CANAL_ALERTAS)
-                                .build())
                         .build())
-                .putAllData(data)
                 .build();
         try {
             String messageId = messaging.send(msg);
