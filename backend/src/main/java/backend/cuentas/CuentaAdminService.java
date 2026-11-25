@@ -188,12 +188,16 @@ public class CuentaAdminService {
         });
 
         Integer vehiculos = jdbc.queryForObject(
-                "SELECT count(*) FROM mycar.vehiculo WHERE id_usuario=?", Integer.class, id);
-        Integer activos = 0;
-        try {
-            activos = jdbc.queryForObject(
-                    "SELECT count(*) FROM mycar.vehiculo WHERE id_usuario=? AND estado='ACTIVO'", Integer.class, id);
-        } catch (Exception ignored) { }
+                """
+                SELECT count(*) FROM mycar.vehiculo
+                WHERE id_usuario=? AND COALESCE(estado_registro,'VIGENTE')='VIGENTE'
+                """, Integer.class, id);
+        Integer activos = jdbc.queryForObject(
+                """
+                SELECT count(*) FROM mycar.vehiculo
+                WHERE id_usuario=? AND estado_vehiculo='ACTIVO'
+                  AND COALESCE(estado_registro,'VIGENTE')='VIGENTE'
+                """, Integer.class, id);
         det.put("vehiculos", Map.of(
                 "cantidad", vehiculos == null ? 0 : vehiculos,
                 "activos", activos == null ? 0 : activos,
@@ -203,20 +207,24 @@ public class CuentaAdminService {
                 SELECT p.codigo, p.nombre, s.estado, s.origen, s.modalidad, s.inicio_utc, s.fin_utc
                   FROM mycar.suscripcion s JOIN mycar.plan p ON p.id_plan=s.id_plan
                  WHERE s.id_usuario=? AND s.estado='ACTIVA'
-                 ORDER BY s.inicio_utc DESC LIMIT 1
+                 ORDER BY s.inicio_utc DESC, s.id_suscripcion DESC LIMIT 1
                 """, (rs, n) -> {
             Map<String, Object> s = new LinkedHashMap<>();
-            s.put("plan", rs.getString("codigo"));
+            String plan = rs.getString("codigo");
+            String modalidad = rs.getString("modalidad");
+            s.put("plan", plan);
             s.put("nombrePlan", rs.getString("nombre"));
             s.put("estado", rs.getString("estado"));
             s.put("origen", rs.getString("origen"));
-            s.put("modalidad", rs.getString("modalidad"));
+            s.put("modalidad", modalidad);
             s.put("inicioUtc", rs.getTimestamp("inicio_utc").toInstant().toString());
             s.put("finUtc", rs.getTimestamp("fin_utc") == null ? null : rs.getTimestamp("fin_utc").toInstant().toString());
-            boolean prueba = "PRUEBA_GRATUITA".equals(rs.getString("modalidad"));
-            boolean sandbox = "PAGO_SANDBOX".equals(rs.getString("modalidad"));
+            boolean premiumActivo = "PREMIUM".equals(plan);
+            boolean prueba = premiumActivo && "PRUEBA_GRATUITA".equals(modalidad);
+            boolean sandbox = premiumActivo && "PAGO_SANDBOX".equals(modalidad);
             s.put("esPruebaGratuita", prueba);
             s.put("esSandbox", sandbox);
+            // Solo mientras Premium sandbox/prueba esté ACTIVA; al volver a FREE el botón desaparece.
             s.put("puedeCancelarAdmin", prueba || sandbox);
             return s;
         }, id);
