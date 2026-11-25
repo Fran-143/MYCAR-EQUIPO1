@@ -332,6 +332,11 @@ public class SoporteService {
         }
         long idVehiculo = fila.idVehiculo() == null ? 0L : fila.idVehiculo();
         dao.bloquearVehiculo(idVehiculo);
+        // RF62: no aplicar VIN a vehículo eliminado; conserva el expediente.
+        if (dao.vehiculoPropio(fila.idUsuario(), idVehiculo).isEmpty()) {
+            throw new ErrorSoporte("VEHICULO_ELIMINADO",
+                    "El vehículo fue eliminado; no se puede aplicar la corrección de VIN.");
+        }
         var veh = tiveDao.vehiculoPropio(fila.idUsuario(), idVehiculo)
                 .orElseThrow(() -> new ErrorSoporte("VEHICULO_NO_ENCONTRADO", "Vehículo no encontrado."));
         String vinActual = veh.numeroVin() == null ? "" : veh.numeroVin().strip().toUpperCase(Locale.ROOT);

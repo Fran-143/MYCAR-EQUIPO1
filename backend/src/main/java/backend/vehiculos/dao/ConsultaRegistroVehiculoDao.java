@@ -28,7 +28,8 @@ public class ConsultaRegistroVehiculoDao {
                 SELECT p.codigo AS plan,
                        p.max_vehiculos_registrados AS limite,
                        (SELECT count(*) FROM mycar.vehiculo v
-                        WHERE v.id_usuario = s.id_usuario) AS registrados
+                        WHERE v.id_usuario = s.id_usuario
+                          AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE') AS registrados
                 FROM mycar.suscripcion s
                 JOIN mycar.plan p ON p.id_plan = s.id_plan
                 WHERE s.id_usuario = ?
@@ -105,6 +106,7 @@ public class ConsultaRegistroVehiculoDao {
                      LIMIT 1
                 ) soat ON TRUE
                 WHERE v.id_usuario=?
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                 ORDER BY v.es_principal DESC, v.id_vehiculo DESC
                 """, (rs, fila) -> new VehiculoResumen(
                     rs.getLong("id_vehiculo"), rs.getString("placa"), rs.getString("marca"),
@@ -145,6 +147,7 @@ public class ConsultaRegistroVehiculoDao {
                     ORDER BY l.fecha_lectura_utc DESC, l.id_lectura_km DESC LIMIT 1
                 ) km ON TRUE
                 WHERE v.id_usuario=? AND v.id_vehiculo=?
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                 """, (rs, fila) -> new DatosDetalleVehiculo(
                 rs.getLong("id_vehiculo"), rs.getString("placa"), rs.getString("marca"),
                 rs.getString("modelo"), rs.getInt("anio_fabricacion"), rs.getString("uso"),

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.*
@@ -70,7 +71,9 @@ fun HistorialMantenimientoScreen(
     /** Catálogo real de tipos (RF17/RF59). Los históricos ausentes del catálogo se suman en el desplegable. */
     tiposCatalogo: List<Pair<String, String>> = emptyList(),
     /** true = formulario/detalle taller a pantalla completa (oculta cabecera y nav inferior). */
-    onFormularioTallerAbierto: (Boolean) -> Unit = {}
+    onFormularioTallerAbierto: (Boolean) -> Unit = {},
+    /** RF26 — Exportar historial PDF (solo pestaña Mantenimientos). */
+    onExportar: (() -> Unit)? = null
 ) {
     var pestana by rememberSaveable {
         mutableStateOf(
@@ -189,6 +192,7 @@ fun HistorialMantenimientoScreen(
                             tiposCatalogo = tiposCatalogo,
                             onFiltrarTipo = onFiltrarTipo,
                             onOrdenar = onOrdenar,
+                            onExportar = onExportar,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
@@ -420,6 +424,7 @@ private fun CriteriosFiltradoMantenimientos(
     tiposCatalogo: List<Pair<String, String>>,
     onFiltrarTipo: (String?) -> Unit,
     onOrdenar: (Boolean) -> Unit,
+    onExportar: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var menuTipo by remember { mutableStateOf(false) }
@@ -471,7 +476,29 @@ private fun CriteriosFiltradoMantenimientos(
                 }
             }
         }
-        OrdenHistorial(recientes = estado.ordenRecientes, onOrdenar = onOrdenar)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            OrdenHistorial(
+                recientes = estado.ordenRecientes,
+                onOrdenar = onOrdenar,
+                modifier = Modifier.weight(1f)
+            )
+            if (onExportar != null && estado.seleccionado != null) {
+                OutlinedButton(
+                    onClick = onExportar,
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.testTag("rf26.exportar")
+                ) {
+                    Icon(Icons.Outlined.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Exportar", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
     }
 }
 

@@ -3,8 +3,10 @@ package com.mycar.app.features.vehiculos.data
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import java.util.UUID
 
 data class DetalleVehiculoDto(
     val idVehiculo: Long, val placa: String, val marca: String, val modelo: String,
@@ -43,6 +45,45 @@ data class SolicitudActualizacionVehiculoDto(
 
 data class SolicitudEstadoVehiculoDto(val estadoVehiculo: String)
 
+data class ResumenDependenciasEliminacionDto(
+    val mantenimientos: Long = 0,
+    val lecturasKm: Long = 0,
+    val alertas: Long = 0,
+    val soat: Long = 0,
+    val tive: Long = 0,
+    val tieneFoto: Boolean = false
+)
+
+data class PrepararEliminacionDto(
+    val idVehiculo: Long = 0,
+    val placa: String? = null,
+    val marca: String? = null,
+    val modelo: String? = null,
+    val estadoVehiculo: String? = null,
+    val principal: Boolean = false,
+    val versionRegistro: Int = 0,
+    val quedaraSinPrincipal: Boolean = false,
+    val idPrincipalCandidato: Long? = null,
+    val placaPrincipalCandidato: String? = null,
+    val marcaPrincipalCandidato: String? = null,
+    val modeloPrincipalCandidato: String? = null,
+    val dependencias: ResumenDependenciasEliminacionDto? = null,
+    val mensajeConsecuenciaPrincipal: String? = null
+)
+
+data class ConfirmarEliminacionBodyDto(
+    val idOperacion: UUID,
+    val versionRegistro: Int
+)
+
+data class ConfirmarEliminacionDto(
+    val idVehiculo: Long = 0,
+    val estadoRegistro: String? = null,
+    val principalResultanteExiste: Boolean = false,
+    val idPrincipalResultante: Long? = null,
+    val mensaje: String? = null
+)
+
 interface DetalleVehiculoApi {
     @GET("api/v1/vehiculos/{idVehiculo}")
     suspend fun consultar(@Path("idVehiculo") idVehiculo: Long): Response<DetalleVehiculoDto>
@@ -61,4 +102,13 @@ interface DetalleVehiculoApi {
         @Path("idVehiculo") idVehiculo: Long,
         @Body solicitud: SolicitudEstadoVehiculoDto
     ): Response<DetalleVehiculoDto>
+
+    @GET("api/v1/vehiculos/{idVehiculo}/eliminacion")
+    suspend fun prepararEliminacion(@Path("idVehiculo") idVehiculo: Long): Response<PrepararEliminacionDto>
+
+    @POST("api/v1/vehiculos/{idVehiculo}/eliminacion")
+    suspend fun confirmarEliminacion(
+        @Path("idVehiculo") idVehiculo: Long,
+        @Body body: ConfirmarEliminacionBodyDto
+    ): Response<ConfirmarEliminacionDto>
 }

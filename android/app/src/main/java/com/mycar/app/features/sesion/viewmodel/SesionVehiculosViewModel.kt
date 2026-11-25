@@ -46,6 +46,7 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     )
     val mantenimiento = com.mycar.app.features.mantenimiento.data.MantenimientoApiAdapter.desde(cliente.retrofit)
     val historial = com.mycar.app.features.historial.data.HistorialApiAdapter.desde(cliente.retrofit)
+    val exportarHistorial = com.mycar.app.features.historial.export.RemoteExportarHistorialRepository.desde(cliente.retrofit)
     val talleres = com.mycar.app.features.talleres.data.TalleresApiAdapter.desde(cliente)
     val alertas = com.mycar.app.features.alertas.data.RemoteAlertasRepository(
         cliente.retrofit.create(com.mycar.app.features.alertas.data.AlertasApi::class.java))

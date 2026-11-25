@@ -49,7 +49,10 @@ fun FlujoHistorialMantenimiento(
     abrirEnTalleres: Boolean = false,
     onAbrirEnTalleresConsumido: () -> Unit = {},
     avatarBytes: ByteArray? = null,
-    iniciales: String? = null
+    iniciales: String? = null,
+    exportarRepository: com.mycar.app.features.historial.export.ExportarHistorialRepository? = null,
+    fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
+    onVerPlanes: (() -> Unit)? = null,
 ) {
     key(claveCuenta) {
         var registrando by rememberSaveable { mutableStateOf(false) }
@@ -108,7 +111,10 @@ fun FlujoHistorialMantenimiento(
                     iniciales = iniciales,
                     tiposCatalogo = tiposCatalogo,
                     onFormularioTallerAbierto = { tallerOverlay = it },
-                    kmEncima = kmEncima)
+                    kmEncima = kmEncima,
+                    exportarRepository = exportarRepository,
+                    fotosRepository = fotosRepository,
+                    onVerPlanes = onVerPlanes)
             }
         }
     }
@@ -148,12 +154,17 @@ fun EntradaHistorialMantenimiento(
     iniciales: String? = null,
     tiposCatalogo: List<Pair<String, String>> = emptyList(),
     onFormularioTallerAbierto: (Boolean) -> Unit = {},
-    kmEncima: Boolean = false
+    kmEncima: Boolean = false,
+    exportarRepository: com.mycar.app.features.historial.export.ExportarHistorialRepository? = null,
+    fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
+    onVerPlanes: (() -> Unit)? = null
 ) {
     var detalleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var correccionLecturaId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var exportandoId by rememberSaveable { mutableStateOf<Long?>(null) }
     BackHandler(enabled = !kmEncima, onBack = {
         when {
+            exportandoId != null -> exportandoId = null
             correccionLecturaId != null -> correccionLecturaId = null
             detalleId != null -> detalleId = null
             else -> onVolver()
@@ -212,7 +223,25 @@ fun EntradaHistorialMantenimiento(
     }
     val idVehiculoDetalle = estado.seleccionado?.id
     val idCorreccion = correccionLecturaId
+    val idExport = exportandoId
+    LaunchedEffect(idExport) {
+        onFormularioTallerAbierto(idExport != null)
+    }
     when {
+        idExport != null && exportarRepository != null -> {
+            com.mycar.app.features.historial.export.ExportarHistorialRoute(
+                idVehiculo = idExport,
+                repository = exportarRepository,
+                onVolver = { exportandoId = null },
+                onVerPlanes = {
+                    exportandoId = null
+                    onVerPlanes?.invoke()
+                },
+                onIniciarSesion = { onIniciarSesion?.invoke() },
+                fotosRepository = fotosRepository,
+                modifier = modifier
+            )
+        }
         idCorreccion != null && idVehiculoDetalle != null && kilometrajeRepository != null -> {
             com.mycar.app.features.vehiculos.ui.CorregirKilometrajeRoute(
                 clave = claveCuenta,
@@ -266,7 +295,12 @@ fun EntradaHistorialMantenimiento(
                 avatarBytes = avatarBytes,
                 iniciales = iniciales,
                 tiposCatalogo = tiposCatalogo,
-                onFormularioTallerAbierto = onFormularioTallerAbierto
+                onFormularioTallerAbierto = onFormularioTallerAbierto,
+                onExportar = if (exportarRepository != null) {
+                    {
+                        estado.seleccionado?.id?.let { exportandoId = it }
+                    }
+                } else null
             )
         }
     }

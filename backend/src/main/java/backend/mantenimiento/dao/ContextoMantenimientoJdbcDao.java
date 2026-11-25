@@ -35,6 +35,7 @@ public class ContextoMantenimientoJdbcDao {
                     ORDER BY fecha_lectura_utc DESC, id_lectura_km DESC LIMIT 1
                 ) l ON true
                 WHERE v.id_usuario = ? AND v.estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                 ORDER BY v.es_principal DESC, v.id_vehiculo
                 """, (rs,n) -> new VehiculoDto(
                 rs.getLong("id_vehiculo"), rs.getString("placa"), rs.getString("marca"),

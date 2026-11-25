@@ -17,6 +17,36 @@ class RemoteDetalleVehiculosRepository(private val api: DetalleVehiculoApi) : De
     override suspend fun cambiarEstado(idVehiculo: Long, estadoVehiculo: String): DetalleVehiculoDto =
         interpretar(api.cambiarEstado(idVehiculo, SolicitudEstadoVehiculoDto(estadoVehiculo)), idVehiculo)
 
+    override suspend fun prepararEliminacion(idVehiculo: Long): PrepararEliminacionDto {
+        val r = api.prepararEliminacion(idVehiculo)
+        if (!r.isSuccessful) throw falloHttp(r)
+        return r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+    }
+
+    override suspend fun confirmarEliminacion(
+        idVehiculo: Long,
+        idOperacion: java.util.UUID,
+        versionRegistro: Int
+    ): ConfirmarEliminacionDto {
+        val r = api.confirmarEliminacion(
+            idVehiculo,
+            ConfirmarEliminacionBodyDto(idOperacion, versionRegistro)
+        )
+        if (!r.isSuccessful) throw falloHttp(r)
+        return r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+    }
+
+    private fun <T> falloHttp(r: Response<T>): FalloRegistroVehiculo {
+        val error = runCatching {
+            r.errorBody()?.use { Gson().fromJson(it.string(), ErrorApi::class.java) }
+        }.getOrNull()
+        return FalloRegistroVehiculo(
+            error?.codigo ?: if (r.code() == 401) "SESION_NO_VALIDA" else "ERROR_HTTP",
+            r.code(),
+            mensajeServidor = error?.mensaje
+        )
+    }
+
     private fun interpretar(r: Response<DetalleVehiculoDto>, idVehiculo: Long): DetalleVehiculoDto {
         if (!r.isSuccessful) {
             val error = runCatching {

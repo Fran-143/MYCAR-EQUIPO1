@@ -1,5 +1,6 @@
 package com.mycar.app.features.vehiculos.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -105,6 +107,11 @@ fun DetalleVehiculoRoute(
         onEstablecerPrincipal = { vm.establecerPrincipal { onCambioOperativo?.invoke() } },
         onActivar = { vm.activar { onCambioOperativo?.invoke() } },
         onDesactivar = { vm.desactivar { onCambioOperativo?.invoke() } },
+        onPrepararEliminacion = vm::prepararEliminacion,
+        onCancelarEliminacion = vm::cancelarEliminacion,
+        onConfirmarEliminacion = {
+            vm.confirmarEliminacion { onCambioOperativo?.invoke() }
+        },
         onLimpiarMensajeAccion = vm::limpiarMensajeAccion,
         onRegistrarFoto = { bytes, ct, nombre ->
             vm.registrarOActualizarFoto(bytes, ct, nombre) { onCambioOperativo?.invoke() }
@@ -138,6 +145,9 @@ fun DetalleVehiculoScreen(
     onEliminarFoto: (() -> Unit)? = null,
     onActivar: (() -> Unit)? = null,
     onDesactivar: (() -> Unit)? = null,
+    onPrepararEliminacion: (() -> Unit)? = null,
+    onCancelarEliminacion: (() -> Unit)? = null,
+    onConfirmarEliminacion: (() -> Unit)? = null,
     onLimpiarMensajeAccion: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -271,6 +281,19 @@ fun DetalleVehiculoScreen(
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
                             ) { Text("Desactivar vehículo", fontWeight = FontWeight.SemiBold) }
                         }
+                        if (onPrepararEliminacion != null) {
+                            OutlinedButton(
+                                onClick = onPrepararEliminacion,
+                                enabled = !estado.ocupado,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 50.dp)
+                                    .testTag("rf62.eliminar"),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, Color(0xFFB71C1C)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB71C1C))
+                            ) { Text("Eliminar vehículo", fontWeight = FontWeight.SemiBold) }
+                        }
                     } else if (onActivar != null) {
                         Button(
                             onClick = onActivar,
@@ -279,6 +302,19 @@ fun DetalleVehiculoScreen(
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)
                         ) { Text("Activar vehículo", fontWeight = FontWeight.SemiBold) }
+                        if (onPrepararEliminacion != null) {
+                            OutlinedButton(
+                                onClick = onPrepararEliminacion,
+                                enabled = !estado.ocupado,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 50.dp)
+                                    .testTag("rf62.eliminar"),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, Color(0xFFB71C1C)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB71C1C))
+                            ) { Text("Eliminar vehículo", fontWeight = FontWeight.SemiBold) }
+                        }
                     }
 
                     SeccionIdentificacion(det)
@@ -373,6 +409,60 @@ fun DetalleVehiculoScreen(
             dismissButton = {
                 TextButton(onClick = { onVolverDetalleTrasVin?.invoke() }) {
                     Text("VOLVER AL DETALLE")
+                }
+            }
+        )
+    }
+    val prepElim = estado.preparacionEliminacion
+    if (prepElim != null) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!estado.ocupado) onCancelarEliminacion?.invoke()
+            },
+            title = { Text("Eliminar vehículo", fontWeight = FontWeight.Bold, color = Color(0xFFB71C1C)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${prepElim.marca.orEmpty()} ${prepElim.modelo.orEmpty()}",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(prepElim.placa.orEmpty(), color = MyCarMuted)
+                    Text("¿Estás seguro de que deseas eliminar este vehículo de tu cuenta?")
+                    Text(
+                        "El vehículo dejará de aparecer en Mis vehículos y no podrás utilizarlo para nuevas operaciones. Sus registros históricos y documentos vinculados se conservarán de forma protegida.",
+                        color = MyCarMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    prepElim.mensajeConsecuenciaPrincipal?.let {
+                        Text(it, color = Color(0xFFC62828), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onConfirmarEliminacion?.invoke() },
+                    enabled = !estado.ocupado,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB71C1C))
+                ) { Text(if (estado.ocupado) "Eliminando…" else "Eliminar vehículo") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { onCancelarEliminacion?.invoke() },
+                    enabled = !estado.ocupado
+                ) { Text("Cancelar") }
+            }
+        )
+    }
+    if (estado.eliminadoOk) {
+        AlertDialog(
+            onDismissRequest = onVolver,
+            title = { Text("Vehículo eliminado", fontWeight = FontWeight.Bold, color = AzulDetalle) },
+            text = {
+                Text(estado.mensajeEliminacion ?: "El vehículo fue retirado de tu cuenta correctamente.")
+            },
+            confirmButton = {
+                Button(onClick = onVolver, colors = ButtonDefaults.buttonColors(containerColor = AzulDetalle)) {
+                    Text("Entendido")
                 }
             }
         )

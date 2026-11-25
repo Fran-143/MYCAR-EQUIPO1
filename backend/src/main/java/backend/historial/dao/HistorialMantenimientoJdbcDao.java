@@ -20,6 +20,7 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
             SELECT id_vehiculo, placa, marca, modelo, estado_vehiculo, es_principal
             FROM mycar.vehiculo
             WHERE id_usuario = ? AND estado_vehiculo IN ('ACTIVO', 'INACTIVO')
+              AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
             """;
 
     public HistorialMantenimientoJdbcDao(JdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -48,6 +49,7 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
                 LEFT JOIN mycar.taller tal ON tal.id_taller = m.id_taller
                 WHERE v.id_usuario = ? AND v.id_vehiculo = ?
                   AND v.estado_vehiculo IN ('ACTIVO', 'INACTIVO')
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                   AND m.estado IN ('REALIZADO', 'ANULADO')
                 ORDER BY m.fecha_servicio DESC, m.id_mantenimiento DESC
                 """, (r, n) -> new Mantenimiento(r.getLong("id_mantenimiento"),
@@ -72,6 +74,7 @@ public class HistorialMantenimientoJdbcDao implements HistorialMantenimientoDao 
                 LEFT JOIN mycar.taller tal ON tal.id_taller = m.id_taller
                 WHERE v.id_usuario = ? AND v.id_vehiculo = ? AND m.id_mantenimiento = ?
                   AND v.estado_vehiculo IN ('ACTIVO', 'INACTIVO')
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                   AND m.estado IN ('REALIZADO', 'ANULADO')
                 """, (r, n) -> {
             long id = r.getLong("id_mantenimiento");

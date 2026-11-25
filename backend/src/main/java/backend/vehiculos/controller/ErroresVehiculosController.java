@@ -17,7 +17,8 @@ import java.util.Set;
 @RestControllerAdvice(assignableTypes = {
         VehiculosController.class,
         KilometrajeVehiculoController.class,
-        CompartirVehiculoController.class
+        CompartirVehiculoController.class,
+        backend.vehiculos.eliminacion.EliminacionVehiculoController.class
 })
 public class ErroresVehiculosController {
     @ExceptionHandler(SesionVehiculosNoValidada.class)
@@ -38,7 +39,8 @@ public class ErroresVehiculosController {
                  "KM_INTERVALO_INVALIDO", "LECTURA_NO_ULTIMA", "REFERENCIA_INCOMPATIBLE",
                  "CAMPO_PROTEGIDO", "IDENTIFICADORES_BLOQUEADOS_TIVE",
                  "PRINCIPAL_REQUIERE_REEMPLAZO", "ULTIMO_ACTIVO", "YA_ES_PRINCIPAL",
-                 "CANDIDATO_NO_ELEGIBLE", "ESTADO_SIN_CAMBIOS" -> HttpStatus.CONFLICT;
+                 "CANDIDATO_NO_ELEGIBLE", "ESTADO_SIN_CAMBIOS",
+                 "VEHICULO_YA_ELIMINADO", "VERSION_DESACTUALIZADA", "PRINCIPAL_NO_ASIGNABLE" -> HttpStatus.CONFLICT;
             case "VEHICULO_INACTIVO", "KILOMETRAJE_NO_DISPONIBLE", "CORRECCION_NO_DISPONIBLE",
                  "CORRECCION_YA_APLICADA" -> HttpStatus.FORBIDDEN;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
@@ -75,6 +77,11 @@ public class ErroresVehiculosController {
             case "CANDIDATO_NO_ELEGIBLE" ->
                     "Solo un vehículo activo propio puede establecerse como principal.";
             case "ESTADO_SIN_CAMBIOS" -> "El vehículo ya se encuentra en ese estado.";
+            case "VEHICULO_YA_ELIMINADO" -> "Este vehículo ya fue eliminado de tu cuenta.";
+            case "VERSION_DESACTUALIZADA" ->
+                    "Los datos del vehículo cambiaron. Actualiza la información y confirma nuevamente.";
+            case "PRINCIPAL_NO_ASIGNABLE" -> "No se pudo asignar el nuevo vehículo principal.";
+            case "ELIMINACION_FALLIDA" -> "No se pudo eliminar el vehículo. Inténtalo nuevamente.";
             case "PLACA_DUPLICADA" -> "Esta placa ya se encuentra registrada en MyCar";
             case "VIN_DUPLICADO" -> "El VIN ya está registrado.";
             case "VEHICULO_DUPLICADO" -> "Ya tienes un vehículo registrado con exactamente los mismos datos.";

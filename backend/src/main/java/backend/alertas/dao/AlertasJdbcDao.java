@@ -21,6 +21,7 @@ public class AlertasJdbcDao {
         Integer ok = jdbc.queryForObject("""
                 SELECT 1 FROM mycar.vehiculo
                 WHERE id_vehiculo = ? AND id_usuario = ? AND estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """, Integer.class, vehiculo, usuario);
         if (ok == null) throw new EmptyResultDataAccessException(1);
     }
@@ -30,6 +31,7 @@ public class AlertasJdbcDao {
         Integer ok = jdbc.queryForObject("""
                 SELECT 1 FROM mycar.vehiculo
                 WHERE id_vehiculo = ? AND id_usuario = ? AND estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 FOR UPDATE
                 """, Integer.class, vehiculo, usuario);
         if (ok == null) throw new EmptyResultDataAccessException(1);

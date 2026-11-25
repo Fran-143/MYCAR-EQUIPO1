@@ -184,6 +184,7 @@ public class VehiculoDao {
                 SELECT COUNT(*)
                 FROM mycar.vehiculo
                 WHERE id_usuario = ?
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """,
                 Long.class,
                 idUsuario
@@ -373,8 +374,19 @@ public class VehiculoDao {
             boolean esPrincipal,
             String placa,
             String marca,
-            String modelo
+            String modelo,
+            String estadoRegistro
     ) {
+        public VehiculoEstadoOperativo(
+                long idVehiculo,
+                String estadoVehiculo,
+                boolean esPrincipal,
+                String placa,
+                String marca,
+                String modelo
+        ) {
+            this(idVehiculo, estadoVehiculo, esPrincipal, placa, marca, modelo, "VIGENTE");
+        }
     }
 
     /** Serializa cambios de estado/principal de la misma cuenta. */
@@ -395,7 +407,8 @@ public class VehiculoDao {
     public Optional<VehiculoEstadoOperativo> obtenerEstadoOperativoPropio(long idUsuario, long idVehiculo) {
         return jdbcTemplate.query(
                 """
-                SELECT id_vehiculo, estado_vehiculo, es_principal, placa, marca, modelo
+                SELECT id_vehiculo, estado_vehiculo, es_principal, placa, marca, modelo,
+                       COALESCE(estado_registro, 'VIGENTE') AS estado_registro
                 FROM mycar.vehiculo
                 WHERE id_usuario = ? AND id_vehiculo = ?
                 """,
@@ -405,7 +418,8 @@ public class VehiculoDao {
                         rs.getBoolean("es_principal"),
                         rs.getString("placa"),
                         rs.getString("marca"),
-                        rs.getString("modelo")
+                        rs.getString("modelo"),
+                        rs.getString("estado_registro")
                 ),
                 idUsuario,
                 idVehiculo
@@ -416,7 +430,9 @@ public class VehiculoDao {
         Long n = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*) FROM mycar.vehiculo
-                WHERE id_usuario = ? AND estado_vehiculo = 'ACTIVO'
+                WHERE id_usuario = ?
+                  AND estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """,
                 Long.class,
                 idUsuario
@@ -471,6 +487,7 @@ public class VehiculoDao {
                 WHERE id_usuario = ?
                   AND id_vehiculo = ?
                   AND estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """,
                 idUsuario,
                 idNuevoPrincipal

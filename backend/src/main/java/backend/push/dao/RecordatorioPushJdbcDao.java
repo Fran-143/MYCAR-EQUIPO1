@@ -44,6 +44,7 @@ public class RecordatorioPushJdbcDao {
                 WHERE a.categoria = 'MANTENIMIENTO'
                   AND a.estado IN ('PROXIMA', 'PENDIENTE', 'VENCIDA')
                   AND v.estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                 ORDER BY v.id_usuario, a.estado DESC, a.id_alerta
                 """, this::mapAlerta);
     }
@@ -58,6 +59,7 @@ public class RecordatorioPushJdbcDao {
                 WHERE a.categoria = 'SOAT'
                   AND a.estado IN ('PROXIMA', 'PENDIENTE', 'VENCIDA')
                   AND v.estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                 ORDER BY v.id_usuario, a.id_alerta
                 """, this::mapAlerta);
     }
@@ -98,6 +100,7 @@ public class RecordatorioPushJdbcDao {
                   AND n.estado_gestion = 'PENDIENTE'
                   AND u.estado_recordatorios = 'ACTIVO'
                   AND v.estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                   AND (n.fecha_emision_utc AT TIME ZONE 'America/Lima')::date = ?
                   AND NOT EXISTS (
                     SELECT 1 FROM mycar.outbox_push_notificacion opn

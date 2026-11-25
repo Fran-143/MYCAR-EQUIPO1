@@ -229,6 +229,7 @@ public class PlanesJdbcDao {
         Long n = jdbc.queryForObject("""
                 SELECT count(*) FROM mycar.vehiculo
                 WHERE id_usuario = ? AND estado_vehiculo = 'INACTIVO'
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """, Long.class, idUsuario);
         return n == null ? 0L : n;
     }
@@ -237,14 +238,18 @@ public class PlanesJdbcDao {
         var rows = jdbc.query("""
                 SELECT id_vehiculo FROM mycar.vehiculo
                 WHERE id_usuario = ? AND es_principal
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 LIMIT 1
                 """, (rs, i) -> rs.getLong(1), idUsuario);
         return rows.stream().findFirst();
     }
 
     public long contarVehiculos(long idUsuario) {
-        Long n = jdbc.queryForObject(
-                "SELECT count(*) FROM mycar.vehiculo WHERE id_usuario = ?", Long.class, idUsuario);
+        Long n = jdbc.queryForObject("""
+                SELECT count(*) FROM mycar.vehiculo
+                WHERE id_usuario = ?
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
+                """, Long.class, idUsuario);
         return n == null ? 0L : n;
     }
 
@@ -252,6 +257,7 @@ public class PlanesJdbcDao {
         Long n = jdbc.queryForObject("""
                 SELECT count(*) FROM mycar.vehiculo
                 WHERE id_usuario = ? AND estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """, Long.class, idUsuario);
         return n == null ? 0L : n;
     }
@@ -266,6 +272,7 @@ public class PlanesJdbcDao {
                            ) AS rn
                     FROM mycar.vehiculo
                     WHERE id_usuario = ? AND estado_vehiculo = 'ACTIVO'
+                      AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 )
                 UPDATE mycar.vehiculo v
                 SET estado_vehiculo = 'INACTIVO',
@@ -278,6 +285,7 @@ public class PlanesJdbcDao {
         Long principales = jdbc.queryForObject("""
                 SELECT count(*) FROM mycar.vehiculo
                 WHERE id_usuario = ? AND estado_vehiculo = 'ACTIVO' AND es_principal
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """, Long.class, idUsuario);
         if (principales != null && principales == 0) {
             jdbc.update("""
@@ -286,6 +294,7 @@ public class PlanesJdbcDao {
                     WHERE id_vehiculo = (
                         SELECT id_vehiculo FROM mycar.vehiculo
                         WHERE id_usuario = ? AND estado_vehiculo = 'ACTIVO'
+                          AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                         ORDER BY creado_utc DESC, id_vehiculo DESC
                         LIMIT 1
                     )

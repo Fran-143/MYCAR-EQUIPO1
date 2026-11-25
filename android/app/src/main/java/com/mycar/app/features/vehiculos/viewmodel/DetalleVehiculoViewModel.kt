@@ -8,9 +8,12 @@ import com.mycar.app.features.fotos.domain.ErrorFotoPersonalizada
 import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
 import com.mycar.app.features.soat.data.SoatDto
 import com.mycar.app.features.soat.domain.SoatRepository
+import com.mycar.app.features.vehiculos.data.ConfirmarEliminacionDto
 import com.mycar.app.features.vehiculos.data.DetalleVehiculoDto
+import com.mycar.app.features.vehiculos.data.PrepararEliminacionDto
 import com.mycar.app.features.vehiculos.domain.DetalleVehiculosRepository
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,7 +37,10 @@ data class EstadoDetalleVehiculo(
     val soatActual: SoatDto? = null,
     val soatResumenCargando: Boolean = false,
     val fotoBytes: ByteArray? = null,
-    val ocupadoFoto: Boolean = false
+    val ocupadoFoto: Boolean = false,
+    val preparacionEliminacion: PrepararEliminacionDto? = null,
+    val eliminadoOk: Boolean = false,
+    val mensajeEliminacion: String? = null
 )
 
 class DetalleVehiculoViewModel(
@@ -176,6 +182,89 @@ class DetalleVehiculoViewModel(
         ) { repository.cambiarEstado(idVehiculo, "INACTIVO") }
     }
 
+    fun prepararEliminacion() {
+        if (_estado.value.ocupado || _estado.value.fase != FaseDetalle.LISTO) return
+        val actual = ++revision
+        _estado.value = _estado.value.copy(
+            ocupado = true,
+            mensajeAccion = null,
+            accionError = false,
+            codigoAccion = null,
+            preparacionEliminacion = null
+        )
+        viewModelScope.launch {
+            try {
+                val prep = withContext(Dispatchers.IO) { repository.prepararEliminacion(idVehiculo) }
+                if (actual != revision) return@launch
+                _estado.value = _estado.value.copy(ocupado = false, preparacionEliminacion = prep)
+            } catch (cancelada: CancellationException) {
+                throw cancelada
+            } catch (error: Exception) {
+                if (actual != revision) return@launch
+                val fallo = error as? FalloRegistroVehiculo
+                if (fallo?.estadoHttp == 401) {
+                    aplicarErrorCarga(error)
+                    return@launch
+                }
+                _estado.value = _estado.value.copy(
+                    ocupado = false,
+                    mensajeAccion = mensajeAccion(fallo),
+                    accionError = true,
+                    codigoAccion = fallo?.codigo
+                )
+            }
+        }
+    }
+
+    fun cancelarEliminacion() {
+        _estado.value = _estado.value.copy(preparacionEliminacion = null)
+    }
+
+    fun confirmarEliminacion(onExito: () -> Unit = {}) {
+        val prep = _estado.value.preparacionEliminacion ?: return
+        if (_estado.value.ocupado) return
+        val actual = ++revision
+        _estado.value = _estado.value.copy(ocupado = true, mensajeAccion = null, accionError = false)
+        viewModelScope.launch {
+            try {
+                val resp = withContext(Dispatchers.IO) {
+                    repository.confirmarEliminacion(
+                        idVehiculo,
+                        UUID.randomUUID(),
+                        prep.versionRegistro
+                    )
+                }
+                if (actual != revision) return@launch
+                _estado.value = _estado.value.copy(
+                    ocupado = false,
+                    preparacionEliminacion = null,
+                    eliminadoOk = true,
+                    mensajeEliminacion = resp.mensaje
+                        ?: "El vehículo fue retirado de tu cuenta correctamente.",
+                    fase = FaseDetalle.NO_DISPONIBLE
+                )
+                onExito()
+            } catch (cancelada: CancellationException) {
+                throw cancelada
+            } catch (error: Exception) {
+                if (actual != revision) return@launch
+                val fallo = error as? FalloRegistroVehiculo
+                if (fallo?.estadoHttp == 401) {
+                    aplicarErrorCarga(error)
+                    return@launch
+                }
+                _estado.value = _estado.value.copy(
+                    ocupado = false,
+                    mensajeAccion = mensajeAccion(fallo),
+                    accionError = true,
+                    codigoAccion = fallo?.codigo,
+                    preparacionEliminacion = if (fallo?.codigo == "VERSION_DESACTUALIZADA") null
+                    else _estado.value.preparacionEliminacion
+                )
+            }
+        }
+    }
+
     private fun ejecutarAccion(
         exitoMensaje: String,
         onExito: () -> Unit,
@@ -240,6 +329,9 @@ class DetalleVehiculoViewModel(
         "YA_ES_PRINCIPAL" -> "Este vehículo ya es el principal."
         "CANDIDATO_NO_ELEGIBLE" -> "Solo un vehículo activo puede ser principal."
         "ESTADO_SIN_CAMBIOS" -> "El vehículo ya está en ese estado."
+        "VEHICULO_YA_ELIMINADO" -> "Este vehículo ya fue eliminado de tu cuenta."
+        "VERSION_DESACTUALIZADA" ->
+            "Los datos del vehículo cambiaron. Actualiza la información y confirma nuevamente."
         else -> fallo?.mensajeServidor ?: "No se pudo completar la acción. Inténtalo nuevamente."
     }
 

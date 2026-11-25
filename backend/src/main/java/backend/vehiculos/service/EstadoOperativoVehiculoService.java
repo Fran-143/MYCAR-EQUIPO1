@@ -41,6 +41,9 @@ public class EstadoOperativoVehiculoService {
 
         var candidato = vehiculos.obtenerEstadoOperativoPropio(idUsuario, idVehiculo)
                 .orElseThrow(() -> new ErrorRegistroVehiculo("VEHICULO_NO_ENCONTRADO"));
+        if ("ELIMINADO".equalsIgnoreCase(candidato.estadoRegistro())) {
+            throw new ErrorRegistroVehiculo("VEHICULO_YA_ELIMINADO");
+        }
         if (!"ACTIVO".equals(candidato.estadoVehiculo())) {
             throw new ErrorRegistroVehiculo("CANDIDATO_NO_ELEGIBLE");
         }
@@ -70,6 +73,9 @@ public class EstadoOperativoVehiculoService {
 
         var actual = vehiculos.obtenerEstadoOperativoPropio(idUsuario, idVehiculo)
                 .orElseThrow(() -> new ErrorRegistroVehiculo("VEHICULO_NO_ENCONTRADO"));
+        if ("ELIMINADO".equalsIgnoreCase(actual.estadoRegistro())) {
+            throw new ErrorRegistroVehiculo("VEHICULO_YA_ELIMINADO");
+        }
 
         if (destino.equals(actual.estadoVehiculo())) {
             throw new ErrorRegistroVehiculo("ESTADO_SIN_CAMBIOS");

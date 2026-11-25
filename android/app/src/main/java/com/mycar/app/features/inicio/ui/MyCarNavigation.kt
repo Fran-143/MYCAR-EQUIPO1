@@ -124,6 +124,7 @@ fun MyCarNavigation(
     var formularioAtencionAlerta by remember { mutableStateOf(false) }
     var detalleAlertaTrasAtencion by rememberSaveable { mutableStateOf<Long?>(null) }
     var perfilAbrirLicencia by rememberSaveable { mutableStateOf(false) }
+    var perfilAbrirPlanes by rememberSaveable { mutableStateOf(false) }
     var borradorAlertaRf17 by remember { mutableStateOf<BorradorAlerta?>(null) }
     val navegacion=NavegacionInicio(SeccionMyCar.valueOf(seccionNombre),secundariaNombre?.let(SecundariaMyCar::valueOf))
     fun navegar(n: NavegacionInicio) { seccionNombre=n.seccion.name; secundariaNombre=n.secundaria?.name; formularioAbierto=false }
@@ -436,7 +437,8 @@ fun MyCarNavigation(
                             val perfilVm: PerfilViewModel = viewModel(key = "perfil-${cuenta.ciclo}", factory = factoryPerfil)
                             val estadoPerfilCabecera by perfilVm.estado.collectAsStateWithLifecycle()
                             LaunchedEffect(cuenta.ciclo, secundariaNombre) {
-                                if (secundariaNombre == SecundariaMyCar.PERFIL.name && !perfilAbrirLicencia) {
+                                if (secundariaNombre == SecundariaMyCar.PERFIL.name
+                                    && !perfilAbrirLicencia && !perfilAbrirPlanes) {
                                     perfilVm.resetAlAbrir()
                                 }
                             }
@@ -448,6 +450,12 @@ fun MyCarNavigation(
                                 if (perfilAbrirLicencia) {
                                     perfilVm.abrirLicencia()
                                     perfilAbrirLicencia = false
+                                }
+                            }
+                            LaunchedEffect(perfilAbrirPlanes) {
+                                if (perfilAbrirPlanes) {
+                                    perfilVm.abrirPlanes()
+                                    perfilAbrirPlanes = false
                                 }
                             }
                             PerfilRoute(
@@ -902,7 +910,13 @@ fun MyCarNavigation(
                                         abrirEnTalleres = abrirHistorialEnTalleres,
                                         onAbrirEnTalleresConsumido = { abrirHistorialEnTalleres = false },
                                         avatarBytes = avatarBytes,
-                                        iniciales = iniciales)
+                                        iniciales = iniciales,
+                                        exportarRepository = cuenta.exportarHistorial,
+                                        fotosRepository = cuenta.fotos,
+                                        onVerPlanes = {
+                                            perfilAbrirPlanes = true
+                                            navegar(navegacion.abrir(SecundariaMyCar.PERFIL))
+                                        })
                                     if (idKmOverlay != null) {
                                         BackHandler { kmOverlayMantenimiento = null }
                                         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

@@ -61,6 +61,14 @@ public class PlanesService {
         return toMiSuscripcion(s);
     }
 
+    /** RF26 / RF29: derecho Premium efectivo vigente (prueba o sandbox aprobados y no vencidos). */
+    @Transactional
+    public boolean tienePremiumEfectivo(long idUsuario) {
+        reconciliarVencimiento(idUsuario);
+        SuscripcionRow s = dao.suscripcionActiva(idUsuario).orElse(null);
+        return s != null && esPremiumActivo(s);
+    }
+
     @Transactional(readOnly = true)
     public List<ContratoPlanes.EventoDto> misEventos(long idUsuario) {
         return dao.eventosUsuario(idUsuario, 50).stream().map(this::toEvento).toList();

@@ -53,6 +53,7 @@ public class SoporteJdbcDao {
                     FROM mycar.vehiculo v
                     LEFT JOIN mycar.tive t ON t.id_vehiculo = v.id_vehiculo
                     WHERE v.id_vehiculo = ? AND v.id_usuario = ?
+                      AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                     """, (rs, n) -> new VehiculoCtx(
                     rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4)
             ), vehiculo, usuario));
