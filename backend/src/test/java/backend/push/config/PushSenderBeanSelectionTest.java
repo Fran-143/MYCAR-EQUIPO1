@@ -41,14 +41,24 @@ class PushSenderBeanSelectionTest {
                 });
     }
 
+    /**
+     * FcmConfiguration usa {@code @Lazy}: Tomcat puede abrir sin SA (Render Free).
+     * El fallo real ocurre al materializar el bean (primer envío / worker), no al arrancar el contexto.
+     */
     @Test
-    void habilitadoTrueSinCredencialesFallaArranque() {
+    void habilitadoTrueSinCredencialesFallaAlMaterializarBeanLazy() {
         runner.withPropertyValues(
                         "mycar.fcm.habilitado=true",
                         "mycar.fcm.credentials-json=",
                         "mycar.fcm.credentials-base64=",
                         "mycar.fcm.credentials-path=")
-                .run(ctx -> assertThat(ctx).hasFailed());
+                .run(ctx -> {
+                    assertThat(ctx).hasNotFailed();
+                    assertThat(ctx).hasSingleBean(PushNotificationSender.class);
+                    org.assertj.core.api.Assertions.assertThatThrownBy(
+                                    () -> ctx.getBean(PushNotificationSender.class).proveedor())
+                            .hasRootCauseInstanceOf(IllegalStateException.class);
+                });
     }
 
     @Test

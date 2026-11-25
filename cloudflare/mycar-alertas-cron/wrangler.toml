@@ -10,9 +10,10 @@ BACKEND_URL = "https://mycar-backend-1dxi.onrender.com"
 # Producción autorizada: COMPLETO (Dashboard ya activo). No bajar a SIMULAR.
 # No desplegar con crons=[]: borraría los triggers del Dashboard.
 EVAL_MODO = "COMPLETO"
-MAX_ATTEMPTS = "4"
-RETRY_BASE_MS = "8000"
-FETCH_TIMEOUT_MS = "25000"
+# Render Free puede tardar >60s en despertar; 6× con backoff cubre el cold start observado.
+MAX_ATTEMPTS = "6"
+RETRY_BASE_MS = "10000"
+FETCH_TIMEOUT_MS = "45000"
 
 # Conservar exactamente: 00:10 eval (RF23+RF43) + 05:00 push (America/Lima = UTC-5).
 [triggers]

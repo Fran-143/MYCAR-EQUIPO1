@@ -126,12 +126,12 @@ class TalleresControllerTest {
 
     @Test void telefonoInvalido400() throws Exception {
         when(servicio.registrar(eq(7L), any()))
-                .thenThrow(new IllegalArgumentException("El teléfono ingresado no es válido"));
+                .thenThrow(new IllegalArgumentException("El teléfono admite máximo 9 dígitos"));
         mvc.perform(post("/api/v1/rf34/talleres").principal(sesion)
                         .contentType("application/json")
-                        .content("{\"nombre\":\"CENTRO\",\"telefono\":\"123\"}"))
+                        .content("{\"nombre\":\"CENTRO\",\"telefono\":\"1234567890\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensaje").value("El teléfono ingresado no es válido"));
+                .andExpect(jsonPath("$.mensaje").value("El teléfono admite máximo 9 dígitos"));
     }
 
     @Test void nombreDuplicado409() throws Exception {

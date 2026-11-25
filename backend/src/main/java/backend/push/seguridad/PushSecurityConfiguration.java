@@ -14,12 +14,17 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 
+/**
+ * Cadena acotada a {@code /api/v1/dispositivos-push/**}.
+ * Solo POST registrar / desvincular / probar con sesión; el resto denyAll.
+ * Order 50 evita empate con RF43 (@Order 49).
+ */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class PushSecurityConfiguration {
 
     @Bean
-    @Order(49)
+    @Order(50)
     SecurityFilterChain pushSecurity(
             HttpSecurity http, SessionAuthentication sesiones, ObjectMapper json) throws Exception {
         return http.securityMatcher("/api/v1/dispositivos-push", "/api/v1/dispositivos-push/**")

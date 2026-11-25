@@ -8,7 +8,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ValidadorTaller {
-    private static final Pattern SOLO_DIGITOS_9 = Pattern.compile("^[0-9]{9}$");
+    /** Máximo 9 dígitos (1–9), no exactamente nueve. */
+    private static final Pattern TELEFONO_1_A_9 = Pattern.compile("^[0-9]{1,9}$");
     private final jakarta.validation.Validator emailValidator =
             Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -23,19 +24,36 @@ public class ValidadorTaller {
         return n;
     }
 
-    /** Opcional; si se informa debe ser exactamente 9 dígitos (sin +/espacios/guiones). */
+    /** Opcional; si se informa: solo dígitos, máximo 9 (^[0-9]{1,9}$). */
     public String telefonoOpcional(String telefono) {
         if (telefono == null || telefono.isBlank()) return null;
-        String digitos = telefono.trim().replaceAll("\\D", "");
-        if (!SOLO_DIGITOS_9.matcher(digitos).matches()) {
+        String bruto = telefono.strip();
+        if (!bruto.chars().allMatch(Character::isDigit)) {
+            throw new IllegalArgumentException("El teléfono solo admite dígitos (0-9)");
+        }
+        if (bruto.length() > 9) {
+            throw new IllegalArgumentException("El teléfono admite máximo 9 dígitos");
+        }
+        if (!TELEFONO_1_A_9.matcher(bruto).matches()) {
             throw new IllegalArgumentException("El teléfono ingresado no es válido");
         }
-        return digitos;
+        return bruto;
     }
 
     public String correoOpcional(String correo) {
         if (correo == null || correo.isBlank()) return null;
         String c = correo.trim().toLowerCase(Locale.ROOT);
+        if (c.chars().anyMatch(Character::isWhitespace)) {
+            throw new IllegalArgumentException("El correo ingresado no es válido");
+        }
+        long arrobas = c.chars().filter(ch -> ch == '@').count();
+        if (arrobas != 1L) {
+            throw new IllegalArgumentException("El correo ingresado no es válido");
+        }
+        int at = c.indexOf('@');
+        if (at <= 0 || at >= c.length() - 1) {
+            throw new IllegalArgumentException("El correo ingresado no es válido");
+        }
         if (c.codePointCount(0, c.length()) < 5 || c.codePointCount(0, c.length()) > 254) {
             throw new IllegalArgumentException("El correo ingresado no es válido");
         }
@@ -49,7 +67,11 @@ public class ValidadorTaller {
     public String direccionOpcional(String direccion) {
         if (direccion == null || direccion.isBlank()) return null;
         String d = direccion.trim().toUpperCase(Locale.ROOT);
-        if (d.codePointCount(0, d.length()) > 200) {
+        int len = d.codePointCount(0, d.length());
+        if (len < 9) {
+            throw new IllegalArgumentException("La dirección debe contener al menos 9 caracteres.");
+        }
+        if (len > 200) {
             throw new IllegalArgumentException("direccion: supera 200 caracteres");
         }
         return d;
