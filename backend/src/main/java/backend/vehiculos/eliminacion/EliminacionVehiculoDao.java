@@ -92,6 +92,9 @@ public class EliminacionVehiculoDao {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public List<String> purgarDatosOperativos(long idVehiculo) {
+        // Flag de sesión: permite DELETE en triggers append-only / inmutables (V54).
+        jdbc.execute("SELECT set_config('mycar.rf62_purga', '1', true)");
+
         List<String> objectKeys = jdbc.query("""
                 SELECT storage_object_key FROM mycar.soat
                 WHERE id_vehiculo = ? AND storage_object_key IS NOT NULL AND btrim(storage_object_key) <> ''
@@ -177,6 +180,8 @@ public class EliminacionVehiculoDao {
                 WHERE mr.id_mantenimiento = m.id_mantenimiento AND m.id_vehiculo = ?
                 """, idVehiculo);
         jdbc.update("DELETE FROM mycar.mantenimiento WHERE id_vehiculo = ?", idVehiculo);
+        // Correcciones RF16 antes de lecturas (FK RESTRICT)
+        jdbc.update("DELETE FROM mycar.correccion_lectura_kilometraje WHERE id_vehiculo = ?", idVehiculo);
         jdbc.update("DELETE FROM mycar.lectura_kilometraje WHERE id_vehiculo = ?", idVehiculo);
         jdbc.update("DELETE FROM mycar.config_recordatorio_km WHERE id_vehiculo = ?", idVehiculo);
 

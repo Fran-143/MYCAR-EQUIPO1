@@ -34,6 +34,8 @@ public class DispositivoPushService {
             throw new IllegalArgumentException("proveedor no soportado");
         }
         dao.upsert(usuario, instalacion, prov, token.trim());
+        // Tras recuperar token activo, reencolar omisiones recientes por sin_tokens (misma TX).
+        dao.reencolarOmitidosSinTokens(usuario);
     }
 
     @Transactional

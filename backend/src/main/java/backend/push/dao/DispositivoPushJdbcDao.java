@@ -69,6 +69,24 @@ public class DispositivoPushJdbcDao {
         return Optional.ofNullable(ok);
     }
 
+    /**
+     * Reencola omisiones recientes por falta de token (misma ventana de día Lima).
+     * No reabre ENVIADO ni otras omisiones.
+     */
+    public int reencolarOmitidosSinTokens(long usuario) {
+        return jdbc.update("""
+                UPDATE mycar.outbox_push
+                SET estado = 'PENDIENTE',
+                    intentos = 0,
+                    ultimo_error = NULL,
+                    actualizado_utc = clock_timestamp()
+                WHERE id_usuario = ?
+                  AND estado = 'OMITIDO'
+                  AND ultimo_error = 'sin_tokens'
+                  AND actualizado_utc >= (clock_timestamp() - INTERVAL '48 hours')
+                """, usuario);
+    }
+
     public record TokenActivo(String token, UUID idInstalacion) {
     }
 }
