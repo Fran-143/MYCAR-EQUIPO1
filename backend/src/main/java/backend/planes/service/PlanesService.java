@@ -674,14 +674,16 @@ public class PlanesService {
     }
 
     private void exigirSandbox() {
+        // Operaciones local-test (escenarios / crear operación) siguen acotadas al sidecar local.
         if (!localTestEnabled || !props.getSandbox().isEnabled()) {
             throw new ErrorPlanes("SANDBOX_DESHABILITADO",
                     "Contratación sandbox no disponible en este entorno.");
         }
     }
 
+    /** Catálogo / pago simulado académico: solo depende del flag de planes (no de local-test). */
     private boolean sandboxOperativo() {
-        return localTestEnabled && props.getSandbox().isEnabled();
+        return props.getSandbox().isEnabled();
     }
 
     private boolean pruebaGratuitaOperativa() {
@@ -696,13 +698,19 @@ public class PlanesService {
     }
 
     /**
-     * Pago simulado: una sola acción del usuario → solicitud PENDIENTE_APROBACION.
-     * Sin escenarios sandbox ni operación de cobro real. Admin aprueba/rechaza la activación.
+     * Pago simulado académico: crea solicitud PAGO_SANDBOX sin cobro real.
+     * Si {@code mycar.planes.sandbox.activacion-inmediata=true}, activa Premium
+     * con la misma vigencia/reglas que la aprobación admin (sin pasarela).
+     * Idempotente ante doble toque: SOLICITUD_ABIERTA / YA_PREMIUM.
      */
     @Transactional
     public ContratoPlanes.SolicitudDto solicitarPagoSimulado(long idUsuario) {
         if (!dao.cuentaActiva(idUsuario)) {
             throw new ErrorPlanes("NO_AUTORIZADO", "La cuenta debe estar ACTIVA.");
+        }
+        if (!sandboxOperativo()) {
+            throw new ErrorPlanes("SANDBOX_DESHABILITADO",
+                    "Simulación de planes no disponible en este entorno.");
         }
         reconciliarVencimiento(idUsuario);
         SuscripcionRow actual = dao.suscripcionActiva(idUsuario).orElse(null);
@@ -719,7 +727,7 @@ public class PlanesService {
             throw new ErrorPlanes("CONFIGURACION_PENDIENTE",
                     "Contratación simulada deshabilitada en el plan PREMIUM.");
         }
-        props.getSandbox().vigenciaOrThrow();
+        Duration vigencia = props.getSandbox().vigenciaOrThrow();
         String codigo = nuevoCodigoSolicitud("PSS");
         try {
             dao.crearSolicitud(codigo, idUsuario, plan.idPlan(), "PAGO_SANDBOX",
@@ -729,7 +737,31 @@ public class PlanesService {
                     "Ya tienes una solicitud Premium abierta.");
         }
         dao.registrarEvento(idUsuario, actual == null ? null : actual.idSuscripcion(), null,
-                "SOLICITUD_PAGO_SIMULADO_CREADA", "codigo=" + codigo);
+                "SOLICITUD_PAGO_SIMULADO_CREADA", "codigo=" + codigo + ";simulado=true");
+
+        if (props.getSandbox().isActivacionInmediata()) {
+            SolicitudRow sol = dao.solicitudPorCodigoForUpdate(codigo)
+                    .orElseThrow(() -> new ErrorPlanes("NO_ENCONTRADO", "Solicitud no encontrada."));
+            if (actual != null) {
+                dao.marcarVencida(actual.idSuscripcion());
+                dao.registrarEvento(idUsuario, actual.idSuscripcion(), null,
+                        "SUSCRIPCION_VENCIDA_POR_UPGRADE", "prev=" + actual.planCodigo());
+            }
+            Instant fin = Instant.now().plus(vigencia);
+            long idNueva = dao.insertarSuscripcion(
+                    idUsuario, sol.idPlan(), "SANDBOX_LOCAL", "PAGO_SANDBOX", fin, null);
+            int decided = dao.decidirSolicitud(
+                    sol.idSolicitud(), sol.versionFila(), "PENDIENTE_APROBACION", "APROBADA",
+                    null, null, "Activación automática — simulación académica (sin cobro real).", idNueva);
+            if (decided != 1) {
+                throw new ErrorPlanes("CONFLICTO",
+                        "La solicitud ya fue decidida. Evita pulsaciones duplicadas.", false);
+            }
+            dao.registrarEvento(idUsuario, idNueva, null,
+                    "SOLICITUD_APROBADA", "activacion_inmediata=true;codigo=" + codigo);
+            dao.registrarEvento(idUsuario, idNueva, null,
+                    "PREMIUM_ACTIVADO", "modalidad=PAGO_SANDBOX;fin=" + fin + ";simulado=true");
+        }
         return toSolicitud(dao.solicitudPorCodigo(codigo).orElseThrow());
     }
 

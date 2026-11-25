@@ -20,6 +20,11 @@ public class PlanesProperties {
         private boolean enabled = true;
         /** Duration ISO-8601 para Premium pago sandbox. Vacío = CONFIGURACION_PENDIENTE. */
         private String vigencia = "";
+        /**
+         * Si true, el pago simulado académico activa Premium en la misma operación
+         * (sin esperar aprobación admin). Sigue sin cobro real.
+         */
+        private boolean activacionInmediata = false;
 
         public boolean isEnabled() {
             return enabled;
@@ -35,6 +40,14 @@ public class PlanesProperties {
 
         public void setVigencia(String vigencia) {
             this.vigencia = vigencia;
+        }
+
+        public boolean isActivacionInmediata() {
+            return activacionInmediata;
+        }
+
+        public void setActivacionInmediata(boolean activacionInmediata) {
+            this.activacionInmediata = activacionInmediata;
         }
 
         public Duration vigenciaOrThrow() {
