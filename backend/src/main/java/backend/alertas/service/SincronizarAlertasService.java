@@ -4,32 +4,42 @@ import backend.alertas.api.dto.ContratoRf22;
 import backend.alertas.dao.AlertasJdbcDao;
 import backend.alertas.model.ErrorAlertas;
 import backend.notificaciones.service.NotificacionInternaService;
+import backend.push.service.RecordatorioPushService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Set;
 
 /** RF23: sincroniza antes del listado (función PostgreSQL). RF24: detalle con sync puntual. */
 @Service
 public class SincronizarAlertasService {
+    private static final Logger log = LoggerFactory.getLogger(SincronizarAlertasService.class);
     private static final Set<String> ATENDIBLES = Set.of("PROXIMA", "PENDIENTE", "VENCIDA");
     private static final Set<String> ANULABLES = Set.of("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA");
 
     private final AlertasJdbcDao alertas;
     private final ObjectProvider<NotificacionInternaService> notificaciones;
+    private final ObjectProvider<RecordatorioPushService> pushRecordatorios;
 
     public SincronizarAlertasService(AlertasJdbcDao alertas) {
-        this(alertas, null);
+        this(alertas, null, null);
     }
 
     @Autowired
     public SincronizarAlertasService(
-            AlertasJdbcDao alertas, ObjectProvider<NotificacionInternaService> notificaciones) {
+            AlertasJdbcDao alertas,
+            ObjectProvider<NotificacionInternaService> notificaciones,
+            ObjectProvider<RecordatorioPushService> pushRecordatorios) {
         this.alertas = alertas;
         this.notificaciones = notificaciones;
+        this.pushRecordatorios = pushRecordatorios;
     }
 
     @Transactional
@@ -197,9 +207,40 @@ public class SincronizarAlertasService {
                     n.sincronizarAvisosVehiculo(vehiculo);
                 }
             }
+            if (cambios > 0) {
+                programarEncoladoPushTrasCommit();
+            }
             return cambios;
         } catch (EmptyResultDataAccessException ex) {
             throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible.");
+        }
+    }
+
+    /** Tras transiciones reales: encola push (despacho FCM en ventana / worker). */
+    private void programarEncoladoPushTrasCommit() {
+        if (pushRecordatorios == null) {
+            return;
+        }
+        Runnable accion = () -> {
+            var push = pushRecordatorios.getIfAvailable();
+            if (push == null) {
+                return;
+            }
+            try {
+                push.encolarCandidatosTrasEvaluacion();
+            } catch (RuntimeException ex) {
+                log.warn("Encolado push tras sync omitido: {}", ex.toString());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    accion.run();
+                }
+            });
+        } else {
+            accion.run();
         }
     }
 

@@ -23,10 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Política push consolidada:
- * MANTENIMIENTO — PROXIMA 1×; PENDIENTE 1× + cada 3d; VENCIDA 1× + cada 3d.
+ * MANTENIMIENTO — PROXIMA 1×; PENDIENTE 1× + cada 3d; VENCIDA 1× + diario.
  * SOAT — hitos −30/−7/−1/+1 y semanal si VENCIDA.
  * KILOMETRAJE — según RF43 (no kilometraje_on); agrupación por categoría.
- * Agrupación 05:00: usuario + categoría + fecha Lima → 1 push si ≥2 avisos.
+ * Encolado: puede ocurrir tras RF23 / sync (sin depender solo del cron 05:00).
+ * Despacho FCM: solo dentro de 05:00–21:59 Lima (salvo forzar-ventana).
+ * Agrupación: usuario + categoría + fecha Lima → 1 push si ≥2 avisos.
  * LICENCIA: sin emisor push dedicado en esta versión (documentado).
  */
 @Service
@@ -75,17 +77,37 @@ public class RecordatorioPushService {
         this.forzarVentana = forzarVentana;
     }
 
+    /**
+     * Cron 05:00 Lima: encola candidatos y despacha dentro de ventana.
+     * Fuera de ventana solo encola (el drain del worker enviará al abrir la ventana).
+     */
     public ResultadoProgramado ejecutarVentanaProgramada() {
         if (!enCurso.compareAndSet(false, true)) {
             log.info("Recordatorios omitidos: ejecución en curso");
             return new ResultadoProgramado(true, 0, 0, 0, 0);
         }
         try {
-            if (!forzarVentana && !ventana.enVentanaDespacho()) {
-                log.info("Fuera de ventana 05:00-21:59 Lima; no se encola ni despacha");
-                return new ResultadoProgramado(false, 0, 0, 0, 0);
+            boolean despachar = forzarVentana || ventana.enVentanaDespacho();
+            if (!despachar) {
+                log.info("Fuera de ventana 05:00-21:59 Lima; se encola y se difiere el despacho FCM");
             }
-            return encolarYDespachar();
+            return encolarYDespachar(despachar);
+        } finally {
+            enCurso.set(false);
+        }
+    }
+
+    /**
+     * Tras RF23 COMPLETO o sync de vehículo: solo encola (idempotente).
+     * No envía FCM aquí; OutboxPushWorker / cron despachan en ventana.
+     */
+    public ResultadoProgramado encolarCandidatosTrasEvaluacion() {
+        if (!enCurso.compareAndSet(false, true)) {
+            log.info("Encolado push omitido: ejecución en curso");
+            return new ResultadoProgramado(true, 0, 0, 0, 0);
+        }
+        try {
+            return encolarYDespachar(false);
         } finally {
             enCurso.set(false);
         }
@@ -128,7 +150,7 @@ public class RecordatorioPushService {
         return encolados;
     }
 
-    private ResultadoProgramado encolarYDespachar() {
+    private ResultadoProgramado encolarYDespachar(boolean despacharFcm) {
         LocalDate hoy = ventana.hoyLima();
         Map<ClaveGrupo, List<Candidato>> grupos = new LinkedHashMap<>();
         int evaluadas = 0;
@@ -194,15 +216,17 @@ public class RecordatorioPushService {
         }
 
         int enviados = 0;
-        int n;
-        do {
-            n = outbox.procesarLote(loteDespacho);
-            enviados += n;
-        } while (n > 0);
+        if (despacharFcm) {
+            int n;
+            do {
+                n = outbox.procesarLote(loteDespacho);
+                enviados += n;
+            } while (n > 0);
+        }
 
         log.info(
-                "Push agrupado evaluadas={} grupos={} encolados={} enviados={} rf48omit={}",
-                evaluadas, grupos.size(), encolados, enviados, omitidosRf48);
+                "Push agrupado evaluadas={} grupos={} encolados={} enviados={} rf48omit={} despachar={}",
+                evaluadas, grupos.size(), encolados, enviados, omitidosRf48, despacharFcm);
         return new ResultadoProgramado(false, evaluadas, encolados, enviados, omitidosRf48);
     }
 
@@ -278,7 +302,7 @@ public class RecordatorioPushService {
                 .isPresent() ? 1 : 0;
     }
 
-    /** Null = no elegible hoy. VENCIDA mantenimiento: cada 3 días (no diario). */
+    /** Null = no elegible hoy. VENCIDA mantenimiento: recordatorio diario (máx. 1/día). */
     Elegibilidad evaluarMantenimiento(AlertaActiva a, Control c, LocalDate hoy) {
         String estado = a.estado();
         if (c != null && c.fechaUltimoEnvioLima() != null && c.fechaUltimoEnvioLima().equals(hoy)) {
@@ -307,7 +331,7 @@ public class RecordatorioPushService {
                 if (ciclo == null || !"VENCIDA".equals(ciclo)) {
                     yield new Elegibilidad(Motivo.ENTRADA_ESTADO);
                 }
-                if (ultimo != null && ChronoUnit.DAYS.between(ultimo, hoy) >= 3) {
+                if (ultimo != null && ChronoUnit.DAYS.between(ultimo, hoy) >= 1) {
                     yield new Elegibilidad(Motivo.RECORDATORIO);
                 }
                 yield null;

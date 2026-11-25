@@ -41,12 +41,10 @@ class RecordatorioPushElegibilidadTest {
     }
 
     @Test
-    void vencidaCada3DiasSinRafaga() {
+    void vencidaRecordatorioDiarioSinRafaga() {
         assertEquals(Motivo.ENTRADA_ESTADO, svc.evaluar(alerta("VENCIDA"), null, hoy).motivo());
         Control ayer = new Control(1L, "VENCIDA", hoy.minusDays(1), "ENTRADA_ESTADO", null);
-        assertNull(svc.evaluar(alerta("VENCIDA"), ayer, hoy));
-        Control d3 = new Control(1L, "VENCIDA", hoy.minusDays(3), "ENTRADA_ESTADO", null);
-        assertEquals(Motivo.RECORDATORIO, svc.evaluar(alerta("VENCIDA"), d3, hoy).motivo());
+        assertEquals(Motivo.RECORDATORIO, svc.evaluar(alerta("VENCIDA"), ayer, hoy).motivo());
         Control hoyYa = new Control(1L, "VENCIDA", hoy, "RECORDATORIO", null);
         assertNull(svc.evaluar(alerta("VENCIDA"), hoyYa, hoy));
         Control viejo = new Control(1L, "VENCIDA", hoy.minusDays(10), "RECORDATORIO", null);

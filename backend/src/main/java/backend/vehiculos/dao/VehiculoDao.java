@@ -20,6 +20,7 @@ public class VehiculoDao {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /** Placa ocupada solo si existe otro vehículo VIGENTE (RF62 libera ELIMINADO). */
     public boolean existePlaca(String placa) {
         Boolean existe = jdbcTemplate.queryForObject(
                 """
@@ -27,6 +28,7 @@ public class VehiculoDao {
                     SELECT 1
                     FROM mycar.vehiculo
                     WHERE placa = ?
+                      AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 )
                 """,
                 Boolean.class,
@@ -47,6 +49,7 @@ public class VehiculoDao {
                     SELECT 1
                     FROM mycar.vehiculo
                     WHERE numero_vin = ?
+                      AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 )
                 """,
                 Boolean.class,
@@ -56,7 +59,7 @@ public class VehiculoDao {
         return Boolean.TRUE.equals(existe);
     }
 
-    /** Unicidad global de VIN excluyendo el propio vehículo (RF11). */
+    /** Unicidad de VIN entre vigentes, excluyendo el propio vehículo (RF11). */
     public boolean existeVinEnOtro(String numeroVin, long idVehiculo) {
         if (numeroVin == null) {
             return false;
@@ -68,6 +71,7 @@ public class VehiculoDao {
                     FROM mycar.vehiculo
                     WHERE numero_vin = ?
                       AND id_vehiculo <> ?
+                      AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 )
                 """,
                 Boolean.class,

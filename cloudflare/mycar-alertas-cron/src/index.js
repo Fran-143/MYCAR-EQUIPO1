@@ -151,12 +151,18 @@ async function runEval(env, { modoForzado, origen }) {
     body: { modo },
     modoLabel: `EVAL_RF43_${modo}`,
   });
+  // Tras evaluación COMPLETO: encolar push (el backend difiere FCM si está fuera de ventana).
+  let pushEncolar = null;
+  if (modo === "COMPLETO" && rf23.ok) {
+    pushEncolar = await runPush(env, `${origen}:push-encolar`);
+  }
   return {
     ok: rf23.ok || rf43.ok,
     modo,
     rf23,
     rf43,
-    nota: "SIMULAR no escribe estados ni RF43; COMPLETO requiere autorización.",
+    pushEncolar,
+    nota: "SIMULAR no escribe estados ni RF43; COMPLETO encola push tras RF23.",
   };
 }
 

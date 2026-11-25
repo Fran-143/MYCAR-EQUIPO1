@@ -1,5 +1,7 @@
 package backend.vehiculos.eliminacion;
 
+import backend.documentos.AlmacenamientoDocumentos;
+import backend.fotos.AlmacenamientoFotos;
 import backend.vehiculos.dao.CondicionesRegistroVehiculoDao;
 import backend.vehiculos.dao.OperacionVehiculoDao;
 import backend.vehiculos.dao.VehiculoDao;
@@ -8,17 +10,24 @@ import backend.vehiculos.eliminacion.EliminacionVehiculoDao.CandidatoPrincipal;
 import backend.vehiculos.eliminacion.EliminacionVehiculoDao.FilaVehiculo;
 import backend.vehiculos.eliminacion.EliminacionVehiculoModelos.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class EliminacionVehiculoService {
+    private static final Logger log = LoggerFactory.getLogger(EliminacionVehiculoService.class);
     private static final String TIPO = "ELIMINAR_VEHICULO";
 
     private final CondicionesRegistroVehiculoDao condiciones;
@@ -26,19 +35,25 @@ public class EliminacionVehiculoService {
     private final EliminacionVehiculoDao dao;
     private final OperacionVehiculoDao operaciones;
     private final ObjectMapper json;
+    private final AlmacenamientoDocumentos documentos;
+    private final AlmacenamientoFotos fotos;
 
     public EliminacionVehiculoService(
             CondicionesRegistroVehiculoDao condiciones,
             VehiculoDao vehiculos,
             EliminacionVehiculoDao dao,
             OperacionVehiculoDao operaciones,
-            ObjectMapper json
+            ObjectMapper json,
+            AlmacenamientoDocumentos documentos,
+            AlmacenamientoFotos fotos
     ) {
         this.condiciones = condiciones;
         this.vehiculos = vehiculos;
         this.dao = dao;
         this.operaciones = operaciones;
         this.json = json;
+        this.documentos = documentos;
+        this.fotos = fotos;
     }
 
     @Transactional(readOnly = true)
@@ -112,6 +127,9 @@ public class EliminacionVehiculoService {
                 throw new ErrorRegistroVehiculo("VERSION_DESACTUALIZADA");
             }
 
+            // 1) Purga operativa (misma TX) → 2) baja lógica + auditoría → 3) storage post-commit
+            List<String> objectKeys = new ArrayList<>(dao.purgarDatosOperativos(idVehiculo));
+
             CandidatoPrincipal cand = dao.candidatoPrincipalTrasEliminar(idUsuario, idVehiculo).orElse(null);
             if (!dao.marcarEliminado(idUsuario, idVehiculo, req.versionRegistro())) {
                 throw new ErrorRegistroVehiculo("VERSION_DESACTUALIZADA");
@@ -131,12 +149,14 @@ public class EliminacionVehiculoService {
             dao.registrarAuditoria(
                     idUsuario, idVehiculo, v.estadoVehiculo(), v.esPrincipal(), idOp, idPrincipal);
 
+            programarBorradoAlmacenamiento(objectKeys);
+
             ConfirmarEliminacionResponse resp = new ConfirmarEliminacionResponse(
                     idVehiculo,
                     "ELIMINADO",
                     idPrincipal != null,
                     idPrincipal,
-                    "El vehículo fue retirado de tu cuenta correctamente."
+                    "El vehículo y su información asociada fueron eliminados de tu cuenta."
             );
             String respuestaJson = json.writeValueAsString(resp);
             if (!operaciones.confirmar(idOp, idUsuario, TIPO, hash, respuestaJson)) {
@@ -146,7 +166,42 @@ public class EliminacionVehiculoService {
         } catch (ErrorRegistroVehiculo ex) {
             throw ex;
         } catch (Exception ex) {
+            log.warn("RF62 eliminación fallida idVehiculo={}: {}", idVehiculo, ex.toString());
             throw new ErrorRegistroVehiculo("ELIMINACION_FALLIDA");
+        }
+    }
+
+    private void programarBorradoAlmacenamiento(List<String> objectKeys) {
+        if (objectKeys == null || objectKeys.isEmpty()) {
+            return;
+        }
+        List<String> copia = List.copyOf(objectKeys);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            borrarAlmacenamientoBestEffort(copia);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                borrarAlmacenamientoBestEffort(copia);
+            }
+        });
+    }
+
+    private void borrarAlmacenamientoBestEffort(List<String> objectKeys) {
+        for (String key : objectKeys) {
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            try {
+                if (key.startsWith("vehiculos/")) {
+                    fotos.borrarLogicoHuerfano(key);
+                } else {
+                    documentos.borrarLogicoHuerfano(key);
+                }
+            } catch (Exception ex) {
+                log.warn("RF62: no se pudo borrar objeto privado '{}': {}", key, ex.toString());
+            }
         }
     }
 

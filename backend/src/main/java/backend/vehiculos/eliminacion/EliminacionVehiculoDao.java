@@ -86,6 +86,92 @@ public class EliminacionVehiculoDao {
         ), idUsuario, idExcluir).stream().findFirst();
     }
 
+    /**
+     * Purga datos operativos exclusivos del vehículo (misma TX).
+     * Devuelve object keys de almacenamiento privado a borrar fuera de TX (best-effort).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<String> purgarDatosOperativos(long idVehiculo) {
+        List<String> objectKeys = jdbc.query("""
+                SELECT storage_object_key FROM mycar.soat
+                WHERE id_vehiculo = ? AND storage_object_key IS NOT NULL AND btrim(storage_object_key) <> ''
+                UNION
+                SELECT storage_object_key FROM mycar.tive
+                WHERE id_vehiculo = ? AND storage_object_key IS NOT NULL AND btrim(storage_object_key) <> ''
+                UNION
+                SELECT foto_storage_object_key FROM mycar.vehiculo
+                WHERE id_vehiculo = ? AND foto_storage_object_key IS NOT NULL AND btrim(foto_storage_object_key) <> ''
+                """, (rs, n) -> rs.getString(1), idVehiculo, idVehiculo, idVehiculo);
+
+        // Alertas → historial / notificaciones / outbox (RESTRICT antes de borrar alerta)
+        jdbc.update("""
+                DELETE FROM mycar.historial_alerta h
+                USING mycar.alerta a
+                WHERE h.id_alerta = a.id_alerta AND a.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("""
+                DELETE FROM mycar.outbox_push_alerta o
+                USING mycar.alerta a
+                WHERE o.id_alerta = a.id_alerta AND a.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("""
+                DELETE FROM mycar.alerta_push_control c
+                USING mycar.alerta a
+                WHERE c.id_alerta = a.id_alerta AND a.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("""
+                DELETE FROM mycar.notificacion
+                WHERE id_vehiculo = ?
+                   OR id_alerta IN (SELECT id_alerta FROM mycar.alerta WHERE id_vehiculo = ?)
+                """, idVehiculo, idVehiculo);
+        // outbox_push.id_alerta es ON DELETE SET NULL; limpiamos pendientes ligados al vehículo
+        jdbc.update("""
+                UPDATE mycar.outbox_push o
+                SET id_alerta = NULL,
+                    estado = CASE WHEN o.estado IN ('PENDIENTE', 'ERROR') THEN 'OMITIDO' ELSE o.estado END,
+                    actualizado_utc = clock_timestamp()
+                FROM mycar.alerta a
+                WHERE o.id_alerta = a.id_alerta AND a.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("DELETE FROM mycar.alerta WHERE id_vehiculo = ?", idVehiculo);
+
+        // SOAT / TIVE (tras alertas por FK RESTRICT)
+        jdbc.update("""
+                DELETE FROM mycar.soat_cambio c
+                USING mycar.soat s
+                WHERE c.id_soat = s.id_soat AND s.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("DELETE FROM mycar.soat WHERE id_vehiculo = ?", idVehiculo);
+        jdbc.update("""
+                DELETE FROM mycar.tive_cambio c
+                USING mycar.tive t
+                WHERE c.id_tive = t.id_tive AND t.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("DELETE FROM mycar.tive WHERE id_vehiculo = ?", idVehiculo);
+
+        // Mantenimientos y km
+        jdbc.update("""
+                DELETE FROM mycar.mantenimiento_repuesto mr
+                USING mycar.mantenimiento m
+                WHERE mr.id_mantenimiento = m.id_mantenimiento AND m.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("DELETE FROM mycar.mantenimiento WHERE id_vehiculo = ?", idVehiculo);
+        jdbc.update("DELETE FROM mycar.lectura_kilometraje WHERE id_vehiculo = ?", idVehiculo);
+        jdbc.update("DELETE FROM mycar.config_recordatorio_km WHERE id_vehiculo = ?", idVehiculo);
+
+        // Soporte: conserva expediente, desvincula vehículo
+        jdbc.update("UPDATE mycar.solicitud_soporte SET id_vehiculo = NULL WHERE id_vehiculo = ?", idVehiculo);
+
+        jdbc.update("""
+                UPDATE mycar.vehiculo
+                SET foto_storage_object_key = NULL,
+                    foto_content_type = NULL,
+                    foto_tamano_bytes = NULL
+                WHERE id_vehiculo = ?
+                """, idVehiculo);
+        return objectKeys;
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean marcarEliminado(long idUsuario, long idVehiculo, int versionEsperada) {
         int filas = jdbc.update("""
@@ -93,7 +179,8 @@ public class EliminacionVehiculoDao {
                 SET estado_registro = 'ELIMINADO',
                     eliminado_en = clock_timestamp(),
                     es_principal = FALSE,
-                    version_registro = version_registro + 1
+                    version_registro = version_registro + 1,
+                    numero_vin = NULL
                 WHERE id_usuario = ?
                   AND id_vehiculo = ?
                   AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
@@ -136,11 +223,12 @@ public class EliminacionVehiculoDao {
         jdbc.update("""
                 INSERT INTO mycar.auditoria_vehiculo_eliminacion (
                     id_usuario, id_vehiculo, estado_operativo_anterior, era_principal,
-                    estado_registro_resultante, id_operacion, id_principal_resultante
-                ) VALUES (?, ?, ?, ?, 'ELIMINADO', ?, ?)
+                    estado_registro_resultante, id_operacion, id_principal_resultante, placa_snapshot
+                ) VALUES (?, ?, ?, ?, 'ELIMINADO', ?, ?,
+                    (SELECT placa FROM mycar.vehiculo WHERE id_vehiculo = ?))
                 ON CONFLICT (id_operacion) DO NOTHING
                 """, idUsuario, idVehiculo, estadoOperativoAnterior, eraPrincipal,
-                idOperacion, idPrincipalResultante);
+                idOperacion, idPrincipalResultante, idVehiculo);
     }
 
     private long count(String sql, long idVehiculo) {

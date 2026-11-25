@@ -2,6 +2,7 @@ package backend.alertas.service;
 
 import backend.alertas.dao.AlertasJdbcDao;
 import backend.notificaciones.service.NotificacionInternaService;
+import backend.push.service.RecordatorioPushService;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
@@ -34,12 +35,22 @@ public class EvaluacionProgramadaAlertasService {
 
     private final AlertasJdbcDao alertas;
     private final ObjectProvider<NotificacionInternaService> notificaciones;
+    private final ObjectProvider<RecordatorioPushService> pushRecordatorios;
     private final AtomicBoolean enCurso = new AtomicBoolean(false);
 
     public EvaluacionProgramadaAlertasService(
             AlertasJdbcDao alertas, ObjectProvider<NotificacionInternaService> notificaciones) {
+        this(alertas, notificaciones, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public EvaluacionProgramadaAlertasService(
+            AlertasJdbcDao alertas,
+            ObjectProvider<NotificacionInternaService> notificaciones,
+            ObjectProvider<RecordatorioPushService> pushRecordatorios) {
         this.alertas = alertas;
         this.notificaciones = notificaciones;
+        this.pushRecordatorios = pushRecordatorios;
     }
 
     public Resultado evaluar(Modo modo) {
@@ -89,6 +100,18 @@ public class EvaluacionProgramadaAlertasService {
                     usuariosLicencia.size(),
                     totalCambios,
                     errores);
+            // Encola push elegibles (sin depender solo del cron 05:00). Despacho FCM sigue en ventana.
+            var push = pushRecordatorios == null ? null : pushRecordatorios.getIfAvailable();
+            if (push != null) {
+                try {
+                    var r = push.encolarCandidatosTrasEvaluacion();
+                    log.info(
+                            "RF23→push encolado: evaluadas={} encolados={} omitRf48={}",
+                            r.alertasEvaluadas(), r.encolados(), r.omitidosRf48());
+                } catch (RuntimeException ex) {
+                    log.warn("RF23→push encolado falló (no revierte evaluación): {}", ex.toString());
+                }
+            }
             return new Resultado(
                     false, modo.name(), vehiculos.size() + usuariosLicencia.size(), totalCambios, errores);
         } finally {
