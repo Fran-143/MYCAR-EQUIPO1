@@ -41,19 +41,29 @@ data class EstadoTalleres(
 class TalleresViewModel(private val repository: TalleresRepository) : ViewModel() {
     private val mutable = MutableStateFlow(EstadoTalleres())
     val estado = mutable.asStateFlow()
-    /** Evita reintentos en bucle del vínculo automático al taller de sistema. */
-    private var autoVinculoIntentado = false
 
     init { cargar() }
 
     fun cargar() {
         val prev = mutable.value
-        mutable.value = prev.copy(fase = FaseTalleres.CARGANDO, mensaje = null)
+        if (prev.fase != FaseTalleres.FORMULARIO &&
+            prev.fase != FaseTalleres.DETALLE &&
+            prev.fase != FaseTalleres.CATALOGO_ASOCIADO
+        ) {
+            mutable.value = prev.copy(fase = FaseTalleres.CARGANDO, mensaje = null)
+        }
         viewModelScope.launch {
             try {
-                // Todos = asociados + manuales; el filtro de chips se aplica en el API.
-                val lista = repository.listarActivos(prev.filtro)
-                mutable.value = prev.copy(
+                val lista = repository.listarActivos(mutable.value.filtro)
+                val actual = mutable.value
+                if (actual.fase == FaseTalleres.FORMULARIO ||
+                    actual.fase == FaseTalleres.DETALLE ||
+                    actual.fase == FaseTalleres.CATALOGO_ASOCIADO
+                ) {
+                    mutable.value = actual.copy(talleres = lista)
+                    return@launch
+                }
+                mutable.value = actual.copy(
                     fase = FaseTalleres.LISTO,
                     talleres = lista,
                     mensaje = null,
@@ -61,68 +71,21 @@ class TalleresViewModel(private val repository: TalleresRepository) : ViewModel(
                     editando = null,
                     detalle = null
                 )
-                asegurarTallerSistema(lista)
             } catch (e: Exception) {
-                mutable.value = prev.copy(
+                val actual = mutable.value
+                if (actual.fase == FaseTalleres.FORMULARIO ||
+                    actual.fase == FaseTalleres.DETALLE ||
+                    actual.fase == FaseTalleres.CATALOGO_ASOCIADO
+                ) {
+                    return@launch
+                }
+                mutable.value = actual.copy(
                     fase = FaseTalleres.ERROR,
                     mensaje = e.message ?: "No se pudieron cargar los talleres"
                 )
             }
         }
     }
-
-    /**
-     * Vincula por defecto el taller oficial autorizado (Prueba MyCar) si falta,
-     * y lo marca favorito solo cuando no hay un favorito MANUAL.
-     */
-    private suspend fun asegurarTallerSistema(listaActual: List<Taller>) {
-        if (autoVinculoIntentado) return
-        val tieneFavorito = listaActual.any { it.favorito }
-        val prueba = listaActual.firstOrNull { esTallerPrueba(it) }
-        if (prueba != null) {
-            autoVinculoIntentado = true
-            // Solo marcar favorito el de sistema si el usuario aún no eligió ninguno.
-            if (!tieneFavorito) {
-                runCatching { repository.marcarFavorito(prueba.id) }
-                val refresco = repository.listarActivos(mutable.value.filtro)
-                mutable.value = mutable.value.copy(talleres = refresco)
-            }
-            return
-        }
-        try {
-            var cat = repository.catalogoGlobal("PRUEBA")
-            if (cat.isEmpty()) cat = repository.catalogoGlobal(null)
-            val objetivo = cat.firstOrNull { it.id == 3L }
-                ?: cat.firstOrNull { it.nombre.contains("PRUEBA MYCAR", ignoreCase = true) }
-                ?: cat.firstOrNull { it.nombre.contains("PRUEBA", ignoreCase = true) }
-            if (objetivo == null) {
-                autoVinculoIntentado = true
-                return
-            }
-            val vinculado = repository.vincularAsociado(objetivo.id)
-            if (!tieneFavorito) {
-                runCatching { repository.marcarFavorito(vinculado.id) }
-            }
-            val lista = repository.listarActivos(FiltroOrigenTaller.TODOS)
-            autoVinculoIntentado = true
-            mutable.value = mutable.value.copy(
-                fase = FaseTalleres.LISTO,
-                talleres = lista,
-                filtro = FiltroOrigenTaller.TODOS,
-                ocupado = false,
-                mensaje = null
-            )
-        } catch (_: Exception) {
-            // Reintentará en la próxima carga si el catálogo/API no respondió.
-        }
-    }
-
-    private fun esTallerPrueba(t: Taller): Boolean =
-        t.esAsociado && (
-            t.nombre.contains("PRUEBA MYCAR", ignoreCase = true) ||
-                t.nombre.contains("Taller Prueba", ignoreCase = true) ||
-                t.nombre.contains("PRUEBA", ignoreCase = true)
-            )
 
     fun cambiarFiltro(f: FiltroOrigenTaller) {
         if (mutable.value.filtro == f) return

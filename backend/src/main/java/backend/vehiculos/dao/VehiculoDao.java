@@ -436,7 +436,7 @@ public class VehiculoDao {
                 WHERE s.id_usuario = ?
                   AND s.estado = 'ACTIVA'
                   AND s.inicio_utc <= clock_timestamp()
-                  AND s.fin_utc IS NULL
+                  AND (s.fin_utc IS NULL OR s.fin_utc > clock_timestamp())
                   AND p.codigo IN ('FREE', 'PREMIUM')
                   AND p.activo
                 """,

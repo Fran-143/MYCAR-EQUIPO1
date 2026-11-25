@@ -264,7 +264,7 @@ fun FilaIconoDetalle(icono: ImageVector, etiqueta: String, valor: String) {
         Icon(icono, contentDescription = null, tint = MyCarMuted, modifier = Modifier.size(22.dp).padding(top = 2.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(etiqueta, fontWeight = FontWeight.SemiBold, color = MyCarNavy, style = MaterialTheme.typography.labelLarge)
-            Text(valor, color = Color(0xFF2D3748), style = MaterialTheme.typography.bodyMedium)
+            Text(valor, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

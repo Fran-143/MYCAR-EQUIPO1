@@ -29,11 +29,6 @@ import com.mycar.app.features.autenticacion.data.AdminSeccionDto
 import com.mycar.app.features.autenticacion.data.AuthGraph
 import com.mycar.app.features.autenticacion.data.AuthenticatedContext
 
-private val Navy = Color(0xFF12285F)
-private val Teal = Color(0xFF007E98)
-private val Bg = Color(0xFFF0F5FA)
-private val Mute = Color(0xFF718096)
-
 @Composable
 fun AdministracionHubScreen(
     authContext: AuthenticatedContext,
@@ -53,7 +48,18 @@ fun AdministracionHubScreen(
     val catalogosRepo = remember(authContext.sessionId) {
         com.mycar.app.features.admin.data.adminCatalogosRepository(context, authContext)
     }
+    val suscripcionesRepo = remember(authContext.sessionId) {
+        com.mycar.app.features.admin.data.adminSuscripcionesRepository(context, authContext)
+    }
     when (subpantalla) {
+        "suscripciones" -> {
+            SuscripcionesAdminRoute(
+                repository = suscripcionesRepo,
+                onVolver = { subpantalla = null },
+                modifier = Modifier.fillMaxSize()
+            )
+            return
+        }
         "pruebas_locales" -> {
             if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
                 com.mycar.app.features.localtest.PruebasLocalesRoute(
@@ -66,6 +72,7 @@ fun AdministracionHubScreen(
         "usuarios" -> {
             UsuariosAdminRoute(
                 repository = usuariosRepo,
+                suscripcionesRepository = suscripcionesRepo,
                 onVolver = { subpantalla = null },
                 onAbrirPruebas = if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
                     { subpantalla = "pruebas_locales" }
@@ -124,33 +131,33 @@ fun AdministracionHubScreen(
     }
 
     val secciones = hub?.secciones?.takeIf { it.isNotEmpty() } ?: listOf(
-        AdminSeccionDto("USUARIOS", "Usuarios", false, "PROXIMAMENTE"),
-        AdminSeccionDto("SUSCRIPCIONES", "Suscripciones", false, "PROXIMAMENTE"),
+        AdminSeccionDto("USUARIOS", "Usuarios", true, "DISPONIBLE"),
+        AdminSeccionDto("SUSCRIPCIONES", "Suscripciones", true, "DISPONIBLE"),
         AdminSeccionDto("INCIDENCIAS", "Incidencias", true, "DISPONIBLE"),
         AdminSeccionDto("CATALOGOS", "Catálogos", true, "DISPONIBLE")
     )
 
-    Scaffold(containerColor = Bg) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp)
         ) {
-            Text("MyCar", color = Navy, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("MyCar", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
                 hub?.titulo ?: "Administración",
-                color = Navy,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(8.dp))
             Text(
                 "Hola, Administrador. Gestiona usuarios, suscripciones, incidencias y catálogos.",
-                color = Color(0xFF4A5568)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(20.dp))
             if (loading) {
                 Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Teal)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.secondary)
                 }
             } else if (error != null) {
                 Text(
@@ -169,6 +176,8 @@ fun AdministracionHubScreen(
                                 subpantalla = "usuarios"
                             seccion.codigo == "CATALOGOS" || seccion.nombre == "Catálogos" ->
                                 subpantalla = "catalogos"
+                            seccion.codigo == "SUSCRIPCIONES" || seccion.nombre == "Suscripciones" ->
+                                subpantalla = "suscripciones"
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -191,54 +200,54 @@ fun AdministracionHubScreen(
 
 @Composable
 private fun IncidenciasHubScreen(onVolver: () -> Unit, onVin: () -> Unit, onGenerales: () -> Unit) {
-    Scaffold(containerColor = Bg) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TextButton(onClick = onVolver) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, tint = Navy, modifier = Modifier.size(20.dp))
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Volver", color = Navy)
+                Text("Volver", color = MaterialTheme.colorScheme.onSurface)
             }
-            Text("Incidencias", fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleLarge)
-            Text("Gestión de incidencias", color = Mute)
+            Text("Incidencias", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+            Text("Gestión de incidencias", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Card(
                 Modifier.fillMaxWidth().clickable(onClick = onVin),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Row(
                     Modifier.padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    HubIconBadge(Icons.Outlined.Report, Navy)
+                    HubIconBadge(Icons.Outlined.Report, MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Incidencias de VIN", fontWeight = FontWeight.SemiBold, color = Navy)
-                        Text("Solicitudes de corrección de VIN de vehículos.", color = Mute)
-                        Text("Disponible", color = Teal, fontWeight = FontWeight.Medium)
+                        Text("Incidencias de VIN", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Solicitudes de corrección de VIN de vehículos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Disponible", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Medium)
                     }
-                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Mute)
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Card(
                 Modifier.fillMaxWidth().clickable(onClick = onGenerales),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Row(
                     Modifier.padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    HubIconBadge(Icons.Outlined.SupportAgent, Navy)
+                    HubIconBadge(Icons.Outlined.SupportAgent, MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Incidencias generales", fontWeight = FontWeight.SemiBold, color = Navy)
-                        Text("Reportes de usuarios sobre la aplicación y servicios.", color = Mute)
-                        Text("Disponible", color = Teal, fontWeight = FontWeight.Medium)
+                        Text("Incidencias generales", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Reportes de usuarios sobre la aplicación y servicios.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Disponible", color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Medium)
                     }
-                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Mute)
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -250,7 +259,8 @@ private fun AdminSectionCard(seccion: AdminSeccionDto, onClick: (() -> Unit)? = 
     val disponible = seccion.disponible ||
         seccion.codigo == "INCIDENCIAS" || seccion.nombre == "Incidencias" ||
         seccion.codigo == "USUARIOS" || seccion.nombre == "Usuarios" ||
-        seccion.codigo == "CATALOGOS" || seccion.nombre == "Catálogos"
+        seccion.codigo == "CATALOGOS" || seccion.nombre == "Catálogos" ||
+        seccion.codigo == "SUSCRIPCIONES" || seccion.nombre == "Suscripciones"
     val icon = when (seccion.codigo?.uppercase()) {
         "USUARIOS" -> Icons.Outlined.People
         "SUSCRIPCIONES" -> Icons.Outlined.CreditCard
@@ -259,13 +269,13 @@ private fun AdminSectionCard(seccion: AdminSeccionDto, onClick: (() -> Unit)? = 
         else -> Icons.Outlined.Category
     }
     val accent = when {
-        !disponible -> Mute
-        seccion.codigo.equals("CATALOGOS", true) -> Teal
-        else -> Navy
+        !disponible -> MaterialTheme.colorScheme.onSurfaceVariant
+        seccion.codigo.equals("CATALOGOS", true) -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.onSurface
     }
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         modifier = Modifier
             .fillMaxWidth()
@@ -280,21 +290,21 @@ private fun AdminSectionCard(seccion: AdminSeccionDto, onClick: (() -> Unit)? = 
             Column(Modifier.weight(1f)) {
                 Text(
                     seccion.nombre ?: seccion.codigo.orEmpty(),
-                    color = Navy,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
                     if (disponible) "Disponible" else "Próximamente",
-                    color = if (disponible) Teal else Mute
+                    color = if (disponible) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             if (disponible) {
                 Icon(
                     Icons.AutoMirrored.Outlined.ArrowForward,
                     contentDescription = null,
-                    tint = Mute,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp)
                 )
             }

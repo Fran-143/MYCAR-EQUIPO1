@@ -2,7 +2,6 @@ package com.mycar.app.features.talleres.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,7 +10,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
@@ -59,10 +57,8 @@ fun TalleresRoute(
     onVolver: (() -> Unit)? = null,
     embebidoEnHistorial: Boolean = false,
     onFormularioAbierto: (Boolean) -> Unit = {},
-    /** Incrementar desde el padre (p. ej. botón Agregar junto al título) para abrir el alta. */
-    solicitarAltaTick: Int = 0,
-    /** Incrementar desde el padre para cerrar detalle/formulario embebido. */
-    solicitarVolverTick: Int = 0,
+    /** Recibe la acción de alta personal. El padre la invoca en el clic; no hay efecto que se repita. */
+    onAccionAlta: ((() -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val factory = remember(repository) {
@@ -81,11 +77,9 @@ fun TalleresRoute(
                 estado.fase == FaseTalleres.DETALLE
         )
     }
-    LaunchedEffect(solicitarAltaTick) {
-        if (solicitarAltaTick > 0) vm.abrirAlta()
-    }
-    LaunchedEffect(solicitarVolverTick) {
-        if (solicitarVolverTick > 0) vm.cancelarFormulario()
+    DisposableEffect(vm) {
+        onAccionAlta?.invoke(vm::abrirAlta)
+        onDispose { onAccionAlta?.invoke { } }
     }
     when (estado.fase) {
         FaseTalleres.FORMULARIO -> FormularioTallerScreen(
@@ -94,7 +88,7 @@ fun TalleresRoute(
             mensaje = estado.mensaje,
             onCancelar = vm::cancelarFormulario,
             onGuardar = vm::guardar,
-            onIrAsociado = { vm.abrirCatalogoAsociado("PRUEBA") },
+            embebidoEnHistorial = embebidoEnHistorial,
             modifier = modifier
         )
         FaseTalleres.CATALOGO_ASOCIADO -> CatalogoAsociadoScreen(
@@ -208,23 +202,6 @@ fun TalleresListScreen(
                         unfocusedBorderColor = Color(0xFFC5D3E3)
                     )
                 )
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()).testTag("rf33.filtros"),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FiltroOrigenTaller.entries.forEach { f ->
-                        FilterChip(
-                            selected = estado.filtro == f,
-                            onClick = { onFiltro(f) },
-                            label = { Text(f.etiqueta) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Azul,
-                                selectedLabelColor = Color.White
-                            ),
-                            modifier = Modifier.testTag("rf33.filtro.${f.api}")
-                        )
-                    }
-                }
                 estado.mensaje?.let { Text(it, color = Celeste, modifier = Modifier.testTag("rf34.mensaje")) }
                 val lista = estado.talleresFiltrados
                 if (lista.isEmpty()) {
@@ -235,7 +212,7 @@ fun TalleresListScreen(
                         modifier = Modifier.testTag("rf34.vacio")
                     )
                     Text(
-                        "El taller oficial MyCar se vincula solo. Usa Agregar para registrar uno manual.",
+                        "Usa Agregar para registrar un taller personal.",
                         color = Color(0xFF6881A5)
                     )
                 } else {
@@ -255,34 +232,39 @@ fun TalleresListScreen(
 @Composable
 private fun TarjetaTaller(t: Taller, onClick: () -> Unit, onFavorito: () -> Unit) {
     Surface(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).testTag("rf34.taller.${t.id}"),
+        Modifier.fillMaxWidth().testTag("rf34.taller.${t.id}"),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         shadowElevation = 2.dp
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                shape = CircleShape,
-                color = if (t.esAsociado) VerdeAsociadoBg else AzulManualBg,
-                modifier = Modifier.size(48.dp)
+        Row(Modifier.padding(start = 14.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.weight(1f).clickable(onClick = onClick),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        if (t.esAsociado) Icons.Default.Store else Icons.Default.Build,
-                        contentDescription = null,
-                        tint = if (t.esAsociado) VerdeAsociado else Azul
-                    )
+                Surface(
+                    shape = CircleShape,
+                    color = if (t.esAsociado) VerdeAsociadoBg else AzulManualBg,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (t.esAsociado) Icons.Default.Store else Icons.Default.Build,
+                            contentDescription = null,
+                            tint = if (t.esAsociado) VerdeAsociado else Azul
+                        )
+                    }
                 }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(t.nombre, fontWeight = FontWeight.SemiBold, color = Azul)
-                BadgeOrigen(t.esAsociado)
-                t.telefono?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
-                }
-                t.direccion?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5), maxLines = 1)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(t.nombre, fontWeight = FontWeight.SemiBold, color = Azul)
+                    BadgeOrigen(t.esAsociado)
+                    t.telefono?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
+                    }
+                    t.direccion?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5), maxLines = 1)
+                    }
                 }
             }
             IconButton(onClick = onFavorito, modifier = Modifier.testTag("rf37.favorito.accion.${t.id}")) {
@@ -327,18 +309,18 @@ fun DetalleTallerScreen(
 ) {
     var confirmar by remember { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(if (embebidoEnHistorial) Color.Transparent else Fondo).testTag("rf34.detalle")) {
-        // Embebido: el padre ya muestra «Detalle taller» + Volver (sin tarjeta duplicada).
-        if (!embebidoEnHistorial) {
-            Surface(color = Color.White, shadowElevation = 1.dp) {
-                Row(
-                    Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onVolver) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Azul)
-                    }
-                    Text("Detalle taller", fontWeight = FontWeight.Bold, color = Azul, style = MaterialTheme.typography.titleLarge)
+        Surface(color = Color.White, shadowElevation = 1.dp) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (embebidoEnHistorial) Modifier else Modifier.statusBarsPadding())
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onVolver) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Azul)
                 }
+                Text("Detalle del taller", fontWeight = FontWeight.Bold, color = Azul, style = MaterialTheme.typography.titleLarge)
             }
         }
         Column(
@@ -471,10 +453,9 @@ fun FormularioTallerScreen(
     mensaje: String?,
     onCancelar: () -> Unit,
     onGuardar: (DatosTallerFormulario) -> Unit,
-    onIrAsociado: () -> Unit = {},
+    embebidoEnHistorial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var modoAsociado by remember { mutableStateOf(false) }
     var nombre by remember(editando) { mutableStateOf(editando?.nombre.orEmpty()) }
     var telefono by remember(editando) { mutableStateOf(editando?.telefono.orEmpty()) }
     var correo by remember(editando) { mutableStateOf(editando?.correo.orEmpty()) }
@@ -504,7 +485,10 @@ fun FormularioTallerScreen(
     Column(modifier.fillMaxSize().background(Fondo)) {
         Surface(color = Color.White, shadowElevation = 1.dp) {
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (embebidoEnHistorial) Modifier else Modifier.statusBarsPadding())
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {
@@ -513,7 +497,7 @@ fun FormularioTallerScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Azul)
                 }
                 Text(
-                    if (editando == null) "Agregar taller" else "Editar taller",
+                    if (editando == null) "Registrar taller" else "Editar taller",
                     fontWeight = FontWeight.Bold,
                     color = Azul,
                     style = MaterialTheme.typography.titleLarge
@@ -524,31 +508,6 @@ fun FormularioTallerScreen(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (editando == null) {
-                Row(
-                    Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(12.dp)).padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    FilterChip(
-                        selected = !modoAsociado,
-                        onClick = { modoAsociado = false },
-                        label = { Text("Manual") },
-                        modifier = Modifier.weight(1f).testTag("rf34.modo.manual"),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Azul, selectedLabelColor = Color.White
-                        )
-                    )
-                    FilterChip(
-                        selected = modoAsociado,
-                        onClick = { modoAsociado = true; onIrAsociado() },
-                        label = { Text("Asociado a MyCar") },
-                        modifier = Modifier.weight(1f).testTag("rf34.modo.asociado"),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Azul, selectedLabelColor = Color.White
-                        )
-                    )
-                }
-            }
             mensaje?.let { Text(it, color = Color(0xFFC62828)) }
             OutlinedTextField(
                 value = nombre,
@@ -786,8 +745,6 @@ fun BotonAgregarTaller(onAgregar: () -> Unit, enabled: Boolean) {
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         modifier = Modifier.testTag("rf34.agregar")
     ) {
-        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(4.dp))
-        Text("Agregar")
+        Text("+ Agregar")
     }
 }

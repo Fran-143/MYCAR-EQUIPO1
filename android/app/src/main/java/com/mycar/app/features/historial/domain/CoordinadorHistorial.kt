@@ -21,6 +21,9 @@ class CoordinadorHistorial(
     private var ultimoValido: EstadoHistorial? = null
 
     suspend fun cargar(idPreferido: Long? = mutable.value.seleccionado?.id) {
+        val filtroPrevio = mutable.value.filtroCodigoTipo
+        val ordenPrevio = mutable.value.ordenRecientes
+        val idPrevio = mutable.value.seleccionado?.id
         val peticion = ++version
         ultimoValido = null
         mutable.value = EstadoHistorial(fase = FaseHistorial.CARGANDO_VEHICULOS)
@@ -37,14 +40,19 @@ class CoordinadorHistorial(
             mutable.value = EstadoHistorial(fase = FaseHistorial.SIN_SELECCION, vehiculos = vehiculos)
             // Incluye principal inactivo: consultable en historial aunque Inicio solo muestre activos.
             val inicial = vehiculos.firstOrNull { it.id == idPreferido } ?: vehiculos.firstOrNull { it.principal }
-            if (inicial != null) seleccionar(inicial.id)
+            if (inicial != null) {
+                val mismo = inicial.id == idPrevio
+                seleccionar(inicial.id, if (mismo) filtroPrevio else null, if (mismo) ordenPrevio else true)
+            }
         } catch (ex: CancellationException) { throw ex
         } catch (ex: Exception) {
             if (peticion == version) fallo(ex, contexto = true)
         }
     }
 
-    suspend fun seleccionar(id: Long) {
+    suspend fun seleccionar(id: Long) = seleccionar(id, filtroConservado = null, ordenConservado = true)
+
+    private suspend fun seleccionar(id: Long, filtroConservado: String?, ordenConservado: Boolean) {
         val candidato = mutable.value.vehiculos.firstOrNull { it.id == id }
         if (candidato == null) {
             mutable.value = mutable.value.copy(aviso = "El vehículo no está disponible")
@@ -69,8 +77,8 @@ class CoordinadorHistorial(
                 vehiculos = actualizados,
                 seleccionado = resultado.vehiculo,
                 mantenimientos = resultado.mantenimientos.toList(),
-                filtroCodigoTipo = null,
-                ordenRecientes = true,
+                filtroCodigoTipo = filtroConservado,
+                ordenRecientes = ordenConservado,
                 faseKm = FaseKilometrajeHistorial.IDLE
             )
             mutable.value = listo
@@ -90,7 +98,6 @@ class CoordinadorHistorial(
         val s = mutable.value
         if (s.fase != FaseHistorial.LISTO) return
         val codigo = codigoTipo?.takeIf { it.isNotBlank() }
-        if (codigo != null && s.tiposFiltro.none { it.first == codigo }) return
         mutable.value = s.copy(filtroCodigoTipo = codigo, aviso = null)
     }
 

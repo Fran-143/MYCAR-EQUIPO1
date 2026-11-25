@@ -1,6 +1,7 @@
 package com.mycar.app.features.admin.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -29,11 +30,8 @@ import com.mycar.app.features.soporte.ui.CamposDetalleSolicitudVin
 import com.mycar.app.features.soporte.ui.ChipEstado
 import com.mycar.app.features.soat.ui.SoatBotonPrincipal
 import com.mycar.app.features.soat.ui.SoatBotonSecundario
-import com.mycar.app.ui.theme.MyCarNavy
 
-private val Navy = Color(0xFF12285F)
 private val Teal = Color(0xFF007E98)
-private val Mute = Color(0xFF718096)
 
 @Composable
 fun IncidenciasVinRoute(
@@ -41,6 +39,7 @@ fun IncidenciasVinRoute(
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     val vm: AdminVinViewModel = viewModel(factory = remember(repository) { AdminVinViewModel.factory(repository) })
     val estado by vm.estado.collectAsState()
     BackHandler {
@@ -53,6 +52,7 @@ fun IncidenciasVinRoute(
     Column(
         modifier
             .fillMaxSize()
+            .background(scheme.background)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -63,7 +63,7 @@ fun IncidenciasVinRoute(
                     PantallaAdminVin.DETALLE, PantallaAdminVin.CONFIRMACION -> vm.volverLista()
                     else -> onVolver()
                 }
-            }) { Text("Volver", color = Navy) }
+            }) { Text("Volver", color = scheme.onSurface) }
             Text(
                 when (estado.pantalla) {
                     PantallaAdminVin.DETALLE -> "Detalle de solicitud"
@@ -72,7 +72,7 @@ fun IncidenciasVinRoute(
                     else -> "Incidencias de VIN"
                 },
                 fontWeight = FontWeight.Bold,
-                color = Navy,
+                color = scheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -91,7 +91,8 @@ fun IncidenciasVinRoute(
 
 @Composable
 private fun ListaIncidencias(estado: com.mycar.app.features.admin.viewmodel.EstadoAdminVin, vm: AdminVinViewModel) {
-    Text("Gestión de solicitudes de corrección de VIN.", color = Mute)
+    val scheme = MaterialTheme.colorScheme
+    Text("Gestión de solicitudes de corrección de VIN.", color = scheme.onSurfaceVariant)
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -120,26 +121,26 @@ private fun ListaIncidencias(estado: com.mycar.app.features.admin.viewmodel.Esta
     )
     SoatBotonSecundario("Buscar", onClick = vm::cargarLista)
     if (estado.lista.isEmpty() && !estado.cargando) {
-        Text("No hay incidencias para este filtro.", color = Mute)
+        Text("No hay incidencias para este filtro.", color = scheme.onSurfaceVariant)
     }
     estado.lista.forEach { s ->
         Card(
             Modifier.fillMaxWidth().clickable { vm.abrirDetalle(s.codigo) },
             shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = scheme.surface)
         ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     s.codigo,
                     fontWeight = FontWeight.Bold,
-                    color = Navy,
+                    color = scheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 ChipEstado(s.estado)
-                Text("Placa: ${s.placa.orEmpty()}", color = Mute)
+                Text("Placa: ${s.placa.orEmpty()}", color = scheme.onSurfaceVariant)
                 s.creadoUtc?.let {
-                    Text(it.take(10), color = Mute, style = MaterialTheme.typography.bodySmall)
+                    Text(it.take(10), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -148,12 +149,13 @@ private fun ListaIncidencias(estado: com.mycar.app.features.admin.viewmodel.Esta
 
 @Composable
 private fun DetalleIncidencia(estado: com.mycar.app.features.admin.viewmodel.EstadoAdminVin, vm: AdminVinViewModel) {
+    val scheme = MaterialTheme.colorScheme
     val d = estado.detalle ?: return
     val cerrado = d.estado in setOf("APROBADA", "RECHAZADA")
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = scheme.surface)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             CabeceraDetalleSolicitud(d.codigo, d.estado)
@@ -176,7 +178,7 @@ private fun DetalleIncidencia(estado: com.mycar.app.features.admin.viewmodel.Est
                 enabled = !estado.ocupado,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
+                colors = ButtonDefaults.buttonColors(containerColor = scheme.primary)
             ) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -212,20 +214,21 @@ private fun DetalleIncidencia(estado: com.mycar.app.features.admin.viewmodel.Est
 
 @Composable
 private fun ResolverIncidencia(estado: com.mycar.app.features.admin.viewmodel.EstadoAdminVin, vm: AdminVinViewModel) {
+    val scheme = MaterialTheme.colorScheme
     val d = estado.detalle ?: return
-    Text("Resultado *", fontWeight = FontWeight.SemiBold, color = Navy)
+    Text("Resultado *", fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
     Row(verticalAlignment = Alignment.CenterVertically) {
         RadioButton(selected = estado.aprobarSeleccionado, onClick = { vm.setResultado(aprobar = true) })
         Column {
             Text("Aprobar solicitud", fontWeight = FontWeight.Medium, color = Color(0xFF2E7D32))
-            Text("Se actualizará el VIN del vehículo.", color = Mute, style = MaterialTheme.typography.bodySmall)
+            Text("Se actualizará el VIN del vehículo.", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         RadioButton(selected = !estado.aprobarSeleccionado, onClick = { vm.setResultado(aprobar = false) })
         Column {
             Text("Rechazar solicitud", fontWeight = FontWeight.Medium, color = Color(0xFFC62828))
-            Text("No se realizará el cambio.", color = Mute, style = MaterialTheme.typography.bodySmall)
+            Text("No se realizará el cambio.", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
     }
     if (!estado.aprobarSeleccionado) {
@@ -273,8 +276,9 @@ private fun ConfirmacionResolucion(estado: com.mycar.app.features.admin.viewmode
 
 @Composable
 private fun FilaAdmin(etiqueta: String, valor: String) {
+    val scheme = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(etiqueta, color = Mute, style = MaterialTheme.typography.labelMedium)
-        Text(valor, fontWeight = FontWeight.Medium, color = Navy)
+        Text(etiqueta, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+        Text(valor, fontWeight = FontWeight.Medium, color = scheme.onSurface)
     }
 }

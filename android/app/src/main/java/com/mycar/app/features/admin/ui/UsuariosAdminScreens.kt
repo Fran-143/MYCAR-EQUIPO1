@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mycar.app.BuildConfig
 import com.mycar.app.core.FechaMyCar
+import com.mycar.app.features.admin.data.AdminSuscripcionesRepository
 import com.mycar.app.features.admin.data.AdminUsuarioDetalleDto
 import com.mycar.app.features.admin.data.AdminUsuarioResumenDto
 import com.mycar.app.features.admin.data.AdminUsuariosRepository
@@ -63,11 +64,11 @@ import com.mycar.app.features.localtest.consultarOtpSimulado
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.ui.unit.sp
 
-private val Navy = Color(0xFF12285F)
 private val Teal = Color(0xFF007E98)
-private val Bg = Color(0xFFF0F5FA)
-private val Mute = Color(0xFF718096)
 private val Danger = Color(0xFFC53030)
 private val Green = Color(0xFF2F855A)
 private val Orange = Color(0xFFDD6B20)
@@ -80,6 +81,7 @@ private enum class UsuariosPaso {
 @Composable
 fun UsuariosAdminRoute(
     repository: AdminUsuariosRepository,
+    suscripcionesRepository: AdminSuscripcionesRepository? = null,
     onVolver: () -> Unit,
     onAbrirPruebas: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -149,7 +151,10 @@ fun UsuariosAdminRoute(
             modifier = modifier.fillMaxSize()
         )
         UsuariosPaso.DETALLE -> when {
-            detalleLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            detalleLoading -> Box(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+                contentAlignment = Alignment.Center
+            ) {
                 CircularProgressIndicator(color = Teal)
             }
             detalleError != null -> DetalleErrorScreen(
@@ -160,6 +165,8 @@ fun UsuariosAdminRoute(
             )
             detalle != null -> UsuariosDetalleScreen(
                 detalle = detalle!!,
+                suscripcionesRepository = suscripcionesRepository,
+                onRefresh = { selectedId?.let { refrescarDetalle(it) } },
                 onVolver = { paso = UsuariosPaso.LISTA },
                 onHistorial = { paso = UsuariosPaso.HISTORIAL },
                 onGestionar = { paso = UsuariosPaso.GESTION },
@@ -265,14 +272,19 @@ private fun DetalleErrorScreen(
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Detalle de usuario") },
                 navigationIcon = { TextButton(onClick = onVolver) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -282,7 +294,7 @@ private fun DetalleErrorScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(24.dp))
-            Text("No se pudo abrir el detalle", fontWeight = FontWeight.Bold, color = Navy)
+            Text("No se pudo abrir el detalle", fontWeight = FontWeight.Bold, color = scheme.onSurface)
             Text(mensaje, color = Danger)
             Spacer(Modifier.weight(1f))
             Button(
@@ -305,6 +317,7 @@ private fun UsuariosListaScreen(
     onDetalle: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     var q by remember { mutableStateOf("") }
     var estado by remember { mutableStateOf("TODOS") }
     var rol by remember { mutableStateOf("TODOS") }
@@ -359,19 +372,23 @@ private fun UsuariosListaScreen(
     // Solución: solo systemBars en Scaffold; búsqueda fija; LazyColumn ocupa el resto.
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         contentWindowInsets = WindowInsets.systemBars,
         topBar = {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.People, contentDescription = null, tint = Navy)
+                        Icon(Icons.Outlined.People, contentDescription = null, tint = scheme.onSurface)
                         Spacer(Modifier.width(8.dp))
                         Text("Usuarios", fontWeight = FontWeight.SemiBold)
                     }
                 },
                 navigationIcon = { TextButton(onClick = onVolver) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -388,7 +405,7 @@ private fun UsuariosListaScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 singleLine = true,
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = Mute) },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = scheme.onSurfaceVariant) },
                 trailingIcon = {
                     if (q.isNotEmpty()) {
                         TextButton(onClick = { q = "" }) { Text("✕") }
@@ -426,7 +443,7 @@ private fun UsuariosListaScreen(
                 error != null -> Text(error!!, color = Danger, modifier = Modifier.padding(8.dp))
                 !loading && items.isEmpty() -> Text(
                     "No hay usuarios con esos filtros.",
-                    color = Mute,
+                    color = scheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp)
                 )
                 else -> LazyColumn(
@@ -446,7 +463,7 @@ private fun UsuariosListaScreen(
                                 onClick = { if (page > 0) { page--; cargar() } },
                                 enabled = page > 0 && !loading
                             ) { Text("Anterior") }
-                            Text("Pág. ${page + 1} · $total", color = Mute)
+                            Text("Pág. ${page + 1} · $total", color = scheme.onSurfaceVariant)
                             TextButton(
                                 onClick = {
                                     if ((page + 1) * 20 < total) {
@@ -472,6 +489,7 @@ private fun FiltroChip(
     icon: ImageVector,
     onSelect: (String) -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
     var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(
@@ -479,7 +497,7 @@ private fun FiltroChip(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = Teal)
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = scheme.secondary)
             Spacer(Modifier.width(6.dp))
             Text(
                 "$label: ${value.replace('_', ' ')}",
@@ -500,11 +518,12 @@ private fun FiltroChip(
 
 @Composable
 private fun UsuarioFila(u: AdminUsuarioResumenDto, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     val visible = (u.estadoVisible ?: u.estado).orEmpty()
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = scheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
@@ -515,10 +534,10 @@ private fun UsuarioFila(u: AdminUsuarioResumenDto, onClick: () -> Unit) {
                 Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(Teal.copy(alpha = 0.12f)),
+                    .background(scheme.secondary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.People, contentDescription = null, tint = Teal)
+                Icon(Icons.Outlined.People, contentDescription = null, tint = scheme.secondary)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -526,14 +545,14 @@ private fun UsuarioFila(u: AdminUsuarioResumenDto, onClick: () -> Unit) {
                     if (u.anonima) "Constancia ${u.constancia.orEmpty()}"
                     else u.nombre.orEmpty(),
                     fontWeight = FontWeight.SemiBold,
-                    color = Navy,
+                    color = scheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 if (!u.anonima) {
                     Text(
                         u.correo.orEmpty(),
-                        color = Mute,
+                        color = scheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -543,12 +562,12 @@ private fun UsuarioFila(u: AdminUsuarioResumenDto, onClick: () -> Unit) {
                 u.desbloqueoUtc?.let {
                     Text(
                         "Hasta: ${FechaMyCar.fechaHora(it)}",
-                        color = Mute,
+                        color = scheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
-            Icon(Icons.Outlined.PersonSearch, contentDescription = "Abrir detalle", tint = Mute)
+            Icon(Icons.Outlined.PersonSearch, contentDescription = "Abrir detalle", tint = scheme.onSurfaceVariant)
         }
     }
 }
@@ -576,13 +595,17 @@ private fun EstadoChip(estado: String) {
     }
 }
 
-private fun estadoColor(estado: String): Color = when (estado) {
-    "ACTIVA" -> Green
-    "SUSPENDIDA" -> Danger
-    "BLOQUEADA" -> Orange
-    "PENDIENTE_ELIMINACION" -> Amber
-    "ELIMINADA" -> Mute
-    else -> Navy
+@Composable
+private fun estadoColor(estado: String): Color {
+    val scheme = MaterialTheme.colorScheme
+    return when (estado) {
+        "ACTIVA" -> Green
+        "SUSPENDIDA" -> Danger
+        "BLOQUEADA" -> Orange
+        "PENDIENTE_ELIMINACION" -> Amber
+        "ELIMINADA" -> scheme.onSurfaceVariant
+        else -> scheme.onSurface
+    }
 }
 
 private fun estadoIcon(estado: String): ImageVector = when (estado) {
@@ -596,20 +619,27 @@ private fun estadoIcon(estado: String): ImageVector = when (estado) {
 @Composable
 private fun UsuariosDetalleScreen(
     detalle: AdminUsuarioDetalleDto,
+    suscripcionesRepository: AdminSuscripcionesRepository? = null,
+    onRefresh: () -> Unit = {},
     onVolver: () -> Unit,
     onHistorial: () -> Unit,
     onGestionar: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     var tab by remember { mutableIntStateOf(0) }
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Detalle de usuario") },
                 navigationIcon = { TextButton(onClick = onVolver) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -623,22 +653,22 @@ private fun UsuariosDetalleScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                colors = CardDefaults.cardColors(containerColor = scheme.surface)
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         if (detalle.anonima) "Constancia ${detalle.constancia.orEmpty()}"
                         else detalle.nombreCompleto ?: listOfNotNull(detalle.nombre, detalle.apellido).joinToString(" "),
-                        fontWeight = FontWeight.Bold, color = Navy
+                        fontWeight = FontWeight.Bold, color = scheme.onSurface
                     )
-                    if (!detalle.anonima) Text(detalle.correo.orEmpty(), color = Mute)
+                    if (!detalle.anonima) Text(detalle.correo.orEmpty(), color = scheme.onSurfaceVariant)
                     Text(
                         (detalle.estadoVisible ?: detalle.estado).orEmpty().replace('_', ' '),
                         color = estadoColor(detalle.estadoVisible ?: detalle.estado.orEmpty()),
                         fontWeight = FontWeight.SemiBold
                     )
-                    detalle.tipoBloqueoVisible?.let { Text("Tipo: $it", color = Mute) }
-                    detalle.restriccion?.let { Text("Restricción: $it", color = Mute) }
+                    detalle.tipoBloqueoVisible?.let { Text("Tipo: $it", color = scheme.onSurfaceVariant) }
+                    detalle.restriccion?.let { Text("Restricción: $it", color = scheme.onSurfaceVariant) }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -646,7 +676,7 @@ private fun UsuariosDetalleScreen(
                 selectedTabIndex = tab,
                 edgePadding = 0.dp,
                 containerColor = Color.Transparent,
-                contentColor = Navy
+                contentColor = scheme.onSurface
             ) {
                 Tab(
                     selected = tab == 0,
@@ -671,7 +701,7 @@ private fun UsuariosDetalleScreen(
             when (tab) {
                 0 -> {
                     if (detalle.anonima) {
-                        Text("Solo constancia técnica no identificable.", color = Mute)
+                        Text("Solo constancia técnica no identificable.", color = scheme.onSurfaceVariant)
                     } else {
                         InfoLine("ID administrativo", detalle.idUsuario.toString())
                         InfoLine("Nombre completo", detalle.nombreCompleto)
@@ -687,26 +717,22 @@ private fun UsuariosDetalleScreen(
                 }
                 1 -> {
                     val v = detalle.vehiculos
-                    Text("Cantidad: ${mapNum(v, "cantidad")}", color = Navy)
-                    Text("Activos: ${mapNum(v, "activos")}", color = Mute)
-                    Text("Inactivos: ${mapNum(v, "inactivos")}", color = Mute)
+                    Text("Cantidad: ${mapNum(v, "cantidad")}", color = scheme.onSurface)
+                    Text("Activos: ${mapNum(v, "activos")}", color = scheme.onSurfaceVariant)
+                    Text("Inactivos: ${mapNum(v, "inactivos")}", color = scheme.onSurfaceVariant)
                 }
-                2 -> {
-                    val s = detalle.suscripcion
-                    if (s == null) Text("Sin suscripción registrada.", color = Mute)
-                    else {
-                        Text("Plan: ${s["plan"]}", color = Navy)
-                        Text("Estado: ${s["estado"]}", color = Mute)
-                        Text("Inicio: ${FechaMyCar.fechaHora(s["inicioUtc"]?.toString())}", color = Mute)
-                    }
-                }
+                2 -> TabPlanUsuario(
+                    detalle = detalle,
+                    suscripcionesRepository = suscripcionesRepository,
+                    onRefresh = onRefresh
+                )
             }
             Spacer(Modifier.height(20.dp))
             Button(
                 onClick = onHistorial,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy)
+                colors = ButtonDefaults.buttonColors(containerColor = scheme.primary)
             ) {
                 Icon(Icons.Outlined.History, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -739,10 +765,263 @@ private fun mapNum(map: Map<String, Any?>?, key: String): String {
     }
 }
 
+private fun mapStr(map: Map<String, Any?>?, key: String): String? =
+    map?.get(key)?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+
+private fun mapBool(map: Map<String, Any?>?, key: String): Boolean {
+    val v = map?.get(key) ?: return false
+    return when (v) {
+        is Boolean -> v
+        is Number -> v.toInt() != 0
+        else -> v.toString().equals("true", ignoreCase = true)
+    }
+}
+
+@Composable
+private fun TabPlanUsuario(
+    detalle: AdminUsuarioDetalleDto,
+    suscripcionesRepository: AdminSuscripcionesRepository?,
+    onRefresh: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var msg by remember { mutableStateOf<String?>(null) }
+    var err by remember { mutableStateOf<String?>(null) }
+    var motivoReject by remember { mutableStateOf("") }
+    var motivoCancel by remember { mutableStateOf("") }
+    var confirmReject by remember { mutableStateOf(false) }
+    var confirmCancel by remember { mutableStateOf(false) }
+    var observacion by remember { mutableStateOf("") }
+
+    val s = detalle.suscripcion
+    val sol = detalle.solicitudPremiumAbierta
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(
+            color = scheme.surface,
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.WorkspacePremium, null, tint = scheme.secondary, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Plan actual", fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+                }
+                if (s == null) {
+                    Text("Sin suscripción registrada.", color = scheme.onSurfaceVariant)
+                } else {
+                    InfoLine("Plan", mapStr(s, "plan") ?: mapStr(s, "nombrePlan"))
+                    InfoLine("Estado", mapStr(s, "estado"))
+                    InfoLine("Modalidad", mapStr(s, "modalidad") ?: "—")
+                    InfoLine("Origen", mapStr(s, "origen"))
+                    InfoLine("Inicio", FechaMyCar.fechaHora(mapStr(s, "inicioUtc")))
+                    InfoLine(
+                        "Fin",
+                        mapStr(s, "finUtc")?.let { FechaMyCar.fechaHora(it) } ?: "Sin vencimiento"
+                    )
+                    when {
+                        mapBool(s, "esPruebaGratuita") ->
+                            Text("Periodo de prueba — admin puede cancelar.", color = Orange, fontSize = 13.sp)
+                        mapBool(s, "esSandbox") ->
+                            Text("Premium sandbox — admin puede cancelar.", color = scheme.secondary, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
+        if (sol != null) {
+            Surface(
+                color = Orange.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Solicitud Premium abierta", fontWeight = FontWeight.SemiBold, color = Orange)
+                    InfoLine("Código", mapStr(sol, "codigo"))
+                    InfoLine("Modalidad", mapStr(sol, "modalidad"))
+                    InfoLine("Estado solicitud", mapStr(sol, "estado"))
+                    InfoLine("Creada", FechaMyCar.fechaHora(mapStr(sol, "creadoUtc")))
+                    mapStr(sol, "referenciaOperacion")?.let {
+                        InfoLine("Operación", "$it (${mapStr(sol, "estadoOperacion") ?: "—"})")
+                    }
+                    err?.let { Text(it, color = Danger) }
+                    msg?.let { Text(it, color = Green) }
+
+                    val estadoSol = mapStr(sol, "estado")
+                    val puedeAprobar = mapBool(sol, "puedeAprobar")
+                    if (suscripcionesRepository != null && estadoSol == "PENDIENTE_APROBACION") {
+                        if (!puedeAprobar) {
+                            Text(
+                                "Aún no se puede aprobar (pago no confirmado o configuración).",
+                                color = Danger,
+                                fontSize = 13.sp
+                            )
+                        }
+                        OutlinedTextField(
+                            value = observacion,
+                            onValueChange = { observacion = it },
+                            label = { Text("Observación (opcional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        Button(
+                            onClick = {
+                                val codigo = mapStr(sol, "codigo") ?: return@Button
+                                scope.launch {
+                                    busy = true; err = null; msg = null
+                                    try {
+                                        suscripcionesRepository.aprobar(codigo, observacion.ifBlank { null })
+                                        msg = "Solicitud aprobada. Premium activado."
+                                        onRefresh()
+                                    } catch (ex: Exception) {
+                                        err = ex.message
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            },
+                            enabled = !busy && puedeAprobar,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green)
+                        ) { Text("Aprobar solicitud") }
+                    } else if (estadoSol == "PENDIENTE_PAGO") {
+                        Text(
+                            "Solicitud antigua (esperaba pago). Recházala y pide de nuevo con «Pagar Premium».",
+                            color = Orange,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    if (suscripcionesRepository != null &&
+                        (estadoSol == "PENDIENTE_APROBACION" || estadoSol == "PENDIENTE_PAGO")
+                    ) {
+                        if (confirmReject) {
+                            OutlinedTextField(
+                                value = motivoReject,
+                                onValueChange = { motivoReject = it },
+                                label = { Text("Motivo del rechazo (obligatorio)") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { confirmReject = false }, enabled = !busy) {
+                                    Text("Cancelar")
+                                }
+                                Button(
+                                    onClick = {
+                                        val codigo = mapStr(sol, "codigo") ?: return@Button
+                                        if (motivoReject.isBlank()) {
+                                            err = "Indica el motivo del rechazo."
+                                            return@Button
+                                        }
+                                        scope.launch {
+                                            busy = true; err = null; msg = null
+                                            try {
+                                                suscripcionesRepository.rechazar(codigo, motivoReject.trim())
+                                                msg = "Solicitud rechazada."
+                                                confirmReject = false
+                                                onRefresh()
+                                            } catch (ex: Exception) {
+                                                err = ex.message
+                                            } finally {
+                                                busy = false
+                                            }
+                                        }
+                                    },
+                                    enabled = !busy,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Danger)
+                                ) { Text("Confirmar rechazo") }
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = { confirmReject = true; err = null },
+                                enabled = !busy,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("Rechazar solicitud") }
+                        }
+                    }
+                }
+            }
+        } else {
+            Text("Sin solicitud Premium pendiente.", color = scheme.onSurfaceVariant)
+        }
+
+        val puedeCancelar = mapBool(s, "puedeCancelarAdmin")
+        if (suscripcionesRepository != null && puedeCancelar) {
+            Surface(
+                color = Danger.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Cancel, null, tint = Danger, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Cancelar Premium (prueba/sandbox)", fontWeight = FontWeight.SemiBold, color = Danger)
+                    }
+                    Text("El usuario vuelve a FREE y se concilian vehículos activos.", color = scheme.onSurfaceVariant, fontSize = 13.sp)
+                    if (confirmCancel) {
+                        OutlinedTextField(
+                            value = motivoCancel,
+                            onValueChange = { motivoCancel = it },
+                            label = { Text("Motivo (obligatorio)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { confirmCancel = false }, enabled = !busy) {
+                                Text("Volver")
+                            }
+                            Button(
+                                onClick = {
+                                    if (motivoCancel.isBlank()) {
+                                        err = "Indica el motivo de cancelación."
+                                        return@Button
+                                    }
+                                    scope.launch {
+                                        busy = true; err = null; msg = null
+                                        try {
+                                            suscripcionesRepository.cancelarPremium(
+                                                detalle.idUsuario,
+                                                motivoCancel.trim()
+                                            )
+                                            msg = "Premium cancelado. Usuario en FREE."
+                                            confirmCancel = false
+                                            onRefresh()
+                                        } catch (ex: Exception) {
+                                            err = ex.message
+                                        } finally {
+                                            busy = false
+                                        }
+                                    }
+                                },
+                                enabled = !busy,
+                                colors = ButtonDefaults.buttonColors(containerColor = Danger)
+                            ) { Text("Confirmar cancelación") }
+                        }
+                    } else {
+                        Button(
+                            onClick = { confirmCancel = true; err = null },
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Danger)
+                        ) { Text("Anular Premium / detener experiencia") }
+                    }
+                }
+            }
+        }
+
+        if (busy) {
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Teal)
+        }
+    }
+}
+
 @Composable
 private fun InfoLine(label: String, value: String?) {
+    val scheme = MaterialTheme.colorScheme
     if (value.isNullOrBlank()) return
-    Text("$label: $value", color = Navy, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp))
+    Text("$label: $value", color = scheme.onSurface, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp))
 }
 
 @Composable
@@ -757,15 +1036,20 @@ private fun UsuariosGestionScreen(
     onHistorial: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     val estado = detalle.estado.orEmpty()
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Gestionar estado") },
                 navigationIcon = { TextButton(onClick = onVolver) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -777,29 +1061,29 @@ private fun UsuariosGestionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Estado actual: ${estado.replace('_', ' ')}", fontWeight = FontWeight.Bold, color = Navy)
+            Text("Estado actual: ${estado.replace('_', ' ')}", fontWeight = FontWeight.Bold, color = scheme.onSurface)
             when (estado) {
                 "ACTIVA" -> {
                     AccionBtn("Suspender cuenta", Danger, onSuspender, Icons.Outlined.PauseCircle)
                     AccionBtn("Bloquear cuenta", Danger, onBloquear, Icons.Outlined.Lock)
                     Text(
                         "Gestionar eliminación: el titular usa Perfil → Eliminar cuenta (plazo 30 días).",
-                        color = Mute
+                        color = scheme.onSurfaceVariant
                     )
                 }
                 "SUSPENDIDA" -> {
                     AccionBtn("Levantar suspensión", Teal, onReactivar, Icons.Outlined.LockOpen)
-                    AccionBtn("Ver historial", Navy, onHistorial, Icons.Outlined.History)
+                    AccionBtn("Ver historial", scheme.primary, onHistorial, Icons.Outlined.History)
                 }
                 "BLOQUEADA" -> {
                     AccionBtn("Desbloquear", Teal, onDesbloquear, Icons.Outlined.LockOpen)
-                    AccionBtn("Ver historial", Navy, onHistorial, Icons.Outlined.History)
+                    AccionBtn("Ver historial", scheme.primary, onHistorial, Icons.Outlined.History)
                 }
                 "PENDIENTE_ELIMINACION" -> {
                     AccionBtn("Reactivar cuenta", Teal, onAsistencia, Icons.Outlined.VerifiedUser)
-                    AccionBtn("Ver historial", Navy, onHistorial, Icons.Outlined.History)
+                    AccionBtn("Ver historial", scheme.primary, onHistorial, Icons.Outlined.History)
                 }
-                "ELIMINADA" -> Text("Sin acciones de reactivación. Solo consulta de constancia.", color = Mute)
+                "ELIMINADA" -> Text("Sin acciones de reactivación. Solo consulta de constancia.", color = scheme.onSurfaceVariant)
             }
             val recup = detalle.restriccionRecuperacion
             val bloqueado = when (val b = recup?.get("bloqueado")) {
@@ -807,8 +1091,8 @@ private fun UsuariosGestionScreen(
                 else -> b?.toString().equals("true", ignoreCase = true)
             }
             if (estado == "ACTIVA" && bloqueado) {
-                Text("Bloqueo de recuperación activo (no impide login).", color = Mute)
-                AccionBtn("Ver historial", Navy, onHistorial)
+                Text("Bloqueo de recuperación activo (no impide login).", color = scheme.onSurfaceVariant)
+                AccionBtn("Ver historial", scheme.primary, onHistorial)
             }
             Spacer(Modifier.weight(1f, fill = true))
             OutlinedButton(onClick = onVolver, modifier = Modifier.fillMaxWidth().height(48.dp)) {
@@ -848,6 +1132,7 @@ private fun FormMotivoScreen(
     onConfirm: suspend (motivo: String, comentario: String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     var motivo by remember { mutableStateOf("") }
     var comentario by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -856,12 +1141,16 @@ private fun FormMotivoScreen(
     val scope = rememberCoroutineScope()
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(titulo) },
                 navigationIcon = { TextButton(onClick = onCancel, enabled = !busy) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -884,7 +1173,7 @@ private fun FormMotivoScreen(
                 label = { Text("Comentario opcional") },
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
             )
-            Text("Esta acción se audita y puede revocar sesiones.", color = Mute)
+            Text("Esta acción se audita y puede revocar sesiones.", color = scheme.onSurfaceVariant)
             error?.let { Text(it, color = Danger) }
             Spacer(Modifier.weight(1f, fill = true))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -934,6 +1223,7 @@ private fun FormBloquearScreen(
     onConfirm: suspend (motivo: String, minutos: Int, observacion: String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     var motivo by remember { mutableStateOf("") }
     var minutos by remember { mutableStateOf("60") }
     var obs by remember { mutableStateOf("") }
@@ -942,12 +1232,16 @@ private fun FormBloquearScreen(
     val scope = rememberCoroutineScope()
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Bloquear cuenta") },
                 navigationIcon = { TextButton(onClick = onCancel) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -960,7 +1254,7 @@ private fun FormBloquearScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Tipo: bloqueo administrativo de acceso.", color = Mute)
+            Text("Tipo: bloqueo administrativo de acceso.", color = scheme.onSurfaceVariant)
             OutlinedTextField(
                 value = motivo, onValueChange = { motivo = it }, label = { Text("Motivo obligatorio") },
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)
@@ -1007,6 +1301,7 @@ private fun UsuariosHistorialScreen(
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     var items by remember { mutableStateOf<List<com.mycar.app.features.admin.data.AdminHistorialItemDto>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(id) {
@@ -1018,12 +1313,16 @@ private fun UsuariosHistorialScreen(
     }
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Historial de estados") },
                 navigationIcon = { TextButton(onClick = onVolver) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -1035,16 +1334,16 @@ private fun UsuariosHistorialScreen(
             items(items) { h ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = scheme.surface),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(h.accion.orEmpty(), fontWeight = FontWeight.SemiBold, color = Navy)
-                        Text("${h.estadoAnterior} → ${h.estadoPosterior}", color = Mute)
-                        Text(h.motivo.orEmpty(), color = Mute)
+                        Text(h.accion.orEmpty(), fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+                        Text("${h.estadoAnterior} → ${h.estadoPosterior}", color = scheme.onSurfaceVariant)
+                        Text(h.motivo.orEmpty(), color = scheme.onSurfaceVariant)
                         Text(
                             FechaMyCar.fechaHora(h.creadoUtc),
-                            color = Mute,
+                            color = scheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -1065,6 +1364,7 @@ private fun ReactivarAsistidaScreen(
     onAbrirPruebas: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     var data by remember { mutableStateOf<Map<String, Any>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var motivo by remember { mutableStateOf("") }
@@ -1119,13 +1419,17 @@ private fun ReactivarAsistidaScreen(
 
     Scaffold(
         modifier = modifier,
-        containerColor = Bg,
+        containerColor = scheme.background,
         contentWindowInsets = WindowInsets.systemBars,
         topBar = {
             TopAppBar(
                 title = { Text("Reactivar cuenta") },
                 navigationIcon = { TextButton(onClick = onVolver, enabled = !busy) { Text("←") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Bg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background,
+                    titleContentColor = scheme.onSurface,
+                    navigationIconContentColor = scheme.onSurface
+                )
             )
         }
     ) { padding ->
@@ -1141,9 +1445,9 @@ private fun ReactivarAsistidaScreen(
                 detalle?.nombreCompleto
                     ?: listOfNotNull(detalle?.nombre, detalle?.apellido).joinToString(" ").ifBlank { "Usuario #$id" },
                 fontWeight = FontWeight.Bold,
-                color = Navy
+                color = scheme.onSurface
             )
-            Text("Estado actual: ${(data?.get("estado") ?: detalle?.estado).toString().replace('_', ' ')}", color = Mute)
+            Text("Estado actual: ${(data?.get("estado") ?: detalle?.estado).toString().replace('_', ' ')}", color = scheme.onSurfaceVariant)
             InfoLine("Solicitud de eliminación", FechaMyCar.fechaHora(sol?.get("solicitadaUtc")?.toString()))
             InfoLine("Fecha límite", FechaMyCar.fecha(sol?.get("venceUtc")?.toString()))
             InfoLine("Días restantes", data?.get("diasRestantes")?.toString())
@@ -1157,7 +1461,7 @@ private fun ReactivarAsistidaScreen(
                 fase == "REACTIVADA" -> {
                     Text(
                         "Esta cuenta ya no está pendiente de eliminación. Estado actual: ${(data?.get("estado") ?: detalle?.estado)}",
-                        color = Navy,
+                        color = scheme.onSurface,
                         fontWeight = FontWeight.SemiBold
                     )
                     OutlinedButton(
@@ -1168,7 +1472,7 @@ private fun ReactivarAsistidaScreen(
                 fase == "NO_INICIADA" -> {
                     Text(
                         "Para reactivar se requiere verificación del titular. No se reenvía código al abrir esta pantalla.",
-                        color = Mute
+                        color = scheme.onSurfaceVariant
                     )
                     AccionBtn(
                         "Iniciar verificación del titular",
@@ -1193,7 +1497,7 @@ private fun ReactivarAsistidaScreen(
                 }
                 fase == "EXPIRADA" -> {
                     Text("Código vencido", color = Danger, fontWeight = FontWeight.Bold)
-                    Text("La verificación anterior expiró. Puedes reenviar un código nuevo.", color = Mute)
+                    Text("La verificación anterior expiró. Puedes reenviar un código nuevo.", color = scheme.onSurfaceVariant)
                     AccionBtn(
                         "Reenviar código",
                         Teal,
@@ -1216,10 +1520,10 @@ private fun ReactivarAsistidaScreen(
                     )
                 }
                 fase == "PENDIENTE_VERIFICACION" -> {
-                    Text("Introducir código", fontWeight = FontWeight.Bold, color = Navy)
+                    Text("Introducir código", fontWeight = FontWeight.Bold, color = scheme.onSurface)
                     Text(
                         "Hay una verificación vigente. No se genera otro correo al reabrir esta pantalla.",
-                        color = Mute
+                        color = scheme.onSurfaceVariant
                     )
                     InfoLine("Vence", FechaMyCar.fechaHora(ver?.get("expiraUtc")?.toString()))
                     CodigoPruebaLocalBanner(codigo = otpLocal)
@@ -1290,7 +1594,7 @@ private fun ReactivarAsistidaScreen(
                 }
                 fase == "TITULAR_VERIFICADO" || titularOk -> {
                     Text("Identidad del titular verificada", color = Green, fontWeight = FontWeight.Bold)
-                    Text("Introduce el motivo obligatorio y confirma la reactivación.", color = Mute)
+                    Text("Introduce el motivo obligatorio y confirma la reactivación.", color = scheme.onSurfaceVariant)
                     OutlinedTextField(
                         value = motivo,
                         onValueChange = { motivo = it },

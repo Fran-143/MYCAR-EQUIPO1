@@ -335,6 +335,23 @@ private fun EscenariosCuentasScreen(
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Preparar límite eliminación 30 días") }
+            Button(
+                onClick = {
+                    run("Cuentas Planes") {
+                        val r = api.prepararPlanes(LocalTestClient.QA_TOKEN)
+                        if (!r.isSuccessful) throw IllegalStateException(errMsg(r.errorBody()?.string(), r.code()))
+                        r.body()!!
+                    }
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Teal)
+            ) { Text("Preparar cuentas Planes (FREE/prueba/sandbox)") }
+            Text(
+                "plan.free / plan.prueba / plan.sandbox / plan.premium @mycar.test · pass PruebaCuentas35!",
+                color = Mute,
+                style = MaterialTheme.typography.bodySmall
+            )
             TextButton(onClick = onAbrirBandeja) { Text("Abrir bandeja de correos") }
             Text(
                 "Credenciales guardadas fuera de Git: %LOCALAPPDATA%\\MyCar\\pruebas-cuentas-rf-v39.json",

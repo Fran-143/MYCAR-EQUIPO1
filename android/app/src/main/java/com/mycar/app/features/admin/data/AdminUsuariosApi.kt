@@ -50,6 +50,7 @@ data class AdminUsuarioDetalleDto(
     val restriccion: String? = null,
     val vehiculos: Map<String, Any?>? = null,
     val suscripcion: Map<String, Any?>? = null,
+    val solicitudPremiumAbierta: Map<String, Any?>? = null,
     val solicitudEliminacion: Map<String, Any?>? = null,
     val restriccionRecuperacion: Map<String, Any?>? = null
 )

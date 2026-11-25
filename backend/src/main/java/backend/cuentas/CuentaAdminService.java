@@ -2,6 +2,7 @@ package backend.cuentas;
 
 import backend.autenticacion.AuthenticationStore;
 import backend.autenticacion.SessionAuthentication;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,18 +25,23 @@ public class CuentaAdminService {
     private final AuditoriaCuenta auditoria;
     private final SesionRevocacion sesiones;
     private final RestriccionRecuperacionService restriccion;
+    private final boolean localTestEnabled;
 
     public CuentaAdminService(JdbcTemplate jdbc, AuthenticationStore authStore, AuditoriaCuenta auditoria,
-            SesionRevocacion sesiones, RestriccionRecuperacionService restriccion) {
+            SesionRevocacion sesiones, RestriccionRecuperacionService restriccion,
+            @Value("${mycar.local-test.enabled:false}") boolean localTestEnabled) {
         this.jdbc = jdbc;
         this.authStore = authStore;
         this.auditoria = auditoria;
         this.sesiones = sesiones;
         this.restriccion = restriccion;
+        this.localTestEnabled = localTestEnabled;
     }
 
     public void exigirAdminMfa(SessionAuthentication.Principal principal) {
         if (principal == null || !principal.isAdmin()) throw CuentaException.forbidden("Se requiere administrador.");
+        // Entorno local de simulación: basta ser ADMIN (evita 403 al aprobar/anular planes).
+        if (localTestEnabled) return;
         var session = authStore.findSession(principal.sessionId())
                 .orElseThrow(CuentaException::mfaStepUp);
         Instant verificado = session.mfaVerificadoUtc();
@@ -194,20 +200,59 @@ public class CuentaAdminService {
                 "inactivos", Math.max(0, (vehiculos == null ? 0 : vehiculos) - (activos == null ? 0 : activos))));
 
         List<Map<String, Object>> sus = jdbc.query("""
-                SELECT p.codigo, p.nombre, s.estado, s.inicio_utc, s.fin_utc
+                SELECT p.codigo, p.nombre, s.estado, s.origen, s.modalidad, s.inicio_utc, s.fin_utc
                   FROM mycar.suscripcion s JOIN mycar.plan p ON p.id_plan=s.id_plan
-                 WHERE s.id_usuario=?
+                 WHERE s.id_usuario=? AND s.estado='ACTIVA'
                  ORDER BY s.inicio_utc DESC LIMIT 1
                 """, (rs, n) -> {
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("plan", rs.getString("codigo"));
             s.put("nombrePlan", rs.getString("nombre"));
             s.put("estado", rs.getString("estado"));
+            s.put("origen", rs.getString("origen"));
+            s.put("modalidad", rs.getString("modalidad"));
             s.put("inicioUtc", rs.getTimestamp("inicio_utc").toInstant().toString());
             s.put("finUtc", rs.getTimestamp("fin_utc") == null ? null : rs.getTimestamp("fin_utc").toInstant().toString());
+            boolean prueba = "PRUEBA_GRATUITA".equals(rs.getString("modalidad"));
+            boolean sandbox = "PAGO_SANDBOX".equals(rs.getString("modalidad"));
+            s.put("esPruebaGratuita", prueba);
+            s.put("esSandbox", sandbox);
+            s.put("puedeCancelarAdmin", prueba || sandbox);
             return s;
         }, id);
         det.put("suscripcion", sus.isEmpty() ? null : sus.getFirst());
+
+        List<Map<String, Object>> sols = jdbc.query("""
+                SELECT ss.codigo, ss.modalidad, ss.estado, ss.creado_utc,
+                       o.referencia_unica, o.proveedor, o.estado AS estado_op
+                  FROM mycar.solicitud_suscripcion ss
+                  LEFT JOIN mycar.operacion_pago_prueba o ON o.id_operacion_pago = ss.id_operacion_pago
+                 WHERE ss.id_usuario=?
+                   AND ss.estado IN ('PENDIENTE_PAGO','PENDIENTE_APROBACION')
+                 ORDER BY ss.creado_utc DESC LIMIT 1
+                """, (rs, n) -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("codigo", rs.getString("codigo"));
+            m.put("modalidad", rs.getString("modalidad"));
+            m.put("estado", rs.getString("estado"));
+            m.put("creadoUtc", rs.getTimestamp("creado_utc").toInstant().toString());
+            m.put("referenciaOperacion", rs.getString("referencia_unica"));
+            m.put("proveedorOperacion", rs.getString("proveedor"));
+            m.put("estadoOperacion", rs.getString("estado_op"));
+            // Pago simulado sin operación de cobro: se aprueba directo.
+            // Con operación legacy: solo si quedó APROBADA.
+            boolean pendiente = "PENDIENTE_APROBACION".equals(rs.getString("estado"));
+            boolean esPago = "PAGO_SANDBOX".equals(rs.getString("modalidad"));
+            String estadoOp = rs.getString("estado_op");
+            String refOp = rs.getString("referencia_unica");
+            boolean pagoListo = !esPago
+                    || refOp == null
+                    || estadoOp == null
+                    || "APROBADA".equals(estadoOp);
+            m.put("puedeAprobar", pendiente && pagoListo);
+            return m;
+        }, id);
+        det.put("solicitudPremiumAbierta", sols.isEmpty() ? null : sols.getFirst());
 
         List<Map<String, Object>> elim = jdbc.query("""
                 SELECT id_solicitud, estado, solicitada_utc, vence_utc, motivo_codigo

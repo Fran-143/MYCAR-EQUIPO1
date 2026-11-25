@@ -33,29 +33,57 @@ fun FlujoHistorialMantenimiento(
     claveCuenta: String? = null,
     onIniciarSesion: (() -> Unit)? = null,
     onActualizarKm: ((Long) -> Unit)? = null,
+    /** true mientras Actualizar KM cubre el historial: el formulario sigue montado. */
+    kmEncima: Boolean = false,
     idVehiculoInicial: Long? = null,
     archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
     estadoEnSistema: Boolean = true,
     onRegistroAbierto: (Boolean) -> Unit = {},
+    /** Incluye formulario/detalle de taller embebido (oculta barra inferior). */
+    onFormularioOverlay: (Boolean) -> Unit = {},
     recargaRegistroToken: Int = 0,
     onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null,
     talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
     onNotificaciones: (() -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
     abrirEnTalleres: Boolean = false,
-    onAbrirEnTalleresConsumido: () -> Unit = {}
+    onAbrirEnTalleresConsumido: () -> Unit = {},
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null
 ) {
     key(claveCuenta) {
         var registrando by rememberSaveable { mutableStateOf(false) }
         var vehiculoElegido by rememberSaveable { mutableStateOf<Long?>(idVehiculoInicial) }
-        LaunchedEffect(registrando) { onRegistroAbierto(registrando) }
+        var tiposCatalogo by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+        LaunchedEffect(mantenimientoRepository) {
+            val repo = mantenimientoRepository ?: return@LaunchedEffect
+            tiposCatalogo = runCatching {
+                repo.contexto().tipos.mapNotNull { tipo ->
+                    val codigo = tipo.codigo.trim()
+                    val nombre = tipo.nombre.trim()
+                    if (codigo.isEmpty() || nombre.isEmpty()) null else codigo to nombre
+                }
+            }.getOrDefault(emptyList())
+        }
+        var tallerOverlay by remember { mutableStateOf(false) }
+        LaunchedEffect(registrando, tallerOverlay) {
+            onRegistroAbierto(registrando)
+            onFormularioOverlay(registrando || tallerOverlay)
+        }
         if (registrando) {
             AmbitoHistorial {
                 EntradaRegistroMantenimiento(onCerrar = { registrando = false }, modifier = modifier,
                     repository = mantenimientoRepository, claveCuentaBorrador = claveCuenta,
-                    idVehiculoInicial = vehiculoElegido, onActualizarKm = onActualizarKm,
+                    idVehiculoInicial = vehiculoElegido,
+                    onActualizarKm = onActualizarKm?.let { abrir ->
+                        { id ->
+                            registrando = true
+                            abrir(id)
+                        }
+                    },
                     onSesionRequerida = onIniciarSesion, archivoPendiente = archivoPendiente,
                     estadoEnSistema = estadoEnSistema, recargaToken = recargaRegistroToken,
+                    retrocesoHabilitado = !kmEncima,
                     onProgramarAlerta = { oferta ->
                         registrando = false
                         onProgramarAlerta?.invoke(oferta)
@@ -75,7 +103,12 @@ fun FlujoHistorialMantenimiento(
                     onNotificaciones = onNotificaciones,
                     onPerfil = onPerfil,
                     abrirEnTalleres = abrirEnTalleres,
-                    onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido)
+                    onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido,
+                    avatarBytes = avatarBytes,
+                    iniciales = iniciales,
+                    tiposCatalogo = tiposCatalogo,
+                    onFormularioTallerAbierto = { tallerOverlay = it },
+                    kmEncima = kmEncima)
             }
         }
     }
@@ -110,11 +143,16 @@ fun EntradaHistorialMantenimiento(
     onNotificaciones: (() -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
     abrirEnTalleres: Boolean = false,
-    onAbrirEnTalleresConsumido: () -> Unit = {}
+    onAbrirEnTalleresConsumido: () -> Unit = {},
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
+    tiposCatalogo: List<Pair<String, String>> = emptyList(),
+    onFormularioTallerAbierto: (Boolean) -> Unit = {},
+    kmEncima: Boolean = false
 ) {
     var detalleId by rememberSaveable { mutableStateOf<Long?>(null) }
     var correccionLecturaId by rememberSaveable { mutableStateOf<Long?>(null) }
-    BackHandler(onBack = {
+    BackHandler(enabled = !kmEncima, onBack = {
         when {
             correccionLecturaId != null -> correccionLecturaId = null
             detalleId != null -> detalleId = null
@@ -127,7 +165,11 @@ fun EntradaHistorialMantenimiento(
             registroDisponible = false, onIniciarSesion = onIniciarSesion,
             onNotificaciones = onNotificaciones, onPerfil = onPerfil,
             abrirEnTalleres = abrirEnTalleres,
-            onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido
+            onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido,
+            avatarBytes = avatarBytes,
+            iniciales = iniciales,
+            tiposCatalogo = tiposCatalogo,
+            onFormularioTallerAbierto = onFormularioTallerAbierto
         )
         return
     }
@@ -220,7 +262,11 @@ fun EntradaHistorialMantenimiento(
                 onNotificaciones = onNotificaciones,
                 onPerfil = onPerfil,
                 abrirEnTalleres = abrirEnTalleres,
-                onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido
+                onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido,
+                avatarBytes = avatarBytes,
+                iniciales = iniciales,
+                tiposCatalogo = tiposCatalogo,
+                onFormularioTallerAbierto = onFormularioTallerAbierto
             )
         }
     }

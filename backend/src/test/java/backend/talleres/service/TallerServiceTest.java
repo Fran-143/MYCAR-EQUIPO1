@@ -3,6 +3,7 @@ package backend.talleres.service;
 import backend.talleres.dao.TallerDao;
 import backend.talleres.model.DatosTaller.*;
 import backend.talleres.model.TallerAsociadoNoEditable;
+import backend.talleres.model.TallerAsociacionNoAutorizada;
 import backend.talleres.model.TallerNombreDuplicado;
 import backend.talleres.model.TallerNoDisponible;
 import backend.talleres.model.TallerVersionConflicto;
@@ -70,7 +71,7 @@ class TallerServiceTest {
         when(dao.existeVinculoAsociadoActivo(7, 5)).thenReturn(false);
         when(dao.insertarAsociado(7, 5, "DEMO", "999888777", null, "LIMA", true, false))
                 .thenReturn(asociado(20, 5));
-        var r = servicio.vincularAsociado(7, new VincularAsociadoRequest(5));
+        var r = servicio.vincularAsociado(7, new VincularAsociadoRequest(5), true);
         assertEquals("ASOCIADO", r.origen());
         assertFalse(r.editable());
     }
@@ -80,7 +81,19 @@ class TallerServiceTest {
         when(dao.globalActivo(5)).thenReturn(Optional.of(g));
         when(dao.existeVinculoAsociadoActivo(7, 5)).thenReturn(true);
         assertThrows(TallerYaVinculado.class, () ->
+                servicio.vincularAsociado(7, new VincularAsociadoRequest(5), true));
+    }
+
+    @Test void vincularAsociadoNoAdmin403() {
+        assertThrows(TallerAsociacionNoAutorizada.class, () ->
                 servicio.vincularAsociado(7, new VincularAsociadoRequest(5)));
+    }
+
+    @Test void registrarConIndicadorGlobalNoAdminRechaza() {
+        assertThrows(TallerAsociacionNoAutorizada.class, () ->
+                servicio.registrar(7, new RegistrarTallerRequest(
+                        "Centro", null, null, null, null, false, "ASOCIADO", null, null, null)));
+        verify(dao, never()).insertarManual(anyLong(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test void retirarSoftDelete() {

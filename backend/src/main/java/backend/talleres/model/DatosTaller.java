@@ -72,11 +72,31 @@ public final class DatosTaller {
             String correo,
             String direccion,
             String notas,
-            Boolean tieneWhatsapp
+            Boolean tieneWhatsapp,
+            String origen,
+            Boolean esGlobal,
+            Boolean asociado,
+            Long idTallerGlobal
     ) {
+        public RegistrarTallerRequest(String nombre, String telefono, String correo,
+                                      String direccion, String notas, Boolean tieneWhatsapp) {
+            this(nombre, telefono, correo, direccion, notas, tieneWhatsapp, null, null, null, null);
+        }
+
         public RegistrarTallerRequest(String nombre, String telefono, String correo,
                                       String direccion, String notas) {
             this(nombre, telefono, correo, direccion, notas, false);
+        }
+
+        /** Intento de marcar el alta como catálogo global u oficialmente asociado a MyCar. */
+        public boolean intentaMarcarGlobalOAsociado() {
+            if (idTallerGlobal != null && idTallerGlobal > 0) return true;
+            if (Boolean.TRUE.equals(esGlobal) || Boolean.TRUE.equals(asociado)) return true;
+            if (origen == null || origen.isBlank()) return false;
+            String o = origen.trim();
+            return o.equalsIgnoreCase("ASOCIADO")
+                    || o.equalsIgnoreCase("GLOBAL")
+                    || o.equalsIgnoreCase("OFICIAL");
         }
     }
 

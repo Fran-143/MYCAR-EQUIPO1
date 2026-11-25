@@ -1,14 +1,39 @@
 package com.mycar.app.features.alertas.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.NotificationImportant
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material3.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,10 +67,29 @@ import com.mycar.app.ui.theme.MyCarStatusProxima
 import com.mycar.app.ui.theme.MyCarStatusRealizada
 import com.mycar.app.ui.theme.MyCarStatusVencida
 
-private val Fondo = Color(0xFFF0F5FA)
-private val Azul = Color(0xFF12285F)
-private val Celeste = Color(0xFF007E98)
-private val RojoAnular = Color(0xFFC62828)
+private data class PaletaAlertas(
+    val fondo: Color,
+    val azul: Color,
+    val celeste: Color,
+    val superficie: Color,
+    val muted: Color,
+    val sobrePrimario: Color,
+    val error: Color
+)
+
+@Composable
+private fun paletaAlertas(): PaletaAlertas {
+    val c = MaterialTheme.colorScheme
+    return PaletaAlertas(
+        fondo = c.background,
+        azul = c.primary,
+        celeste = c.secondary,
+        superficie = c.surface,
+        muted = c.onSurfaceVariant,
+        sobrePrimario = c.onPrimary,
+        error = c.error
+    )
+}
 
 @Composable
 fun AlertasRoute(
@@ -68,6 +112,8 @@ fun AlertasRoute(
     onPerfil: (() -> Unit)? = null,
     onAbrirSoatDesdeAlerta: ((idVehiculo: Long) -> Unit)? = null,
     onAbrirLicenciaDesdeAlerta: (() -> Unit)? = null,
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
     modifier: Modifier = Modifier
 ) {
     val vm: AlertasViewModel = viewModel(key = "rf23-lista-${vehiculos.map { it.first }.joinToString()}-$idVehiculoInicial") {
@@ -76,6 +122,12 @@ fun AlertasRoute(
     val estado by vm.estado.collectAsStateWithLifecycle()
     var detalleId by remember { mutableStateOf<Long?>(null) }
     var atencion by remember { mutableStateOf<ContextoDesdeAlerta?>(null) }
+    val listaVehiculos = rememberLazyListState()
+    val listaLicencia = rememberLazyListState()
+    BackHandler(enabled = detalleId != null && atencion == null) {
+        detalleId = null
+        vm.recargar()
+    }
     LaunchedEffect(detalleInicialId) {
         if (detalleInicialId != null) {
             detalleId = detalleInicialId
@@ -92,8 +144,8 @@ fun AlertasRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(vehiculos, idVehiculoInicial) {
-        val id = idVehiculoInicial ?: vehiculos.firstOrNull()?.first
-        if (id != null) vm.seleccionar(id)
+        val id = idVehiculoInicial ?: vehiculos.firstOrNull()?.first ?: return@LaunchedEffect
+        if (vm.estado.value.vehiculoId != id) vm.seleccionar(id)
     }
     LaunchedEffect(recargaToken, reiniciarFiltroTodas) {
         if (recargaToken > 0) {
@@ -193,8 +245,12 @@ fun AlertasRoute(
                 },
                 onAnular = vm::anular,
                 onVerDetalle = { detalleId = it },
+                listaVehiculos = listaVehiculos,
+                listaLicencia = listaLicencia,
                 onNotificaciones = onNotificaciones,
                 onPerfil = onPerfil,
+                avatarBytes = avatarBytes,
+                iniciales = iniciales,
                 modifier = modifier
             )
         }
@@ -213,13 +269,23 @@ fun AlertasScreen(
     onAtenderDesdeFormulario: (Long, String, String?) -> Unit = { _, _, _ -> },
     onAnular: (Long, String) -> Unit = { _, _ -> },
     onVerDetalle: (Long) -> Unit = {},
+    listaVehiculos: LazyListState,
+    listaLicencia: LazyListState,
     onNotificaciones: (() -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
     modifier: Modifier = Modifier
 ) {
+    val p = paletaAlertas()
     val enVehiculos = estado.ambito == AmbitoAlertas.VEHICULOS
-    Column(modifier.fillMaxSize().background(Fondo)) {
-        com.mycar.app.ui.MycarCabeceraApp(onNotificaciones = onNotificaciones, onPerfil = onPerfil)
+    Column(modifier.fillMaxSize().background(p.fondo)) {
+        com.mycar.app.ui.MycarCabeceraApp(
+            onNotificaciones = onNotificaciones,
+            onPerfil = onPerfil,
+            avatarBytes = avatarBytes,
+            iniciales = iniciales
+        )
         Column(
             Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -233,7 +299,7 @@ fun AlertasScreen(
                 "Alertas",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = Azul
+                color = p.azul
             )
             if (enVehiculos) {
                 val id = estado.vehiculoId
@@ -245,7 +311,10 @@ fun AlertasScreen(
                         onClick = { id?.let(onProgramar) },
                         enabled = puedeProgramar && estado.fase != FaseAlertas.CARGANDO,
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Azul),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = p.azul,
+                            contentColor = p.sobrePrimario
+                        ),
                         modifier = Modifier.testTag("rf23.programar")
                     ) { Text("Programar alerta", fontWeight = FontWeight.SemiBold) }
                 }
@@ -263,10 +332,16 @@ fun AlertasScreen(
                 onRecargar = onRecargar,
                 onAtenderDesdeFormulario = onAtenderDesdeFormulario,
                 onAnular = onAnular,
-                onVerDetalle = onVerDetalle
+                onVerDetalle = onVerDetalle,
+                listaState = listaVehiculos
             )
         } else {
-            ContenidoLicencia(estado = estado, onRecargar = onRecargar, onVerDetalle = onVerDetalle)
+            ContenidoLicencia(
+                estado = estado,
+                onRecargar = onRecargar,
+                onVerDetalle = onVerDetalle,
+                listaState = listaLicencia
+            )
         }
         }
     }
@@ -274,6 +349,7 @@ fun AlertasScreen(
 
 @Composable
 private fun PestanasAmbitoAlertas(activa: AmbitoAlertas, onCambiar: (AmbitoAlertas) -> Unit) {
+    val p = paletaAlertas()
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(
             AmbitoAlertas.VEHICULOS to ("Vehículos" to "rf23.tab.vehiculos"),
@@ -287,11 +363,11 @@ private fun PestanasAmbitoAlertas(activa: AmbitoAlertas, onCambiar: (AmbitoAlert
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp),
                 border = BorderStroke(
                     1.dp,
-                    if (seleccionada) Celeste else Azul.copy(alpha = 0.25f)
+                    if (seleccionada) p.celeste else p.azul.copy(alpha = 0.25f)
                 ),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (seleccionada) Color.White else Color.Transparent,
-                    contentColor = if (seleccionada) Celeste else Azul
+                    containerColor = if (seleccionada) p.superficie else Color.Transparent,
+                    contentColor = if (seleccionada) p.celeste else p.azul
                 )
             ) {
                 Text(
@@ -314,8 +390,34 @@ private fun ColumnScope.ContenidoVehiculos(
     onRecargar: () -> Unit,
     onAtenderDesdeFormulario: (Long, String, String?) -> Unit,
     onAnular: (Long, String) -> Unit,
-    onVerDetalle: (Long) -> Unit
+    onVerDetalle: (Long) -> Unit,
+    listaState: LazyListState
 ) {
+    val p = paletaAlertas()
+    val deltaFiltro = remember { mutableFloatStateOf(0f) }
+    val mostrarFiltros by remember {
+        derivedStateOf {
+            val enTope = !listaState.canScrollBackward
+            enTope || deltaFiltro.floatValue > -24f
+        }
+    }
+    val conexionFiltros = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                val dy = consumed.y
+                when {
+                    dy > 0.5f -> deltaFiltro.floatValue = 0f
+                    dy < -0.5f -> deltaFiltro.floatValue =
+                        (deltaFiltro.floatValue + dy).coerceAtLeast(-80f)
+                }
+                return Offset.Zero
+            }
+        }
+    }
     if (vehiculos.isEmpty()) {
         EstadoVacioCard(
             titulo = EstadoAlertas.TITULO_SIN_VEHICULOS,
@@ -332,7 +434,7 @@ private fun ColumnScope.ContenidoVehiculos(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Vehículo", style = MaterialTheme.typography.labelMedium, color = Color(0xFF6881A5))
+            Text("Vehículo", style = MaterialTheme.typography.labelMedium, color = p.muted)
             var expandido by remember { mutableStateOf(false) }
             Box {
                 OutlinedButton(
@@ -347,7 +449,7 @@ private fun ColumnScope.ContenidoVehiculos(
                                 ?: "Elegir vehículo"
                         },
                         modifier = Modifier.weight(1f),
-                        color = Azul,
+                        color = p.azul,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text("⌄")
@@ -374,67 +476,89 @@ private fun ColumnScope.ContenidoVehiculos(
         }
     }
 
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    AnimatedVisibility(
+        visible = mostrarFiltros,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
     ) {
-        FiltroAlertas.entries.forEach { f ->
-            FilterChip(
-                selected = estado.filtro == f,
-                onClick = { onFiltro(f) },
-                enabled = estado.fase != FaseAlertas.CARGANDO,
-                label = { Text(f.etiqueta) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Azul,
-                    selectedLabelColor = Color.White,
-                    containerColor = Color.White,
-                    labelColor = Azul
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FiltroAlertas.entries.forEach { f ->
+                FilterChip(
+                    selected = estado.filtro == f,
+                    onClick = { onFiltro(f) },
+                    enabled = estado.fase != FaseAlertas.CARGANDO,
+                    label = { Text(f.etiqueta) },
+                    leadingIcon = {
+                        Icon(
+                            iconoFiltroAlerta(f),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = p.azul,
+                        selectedLabelColor = p.sobrePrimario,
+                        selectedLeadingIconColor = p.sobrePrimario,
+                        containerColor = p.superficie,
+                        labelColor = p.azul,
+                        iconColor = p.azul
+                    )
                 )
-            )
+            }
         }
     }
 
     when (estado.fase) {
         FaseAlertas.CARGANDO -> {
-            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Celeste)
-            Text("Actualizando alertas…", color = Azul)
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = p.celeste)
+            if (estado.visibles.isEmpty()) {
+                Text("Actualizando alertas…", color = p.azul)
+            }
         }
         FaseAlertas.ERROR -> {
-            Text(estado.mensaje ?: "No se pudieron cargar las alertas.", color = Azul)
+            Text(estado.mensaje ?: "No se pudieron cargar las alertas.", color = p.azul)
             OutlinedButton(onClick = onRecargar) { Text("Reintentar") }
         }
         FaseAlertas.VACIO -> {
-            EstadoVacioCard(
-                titulo = if (estado.filtro == FiltroAlertas.TODAS) "Sin alertas"
-                else "Sin alertas «${estado.filtro.etiqueta.lowercase()}»",
-                mensaje = estado.mensaje ?: EstadoAlertas.MENSAJE_SIN_ALERTAS_VEHICULO,
-                modifier = Modifier.testTag("rf23.ea03.sinAlertas")
-            )
+            if (estado.visibles.isEmpty()) {
+                EstadoVacioCard(
+                    titulo = if (estado.filtro == FiltroAlertas.TODAS) "Sin alertas"
+                    else "Sin alertas «${estado.filtro.etiqueta.lowercase()}»",
+                    mensaje = estado.mensaje ?: EstadoAlertas.MENSAJE_SIN_ALERTAS_VEHICULO,
+                    modifier = Modifier.testTag("rf23.ea03.sinAlertas")
+                )
+            }
         }
         FaseAlertas.LISTO -> {
             if (estado.sincronizadas > 0) {
                 Text(
                     "Se actualizó el estado de ${estado.sincronizadas} alerta(s).",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF6881A5)
+                    color = p.muted
                 )
             }
             estado.avisoAccion?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = Celeste)
+                Text(it, style = MaterialTheme.typography.bodySmall, color = p.celeste)
             }
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f, fill = true)
-            ) {
-                items(estado.visibles, key = { it.id }) { a ->
-                    TarjetaAlerta(
-                        a,
-                        ocupado = estado.ocupadoAccion,
-                        onAtender = { onAtenderDesdeFormulario(a.id, a.codigoTipo, a.servicioOtro) },
-                        onAnular = onAnular,
-                        onVerDetalle = onVerDetalle
-                    )
-                }
+        }
+    }
+    if (estado.visibles.isNotEmpty()) {
+        LazyColumn(
+            state = listaState,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f, fill = true).nestedScroll(conexionFiltros)
+        ) {
+            items(estado.visibles, key = { it.id }) { a ->
+                TarjetaAlerta(
+                    a,
+                    ocupado = estado.ocupadoAccion,
+                    onAtender = { onAtenderDesdeFormulario(a.id, a.codigoTipo, a.servicioOtro) },
+                    onAnular = onAnular,
+                    onVerDetalle = onVerDetalle
+                )
             }
         }
     }
@@ -444,46 +568,55 @@ private fun ColumnScope.ContenidoVehiculos(
 private fun ColumnScope.ContenidoLicencia(
     estado: EstadoAlertas,
     onRecargar: () -> Unit,
-    onVerDetalle: (Long) -> Unit = {}
+    onVerDetalle: (Long) -> Unit = {},
+    listaState: LazyListState
 ) {
+    val p = paletaAlertas()
     Text(
         "Alertas de licencia de conducir",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
-        color = Celeste,
+        color = p.celeste,
         modifier = Modifier.testTag("rf23.licencia.titulo")
     )
     when (estado.faseLicencia) {
         FaseAlertas.CARGANDO -> {
-            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Celeste)
-            Text("Consultando alertas de licencia…", color = Azul)
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = p.celeste)
+            if (estado.alertasLicencia.isEmpty()) {
+                Text("Consultando alertas de licencia…", color = p.azul)
+            }
         }
         FaseAlertas.ERROR -> {
-            Text(estado.mensajeLicencia ?: "No se pudieron cargar las alertas de licencia.", color = Azul)
+            Text(estado.mensajeLicencia ?: "No se pudieron cargar las alertas de licencia.", color = p.azul)
             OutlinedButton(onClick = onRecargar) { Text("Reintentar") }
         }
         FaseAlertas.VACIO -> {
-            EstadoVacioCard(
-                titulo = EstadoAlertas.TITULO_SIN_ALERTAS_LICENCIA,
-                mensaje = estado.mensajeLicencia ?: EstadoAlertas.MENSAJE_SIN_ALERTAS_LICENCIA,
-                modifier = Modifier.testTag("rf23.ea06.sinLicencia")
-            )
+            if (estado.alertasLicencia.isEmpty()) {
+                EstadoVacioCard(
+                    titulo = EstadoAlertas.TITULO_SIN_ALERTAS_LICENCIA,
+                    mensaje = estado.mensajeLicencia ?: EstadoAlertas.MENSAJE_SIN_ALERTAS_LICENCIA,
+                    modifier = Modifier.testTag("rf23.ea06.sinLicencia")
+                )
+            }
         }
         FaseAlertas.LISTO -> {
             if (estado.sincronizadasLicencia > 0) {
                 Text(
                     "Se actualizó el estado de ${estado.sincronizadasLicencia} alerta(s) de licencia.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF6881A5)
+                    color = p.muted
                 )
             }
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f, fill = true)
-            ) {
-                items(estado.alertasLicencia, key = { it.id }) { a ->
-                    TarjetaAlerta(a, onVerDetalle = onVerDetalle)
-                }
+        }
+    }
+    if (estado.alertasLicencia.isNotEmpty()) {
+        LazyColumn(
+            state = listaState,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f, fill = true)
+        ) {
+            items(estado.alertasLicencia, key = { it.id }) { a ->
+                TarjetaAlerta(a, onVerDetalle = onVerDetalle)
             }
         }
     }
@@ -491,10 +624,11 @@ private fun ColumnScope.ContenidoLicencia(
 
 @Composable
 private fun EstadoVacioCard(titulo: String, mensaje: String, modifier: Modifier = Modifier) {
+    val p = paletaAlertas()
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = p.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -502,11 +636,11 @@ private fun EstadoVacioCard(titulo: String, mensaje: String, modifier: Modifier 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(titulo, fontWeight = FontWeight.Bold, color = Azul, textAlign = TextAlign.Center)
+            Text(titulo, fontWeight = FontWeight.Bold, color = p.azul, textAlign = TextAlign.Center)
             Text(
                 mensaje,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF6881A5),
+                color = p.muted,
                 textAlign = TextAlign.Center
             )
         }
@@ -521,30 +655,37 @@ private fun TarjetaAlerta(
     onAnular: (Long, String) -> Unit = { _, _ -> },
     onVerDetalle: (Long) -> Unit = {}
 ) {
+    val p = paletaAlertas()
     val badge = colorEstado(a.estado)
-    val esDocumento = a.codigoTipo.equals("SOAT", ignoreCase = true)
-        || a.codigoTipo.equals("LICENCIA", ignoreCase = true)
-    val atendible = !esDocumento && a.estado in setOf("PROXIMA", "PENDIENTE", "VENCIDA")
-    val anulable = !esDocumento && a.estado in setOf("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA")
+    val atendible = puedeAtenderRf24(a)
+    val anulable = puedeAnularRf24(a)
     var dialogAnular by remember { mutableStateOf(false) }
     var motivoAnular by remember { mutableStateOf("") }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = p.superficie),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Surface(shape = CircleShape, color = p.azul.copy(alpha = 0.08f)) {
+                    Icon(
+                        iconoServicioAlerta(a),
+                        contentDescription = null,
+                        tint = p.celeste,
+                        modifier = Modifier.padding(8.dp).size(20.dp)
+                    )
+                }
                 Text(
                     etiquetaServicioAlerta(a.codigoTipo, a.tipo, a.servicioOtro),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Azul,
+                    color = p.azul,
                     modifier = Modifier.weight(1f)
                 )
                 Surface(shape = RoundedCornerShape(50), color = badge.copy(alpha = 0.15f)) {
@@ -557,40 +698,46 @@ private fun TarjetaAlerta(
                     )
                 }
             }
-            Text(etiquetaCriterio(a.criterio), style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
+            Text(etiquetaCriterio(a.criterio), style = MaterialTheme.typography.bodySmall, color = p.muted)
             a.fechaObjetivo?.let {
-                Text("Fecha objetivo: $it", style = MaterialTheme.typography.bodyMedium, color = Azul)
+                Text("Fecha objetivo: $it", style = MaterialTheme.typography.bodyMedium, color = p.azul)
             }
             a.kmObjetivo?.let {
                 Text(
                     "Km objetivo: %,d km".format(it).replace(',', ' '),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Azul
+                    color = p.azul
                 )
             }
             // Etiqueta unificada en el título; no repetir servicio_otro debajo.
-            TextButton(onClick = { onVerDetalle(a.id) }, colors = ButtonDefaults.textButtonColors(contentColor = Celeste)) {
-                Text("Ver detalle →")
-            }
-            if (atendible || anulable) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (atendible) {
-                        Button(
-                            onClick = onAtender,
-                            enabled = !ocupado,
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Azul)
-                        ) { Text("Registrar como realizado") }
-                    }
-                    if (anulable) {
-                        OutlinedButton(
-                            onClick = { dialogAnular = true },
-                            enabled = !ocupado,
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = RojoAnular)
-                        ) { Text("Anular") }
-                    }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = { onVerDetalle(a.id) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = p.celeste)
+                ) { Text("Ver detalle") }
+                if (anulable) {
+                    OutlinedButton(
+                        onClick = { dialogAnular = true },
+                        enabled = !ocupado,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = p.error)
+                    ) { Text("Anular") }
                 }
+            }
+            if (atendible) {
+                Button(
+                    onClick = onAtender,
+                    enabled = !ocupado,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = p.azul,
+                        contentColor = p.sobrePrimario
+                    )
+                ) { Text("Registrar como realizado") }
             }
         }
     }
@@ -598,7 +745,7 @@ private fun TarjetaAlerta(
         AlertDialog(
             onDismissRequest = { if (!ocupado) dialogAnular = false },
             shape = RoundedCornerShape(20.dp),
-            title = { Text("¿Anular alerta?", fontWeight = FontWeight.Bold, color = Azul) },
+            title = { Text("¿Anular alerta?", fontWeight = FontWeight.Bold, color = p.azul) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("La alerta quedará ANULADA. El mantenimiento histórico de referencia no se anula.")
@@ -623,7 +770,10 @@ private fun TarjetaAlerta(
                         }
                     },
                     enabled = !ocupado && motivoAnular.trim().isNotEmpty(),
-                    colors = ButtonDefaults.buttonColors(containerColor = RojoAnular),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = p.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
                     shape = RoundedCornerShape(12.dp)
                 ) { Text("Anular") }
             },
@@ -636,6 +786,22 @@ private fun TarjetaAlerta(
             }
         )
     }
+}
+
+/** RF24: SOAT y licencia no se anulan; el resto solo en PROGRAMADA, PRÓXIMA, PENDIENTE o VENCIDA. */
+private fun puedeAnularRf24(a: DatosAlerta): Boolean {
+    if (a.codigoTipo.equals("SOAT", ignoreCase = true) || a.codigoTipo.equals("LICENCIA", ignoreCase = true)) {
+        return false
+    }
+    return a.estado in setOf("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA")
+}
+
+/** RF24: atender solo PRÓXIMA, PENDIENTE o VENCIDA, y nunca documentos SOAT/licencia. */
+private fun puedeAtenderRf24(a: DatosAlerta): Boolean {
+    if (a.codigoTipo.equals("SOAT", ignoreCase = true) || a.codigoTipo.equals("LICENCIA", ignoreCase = true)) {
+        return false
+    }
+    return a.estado in setOf("PROXIMA", "PENDIENTE", "VENCIDA")
 }
 
 private fun colorEstado(estado: String): Color = when (estado) {
@@ -652,6 +818,30 @@ private fun etiquetaCriterio(criterio: String): String = when (criterio) {
     "POR_KILOMETRAJE" -> "Por kilometraje"
     "AMBOS" -> "Por tiempo y kilometraje"
     else -> criterio
+}
+
+private fun iconoFiltroAlerta(filtro: FiltroAlertas): ImageVector = when (filtro) {
+    FiltroAlertas.TODAS -> Icons.Outlined.Notifications
+    FiltroAlertas.PROGRAMADAS -> Icons.Outlined.NotificationsNone
+    FiltroAlertas.PROXIMAS -> Icons.Outlined.NotificationsActive
+    FiltroAlertas.PENDIENTES -> Icons.Outlined.NotificationImportant
+    FiltroAlertas.VENCIDAS -> Icons.Outlined.Alarm
+    FiltroAlertas.REALIZADAS -> Icons.Outlined.DoneAll
+}
+
+private fun iconoServicioAlerta(a: DatosAlerta): ImageVector {
+    val codigo = a.codigoTipo.uppercase()
+    return when {
+        codigo.contains("NEUMAT") || codigo.contains("LLANTA") ||
+            codigo.contains("ALINEA") || codigo.contains("BALANCE") -> Icons.Outlined.Speed
+        codigo.contains("FRENO") || codigo.contains("TRANSM") ||
+            codigo.contains("EMBRAG") || codigo.contains("CAJA") -> Icons.Outlined.Settings
+        codigo == "SOAT" || codigo == "LICENCIA" -> Icons.Outlined.Schedule
+        a.criterio == "POR_KILOMETRAJE" -> Icons.Outlined.Speed
+        a.criterio == "POR_TIEMPO" -> Icons.Outlined.Schedule
+        a.criterio == "AMBOS" -> Icons.Outlined.Settings
+        else -> Icons.Outlined.Build
+    }
 }
 
 private fun etiquetaEstado(estado: String): String = when (estado) {

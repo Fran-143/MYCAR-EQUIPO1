@@ -36,7 +36,7 @@ class ReglasResumenInicioTest {
         assertNull(ReglasResumenInicio.ultimoRealizado(listOf(m(9,"ANULADO","2026-10-27"))))
     }
     @Test fun barraTieneExactamenteLasCuatroSeccionesSolicitadas() {
-        assertEquals(listOf("Inicio","Vehículos","Mantenimientos","Alertas"),SeccionMyCar.entries.map { it.titulo })
+        assertEquals(listOf("Inicio","Vehículos","Historial","Alertas"),SeccionMyCar.entries.map { it.titulo })
     }
     @Test fun atrasSecundariaVuelveASuOrigenSinDuplicarPestanas() {
         val origen=NavegacionInicio().abrir(SeccionMyCar.VEHICULOS)

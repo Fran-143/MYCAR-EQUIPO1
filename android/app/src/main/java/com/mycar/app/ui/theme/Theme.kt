@@ -7,6 +7,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -22,7 +23,7 @@ private val MyCarLightScheme = lightColorScheme(
     onSecondaryContainer = MyCarNavy,
     tertiary = MyCarSky,
     onTertiary = MyCarSurface,
-    background = MyCarSurface,
+    background = MyCarBg,
     onBackground = MyCarOnSurface,
     surface = MyCarSurface,
     onSurface = MyCarOnSurface,
@@ -36,25 +37,27 @@ private val MyCarLightScheme = lightColorScheme(
 
 private val MyCarDarkScheme = darkColorScheme(
     primary = MyCarSky,
-    onPrimary = MyCarNavy,
+    onPrimary = Color.White,
     primaryContainer = MyCarTileDark,
     onPrimaryContainer = MyCarOnSurfaceDark,
     secondary = MyCarTeal,
-    onSecondary = MyCarNavy,
+    onSecondary = Color.White,
     secondaryContainer = MyCarTileDark,
     onSecondaryContainer = MyCarOnSurfaceDark,
     tertiary = MyCarBlue,
-    onTertiary = MyCarOnSurfaceDark,
+    onTertiary = Color.White,
     background = MyCarBgDark,
     onBackground = MyCarOnSurfaceDark,
     surface = MyCarSurfaceDark,
     onSurface = MyCarOnSurfaceDark,
-    surfaceVariant = MyCarBgSoftDark,
+    surfaceVariant = MyCarFieldDark,
     onSurfaceVariant = MyCarMutedDark,
     outline = MyCarOutlineDark,
     outlineVariant = MyCarOutlineSoftDark,
     error = MyCarStatusVencida,
-    onError = MyCarOnSurfaceDark
+    onError = Color.White,
+    inverseSurface = MyCarOnSurfaceDark,
+    inverseOnSurface = MyCarBgDark
 )
 
 @Composable

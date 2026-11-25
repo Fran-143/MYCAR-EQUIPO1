@@ -41,6 +41,9 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     val soporte = com.mycar.app.features.soporte.data.RemoteSoporteRepository(
         cliente.retrofit.create(com.mycar.app.features.soporte.data.SoporteApi::class.java)
     )
+    val planes = com.mycar.app.features.planes.data.RemotePlanesRepository(
+        cliente.retrofit.create(com.mycar.app.features.planes.data.PlanesApi::class.java)
+    )
     val mantenimiento = com.mycar.app.features.mantenimiento.data.MantenimientoApiAdapter.desde(cliente.retrofit)
     val historial = com.mycar.app.features.historial.data.HistorialApiAdapter.desde(cliente.retrofit)
     val talleres = com.mycar.app.features.talleres.data.TalleresApiAdapter.desde(cliente)
@@ -63,7 +66,7 @@ class CuentaVehiculos(val usuario: Long, val ciclo: String,
     val avatarPresentacion = MutableStateFlow<ByteArray?>(null)
     val inicialesPresentacion = MutableStateFlow<String?>(null)
     val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(
-        listado, historial, mantenimiento, alertas
+        listado, historial, mantenimiento, alertas, talleres
     )
     override fun toString() = "CuentaVehiculos[REDACTED]"
 }

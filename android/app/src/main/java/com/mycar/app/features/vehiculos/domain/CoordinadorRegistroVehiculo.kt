@@ -42,7 +42,11 @@ class CoordinadorRegistroVehiculo(
             }
             val cupo = repository.cupo()
             if (!cupo.puedeRegistrar) {
-                estado = estado.copy(fase = FaseRegistro.SIN_CUPO, mensaje = "Tu plan Free ya tiene un vehículo registrado.")
+                val plan = cupo.plan.ifBlank { "tu plan" }
+                estado = estado.copy(
+                    fase = FaseRegistro.SIN_CUPO,
+                    mensaje = "Plan $plan: cupo completo (${cupo.registrados}/${cupo.limite} vehículos registrados)."
+                )
                 return
             }
             estado = estado.copy(fase = FaseRegistro.FORMULARIO,
@@ -128,7 +132,7 @@ class CoordinadorRegistroVehiculo(
                     mensaje = when (rechazo?.codigo) {
                         "PLACA_DUPLICADA" -> "La placa ya está registrada."
                         "VIN_DUPLICADO" -> "El VIN ya está registrado."
-                        "LIMITE_FREE" -> "Tu plan Free ya tiene un vehículo registrado."
+                        "LIMITE_FREE" -> "Alcanzaste el límite de vehículos registrados de tu plan."
                         "PLAN_FREE_NO_DISPONIBLE" -> "Tu cuenta no tiene un plan disponible para registrar."
                         else -> "Revisa los datos antes de volver a guardar."
                     })

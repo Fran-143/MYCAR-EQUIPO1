@@ -19,8 +19,8 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 45
-        versionName = "1.2.21-rf60-incidencias"
+        versionCode = 57
+        versionName = "1.2.33-alertas-iconos-general-v57"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.

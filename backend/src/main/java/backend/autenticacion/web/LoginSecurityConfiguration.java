@@ -55,6 +55,8 @@ public class LoginSecurityConfiguration {
                         .hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/v1/admin/catalogos","/api/v1/admin/catalogos/**")
                         .hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/api/v1/admin/suscripciones","/api/v1/admin/suscripciones/**")
+                        .hasAuthority("ROLE_ADMIN")
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(authentication,json),AnonymousAuthenticationFilter.class).build();
     }

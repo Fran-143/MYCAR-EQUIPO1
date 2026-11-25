@@ -61,6 +61,34 @@ class TalleresControllerTest {
                 .andExpect(jsonPath("$.idTaller").value(11));
     }
 
+    @Test void registrarPersonalSigue200AunqueExistanCamposNulos() throws Exception {
+        when(servicio.registrar(eq(7L), any())).thenReturn(ejemplo());
+        mvc.perform(post("/api/v1/rf34/talleres").principal(sesion)
+                        .contentType("application/json")
+                        .content("{\"nombre\":\"Taller Centro\",\"origen\":null,\"esGlobal\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idTaller").value(11));
+    }
+
+    @Test void registrarAsociadoNoAdmin403() throws Exception {
+        mvc.perform(post("/api/v1/rf34/talleres").principal(sesion)
+                        .contentType("application/json")
+                        .content("{\"nombre\":\"Oficial\",\"origen\":\"ASOCIADO\",\"idTallerGlobal\":3}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.codigo").value("TALLER_ASOCIACION_NO_AUTORIZADA"));
+        verify(servicio, never()).registrar(anyLong(), any());
+        verify(servicio, never()).registrar(anyLong(), any(), anyBoolean());
+    }
+
+    @Test void vincularAsociadoNoAdmin403() throws Exception {
+        mvc.perform(post("/api/v1/rf34/talleres/asociados").principal(sesion)
+                        .contentType("application/json")
+                        .content("{\"idTallerGlobal\":3}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.codigo").value("TALLER_ASOCIACION_NO_AUTORIZADA"));
+        verify(servicio, never()).vincularAsociado(anyLong(), any(), anyBoolean());
+    }
+
     @Test void actualizarVersionConflicto409() throws Exception {
         when(servicio.actualizar(eq(7L), eq(11L), any())).thenThrow(new TallerVersionConflicto());
         mvc.perform(put("/api/v1/rf34/talleres/11").principal(sesion)

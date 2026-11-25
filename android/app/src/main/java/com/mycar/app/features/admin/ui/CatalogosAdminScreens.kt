@@ -78,10 +78,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val Navy = Color(0xFF12285F)
 private val Teal = Color(0xFF007E98)
-private val Bg = Color(0xFFF0F5FA)
-private val Mute = Color(0xFF718096)
 private val Danger = Color(0xFFC53030)
 private val Green = Color(0xFF2F855A)
 
@@ -93,6 +90,7 @@ fun CatalogosAdminRoute(
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     var destino by remember { mutableStateOf(CatalogosDestino.HOME) }
     BackHandler {
         if (destino == CatalogosDestino.HOME) onVolver() else destino = CatalogosDestino.HOME
@@ -108,7 +106,7 @@ fun CatalogosAdminRoute(
         CatalogosDestino.TIPOS -> CatalogoNombreCrudScreen(
             titulo = "Tipos de mantenimiento",
             itemIcon = Icons.Outlined.Build,
-            accent = Navy,
+            accent = scheme.onSurface,
             listar = { q, e -> repository.listarTipos(q, e) },
             crear = { repository.crearTipo(it) },
             editar = { id, n -> repository.editarTipo(id, n) },
@@ -121,7 +119,7 @@ fun CatalogosAdminRoute(
         CatalogosDestino.ASEGURADORAS -> CatalogoNombreCrudScreen(
             titulo = "Aseguradoras SOAT",
             itemIcon = Icons.Outlined.VerifiedUser,
-            accent = Teal,
+            accent = scheme.secondary,
             listar = { q, e -> repository.listarAseguradoras(q, e) },
             crear = { repository.crearAseguradora(it) },
             editar = { id, n -> repository.editarAseguradora(id, n) },
@@ -147,8 +145,9 @@ private fun CatalogosHomeScreen(
     onTalleres: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     Scaffold(
-        containerColor = Bg,
+        containerColor = scheme.background,
         contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
@@ -156,27 +155,27 @@ private fun CatalogosHomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             VolverBtn(onVolver)
-            Text("Catálogos", fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleLarge)
-            Text("Administra tipos, aseguradoras SOAT y talleres asociados.", color = Mute)
+            Text("Catálogos", fontWeight = FontWeight.Bold, color = scheme.onSurface, style = MaterialTheme.typography.titleLarge)
+            Text("Administra tipos, aseguradoras SOAT y talleres asociados.", color = scheme.onSurfaceVariant)
             CatalogoCard(
                 titulo = "Tipos de mantenimiento",
                 sub = "RF17 / RF22 — catálogo activo",
                 icon = Icons.Outlined.Build,
-                accent = Navy,
+                accent = scheme.onSurface,
                 onClick = onTipos
             )
             CatalogoCard(
                 titulo = "Aseguradoras SOAT",
                 sub = "Selector de registro y corrección",
                 icon = Icons.Outlined.Shield,
-                accent = Teal,
+                accent = scheme.secondary,
                 onClick = onAseg
             )
             CatalogoCard(
                 titulo = "Talleres asociados",
                 sub = "Catálogo global MyCar",
                 icon = Icons.Outlined.Store,
-                accent = Navy,
+                accent = scheme.onSurface,
                 onClick = onTalleres
             )
         }
@@ -191,10 +190,11 @@ private fun CatalogoCard(
     accent: Color,
     onClick: () -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
     Card(
         Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = scheme.surface)
     ) {
         Row(
             Modifier.padding(20.dp),
@@ -203,14 +203,14 @@ private fun CatalogoCard(
             IconBadge(icon, accent)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(titulo, fontWeight = FontWeight.SemiBold, color = Navy)
-                Text(sub, color = Mute)
-                Text("Disponible", color = Teal, fontWeight = FontWeight.Medium)
+                Text(titulo, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
+                Text(sub, color = scheme.onSurfaceVariant)
+                Text("Disponible", color = scheme.secondary, fontWeight = FontWeight.Medium)
             }
             Icon(
                 Icons.AutoMirrored.Outlined.ArrowForward,
                 contentDescription = null,
-                tint = Mute,
+                tint = scheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -231,6 +231,7 @@ private fun CatalogoNombreCrudScreen(
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     var q by remember { mutableStateOf("") }
     var qDebounced by remember { mutableStateOf("") }
@@ -291,13 +292,13 @@ private fun CatalogoNombreCrudScreen(
     }
 
     Scaffold(
-        containerColor = Bg,
+        containerColor = scheme.background,
         contentWindowInsets = WindowInsets.systemBars,
         modifier = modifier
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             VolverBtn(onVolver)
-            Text(titulo, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleLarge)
+            Text(titulo, fontWeight = FontWeight.Bold, color = scheme.onSurface, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = q,
@@ -306,12 +307,12 @@ private fun CatalogoNombreCrudScreen(
                 placeholder = { Text("Buscar…") },
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Outlined.Search, contentDescription = null, tint = Mute, modifier = Modifier.size(22.dp))
+                    Icon(Icons.Outlined.Search, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 },
                 trailingIcon = {
                     if (q.isNotEmpty()) {
                         IconButton(onClick = { q = "" }) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Limpiar", tint = Mute, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Outlined.Close, contentDescription = "Limpiar", tint = scheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -395,23 +396,24 @@ private fun CatalogoListItem(
     onDesactivar: () -> Unit,
     onReactivar: () -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
     Card(
         Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = scheme.surface),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBadge(icon, if (activo) accent else Mute, size = 36.dp, iconSize = 20.dp)
+                IconBadge(icon, if (activo) accent else scheme.onSurfaceVariant, size = 36.dp, iconSize = 20.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(nombre, fontWeight = FontWeight.SemiBold, color = Navy)
+                    Text(nombre, fontWeight = FontWeight.SemiBold, color = scheme.onSurface)
                     if (!detalle.isNullOrBlank()) {
-                        Text(detalle, color = Mute, style = MaterialTheme.typography.bodySmall)
+                        Text(detalle, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                     Text(
                         if (activo) "Activo" else "Inactivo",
-                        color = if (activo) Green else Mute,
+                        color = if (activo) Green else scheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -423,9 +425,9 @@ private fun CatalogoListItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onEditar) {
-                        Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp), tint = Navy)
+                        Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp), tint = scheme.onSurface)
                         Spacer(Modifier.width(4.dp))
-                        Text("Editar", color = Navy)
+                        Text("Editar", color = scheme.onSurface)
                     }
                     if (activo) {
                         TextButton(onClick = onDesactivar) {
@@ -435,14 +437,14 @@ private fun CatalogoListItem(
                         }
                     } else {
                         TextButton(onClick = onReactivar) {
-                            Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp), tint = Teal)
+                            Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp), tint = scheme.secondary)
                             Spacer(Modifier.width(4.dp))
-                            Text("Reactivar", color = Teal)
+                            Text("Reactivar", color = scheme.secondary)
                         }
                     }
                 }
             } else {
-                Text("Protegido", color = Mute, style = MaterialTheme.typography.bodySmall)
+                Text("Protegido", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -456,9 +458,10 @@ private fun NombreFormScreen(
     onCancel: () -> Unit,
     onSave: (String) -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
     var nombre by remember { mutableStateOf(inicial) }
     Scaffold(
-        containerColor = Bg,
+        containerColor = scheme.background,
         contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
@@ -466,11 +469,11 @@ private fun NombreFormScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TextButton(onClick = onCancel) {
-                Icon(Icons.Outlined.Close, contentDescription = null, tint = Navy, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.Close, contentDescription = null, tint = scheme.onSurface, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Cancelar", color = Navy)
+                Text("Cancelar", color = scheme.onSurface)
             }
-            Text(titulo, fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleLarge)
+            Text(titulo, fontWeight = FontWeight.Bold, color = scheme.onSurface, style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(
                 value = nombre,
                 onValueChange = { nombre = it },
@@ -478,7 +481,7 @@ private fun NombreFormScreen(
                 label = { Text("Nombre") },
                 singleLine = true,
                 leadingIcon = {
-                    Icon(fieldIcon, contentDescription = null, tint = Mute, modifier = Modifier.size(22.dp))
+                    Icon(fieldIcon, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
             )
             Button(
@@ -500,6 +503,7 @@ private fun TalleresGlobalesAdminScreen(
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     var q by remember { mutableStateOf("") }
     var qDebounced by remember { mutableStateOf("") }
@@ -558,13 +562,13 @@ private fun TalleresGlobalesAdminScreen(
     }
 
     Scaffold(
-        containerColor = Bg,
+        containerColor = scheme.background,
         contentWindowInsets = WindowInsets.systemBars,
         modifier = modifier
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             VolverBtn(onVolver)
-            Text("Talleres asociados", fontWeight = FontWeight.Bold, color = Navy, style = MaterialTheme.typography.titleLarge)
+            Text("Talleres asociados", fontWeight = FontWeight.Bold, color = scheme.onSurface, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = q,
@@ -573,12 +577,12 @@ private fun TalleresGlobalesAdminScreen(
                 placeholder = { Text("Buscar…") },
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Outlined.Search, contentDescription = null, tint = Mute, modifier = Modifier.size(22.dp))
+                    Icon(Icons.Outlined.Search, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 },
                 trailingIcon = {
                     if (q.isNotEmpty()) {
                         IconButton(onClick = { q = "" }) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Limpiar", tint = Mute, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Outlined.Close, contentDescription = "Limpiar", tint = scheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -614,7 +618,7 @@ private fun TalleresGlobalesAdminScreen(
                             detalle = item.telefono,
                             activo = activo,
                             icon = Icons.Outlined.Store,
-                            accent = Navy,
+                            accent = scheme.onSurface,
                             bloqueado = false,
                             onEditar = { form = item },
                             onDesactivar = { confirm = item to "DESACTIVAR" },
@@ -663,6 +667,7 @@ private fun TallerFormScreen(
     onCancel: () -> Unit,
     onSave: (TallerGlobalBody) -> Unit
 ) {
+    val scheme = MaterialTheme.colorScheme
     var nombre by remember { mutableStateOf(inicial?.nombre.orEmpty()) }
     var telefono by remember { mutableStateOf(inicial?.telefono.orEmpty()) }
     var correo by remember { mutableStateOf(inicial?.correo.orEmpty()) }
@@ -672,7 +677,7 @@ private fun TallerFormScreen(
     var auth by remember { mutableStateOf(inicial?.contactoAutorizado == true) }
 
     Scaffold(
-        containerColor = Bg,
+        containerColor = scheme.background,
         contentWindowInsets = WindowInsets.systemBars
     ) { padding ->
         Column(
@@ -680,43 +685,43 @@ private fun TallerFormScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             TextButton(onClick = onCancel) {
-                Icon(Icons.Outlined.Close, contentDescription = null, tint = Navy, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.Close, contentDescription = null, tint = scheme.onSurface, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Cancelar", color = Navy)
+                Text("Cancelar", color = scheme.onSurface)
             }
             Text(
                 if (inicial == null) "Nuevo taller" else "Editar taller",
                 fontWeight = FontWeight.Bold,
-                color = Navy,
+                color = scheme.onSurface,
                 style = MaterialTheme.typography.titleLarge
             )
             OutlinedTextField(
                 nombre, { nombre = it }, Modifier.fillMaxWidth(),
                 label = { Text("Nombre *") }, singleLine = true,
-                leadingIcon = { Icon(Icons.Outlined.Store, null, Modifier.size(22.dp), Mute) }
+                leadingIcon = { Icon(Icons.Outlined.Store, null, Modifier.size(22.dp), scheme.onSurfaceVariant) }
             )
             OutlinedTextField(
                 telefono, { telefono = it }, Modifier.fillMaxWidth(),
                 label = { Text("Teléfono (9 dígitos)") }, singleLine = true,
-                leadingIcon = { Icon(Icons.Outlined.Phone, null, Modifier.size(22.dp), Mute) }
+                leadingIcon = { Icon(Icons.Outlined.Phone, null, Modifier.size(22.dp), scheme.onSurfaceVariant) }
             )
             OutlinedTextField(
                 correo, { correo = it }, Modifier.fillMaxWidth(),
                 label = { Text("Correo") }, singleLine = true,
-                leadingIcon = { Icon(Icons.Outlined.Email, null, Modifier.size(22.dp), Mute) }
+                leadingIcon = { Icon(Icons.Outlined.Email, null, Modifier.size(22.dp), scheme.onSurfaceVariant) }
             )
             OutlinedTextField(
                 direccion, { direccion = it }, Modifier.fillMaxWidth(),
                 label = { Text("Dirección") },
-                leadingIcon = { Icon(Icons.Outlined.LocationOn, null, Modifier.size(22.dp), Mute) }
+                leadingIcon = { Icon(Icons.Outlined.LocationOn, null, Modifier.size(22.dp), scheme.onSurfaceVariant) }
             )
             OutlinedTextField(notas, { notas = it }, Modifier.fillMaxWidth(), label = { Text("Notas públicas") })
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Tiene WhatsApp", color = Navy)
+                Text("Tiene WhatsApp", color = scheme.onSurface)
                 Switch(checked = wa, onCheckedChange = { wa = it })
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Contacto autorizado", color = Navy)
+                Text("Contacto autorizado", color = scheme.onSurface)
                 Switch(checked = auth, onCheckedChange = { auth = it })
             }
             Button(
@@ -751,10 +756,11 @@ private fun TallerFormScreen(
 
 @Composable
 private fun VolverBtn(onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     TextButton(onClick = onClick) {
-        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, tint = Navy, modifier = Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, tint = scheme.onSurface, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(6.dp))
-        Text("Volver", color = Navy)
+        Text("Volver", color = scheme.onSurface)
     }
 }
 

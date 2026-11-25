@@ -2,16 +2,21 @@ package com.mycar.app.features.alertas.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -387,25 +392,48 @@ fun DetalleAlertaScreen(
     }
 
     if (dialogCambiarTaller) {
+        val scheme = MaterialTheme.colorScheme
         AlertDialog(
             onDismissRequest = { if (!estado.ocupado) dialogCambiarTaller = false },
-            title = { Text("Cambiar taller", fontWeight = FontWeight.Bold, color = Azul) },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = scheme.surface,
+            titleContentColor = scheme.onSurface,
+            textContentColor = scheme.onSurface,
+            iconContentColor = scheme.primary,
+            icon = {
+                Surface(shape = CircleShape, color = scheme.primary.copy(alpha = 0.12f)) {
+                    Icon(
+                        Icons.Outlined.Storefront,
+                        contentDescription = null,
+                        tint = scheme.primary,
+                        modifier = Modifier.padding(10.dp).size(24.dp)
+                    )
+                }
+            },
+            title = { Text("Cambiar taller", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("La elección aplica solo a esta alerta. No modifica el mantenimiento histórico ni el favorito.")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "La elección aplica solo a esta alerta. No modifica el mantenimiento histórico ni el favorito.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant
+                    )
                     if (talleresDisponibles.isEmpty()) {
-                        Text("No hay talleres en tu catálogo personal.", color = Color(0xFF6881A5))
+                        Text("No hay talleres en tu catálogo personal.", color = scheme.onSurfaceVariant)
                     } else {
-                        talleresDisponibles.forEach { t ->
-                            TextButton(
-                                onClick = {
-                                    dialogCambiarTaller = false
-                                    onElegirContacto(t.id)
-                                },
-                                enabled = !estado.ocupado,
-                                modifier = Modifier.fillMaxWidth().testTag("rf24.contacto.elegir.${t.id}")
-                            ) {
-                                Text("${t.nombre}${if (t.esAsociado) " (Asociado)" else ""}")
+                        Column(
+                            Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            talleresDisponibles.forEach { t ->
+                                FilaEleccionTaller(
+                                    taller = t,
+                                    enabled = !estado.ocupado,
+                                    onClick = {
+                                        dialogCambiarTaller = false
+                                        onElegirContacto(t.id)
+                                    }
+                                )
                             }
                         }
                     }
@@ -413,33 +441,89 @@ fun DetalleAlertaScreen(
             },
             confirmButton = {},
             dismissButton = {
-                OutlinedButton(onClick = { dialogCambiarTaller = false }) { Text("Cerrar") }
+                OutlinedButton(
+                    onClick = { dialogCambiarTaller = false },
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Cerrar") }
             }
         )
     }
 
     avisoContacto?.let { msg ->
+        val scheme = MaterialTheme.colorScheme
+        val tel = telefonoFallback
         AlertDialog(
             onDismissRequest = { avisoContacto = null; telefonoFallback = null },
-            title = { Text("Contacto", fontWeight = FontWeight.Bold, color = Azul) },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = scheme.surface,
+            titleContentColor = scheme.onSurface,
+            textContentColor = scheme.onSurface,
+            iconContentColor = scheme.primary,
+            icon = {
+                Icon(
+                    if (tel != null) Icons.Outlined.Phone else Icons.Outlined.Info,
+                    contentDescription = null
+                )
+            },
+            title = { Text("Contacto", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(msg)
-                    telefonoFallback?.let { Text("Número: +$it", color = Celeste) }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(msg, color = scheme.onSurface)
+                    if (tel != null) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = scheme.surfaceVariant,
+                            border = BorderStroke(1.dp, scheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Outlined.Phone, contentDescription = "Teléfono", tint = scheme.primary)
+                                    Text("Número: +$tel", color = scheme.onSurface, fontWeight = FontWeight.SemiBold)
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    MarcaWhatsApp(Modifier.size(22.dp))
+                                    Text("WhatsApp", color = scheme.onSurface, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
-                val tel = telefonoFallback
                 if (tel != null) {
-                    TextButton(onClick = {
-                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$tel")))
-                        avisoContacto = null
-                        telefonoFallback = null
-                    }) { Text("Llamar") }
+                    Button(
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$tel")))
+                            avisoContacto = null
+                            telefonoFallback = null
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = scheme.primary,
+                            contentColor = scheme.onPrimary
+                        )
+                    ) {
+                        Icon(Icons.Outlined.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Llamar")
+                    }
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { avisoContacto = null; telefonoFallback = null }) {
+                OutlinedButton(
+                    onClick = { avisoContacto = null; telefonoFallback = null },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Text("Cerrar")
                 }
             }
@@ -487,6 +571,92 @@ fun DetalleAlertaScreen(
                 ) { Text("Cancelar") }
             }
         )
+    }
+}
+
+@Composable
+private fun FilaEleccionTaller(
+    taller: Taller,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().testTag("rf24.contacto.elegir.${taller.id}"),
+        shape = RoundedCornerShape(14.dp),
+        color = scheme.surfaceVariant,
+        contentColor = scheme.onSurface,
+        border = BorderStroke(1.dp, scheme.outlineVariant)
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(shape = CircleShape, color = scheme.primary.copy(alpha = 0.12f)) {
+                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.Storefront,
+                        contentDescription = "Taller",
+                        tint = scheme.primary
+                    )
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "${taller.nombre}${if (taller.esAsociado) " (Asociado)" else ""}",
+                    fontWeight = FontWeight.SemiBold,
+                    color = scheme.onSurface
+                )
+                if (!taller.telefono.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Phone,
+                            contentDescription = "Teléfono",
+                            tint = scheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            taller.telefono,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (taller.tieneWhatsapp) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        MarcaWhatsApp(Modifier.size(16.dp))
+                        Text(
+                            "WhatsApp",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF128C7E)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarcaWhatsApp(modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = CircleShape, color = Color(0xFF128C7E)) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                "WA",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

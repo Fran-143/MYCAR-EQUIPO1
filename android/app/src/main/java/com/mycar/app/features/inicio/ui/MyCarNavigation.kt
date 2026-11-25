@@ -1,17 +1,20 @@
 ﻿package com.mycar.app.features.inicio.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.*
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -110,6 +113,11 @@ fun MyCarNavigation(
     var alertasProgramarId by rememberSaveable { mutableStateOf<Long?>(null) }
     var alertasSesion by rememberSaveable { mutableIntStateOf(0) }
     var vehiculoAlertas by rememberSaveable { mutableStateOf<Long?>(null) }
+    // Sobrevive al cambio de pestaña: si vive dentro de ALERTAS, el primer frame
+    // vuelve con lista vacía y el ViewModel (filtro + caché) se recrea.
+    var vehiculosAlertas by remember(cuenta?.ciclo) {
+        mutableStateOf<List<Pair<Long, String>>>(emptyList())
+    }
     var recargaAlertas by rememberSaveable { mutableIntStateOf(0) }
     var alertasFiltroTodasTrasExito by rememberSaveable { mutableStateOf(false) }
     var formularioAbierto by remember { mutableStateOf(false) }
@@ -183,6 +191,7 @@ fun MyCarNavigation(
         kmOrigenDetalle = desdeDetalle
         navegar(navegacion.abrir(SecundariaMyCar.KILOMETRAJE))
     }
+    /** Overlay sobre Mantenimientos. No llama a navegar(): eso desmonta el formulario. */
     fun abrirKmDesdeMantenimiento(id: Long) {
         kmSesion++
         kmOverlayMantenimiento = id
@@ -236,20 +245,48 @@ fun MyCarNavigation(
     }
     Scaffold(contentWindowInsets=WindowInsets(0),bottomBar={
             if(navegacion.secundaria==null && !formularioAbierto && !formularioAtencionAlerta && kmOverlayMantenimiento==null && alertasProgramarId==null)
-                NavigationBar(containerColor=MaterialTheme.colorScheme.surface) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .windowInsetsPadding(
+                            WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
+                                .union(WindowInsets.navigationBars)
+                        )
+                ) {
+                NavigationBar(
+                    containerColor=MaterialTheme.colorScheme.surface,
+                    windowInsets=WindowInsets(0)
+                ) {
                 SeccionMyCar.entries.forEach { destino ->
-                    val icono=when(destino) {
-                        SeccionMyCar.INICIO -> R.drawable.ic_inicio_inicio
-                        SeccionMyCar.VEHICULOS -> R.drawable.ic_vehiculo_predeterminado_rf08
-                        SeccionMyCar.MANTENIMIENTOS -> R.drawable.ic_inicio_llave
-                        SeccionMyCar.ALERTAS -> R.drawable.ic_inicio_campana
-                    }
-                    NavigationBarItem(selected=navegacion.seccion==destino,onClick={
+                    val seleccionado = navegacion.seccion==destino
+                    NavigationBarItem(selected=seleccionado,onClick={
                         if (destino==SeccionMyCar.MANTENIMIENTOS) abrirHistorialEnTalleres=false
                         navegar(navegacion.abrir(destino))
                     },
-                        icon={ Icon(painterResource(icono),destino.titulo,modifier=Modifier.size(24.dp)) },
-                        label={ Text(destino.titulo,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis) })
+                        icon={
+                            when (destino) {
+                                SeccionMyCar.VEHICULOS -> Icon(Icons.Outlined.DirectionsCar, destino.titulo)
+                                SeccionMyCar.INICIO -> Icon(
+                                    painterResource(R.drawable.ic_inicio_inicio), destino.titulo, modifier=Modifier.size(24.dp)
+                                )
+                                SeccionMyCar.MANTENIMIENTOS -> Icon(
+                                    painterResource(R.drawable.ic_inicio_llave), destino.titulo, modifier=Modifier.size(24.dp)
+                                )
+                                SeccionMyCar.ALERTAS -> Icon(
+                                    painterResource(R.drawable.ic_inicio_campana), destino.titulo, modifier=Modifier.size(24.dp)
+                                )
+                            }
+                        },
+                        label={ Text(destino.titulo,fontSize=10.sp,maxLines=1,overflow=TextOverflow.Ellipsis) },
+                        colors=NavigationBarItemDefaults.colors(
+                            selectedIconColor=MaterialTheme.colorScheme.secondary,
+                            selectedTextColor=MaterialTheme.colorScheme.primary,
+                            indicatorColor=MaterialTheme.colorScheme.secondaryContainer,
+                            unselectedIconColor=MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor=MaterialTheme.colorScheme.onSurfaceVariant
+                        ))
+                }
                 }
             }
         }) { padding ->
@@ -398,6 +435,11 @@ fun MyCarNavigation(
                             }
                             val perfilVm: PerfilViewModel = viewModel(key = "perfil-${cuenta.ciclo}", factory = factoryPerfil)
                             val estadoPerfilCabecera by perfilVm.estado.collectAsStateWithLifecycle()
+                            LaunchedEffect(cuenta.ciclo, secundariaNombre) {
+                                if (secundariaNombre == SecundariaMyCar.PERFIL.name && !perfilAbrirLicencia) {
+                                    perfilVm.resetAlAbrir()
+                                }
+                            }
                             LaunchedEffect(estadoPerfilCabecera.perfil?.iniciales, estadoPerfilCabecera.fotoBytes) {
                                 cuenta.inicialesPresentacion.value = estadoPerfilCabecera.perfil?.iniciales
                                 cuenta.avatarPresentacion.value = estadoPerfilCabecera.fotoBytes
@@ -415,6 +457,7 @@ fun MyCarNavigation(
                                 fotosRepository = cuenta.fotos,
                                 licenciaRepository = cuenta.licencia,
                                 soporteRepository = cuenta.soporte,
+                                planesRepository = cuenta.planes,
                                 onVolver = { navegar(navegacion.atras()) },
                                 onSesionInvalida = { sesion.sesionRequerida(cuenta.ciclo) },
                                 onCerrarSesion = { cerrarSesion?.invoke() },
@@ -708,6 +751,8 @@ fun MyCarNavigation(
                             }
                         }
                         secundaria==SecundariaMyCar.NOTIFICACIONES && cuenta!=null -> {
+                            val avatarBytes by cuenta.avatarPresentacion.collectAsStateWithLifecycle()
+                            val iniciales by cuenta.inicialesPresentacion.collectAsStateWithLifecycle()
                             NotificacionesRoute(
                                 repository = cuenta.notificaciones,
                                 categoriaInicial = pushNotifCategoria,
@@ -738,6 +783,8 @@ fun MyCarNavigation(
                                     abrirKilometraje(idVehiculo)
                                 },
                                 onPerfil = { navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
+                                avatarBytes = avatarBytes,
+                                iniciales = iniciales,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -769,7 +816,14 @@ fun MyCarNavigation(
                                 val vm:ResumenInicioViewModel=viewModel(key="rf50-${cuenta.ciclo}",factory=factory)
                                 val estado by vm.estado.collectAsStateWithLifecycle()
                                 val nombrePresentacion by cuenta.nombrePresentacion.collectAsStateWithLifecycle()
-                                LaunchedEffect(vm, recargaInicio) { vm.cargar() }
+                                val lifecycleOwner = LocalLifecycleOwner.current
+                                DisposableEffect(lifecycleOwner, vm, recargaInicio) {
+                                    val observer = LifecycleEventObserver { _, event ->
+                                        if (event == Lifecycle.Event.ON_RESUME) vm.cargar()
+                                    }
+                                    lifecycleOwner.lifecycle.addObserver(observer)
+                                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                                }
                                 LaunchedEffect(nombrePresentacion) { vm.actualizarNombreUsuario(nombrePresentacion) }
                                 LaunchedEffect(estado.fase) {
                                     if(estado.fase==FaseInicio.SIN_SESION) sesion.sesionRequerida(cuenta.ciclo)
@@ -793,6 +847,14 @@ fun MyCarNavigation(
                                         abrirHistorialEnTalleres=true
                                         navegar(navegacion.abrir(SeccionMyCar.MANTENIMIENTOS))
                                     },
+                                    onVerDetalleAlerta={ idAlerta ->
+                                        val idVehiculo = estado.seleccionado
+                                        if (idVehiculo != null) {
+                                            vehiculoAlertas = idVehiculo
+                                            detalleAlertaTrasAtencion = idAlerta
+                                            navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
+                                        }
+                                    },
                                     fotosRepository = cuenta.fotos,
                                     avatarBytes = avatarBytes,
                                     iniciales = iniciales,
@@ -814,6 +876,8 @@ fun MyCarNavigation(
                             }
                             SeccionMyCar.MANTENIMIENTOS -> {
                                 val idKmOverlay = kmOverlayMantenimiento
+                                val avatarBytes by cuenta.avatarPresentacion.collectAsStateWithLifecycle()
+                                val iniciales by cuenta.inicialesPresentacion.collectAsStateWithLifecycle()
                                 Box(Modifier.fillMaxSize()) {
                                     FlujoHistorialMantenimiento(
                                         onVolverInicio={
@@ -825,16 +889,22 @@ fun MyCarNavigation(
                                         claveCuenta="${com.mycar.app.BuildConfig.API_BASE_URL}|${cuenta.usuario}",
                                         onIniciarSesion={ sesion.sesionRequerida(cuenta.ciclo) },
                                         onActualizarKm={ abrirKmDesdeMantenimiento(it) },
+                                        kmEncima = idKmOverlay != null,
                                         idVehiculoInicial=vehiculoMantenimiento, archivoPendiente=cuenta.archivoMantenimiento,
-                                        estadoEnSistema=false, onRegistroAbierto={ formularioAbierto=it },
+                                        estadoEnSistema=false,
+                                        onRegistroAbierto={ formularioAbierto=it },
+                                        onFormularioOverlay={ formularioAbierto=it },
                                         recargaRegistroToken = recargaMantenimiento,
                                         onProgramarAlerta = { abrirProgramarDesdeRf17(it) },
                                         talleresRepository = cuenta.talleres,
                                         onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
                                         onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
                                         abrirEnTalleres = abrirHistorialEnTalleres,
-                                        onAbrirEnTalleresConsumido = { abrirHistorialEnTalleres = false })
+                                        onAbrirEnTalleresConsumido = { abrirHistorialEnTalleres = false },
+                                        avatarBytes = avatarBytes,
+                                        iniciales = iniciales)
                                     if (idKmOverlay != null) {
+                                        BackHandler { kmOverlayMantenimiento = null }
                                         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                                             ActualizarKilometrajeRoute(
                                                 "${cuenta.ciclo}|mant-$idKmOverlay|s$kmSesion", idKmOverlay, cuenta.kilometraje,
@@ -851,9 +921,8 @@ fun MyCarNavigation(
                                 }
                             }
                             SeccionMyCar.ALERTAS -> {
-                                var vehiculosAlertas by remember(cuenta.ciclo) {
-                                    mutableStateOf<List<Pair<Long, String>>>(emptyList())
-                                }
+                                val avatarBytes by cuenta.avatarPresentacion.collectAsStateWithLifecycle()
+                                val iniciales by cuenta.inicialesPresentacion.collectAsStateWithLifecycle()
                                 LaunchedEffect(cuenta.mantenimiento) {
                                     runCatching {
                                         val ctx = cuenta.mantenimiento.contexto()
@@ -916,6 +985,8 @@ fun MyCarNavigation(
                                             perfilAbrirLicencia = true
                                             navegar(navegacion.abrir(SecundariaMyCar.PERFIL))
                                         },
+                                        avatarBytes = avatarBytes,
+                                        iniciales = iniciales,
                                         modifier=Modifier)
                                 }
                             }

@@ -62,4 +62,7 @@ interface LocalTestApi {
 
     @POST("api/v1/local-test/fixtures/preparar-limite-eliminacion")
     suspend fun prepararLimite(@Header("X-MyCar-Local-Test") token: String): Response<Map<String, Any>>
+
+    @POST("api/v1/local-test/fixtures/preparar-planes")
+    suspend fun prepararPlanes(@Header("X-MyCar-Local-Test") token: String): Response<Map<String, Any>>
 }

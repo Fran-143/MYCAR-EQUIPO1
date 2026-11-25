@@ -1,6 +1,7 @@
 package com.mycar.app.features.perfil.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,16 +11,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -31,7 +42,6 @@ import com.mycar.app.features.autenticacion.domain.RegistrationValidator
 import com.mycar.app.features.fotos.ui.FlujoSelectorFotoPersonalizada
 import com.mycar.app.features.fotos.ui.ImagenBytesFoto
 import com.mycar.app.features.perfil.domain.PerfilValidator
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mycar.app.features.perfil.viewmodel.EstadoPerfil
 import com.mycar.app.features.perfil.viewmodel.PantallaPerfil
 import com.mycar.app.features.perfil.viewmodel.PerfilViewModel
@@ -44,6 +54,7 @@ fun PerfilRoute(
     fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
     licenciaRepository: com.mycar.app.features.licencia.domain.LicenciaRepository,
     soporteRepository: com.mycar.app.features.soporte.domain.SoporteRepository,
+    planesRepository: com.mycar.app.features.planes.domain.PlanesRepository,
     onVolver: () -> Unit,
     onSesionInvalida: () -> Unit,
     onCerrarSesion: () -> Unit,
@@ -51,10 +62,11 @@ fun PerfilRoute(
 ) {
     val estado by vm.estado.collectAsState()
     LaunchedEffect(estado.sesionInvalida) { if (estado.sesionInvalida) onSesionInvalida() }
-    // LICENCIA / notificaciones / RF43 manejan su propio atrás.
+    // LICENCIA / notificaciones / RF43 / PLANES manejan su propio atrás.
     BackHandler(
         enabled = estado.pantalla != PantallaPerfil.LICENCIA &&
             estado.pantalla != PantallaPerfil.SOPORTE &&
+            estado.pantalla != PantallaPerfil.PLANES &&
             estado.pantalla != PantallaPerfil.NOTIFICACIONES_EXTERNAS &&
             estado.pantalla != PantallaPerfil.RECORDATORIOS_KM
     ) {
@@ -63,7 +75,7 @@ fun PerfilRoute(
             else -> vm.volverAtras()
         }
     }
-    Box(modifier.fillMaxSize().background(PerfilColors.Bg)) {
+    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when (estado.pantalla) {
             PantallaPerfil.HUB -> PerfilHubScreen(estado, vm, onVolver)
             PantallaPerfil.DATOS -> DatosPersonalesScreen(estado, vm)
@@ -99,6 +111,13 @@ fun PerfilRoute(
                     onSesionInvalida = onSesionInvalida,
                     modifier = Modifier.fillMaxSize()
                 )
+            PantallaPerfil.PLANES ->
+                com.mycar.app.features.planes.ui.PlanesRoute(
+                    repository = planesRepository,
+                    onVolver = vm::volverAtras,
+                    onSesionInvalida = onSesionInvalida,
+                    modifier = Modifier.fillMaxSize()
+                )
             PantallaPerfil.ELIMINAR_CUENTA ->
                 com.mycar.app.features.cuenta.ui.EliminarCuentaRoute(
                     onCancel = vm::volverAtras,
@@ -123,6 +142,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
     var menuFoto by remember { mutableStateOf(false) }
     var selectorActivo by remember { mutableStateOf(false) }
     var confirmarEliminar by remember { mutableStateOf(false) }
+    val iconos = perfilIconos()
     Column(Modifier.fillMaxSize()) {
         com.mycar.app.ui.MycarCabeceraApp(
             conStatusBars = true,
@@ -131,11 +151,11 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
         )
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onVolver) { Text("Volver", color = PerfilColors.Navy) }
+                TextButton(onClick = onVolver) { Text("Volver", color = MaterialTheme.colorScheme.primary) }
                 Text(
                     "Perfil",
                     Modifier.weight(1f),
-                    color = PerfilColors.Navy,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     textAlign = TextAlign.Center
@@ -146,18 +166,28 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
             when {
                 estado.cargando && estado.perfil == null -> {
                     Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = PerfilColors.Navy)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                     Seccion("SESIÓN") {
-                        FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
+                        FilaAccion(
+                            "Cerrar sesión",
+                            icon = Icons.AutoMirrored.Outlined.Logout,
+                            iconTint = iconos.logout,
+                            onClick = vm::pedirCerrarSesion
+                        )
                     }
                 }
                 estado.perfil == null -> {
-                    estado.mensaje?.let { Text(it, color = PerfilColors.Danger) }
+                    estado.mensaje?.let { Text(it, color = perfilDanger()) }
                     TextButton(onClick = vm::cargar) { Text("Reintentar") }
                     Spacer(Modifier.height(16.dp))
                     Seccion("SESIÓN") {
-                        FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
+                        FilaAccion(
+                            "Cerrar sesión",
+                            icon = Icons.AutoMirrored.Outlined.Logout,
+                            iconTint = iconos.logout,
+                            onClick = vm::pedirCerrarSesion
+                        )
                     }
                 }
                 else -> {
@@ -165,20 +195,21 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                     estado.mensajeFoto?.let { texto ->
                         Surface(
                             Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                            color = if (estado.errorFoto) Color(0xFFFFEBEE) else PerfilColors.SuccessBg,
+                            color = if (estado.errorFoto) MaterialTheme.colorScheme.errorContainer else perfilSuccessContainer(),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
                                 texto,
                                 Modifier.padding(14.dp),
-                                color = if (estado.errorFoto) PerfilColors.Danger else PerfilColors.SuccessText
+                                color = if (estado.errorFoto) MaterialTheme.colorScheme.onErrorContainer else perfilSuccessContent()
                             )
                         }
                     }
                     Surface(
                         Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        color = PerfilColors.Card,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         shadowElevation = 1.dp
                     ) {
                         Column(
@@ -187,7 +218,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                         ) {
                             Box(contentAlignment = Alignment.BottomEnd) {
                                 Box(
-                                    Modifier.size(84.dp).clip(CircleShape).background(PerfilColors.Teal),
+                                    Modifier.size(84.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     ImagenBytesFoto(
@@ -197,7 +228,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                     ) {
                                         Text(
                                             perfil.iniciales,
-                                            color = Color.White,
+                                            color = MaterialTheme.colorScheme.onSecondary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 28.sp,
                                             textAlign = TextAlign.Center,
@@ -209,7 +240,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                     Surface(
                                         onClick = { if (!estado.ocupadoFoto) menuFoto = true },
                                         shape = CircleShape,
-                                        color = PerfilColors.Navy,
+                                        color = MaterialTheme.colorScheme.primary,
                                         shadowElevation = 2.dp,
                                         modifier = Modifier.size(30.dp)
                                     ) {
@@ -217,17 +248,21 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                             Icon(
                                                 Icons.Filled.PhotoCamera,
                                                 contentDescription = "Foto de perfil",
-                                                tint = Color.White,
+                                                tint = MaterialTheme.colorScheme.onPrimary,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
                                     }
-                                    DropdownMenu(expanded = menuFoto, onDismissRequest = { menuFoto = false }) {
+                                    DropdownMenu(
+                                        expanded = menuFoto,
+                                        onDismissRequest = { menuFoto = false },
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    ) {
                                         if (perfil.tieneFoto) {
                                             DropdownMenuItem(
                                                 text = { Text("Cambiar foto") },
                                                 leadingIcon = {
-                                                    Icon(Icons.Filled.SwapHoriz, null, tint = PerfilColors.Navy)
+                                                    Icon(Icons.Filled.SwapHoriz, null, tint = MaterialTheme.colorScheme.primary)
                                                 },
                                                 onClick = {
                                                     menuFoto = false
@@ -237,7 +272,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                             DropdownMenuItem(
                                                 text = { Text("Eliminar foto") },
                                                 leadingIcon = {
-                                                    Icon(Icons.Filled.Delete, null, tint = PerfilColors.Danger)
+                                                    Icon(Icons.Filled.Delete, null, tint = perfilDanger())
                                                 },
                                                 onClick = {
                                                     menuFoto = false
@@ -248,7 +283,7 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                             DropdownMenuItem(
                                                 text = { Text("Agregar foto") },
                                                 leadingIcon = {
-                                                    Icon(Icons.Filled.AddAPhoto, null, tint = PerfilColors.Teal)
+                                                    Icon(Icons.Filled.AddAPhoto, null, tint = MaterialTheme.colorScheme.secondary)
                                                 },
                                                 onClick = {
                                                     menuFoto = false
@@ -267,24 +302,24 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                 Spacer(Modifier.height(8.dp))
                                 CircularProgressIndicator(
                                     Modifier.size(22.dp),
-                                    color = PerfilColors.Navy,
+                                    color = MaterialTheme.colorScheme.primary,
                                     strokeWidth = 2.dp
                                 )
                             }
                             Spacer(Modifier.height(12.dp))
                             Text(
                                 perfil.nombreCompleto,
-                                color = PerfilColors.Navy,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 18.sp
                             )
-                            Text(perfil.correo, color = PerfilColors.Mute, fontSize = 14.sp)
+                            Text(perfil.correo, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                             Spacer(Modifier.height(16.dp))
                             OutlinedButton(
                                 onClick = vm::abrirDatos,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = PerfilColors.Navy)
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                             ) { Text("Datos personales") }
                         }
                     }
@@ -300,10 +335,14 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                     if (confirmarEliminar) {
                         AlertDialog(
                             onDismissRequest = { confirmarEliminar = false },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            iconContentColor = perfilDanger(),
                             icon = {
-                                Icon(Icons.Filled.Delete, null, tint = PerfilColors.Danger, modifier = Modifier.size(28.dp))
+                                Icon(Icons.Filled.Delete, null, tint = perfilDanger(), modifier = Modifier.size(28.dp))
                             },
-                            title = { Text("Eliminar foto", color = PerfilColors.Navy, fontWeight = FontWeight.Bold) },
+                            title = { Text("Eliminar foto", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
                             text = { Text("¿Eliminar tu foto de perfil? Se mostrarán tus iniciales.") },
                             dismissButton = {
                                 OutlinedButton(
@@ -317,7 +356,10 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                         confirmarEliminar = false
                                         vm.eliminarFoto()
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Danger),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError
+                                    ),
                                     shape = RoundedCornerShape(12.dp)
                                 ) { Text("Eliminar") }
                             },
@@ -326,27 +368,58 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                     }
                     Spacer(Modifier.height(20.dp))
                     Seccion("CUENTA") {
-                        FilaAccion("Cambiar contraseña", onClick = vm::abrirCambiarContrasena)
-                        FilaAccion("Licencia de conducir", onClick = vm::abrirLicencia)
-                        FilaAccion("Soporte", onClick = vm::abrirSoporte)
-                        FilaDeshabilitada("Planes y suscripción")
+                        FilaAccion(
+                            "Cambiar contraseña",
+                            icon = Icons.Outlined.Lock,
+                            iconTint = iconos.lock,
+                            onClick = vm::abrirCambiarContrasena
+                        )
+                        FilaAccion(
+                            "Licencia de conducir",
+                            icon = Icons.Outlined.Badge,
+                            iconTint = iconos.license,
+                            onClick = vm::abrirLicencia
+                        )
+                        FilaAccion(
+                            "Soporte",
+                            icon = Icons.Outlined.SupportAgent,
+                            iconTint = iconos.support,
+                            onClick = vm::abrirSoporte
+                        )
+                        FilaAccion(
+                            "Planes y suscripción",
+                            icon = Icons.Outlined.WorkspacePremium,
+                            iconTint = iconos.planes,
+                            onClick = vm::abrirPlanes
+                        )
                     }
                     Seccion("VEHÍCULO") {
                         FilaAccion(
                             "Recordatorios de kilometraje",
+                            icon = Icons.Outlined.DirectionsCar,
+                            iconTint = iconos.km,
                             onClick = vm::abrirRecordatoriosKm
                         )
-                        FilaAccion("Notificaciones externas", onClick = vm::abrirNotificacionesExternas)
-                    }
-                    Seccion("APARIENCIA") {
-                        AparienciaSelector()
+                        FilaAccion(
+                            "Notificaciones externas",
+                            icon = Icons.Outlined.Notifications,
+                            iconTint = iconos.notif,
+                            onClick = vm::abrirNotificacionesExternas
+                        )
                     }
                     Seccion("SESIÓN") {
-                        FilaAccion("Cerrar sesión", onClick = vm::pedirCerrarSesion)
+                        FilaAccion(
+                            "Cerrar sesión",
+                            icon = Icons.AutoMirrored.Outlined.Logout,
+                            iconTint = iconos.logout,
+                            onClick = vm::pedirCerrarSesion
+                        )
                     }
                     Seccion("ZONA DE PELIGRO") {
                         FilaAccion(
                             "Eliminar cuenta",
+                            icon = Icons.Outlined.DeleteForever,
+                            iconTint = iconos.danger,
                             onClick = vm::abrirEliminarCuenta,
                             peligro = true
                         )
@@ -364,14 +437,14 @@ private fun DatosPersonalesScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp)) {
         TopBar("Datos personales", onBack = vm::volverAtras)
         if (estado.exitoDatos) {
-            Surface(Modifier.fillMaxWidth().padding(bottom = 12.dp), color = PerfilColors.SuccessBg,
+            Surface(Modifier.fillMaxWidth().padding(bottom = 12.dp), color = perfilSuccessContainer(),
                 shape = RoundedCornerShape(12.dp)) {
-                Text("Datos actualizados correctamente.", Modifier.padding(14.dp), color = PerfilColors.SuccessText)
+                Text("Datos actualizados correctamente.", Modifier.padding(14.dp), color = perfilSuccessContent())
             }
         }
         CampoSoloLectura("Nombre completo", perfil.nombreCompleto)
         CampoSoloLectura("Correo electrónico", perfil.correo)
-        Text("El correo no puede modificarse", color = PerfilColors.Mute, fontSize = 12.sp,
+        Text("El correo no puede modificarse", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 12.dp))
         CampoSoloLectura("Fecha de nacimiento", PerfilValidator.isoToDisplay(perfil.fechaNacimientoIso))
         Spacer(Modifier.height(16.dp))
@@ -379,7 +452,10 @@ private fun DatosPersonalesScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
             onClick = vm::abrirEditar,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Navy)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
         ) { Text("Editar") }
     }
 }
@@ -389,7 +465,7 @@ private fun EditarPerfilScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
     val form = estado.formulario
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp)) {
         TopBar("Editar Perfil", onBack = vm::cancelarEdicion)
-        estado.mensaje?.let { Text(it, color = PerfilColors.Danger, modifier = Modifier.padding(bottom = 8.dp)) }
+        estado.mensaje?.let { Text(it, color = perfilDanger(), modifier = Modifier.padding(bottom = 8.dp)) }
         CampoEditable("Nombre", form.nombre, estado.errores["nombre"], !estado.guardando) {
             vm.editarCampo { f -> f.copy(nombre = RegistrationValidator.limitCodePoints(it, RegistrationValidator.MAX_NOMBRE)) }
         }
@@ -397,7 +473,7 @@ private fun EditarPerfilScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
             vm.editarCampo { f -> f.copy(apellido = RegistrationValidator.limitCodePoints(it, RegistrationValidator.MAX_APELLIDO)) }
         }
         CampoEditable("Correo electrónico", form.correo, null, enabled = false) {}
-        Text("El correo no puede modificarse", color = PerfilColors.Mute, fontSize = 12.sp,
+        Text("El correo no puede modificarse", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 12.dp))
         CampoEditable("Fecha de nacimiento", form.fechaNacimiento, estado.errores["fechaNacimiento"],
             !estado.guardando, placeholder = "dd/mm/aaaa", keyboard = KeyboardType.Number) {
@@ -410,16 +486,19 @@ private fun EditarPerfilScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
                 enabled = !estado.guardando,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PerfilColors.Navy)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
             ) { Text("Cancelar") }
             Button(
                 onClick = vm::guardar,
                 enabled = !estado.guardando,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Navy)
+                colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
             ) {
-                if (estado.guardando) CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                if (estado.guardando) CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                 else Text("Guardar cambios")
             }
         }
@@ -437,9 +516,9 @@ private fun CambiarContrasenaScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
         Text(
             if (!liberada) "Primero confirma tu contraseña actual."
             else "Contraseña actual verificada. Elige una nueva distinta.",
-            color = PerfilColors.Mute, fontSize = 13.sp, modifier = Modifier.padding(bottom = 12.dp)
+            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, modifier = Modifier.padding(bottom = 12.dp)
         )
-        estado.mensaje?.let { Text(it, color = PerfilColors.Danger, modifier = Modifier.padding(bottom = 8.dp)) }
+        estado.mensaje?.let { Text(it, color = perfilDanger(), modifier = Modifier.padding(bottom = 8.dp)) }
         CampoPassword("Contraseña actual", estado.contrasenaActual, estado.errores["contrasenaActual"],
             verActual, !estado.guardando, { verActual = !verActual }) { vm.editarContrasena(actual = it) }
         if (!liberada) {
@@ -449,9 +528,12 @@ private fun CambiarContrasenaScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
                 enabled = !estado.guardando && estado.contrasenaActual.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Navy)
+                colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
             ) {
-                if (estado.guardando) CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                if (estado.guardando) CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                 else Text("Continuar")
             }
             Spacer(Modifier.height(12.dp))
@@ -463,9 +545,9 @@ private fun CambiarContrasenaScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
         CampoPassword("Nueva contraseña", estado.nuevaContrasena, estado.errores["nuevaContrasena"],
             verNueva, !estado.guardando, { verNueva = !verNueva }) { vm.editarContrasena(nueva = it) }
         Column(Modifier.padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Debe ser distinta a la actual.", color = PerfilColors.Mute, fontSize = 12.sp)
+            Text("Debe ser distinta a la actual.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             RegistrationValidator.passwordRequirements(estado.nuevaContrasena).forEach { (label, met) ->
-                Text((if (met) "✓ " else "• ") + label, color = if (met) PerfilColors.Teal else PerfilColors.Mute, fontSize = 12.sp)
+                Text((if (met) "✓ " else "• ") + label, color = if (met) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
         CampoPassword("Confirmar nueva contraseña", estado.confirmacionContrasena, estado.errores["confirmacionContrasena"],
@@ -476,8 +558,11 @@ private fun CambiarContrasenaScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
                 modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(14.dp)) { Text("Cancelar") }
             Button(onClick = vm::confirmarCambioContrasena, enabled = !estado.guardando,
                 modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Navy)) {
-                if (estado.guardando) CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )) {
+                if (estado.guardando) CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                 else Text("Cambiar contraseña")
             }
         }
@@ -488,18 +573,21 @@ private fun CambiarContrasenaScreen(estado: EstadoPerfil, vm: PerfilViewModel) {
 private fun ContrasenaActualizadaScreen(onVolver: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center) {
-        Box(Modifier.size(88.dp).clip(CircleShape).background(PerfilColors.SuccessBg), contentAlignment = Alignment.Center) {
-            Text("✓", color = PerfilColors.SuccessText, fontSize = 36.sp, fontWeight = FontWeight.Bold)
+        Box(Modifier.size(88.dp).clip(CircleShape).background(perfilSuccessContainer()), contentAlignment = Alignment.Center) {
+            Text("✓", color = perfilSuccessContent(), fontSize = 36.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(20.dp))
-        Text("Contraseña actualizada", color = PerfilColors.Navy, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+        Text("Contraseña actualizada", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 22.sp)
         Spacer(Modifier.height(8.dp))
         Text("Tu contraseña ha sido cambiada correctamente. Los próximos accesos deben usar la nueva contraseña.",
-            color = PerfilColors.Mute, textAlign = TextAlign.Center)
+            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(28.dp))
         Button(onClick = onVolver, modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Navy)) {
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )) {
             Text("Volver al perfil")
         }
     }
@@ -509,13 +597,19 @@ private fun ContrasenaActualizadaScreen(onVolver: () -> Unit) {
 private fun CerrarSesionDialog(onCancelar: () -> Unit, onConfirmar: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancelar,
-        title = { Text("Cerrar sesión", color = PerfilColors.Navy, fontWeight = FontWeight.Bold) },
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        title = { Text("Cerrar sesión", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
         text = { Text("¿Estás seguro de que deseas cerrar sesión? Tus datos quedarán guardados.") },
         dismissButton = {
             OutlinedButton(onClick = onCancelar, shape = RoundedCornerShape(12.dp)) { Text("Cancelar") }
         },
         confirmButton = {
-            Button(onClick = onConfirmar, colors = ButtonDefaults.buttonColors(containerColor = PerfilColors.Danger),
+            Button(onClick = onConfirmar, colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError
+            ),
                 shape = RoundedCornerShape(12.dp)) { Text("Cerrar sesión") }
         }
     )
@@ -524,26 +618,64 @@ private fun CerrarSesionDialog(onCancelar: () -> Unit, onConfirmar: () -> Unit) 
 @Composable
 private fun TopBar(titulo: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = onBack) { Text("←", color = PerfilColors.Navy, fontSize = 20.sp) }
-        Text(titulo, color = PerfilColors.Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        TextButton(onClick = onBack) { Text("←", color = MaterialTheme.colorScheme.primary, fontSize = 20.sp) }
+        Text(titulo, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 20.sp)
     }
 }
 
 @Composable
 private fun Seccion(titulo: String, content: @Composable ColumnScope.() -> Unit) {
-    Text(titulo, color = PerfilColors.Mute, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+    Text(titulo, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(top = 8.dp, bottom = 6.dp, start = 4.dp))
-    Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), shape = RoundedCornerShape(16.dp), color = PerfilColors.Card) {
+    Surface(
+        Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
         Column(Modifier.padding(vertical = 4.dp), content = content)
     }
 }
 
 @Composable
-private fun FilaAccion(texto: String, onClick: () -> Unit, peligro: Boolean = false) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Text(texto, Modifier.weight(1f), color = if (peligro) PerfilColors.Danger else PerfilColors.Navy)
-        Text("›", color = if (peligro) PerfilColors.Danger else PerfilColors.Mute)
+private fun FilaAccion(
+    texto: String,
+    onClick: () -> Unit,
+    peligro: Boolean = false,
+    icon: ImageVector? = null,
+    iconTint: Color = MaterialTheme.colorScheme.secondary
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon != null) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = iconTint.copy(alpha = 0.12f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+        }
+        Text(
+            texto,
+            Modifier.weight(1f),
+            color = if (peligro) perfilDanger() else MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium
+        )
+        Icon(
+            Icons.Outlined.ChevronRight,
+            contentDescription = null,
+            tint = if (peligro) perfilDanger() else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -551,44 +683,21 @@ private fun FilaAccion(texto: String, onClick: () -> Unit, peligro: Boolean = fa
 private fun FilaDeshabilitada(texto: String, peligro: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(texto, Modifier.weight(1f), color = if (peligro) PerfilColors.Danger.copy(alpha = 0.55f) else PerfilColors.Mute)
-        Text("Próximamente", color = PerfilColors.Mute, fontSize = 11.sp)
-    }
-}
-
-@Composable
-private fun AparienciaSelector() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val modo by com.mycar.app.ui.theme.AparienciaPreferencias.flujo.collectAsStateWithLifecycle()
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Tema de la aplicación", color = PerfilColors.Navy, fontWeight = FontWeight.Medium)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                com.mycar.app.ui.theme.ModoApariencia.CLARO to "Claro",
-                com.mycar.app.ui.theme.ModoApariencia.OSCURO to "Oscuro"
-            ).forEach { (valor, etiqueta) ->
-                val seleccionado = modo == valor
-                FilterChip(
-                    selected = seleccionado,
-                    onClick = {
-                        com.mycar.app.ui.theme.AparienciaPreferencias.guardar(context, valor)
-                    },
-                    label = { Text(etiqueta) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = PerfilColors.Navy,
-                        selectedLabelColor = Color.White
-                    )
-                )
-            }
-        }
+        Text(texto, Modifier.weight(1f), color = if (peligro) perfilDanger() else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Próximamente", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
     }
 }
 
 @Composable
 private fun CampoSoloLectura(label: String, value: String) {
-    Text(label, color = PerfilColors.Navy, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
-    Surface(Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = RoundedCornerShape(12.dp), color = Color(0xFFE8EEF5)) {
-        Text(value, Modifier.padding(16.dp), color = PerfilColors.Navy)
+    Text(label, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
+    Surface(
+        Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Text(value, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -598,7 +707,7 @@ private fun CampoEditable(
     placeholder: String = "", keyboard: KeyboardType = KeyboardType.Text,
     onValue: (String) -> Unit
 ) {
-    Text(label, color = PerfilColors.Navy, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
+    Text(label, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
     OutlinedTextField(
         value = value, onValueChange = onValue, enabled = enabled, singleLine = true,
         placeholder = { if (placeholder.isNotEmpty()) Text(placeholder) },
@@ -607,12 +716,7 @@ private fun CampoEditable(
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = PerfilColors.Navy,
-            unfocusedBorderColor = Color(0xFFC5D0DE),
-            disabledTextColor = PerfilColors.Mute,
-            disabledBorderColor = Color(0xFFC5D0DE)
-        )
+        colors = perfilFieldColors()
     )
 }
 
@@ -621,7 +725,7 @@ private fun CampoPassword(
     label: String, value: String, error: String?, visible: Boolean, enabled: Boolean,
     onToggle: () -> Unit, onValue: (String) -> Unit
 ) {
-    Text(label, color = PerfilColors.Navy, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
+    Text(label, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 6.dp))
     OutlinedTextField(
         value = value, onValueChange = onValue, enabled = enabled, singleLine = true,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -631,6 +735,6 @@ private fun CampoPassword(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PerfilColors.Navy, unfocusedBorderColor = Color(0xFFC5D0DE))
+        colors = perfilFieldColors()
     )
 }

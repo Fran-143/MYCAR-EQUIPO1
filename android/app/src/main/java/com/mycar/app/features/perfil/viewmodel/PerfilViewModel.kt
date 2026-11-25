@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 enum class PantallaPerfil {
     HUB, DATOS, EDITAR, CAMBIAR_CONTRASENA, CONTRASENA_OK,
-    NOTIFICACIONES_EXTERNAS, RECORDATORIOS_KM, LICENCIA, SOPORTE,
+    NOTIFICACIONES_EXTERNAS, RECORDATORIOS_KM, LICENCIA, SOPORTE, PLANES,
     ELIMINAR_CUENTA
 }
 
@@ -231,6 +231,10 @@ class PerfilViewModel(
         _estado.value = _estado.value.copy(pantalla = PantallaPerfil.SOPORTE, mensaje = null)
     }
 
+    fun abrirPlanes() {
+        _estado.value = _estado.value.copy(pantalla = PantallaPerfil.PLANES, mensaje = null)
+    }
+
     fun abrirEliminarCuenta() {
         _estado.value = _estado.value.copy(pantalla = PantallaPerfil.ELIMINAR_CUENTA, mensaje = null)
     }
@@ -354,12 +358,23 @@ class PerfilViewModel(
         _estado.value = _estado.value.copy(pantalla = PantallaPerfil.HUB, exitoDatos = false, mensaje = null)
     }
 
+    /** Al reabrir Perfil desde cabecera/navegación: siempre el hub, no la última subpantalla. */
+    fun resetAlAbrir() {
+        _estado.value = _estado.value.copy(
+            pantalla = PantallaPerfil.HUB,
+            exitoDatos = false,
+            mensaje = null,
+            confirmarCierre = false
+        )
+    }
+
     fun volverAtras() {
         when (_estado.value.pantalla) {
             PantallaPerfil.HUB -> Unit
             PantallaPerfil.DATOS, PantallaPerfil.CAMBIAR_CONTRASENA, PantallaPerfil.CONTRASENA_OK,
             PantallaPerfil.NOTIFICACIONES_EXTERNAS, PantallaPerfil.RECORDATORIOS_KM,
-            PantallaPerfil.LICENCIA, PantallaPerfil.SOPORTE, PantallaPerfil.ELIMINAR_CUENTA ->
+            PantallaPerfil.LICENCIA, PantallaPerfil.SOPORTE, PantallaPerfil.PLANES,
+            PantallaPerfil.ELIMINAR_CUENTA ->
                 _estado.value = _estado.value.copy(pantalla = PantallaPerfil.HUB, exitoDatos = false)
             PantallaPerfil.EDITAR -> cancelarEdicion()
         }

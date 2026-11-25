@@ -42,17 +42,22 @@ public class FixtureCuentasLocalService {
         Instant now = Instant.now();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("passwordCompartida", PASSWORD);
-        out.put("items", List.of(
-                ensure("rf.activa@mycar.test", "Activa", "RF", "USUARIO", CuentaEstados.ACTIVA, null, now),
-                ensure("rf.suspendida@mycar.test", "Suspendida", "RF", "USUARIO", CuentaEstados.SUSPENDIDA, null, now),
-                ensureBloqueoLogin("rf.bloq.login@mycar.test", now),
-                ensureBloqueoRecup("rf.bloq.recup@mycar.test", now),
-                ensureBloqueoAdmin("rf.bloq.admin@mycar.test", now),
-                ensurePendiente("rf.pendiente@mycar.test", now),
-                ensureEliminadaConstancia(now),
-                ensure("rf.admin@mycar.test", "Admin", "RF", "ADMIN", CuentaEstados.ACTIVA, null, now)
-        ));
+        List<Map<String, Object>> items = new java.util.ArrayList<>();
+        items.add(ensure("rf.activa@mycar.test", "Activa", "RF", "USUARIO", CuentaEstados.ACTIVA, null, now));
+        items.add(ensure("rf.suspendida@mycar.test", "Suspendida", "RF", "USUARIO", CuentaEstados.SUSPENDIDA, null, now));
+        items.add(ensureBloqueoLogin("rf.bloq.login@mycar.test", now));
+        items.add(ensureBloqueoRecup("rf.bloq.recup@mycar.test", now));
+        items.add(ensureBloqueoAdmin("rf.bloq.admin@mycar.test", now));
+        items.add(ensurePendiente("rf.pendiente@mycar.test", now));
+        items.add(ensureEliminadaConstancia(now));
+        items.add(ensure("rf.admin@mycar.test", "Admin", "RF", "ADMIN", CuentaEstados.ACTIVA, null, now));
+        // Planes limpios para testear solicitudes (prueba 14d / pagar 30d).
+        items.add(ensurePlanFree("rf.activa@mycar.test", "Activa", now));
+        items.add(ensurePlanFree("plan.prueba@mycar.test", "PlanPrueba", now));
+        items.add(ensurePlanFree("plan.pago@mycar.test", "PlanPago", now));
+        out.put("items", items);
         out.put("resultado", "OK");
+        out.put("notaPlanes", "rf.activa + plan.prueba (14d) + plan.pago (Pagar 30d) en FREE sin solicitudes.");
         return out;
     }
 
@@ -165,6 +170,64 @@ public class FixtureCuentasLocalService {
                 "estado", CuentaEstados.PENDIENTE_ELIMINACION,
                 "password", PASSWORD,
                 "venceUtc", vence.toString());
+    }
+
+    /**
+     * Cuentas aisladas para testear Planes (FREE / prueba / sandbox).
+     * Password compartida: {@link #PASSWORD}.
+     */
+    @Transactional
+    public Map<String, Object> prepararCuentasPlanes() {
+        LocalTestGuard.requireEnabled(enabled);
+        Instant now = Instant.now();
+        List<Map<String, Object>> items = new java.util.ArrayList<>();
+        items.add(ensurePlanFree("rf.activa@mycar.test", "Activa", now));
+        items.add(ensurePlanFree("plan.prueba@mycar.test", "PlanPrueba", now));
+        items.add(ensurePlanFree("plan.pago@mycar.test", "PlanPago", now));
+        items.add(ensurePlanFree("plan.free@mycar.test", "PlanFree", now));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("passwordCompartida", PASSWORD);
+        out.put("nota", "FREE limpio. plan.prueba→Solicitar prueba 14d. plan.pago / rf.activa→Pagar Premium 30d. Admin aprueba/rechaza en detalle.");
+        out.put("items", items);
+        out.put("resultado", "OK");
+        return out;
+    }
+
+    private Map<String, Object> ensurePlanFree(String correo, String nombre, Instant now) {
+        String apellido = correo.startsWith("rf.") ? "RF" : "Planes";
+        Map<String, Object> base = ensure(correo, nombre, apellido, "USUARIO", CuentaEstados.ACTIVA, null, now);
+        long id = idOf(correo);
+        limpiarHistorialPlanes(id);
+        Long planFree = jdbc.query("""
+                SELECT id_plan FROM mycar.plan WHERE codigo='FREE' AND activo LIMIT 1
+                """, (r, n) -> r.getLong(1)).stream().findFirst().orElse(null);
+        if (planFree != null) {
+            jdbc.update("""
+                    INSERT INTO mycar.suscripcion(id_usuario, id_plan, estado, origen, modalidad, fin_utc)
+                    VALUES (?, ?, 'ACTIVA', 'REGISTRO', 'FREE', NULL)
+                    """, id, planFree);
+        }
+        Map<String, Object> m = new LinkedHashMap<>(base);
+        m.put("plan", "FREE");
+        m.put("uso", switch (correo) {
+            case "rf.activa@mycar.test" -> "FREE limpio — solicitar prueba 14d o Pagar 30d";
+            case "plan.prueba@mycar.test" -> "Caso prueba gratuita 14d → admin aprueba/rechaza";
+            case "plan.pago@mycar.test" -> "Caso Pagar Premium simulado 30d → admin aprueba/rechaza";
+            case "plan.free@mycar.test" -> "Solo FREE de control";
+            default -> "Planes";
+        });
+        return m;
+    }
+
+    /** Solo @mycar.test: borra solicitudes/ops/eventos de planes y deja suscripciones vencidas. */
+    private void limpiarHistorialPlanes(long id) {
+        jdbc.update("DELETE FROM mycar.suscripcion_evento WHERE id_usuario=?", id);
+        jdbc.update("DELETE FROM mycar.solicitud_suscripcion WHERE id_usuario=?", id);
+        jdbc.update("DELETE FROM mycar.operacion_pago_prueba WHERE id_usuario=?", id);
+        jdbc.update("""
+                UPDATE mycar.suscripcion SET estado='VENCIDA', fin_utc=COALESCE(fin_utc, clock_timestamp())
+                 WHERE id_usuario=? AND estado='ACTIVA'
+                """, id);
     }
 
     private Map<String, Object> ensureEliminadaConstancia(Instant now) {

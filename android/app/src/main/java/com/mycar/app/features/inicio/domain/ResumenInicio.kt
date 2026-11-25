@@ -11,6 +11,13 @@ data class ResumenAlertaInicio(
     val titulo: String,
     val estado: String
 )
+/** Último taller activo del catálogo del usuario (mayor id = el más reciente registrado). */
+data class ResumenTallerInicio(
+    val id: Long,
+    val nombre: String,
+    val origen: String? = null,
+    val direccion: String? = null
+)
 data class BloquesInicio(
     val kilometraje: Int?, val fechaLectura: Instant? = null,
     val ultimoMantenimiento: MantenimientoHistorial? = null,
@@ -18,7 +25,9 @@ data class BloquesInicio(
     val lectura: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
     val alertas: List<ResumenAlertaInicio> = emptyList(),
     val alertasDisponibilidad: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
-    val totalAlertas: Int = 0
+    val totalAlertas: Int = 0,
+    val ultimoTaller: ResumenTallerInicio? = null,
+    val talleresDisponibilidad: DisponibilidadInicio = DisponibilidadInicio.CARGANDO
 )
 data class EstadoResumenInicio(
     val fase: FaseInicio = FaseInicio.SIN_SESION,

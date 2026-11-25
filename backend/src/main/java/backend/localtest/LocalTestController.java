@@ -92,6 +92,13 @@ public class LocalTestController {
         return ResponseEntity.ok(fixtures.prepararLimiteEliminacion30d());
     }
 
+    @PostMapping(path = "/fixtures/preparar-planes", produces = "application/json")
+    public ResponseEntity<?> prepararPlanes(
+            @RequestHeader(value = "X-MyCar-Local-Test", required = false) String token) {
+        exigir(token);
+        return ResponseEntity.ok(fixtures.prepararCuentasPlanes());
+    }
+
     private void exigir(String token) {
         LocalTestGuard.requireEnabled(enabled);
         if (qaToken == null || qaToken.isBlank() || token == null || !qaToken.equals(token)) {

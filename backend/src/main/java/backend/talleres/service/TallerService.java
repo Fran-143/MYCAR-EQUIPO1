@@ -2,6 +2,7 @@ package backend.talleres.service;
 
 import backend.talleres.dao.TallerDao;
 import backend.talleres.model.DatosTaller.*;
+import backend.talleres.model.TallerAsociacionNoAutorizada;
 import backend.talleres.model.TallerAsociadoNoEditable;
 import backend.talleres.model.TallerFavoritoFallido;
 import backend.talleres.model.TallerNombreDuplicado;
@@ -83,11 +84,19 @@ public class TallerService {
         }
     }
 
-    /** RF33 — registrar taller MANUAL (formulario por defecto). */
+    /** RF33 — registrar taller MANUAL (formulario personal). */
     @Transactional
     public Taller registrar(long idUsuario, RegistrarTallerRequest body) {
+        return registrar(idUsuario, body, false);
+    }
+
+    @Transactional
+    public Taller registrar(long idUsuario, RegistrarTallerRequest body, boolean solicitanteAdmin) {
         exigirUsuario(idUsuario);
         if (body == null) throw new IllegalArgumentException("Solicitud obligatoria");
+        if (body.intentaMarcarGlobalOAsociado() && !solicitanteAdmin) {
+            throw new TallerAsociacionNoAutorizada();
+        }
         String nombre = validador.nombreObligatorio(body.nombre());
         exigirNombreLibre(idUsuario, nombre, 0);
         String telefono = validador.telefonoOpcional(body.telefono());
@@ -106,9 +115,15 @@ public class TallerService {
         }
     }
 
-    /** RF33-EA07 — vincular taller ASOCIADO del catálogo global. */
+    /** RF33-EA07 — vincular taller ASOCIADO. Solo un administrador. */
     @Transactional
     public Taller vincularAsociado(long idUsuario, VincularAsociadoRequest body) {
+        return vincularAsociado(idUsuario, body, false);
+    }
+
+    @Transactional
+    public Taller vincularAsociado(long idUsuario, VincularAsociadoRequest body, boolean solicitanteAdmin) {
+        if (!solicitanteAdmin) throw new TallerAsociacionNoAutorizada();
         exigirUsuario(idUsuario);
         if (body == null || body.idTallerGlobal() <= 0) {
             throw new IllegalArgumentException("idTallerGlobal inválido");

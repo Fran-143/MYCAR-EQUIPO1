@@ -79,6 +79,8 @@ fun NotificacionesRoute(
     onAbrirLicenciaDesdeAviso: (() -> Unit)? = null,
     onAbrirKilometrajeDesdeAviso: ((idVehiculo: Long) -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
     categoriaInicial: String? = null,
     idResaltar: Long? = null,
     modifier: Modifier = Modifier
@@ -147,6 +149,8 @@ fun NotificacionesRoute(
         },
         onCerrarAviso = { avisoDestino = null },
         onPerfil = onPerfil,
+        avatarBytes = avatarBytes,
+        iniciales = iniciales,
         modifier = modifier
     )
 }
@@ -165,6 +169,8 @@ fun NotificacionesScreen(
     onAccionDetalle: () -> Unit = {},
     onCerrarAviso: () -> Unit,
     onPerfil: (() -> Unit)? = null,
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
     modifier: Modifier = Modifier
 ) {
     val detalle = estado.detalle
@@ -176,7 +182,12 @@ fun NotificacionesScreen(
         )
     }
     Column(modifier.fillMaxSize().background(Fondo)) {
-        com.mycar.app.ui.MycarCabeceraApp(onPerfil = onPerfil, conStatusBars = true)
+        com.mycar.app.ui.MycarCabeceraApp(
+            onPerfil = onPerfil,
+            conStatusBars = true,
+            avatarBytes = avatarBytes,
+            iniciales = iniciales
+        )
         Column(
             Modifier
                 .fillMaxSize()

@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -210,7 +211,54 @@ fun RegistroVehiculoScreen(
                         Button(onClick = onIniciarSesion, enabled = !estado.ocupado) { Text("Iniciar sesión") }
                         OutlinedButton(onClick = onRecargar, enabled = !estado.ocupado) { Text("Volver a comprobar") }
                     }
-                    FaseRegistro.SIN_CUPO -> OutlinedButton(onClick = onVolver, enabled = !estado.ocupado) { Text("Volver") }
+                    FaseRegistro.SIN_CUPO -> {
+                        val azul = Color(0xFF1565C0)
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = azul.copy(alpha = 0.08f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, azul.copy(alpha = 0.25f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                Modifier.padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    Modifier
+                                        .size(64.dp)
+                                        .background(azul.copy(alpha = 0.14f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.DirectionsCar,
+                                        contentDescription = null,
+                                        tint = azul,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                                Text(
+                                    "Cupo de vehículos completo",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF003366)
+                                )
+                                Text(
+                                    estado.mensaje
+                                        ?: "Tu plan ya alcanzó el máximo de vehículos registrados.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Button(
+                                    onClick = onVolver,
+                                    enabled = !estado.ocupado,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = azul),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Volver a mis vehículos") }
+                            }
+                        }
+                    }
                     FaseRegistro.INCIERTA -> {
                         Text("Conservamos tu solicitud para evitar registros duplicados.")
                         Button(onClick = onComprobar, enabled = !estado.ocupado, modifier = Modifier.fillMaxWidth()) { Text("Comprobar registro") }

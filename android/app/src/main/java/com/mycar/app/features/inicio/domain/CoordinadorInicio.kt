@@ -83,7 +83,9 @@ class CoordinadorInicio(private val repository: ResumenInicioRepository, private
             if(turno==revision) {
                 if(e is ErrorResumenInicio && e.sesion) publicarError(e)
                 else mutable.value=mutable.value.copy(bloques=BloquesInicio(v.kilometrajeActual,
-                    historial=DisponibilidadInicio.NO_DISPONIBLE,lectura=DisponibilidadInicio.NO_DISPONIBLE))
+                    historial=DisponibilidadInicio.NO_DISPONIBLE,lectura=DisponibilidadInicio.NO_DISPONIBLE,
+                    alertasDisponibilidad=DisponibilidadInicio.NO_DISPONIBLE,
+                    talleresDisponibilidad=DisponibilidadInicio.NO_DISPONIBLE))
             }
         }
     }

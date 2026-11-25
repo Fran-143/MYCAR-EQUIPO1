@@ -80,13 +80,13 @@ class HistorialMantenimientoPantallasTest {
         compose.onNodeWithTag("rf18.registrar").assertIsNotEnabled()
     }
 
-    @Test fun activoAbreRegistroConSuIdYVolverInvocaNavegacion() {
-        var id: Long? = null; var salidas = 0
+    @Test fun activoAbreRegistroConSuId() {
+        var id: Long? = null
         mostrar(EstadoHistorial(FaseHistorial.LISTO, listOf(activo), activo),
-            registrar = { id = it }, volver = { salidas++ })
+            registrar = { id = it })
         compose.onNodeWithTag("rf18.registrar").performClick()
-        compose.onNodeWithTag("rf18.volver").performClick()
-        compose.runOnIdle { assertEquals(10L, id); assertEquals(1, salidas) }
+        compose.onNodeWithText("+ Registrar").assertExists()
+        compose.runOnIdle { assertEquals(10L, id) }
     }
     @Test fun sinClaveDeSesionNoConsultaRepositorios() {
         val consultas = java.util.concurrent.atomic.AtomicInteger()

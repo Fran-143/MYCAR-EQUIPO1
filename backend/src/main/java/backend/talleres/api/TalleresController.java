@@ -3,6 +3,7 @@ package backend.talleres.api;
 import backend.autenticacion.SessionAuthentication;
 import backend.mantenimiento.seguridad.SesionMantenimientoNoValidada;
 import backend.talleres.model.DatosTaller.*;
+import backend.talleres.model.TallerAsociacionNoAutorizada;
 import backend.talleres.service.TallerService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.CacheControl;
@@ -43,15 +44,26 @@ public class TalleresController {
 
     @PostMapping("/talleres")
     public ResponseEntity<Taller> registrar(Authentication auth, @RequestBody RegistrarTallerRequest body) {
+        if (body != null && body.intentaMarcarGlobalOAsociado() && !esAdmin(auth)) {
+            throw new TallerAsociacionNoAutorizada();
+        }
+        long idUsuario = usuario(auth);
+        if (esAdmin(auth) && body != null && body.intentaMarcarGlobalOAsociado()) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(servicio.registrar(idUsuario, body, true));
+        }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(servicio.registrar(usuario(auth), body));
+                .body(servicio.registrar(idUsuario, body));
     }
 
     @PostMapping("/talleres/asociados")
     public ResponseEntity<Taller> vincularAsociado(
             Authentication auth, @RequestBody VincularAsociadoRequest body) {
+        if (!esAdmin(auth)) {
+            throw new TallerAsociacionNoAutorizada();
+        }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(servicio.vincularAsociado(usuario(auth), body));
+                .body(servicio.vincularAsociado(usuario(auth), body, true));
     }
 
     @PutMapping("/talleres/{idTaller}")
@@ -90,5 +102,11 @@ public class TalleresController {
             throw new SesionMantenimientoNoValidada();
         }
         return principal.userId();
+    }
+
+    private static boolean esAdmin(Authentication autenticacion) {
+        return autenticacion != null
+                && autenticacion.getPrincipal() instanceof SessionAuthentication.Principal principal
+                && principal.isAdmin();
     }
 }

@@ -1,6 +1,7 @@
 package backend.talleres.api;
 
 import backend.mantenimiento.seguridad.SesionMantenimientoNoValidada;
+import backend.talleres.model.TallerAsociacionNoAutorizada;
 import backend.talleres.model.TallerAsociadoNoEditable;
 import backend.talleres.model.TallerFavoritoFallido;
 import backend.talleres.model.TallerNombreDuplicado;
@@ -41,6 +42,11 @@ public class ErroresTalleresController {
     @ExceptionHandler(TallerYaVinculado.class)
     ResponseEntity<Error> yaVinculado(TallerYaVinculado ex) {
         return error(409, "TALLER_YA_VINCULADO", ex.getMessage());
+    }
+
+    @ExceptionHandler(TallerAsociacionNoAutorizada.class)
+    ResponseEntity<Error> asociacionNoAutorizada(TallerAsociacionNoAutorizada ex) {
+        return error(403, "TALLER_ASOCIACION_NO_AUTORIZADA", ex.getMessage());
     }
 
     @ExceptionHandler(TallerAsociadoNoEditable.class)

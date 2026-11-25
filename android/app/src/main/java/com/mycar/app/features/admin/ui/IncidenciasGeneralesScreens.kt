@@ -1,6 +1,7 @@
 package com.mycar.app.features.admin.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -31,11 +32,8 @@ import com.mycar.app.features.soporte.ui.CamposDetalleIncidenciaGeneral
 import com.mycar.app.features.soporte.ui.ChipEstado
 import com.mycar.app.features.soat.ui.SoatBotonPrincipal
 import com.mycar.app.features.soat.ui.SoatBotonSecundario
-import com.mycar.app.ui.theme.MyCarNavy
 
-private val Navy = Color(0xFF12285F)
 private val Teal = Color(0xFF007E98)
-private val Mute = Color(0xFF718096)
 
 @Composable
 fun IncidenciasGeneralesRoute(
@@ -43,6 +41,7 @@ fun IncidenciasGeneralesRoute(
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     val vm: AdminGeneralesViewModel = viewModel(factory = remember(repository) { AdminGeneralesViewModel.factory(repository) })
     val estado by vm.estado.collectAsState()
     BackHandler {
@@ -56,6 +55,7 @@ fun IncidenciasGeneralesRoute(
     Column(
         modifier
             .fillMaxSize()
+            .background(scheme.background)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -68,7 +68,7 @@ fun IncidenciasGeneralesRoute(
                     PantallaAdminGenerales.CONFIRMACION -> vm.volverLista()
                     else -> onVolver()
                 }
-            }) { Text("Volver", color = Navy) }
+            }) { Text("Volver", color = scheme.onSurface) }
             Text(
                 when (estado.pantalla) {
                     PantallaAdminGenerales.DETALLE -> "Detalle de incidencia"
@@ -78,7 +78,7 @@ fun IncidenciasGeneralesRoute(
                     else -> "Incidencias generales"
                 },
                 fontWeight = FontWeight.Bold,
-                color = Navy,
+                color = scheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -112,10 +112,11 @@ private fun FilaContadores(c: ContadoresIncidenciaDto) {
 
 @Composable
 private fun MiniContador(etiqueta: String, valor: Int, color: Color) {
+    val scheme = MaterialTheme.colorScheme
     Surface(shape = RoundedCornerShape(10.dp), color = color.copy(alpha = 0.1f)) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("$valor", fontWeight = FontWeight.Bold, color = color)
-            Text(etiqueta, style = MaterialTheme.typography.labelSmall, color = Mute)
+            Text(etiqueta, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
         }
     }
 }
@@ -125,7 +126,8 @@ private fun ListaIncidenciasGenerales(
     estado: com.mycar.app.features.admin.viewmodel.EstadoAdminGenerales,
     vm: AdminGeneralesViewModel
 ) {
-    Text("Gestión de incidencias generales reportadas por usuarios.", color = Mute)
+    val scheme = MaterialTheme.colorScheme
+    Text("Gestión de incidencias generales reportadas por usuarios.", color = scheme.onSurfaceVariant)
     FilaContadores(estado.contadores)
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -161,35 +163,35 @@ private fun ListaIncidenciasGenerales(
         singleLine = true
     )
     if (estado.lista.isEmpty() && !estado.cargando) {
-        Text("No hay incidencias para este filtro.", color = Mute)
+        Text("No hay incidencias para este filtro.", color = scheme.onSurfaceVariant)
     }
     estado.lista.forEach { s ->
         Card(
             Modifier.fillMaxWidth().clickable { vm.abrirDetalle(s.codigo) },
             shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = scheme.surface)
         ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     s.codigo,
                     fontWeight = FontWeight.Bold,
-                    color = Navy,
+                    color = scheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 ChipEstado(s.estado)
                 s.asunto?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, color = Navy, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(it, color = scheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 s.categoria?.let {
                     Text(
                         IncidenciaGeneralFormulario.etiquetaCategoria(it),
-                        color = Mute,
+                        color = scheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
                 s.creadoUtc?.let {
-                    Text(it.take(10), color = Mute, style = MaterialTheme.typography.bodySmall)
+                    Text(it.take(10), color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -201,13 +203,14 @@ private fun DetalleIncidenciaGeneral(
     estado: com.mycar.app.features.admin.viewmodel.EstadoAdminGenerales,
     vm: AdminGeneralesViewModel
 ) {
+    val scheme = MaterialTheme.colorScheme
     val d = estado.detalle ?: return
     val cerrado = d.estado in setOf("RESUELTA", "RECHAZADA")
     val puedeRechazar = d.estado in setOf("PENDIENTE", "ACEPTADA", "EN_PROCESO")
     Card(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = scheme.surface)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             CabeceraDetalleSolicitud(d.codigo, d.estado)
@@ -243,7 +246,7 @@ private fun DetalleIncidenciaGeneral(
                     enabled = !estado.ocupado,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
+                    colors = ButtonDefaults.buttonColors(containerColor = scheme.primary)
                 ) {
                     Icon(Icons.Filled.Check, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -256,7 +259,7 @@ private fun DetalleIncidenciaGeneral(
                     enabled = !estado.ocupado,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
+                    colors = ButtonDefaults.buttonColors(containerColor = scheme.primary)
                 ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -298,11 +301,12 @@ private fun TerminarIncidenciaGeneral(
     estado: com.mycar.app.features.admin.viewmodel.EstadoAdminGenerales,
     vm: AdminGeneralesViewModel
 ) {
+    val scheme = MaterialTheme.colorScheme
     Text(
         "Escribe la respuesta que verá el usuario al cerrar el caso.",
-        color = Mute
+        color = scheme.onSurfaceVariant
     )
-    Text("Requiere MFA confirmado en los últimos 10 minutos.", color = Mute, style = MaterialTheme.typography.bodySmall)
+    Text("Requiere MFA confirmado en los últimos 10 minutos.", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     OutlinedTextField(
         value = estado.textoRespuesta,
         onValueChange = vm::editarTextoRespuesta,
@@ -321,8 +325,9 @@ private fun RechazarIncidenciaGeneral(
     estado: com.mycar.app.features.admin.viewmodel.EstadoAdminGenerales,
     vm: AdminGeneralesViewModel
 ) {
-    Text("Indica el motivo del rechazo.", color = Mute)
-    Text("Requiere MFA confirmado en los últimos 10 minutos.", color = Mute, style = MaterialTheme.typography.bodySmall)
+    val scheme = MaterialTheme.colorScheme
+    Text("Indica el motivo del rechazo.", color = scheme.onSurfaceVariant)
+    Text("Requiere MFA confirmado en los últimos 10 minutos.", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     OutlinedTextField(
         value = estado.motivoRechazo,
         onValueChange = vm::editarMotivoRechazo,
@@ -358,8 +363,9 @@ private fun ConfirmacionIncidenciaGeneral(
 
 @Composable
 private fun FilaAdminGenerales(etiqueta: String, valor: String) {
+    val scheme = MaterialTheme.colorScheme
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(etiqueta, color = Mute, style = MaterialTheme.typography.labelMedium)
-        Text(valor, fontWeight = FontWeight.Medium, color = Navy)
+        Text(etiqueta, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+        Text(valor, fontWeight = FontWeight.Medium, color = scheme.onSurface)
     }
 }

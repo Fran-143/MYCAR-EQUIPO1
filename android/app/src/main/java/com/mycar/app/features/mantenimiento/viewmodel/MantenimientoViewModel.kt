@@ -126,13 +126,14 @@ class MantenimientoViewModel(
     /**
      * Recarga referencias y, si el formulario está trabado (error / sin vehículos / pendiente),
      * limpia borrador local para desbloquear la UI.
+     * [conservarBorrador] evita ese borrado al volver del overlay de kilometraje.
      */
-    fun recargar() {
+    fun recargar(conservarBorrador: Boolean = false) {
         viewModelScope.launch {
             val s = mutable.value
             val trabado = s.mensaje != null || s.contexto == null || s.contexto.vehiculos.isEmpty()
                     || s.recuperacionBloqueada || (s.incierto && s.contexto == null)
-            if (trabado && desdeAlerta == null) {
+            if (trabado && desdeAlerta == null && !conservarBorrador) {
                 runCatching { withContext(Dispatchers.IO) { archivo.borrar() } }
                 saved.remove<String>("rf17.borrador")
                 mutable.value = MantenimientoUiState(

@@ -1,10 +1,16 @@
 package com.mycar.app.features.historial.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,23 +23,23 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mycar.app.features.historial.domain.*
 import com.mycar.app.ui.MycarCabeceraApp
-import androidx.compose.runtime.mutableIntStateOf
 import java.math.RoundingMode
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val FondoHistorial = Color(0xFFF0F5FA)
-private val AzulHistorial = Color(0xFF12285F)
-private val CelesteHistorial = Color(0xFF007E98)
 
 /** Vista real de producción; ejemplos de vehículos/registros viven únicamente en debug y pruebas. */
 @Composable
@@ -58,7 +64,13 @@ fun HistorialMantenimientoScreen(
     onNotificaciones: (() -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
     abrirEnTalleres: Boolean = false,
-    onAbrirEnTalleresConsumido: () -> Unit = {}
+    onAbrirEnTalleresConsumido: () -> Unit = {},
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
+    /** Catálogo real de tipos (RF17/RF59). Los históricos ausentes del catálogo se suman en el desplegable. */
+    tiposCatalogo: List<Pair<String, String>> = emptyList(),
+    /** true = formulario/detalle taller a pantalla completa (oculta cabecera y nav inferior). */
+    onFormularioTallerAbierto: (Boolean) -> Unit = {}
 ) {
     var pestana by rememberSaveable {
         mutableStateOf(
@@ -66,83 +78,131 @@ fun HistorialMantenimientoScreen(
         )
     }
     var talleresSubpantalla by remember { mutableStateOf(false) }
-    var solicitarAltaTalleres by remember { mutableIntStateOf(0) }
-    var solicitarVolverTalleres by remember { mutableIntStateOf(0) }
+    // El botón llama una vez a abrirAlta. Un tick + LaunchedEffect se reejecutaba al
+    // recomponer y el padre titulaba esa misma pantalla como "Detalle taller".
+    var abrirAltaTaller by remember { mutableStateOf<(() -> Unit)?>(null) }
     LaunchedEffect(abrirEnTalleres) {
         if (abrirEnTalleres) {
             pestana = PestanaHistorial.TALLERES
             onAbrirEnTalleresConsumido()
         }
     }
-    val tituloSeccion = when {
-        pestana == PestanaHistorial.TALLERES && talleresSubpantalla -> "Detalle taller"
-        pestana == PestanaHistorial.TALLERES -> "Talleres"
-        pestana == PestanaHistorial.KILOMETRAJE -> "Kilometraje"
-        else -> "Mantenimientos"
+    val shellVisible = !(pestana == PestanaHistorial.TALLERES && talleresSubpantalla)
+    LaunchedEffect(shellVisible) {
+        onFormularioTallerAbierto(!shellVisible)
     }
-
-    Column(modifier.fillMaxSize().background(FondoHistorial).testTag("rf18.pantalla")) {
-        MycarCabeceraApp(onNotificaciones = onNotificaciones, onPerfil = onPerfil)
-
-        Surface(color = Color.White, shadowElevation = 1.dp) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Solo subpantallas (p. ej. detalle de taller) necesitan Volver; las pestañas
-                // principales usan la barra inferior.
-                if (pestana == PestanaHistorial.TALLERES && talleresSubpantalla) {
-                    TextButton(
-                        onClick = { solicitarVolverTalleres += 1 },
-                        modifier = Modifier.testTag("rf18.volver")
-                    ) { Text("Volver") }
+    val pestanaState = rememberUpdatedState(pestana)
+    val deltaFiltro = remember { mutableFloatStateOf(0f) }
+    val estadoLista = rememberLazyListState()
+    val mostrarCriterios by remember {
+        derivedStateOf {
+            val enTope = !estadoLista.canScrollBackward
+            enTope || deltaFiltro.floatValue > -24f
+        }
+    }
+    val scrollFiltros = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (pestanaState.value != PestanaHistorial.MANTENIMIENTOS) return Offset.Zero
+                val dy = consumed.y
+                when {
+                    dy > 0.5f -> deltaFiltro.floatValue = 0f
+                    dy < -0.5f -> deltaFiltro.floatValue =
+                        (deltaFiltro.floatValue + dy).coerceAtLeast(-80f)
                 }
-                Text(
-                    tituloSeccion,
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = AzulHistorial
-                )
-                if (pestana == PestanaHistorial.MANTENIMIENTOS) {
-                    Button(
-                        onClick = { estado.seleccionado?.id?.let(onRegistrar) },
-                        enabled = estado.puedeRegistrar && registroDisponible,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("rf18.registrar"),
-                        colors = ButtonDefaults.buttonColors(containerColor = AzulHistorial)
-                    ) { Text("Registrar mantenimiento") }
-                }
-                if (pestana == PestanaHistorial.KILOMETRAJE && onActualizarKm != null) {
-                    Button(
-                        onClick = { estado.seleccionado?.id?.let(onActualizarKm) },
-                        enabled = estado.seleccionado?.activo == true,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("rf14.desdeHistorial"),
-                        colors = ButtonDefaults.buttonColors(containerColor = CelesteHistorial)
-                    ) { Text("Actualizar") }
-                }
-                if (pestana == PestanaHistorial.TALLERES && !talleresSubpantalla) {
-                    com.mycar.app.features.talleres.ui.BotonAgregarTaller(
-                        onAgregar = { solicitarAltaTalleres += 1 },
-                        enabled = true
-                    )
-                }
+                return Offset.Zero
             }
         }
+    }
+    LaunchedEffect(pestana) {
+        if (pestana == PestanaHistorial.MANTENIMIENTOS) deltaFiltro.floatValue = 0f
+    }
 
-        // Tabs del historial: ocultas en detalle/formulario de talleres.
-        if (!(pestana == PestanaHistorial.TALLERES && talleresSubpantalla)) {
-            Surface(color = Color.White, shadowElevation = 0.dp) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+    Column(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag("rf18.pantalla")) {
+        if (shellVisible) {
+            MycarCabeceraApp(
+                onNotificaciones = onNotificaciones,
+                onPerfil = onPerfil,
+                avatarBytes = avatarBytes,
+                iniciales = iniciales
+            )
+            Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 1.dp) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        "Historial integral",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF6881A5),
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        "Historial",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    when (pestana) {
+                        PestanaHistorial.MANTENIMIENTOS -> {
+                            Button(
+                                onClick = { estado.seleccionado?.id?.let(onRegistrar) },
+                                enabled = estado.puedeRegistrar && registroDisponible,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.testTag("rf18.registrar"),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("+ Registrar", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        PestanaHistorial.TALLERES -> {
+                            com.mycar.app.features.talleres.ui.BotonAgregarTaller(
+                                onAgregar = { abrirAltaTaller?.invoke() },
+                                enabled = abrirAltaTaller != null
+                            )
+                        }
+                        PestanaHistorial.KILOMETRAJE -> Unit
+                    }
+                }
+            }
+            if (pestana != PestanaHistorial.TALLERES && estado.vehiculos.isNotEmpty()) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    SelectorVehiculoHistorial(estado, onSeleccionar)
+                }
+            }
+            Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 0.dp) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
                     PestanasHistorial(pestana) { pestana = it }
                 }
+            }
+            when (pestana) {
+                PestanaHistorial.MANTENIMIENTOS -> {
+                    AnimatedVisibility(
+                        visible = estado.vehiculos.isNotEmpty() && mostrarCriterios,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        CriteriosFiltradoMantenimientos(
+                            estado = estado,
+                            tiposCatalogo = tiposCatalogo,
+                            onFiltrarTipo = onFiltrarTipo,
+                            onOrdenar = onOrdenar,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                PestanaHistorial.KILOMETRAJE -> {
+                    if (estado.faseKm == FaseKilometrajeHistorial.LISTO) {
+                        OrdenHistorial(
+                            recientes = estado.ordenRecientes,
+                            onOrdenar = onOrdenar,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                PestanaHistorial.TALLERES -> Unit
             }
         }
 
@@ -153,8 +213,7 @@ fun HistorialMantenimientoScreen(
                     onVolver = onVolver,
                     embebidoEnHistorial = true,
                     onFormularioAbierto = { talleresSubpantalla = it },
-                    solicitarAltaTick = solicitarAltaTalleres,
-                    solicitarVolverTick = solicitarVolverTalleres,
+                    onAccionAlta = { abrirAltaTaller = it },
                     modifier = Modifier.weight(1f).testTag("rf34.enHistorial")
                 )
             }
@@ -171,13 +230,11 @@ fun HistorialMantenimientoScreen(
                 }
             }
             else -> LazyColumn(
-            Modifier.weight(1f),
+            Modifier.weight(1f).nestedScroll(scrollFiltros),
+            state = estadoLista,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            if (estado.vehiculos.isNotEmpty()) {
-                item { SelectorVehiculoHistorial(estado, onSeleccionar) }
-            }
             estado.aviso?.let { item { MensajeHistorial("Vehículo no disponible", it) } }
             when (pestana) {
                 PestanaHistorial.KILOMETRAJE -> item {
@@ -185,7 +242,6 @@ fun HistorialMantenimientoScreen(
                         estado = estado,
                         onRecargarKm = onRecargarKm,
                         onReintentar = onReintentar,
-                        onOrdenar = onOrdenar,
                         onCorregirKm = onCorregirKm,
                         vehiculoActivo = vehiculoActivo
                     )
@@ -204,12 +260,12 @@ fun HistorialMantenimientoScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             LinearProgressIndicator(
                                 Modifier.fillMaxWidth().testTag("rf18.cargando"),
-                                color = CelesteHistorial
+                                color = MaterialTheme.colorScheme.secondary
                             )
                             Text(
                                 if (estado.fase == FaseHistorial.CARGANDO_VEHICULOS) "Cargando tus vehículos…"
                                 else "Cargando el historial del vehículo…",
-                                color = AzulHistorial
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -239,24 +295,17 @@ fun HistorialMantenimientoScreen(
                                 "Puedes consultar su historial. El registro de mantenimientos está disponible para vehículos activos."
                             )
                         }
-                        if (estado.mantenimientos.isEmpty()) {
+                        if (estado.mantenimientos.isEmpty() && estado.filtroCodigoTipo == null) {
                             item {
                                 EstadoVacioMantenimientos()
                             }
                         } else {
                             item {
-                                CriteriosFiltradoMantenimientos(
-                                    estado = estado,
-                                    onFiltrarTipo = onFiltrarTipo,
-                                    onOrdenar = onOrdenar
-                                )
-                            }
-                            item {
                                 Text(
                                     "${estado.contador} registros",
                                     Modifier.testTag("rf18.contador"),
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = AzulHistorial
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             if (estado.sinCoincidenciasFiltro) {
@@ -296,7 +345,7 @@ private enum class PestanaHistorial { MANTENIMIENTOS, KILOMETRAJE, TALLERES }
 private fun SelectorVehiculoHistorial(estado: EstadoHistorial, onSeleccionar: (Long) -> Unit) {
     var abierto by remember { mutableStateOf(false) }
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
@@ -305,28 +354,28 @@ private fun SelectorVehiculoHistorial(estado: EstadoHistorial, onSeleccionar: (L
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Surface(shape = CircleShape, color = Color(0xFFE8F1FA)) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                     Icon(
                         Icons.Filled.DirectionsCar,
                         contentDescription = null,
-                        tint = CelesteHistorial,
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.padding(8.dp).size(18.dp)
                     )
                 }
-                Text("Vehículo", style = MaterialTheme.typography.labelLarge, color = AzulHistorial, fontWeight = FontWeight.SemiBold)
+                Text("Seleccionar vehículo", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
             }
             Box {
                 OutlinedButton(
                     onClick = { abierto = true },
                     modifier = Modifier.fillMaxWidth().testTag("rf18.selector"),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, AzulHistorial.copy(alpha = 0.25f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
                 ) {
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                         Text(
-                            estado.seleccionado?.nombre ?: "Selecciona un vehículo",
-                            color = AzulHistorial,
+                            estado.seleccionado?.nombre ?: "Seleccionar vehículo",
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -341,7 +390,7 @@ private fun SelectorVehiculoHistorial(estado: EstadoHistorial, onSeleccionar: (L
                             )
                         }
                     }
-                    Text("▾", color = CelesteHistorial)
+                    Text("▾", color = MaterialTheme.colorScheme.secondary)
                 }
                 DropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
                     estado.vehiculos.forEach { v ->
@@ -368,52 +417,123 @@ private fun SelectorVehiculoHistorial(estado: EstadoHistorial, onSeleccionar: (L
 @Composable
 private fun CriteriosFiltradoMantenimientos(
     estado: EstadoHistorial,
+    tiposCatalogo: List<Pair<String, String>>,
     onFiltrarTipo: (String?) -> Unit,
-    onOrdenar: (Boolean) -> Unit
+    onOrdenar: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Filtros", style = MaterialTheme.typography.labelLarge, color = AzulHistorial, fontWeight = FontWeight.SemiBold)
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterChip(
-                selected = estado.filtroCodigoTipo == null,
-                onClick = { onFiltrarTipo(null) },
-                label = { Text("Todos") },
-                modifier = Modifier.testTag("rf18.filtro.todos")
-            )
-            estado.tiposFiltro.forEach { (codigo, nombre) ->
-                FilterChip(
-                    selected = estado.filtroCodigoTipo == codigo,
-                    onClick = { onFiltrarTipo(codigo) },
-                    label = { Text(nombre, maxLines = 1) },
-                    modifier = Modifier.testTag("rf18.filtro.$codigo")
+    var menuTipo by remember { mutableStateOf(false) }
+    val opciones = remember(tiposCatalogo, estado.tiposFiltro) {
+        val map = linkedMapOf<String, String>()
+        tiposCatalogo.forEach { (codigo, nombre) ->
+            if (codigo.isNotBlank()) map[codigo] = nombre.ifBlank { codigo }
+        }
+        estado.tiposFiltro.forEach { (codigo, nombre) ->
+            if (codigo.isNotBlank() && codigo !in map) map[codigo] = nombre.ifBlank { codigo }
+        }
+        map.entries.sortedBy { it.value.lowercase() }.map { it.key to it.value }
+    }
+    val etiquetaTipo = estado.filtroCodigoTipo?.let { codigo ->
+        opciones.firstOrNull { it.first == codigo }?.second ?: codigo
+    } ?: "Todos"
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Tipo de mantenimiento", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+        Box {
+            OutlinedButton(
+                onClick = { menuTipo = true },
+                modifier = Modifier.fillMaxWidth().testTag("rf18.filtro.tipo"),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    etiquetaTipo,
+                    Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Text("▾", color = MaterialTheme.colorScheme.secondary)
+            }
+            DropdownMenu(expanded = menuTipo, onDismissRequest = { menuTipo = false }) {
+                DropdownMenuItem(
+                    text = { Text("Todos") },
+                    onClick = { menuTipo = false; onFiltrarTipo(null) },
+                    modifier = Modifier.testTag("rf18.filtro.todos")
+                )
+                opciones.forEach { (codigo, nombre) ->
+                    DropdownMenuItem(
+                        text = { Text(nombre, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        onClick = { menuTipo = false; onFiltrarTipo(codigo) },
+                        modifier = Modifier.testTag("rf18.filtro.$codigo")
+                    )
+                }
             }
         }
-        Text("Orden", style = MaterialTheme.typography.labelLarge, color = AzulHistorial, fontWeight = FontWeight.SemiBold)
+        OrdenHistorial(recientes = estado.ordenRecientes, onOrdenar = onOrdenar)
+    }
+}
+
+@Composable
+private fun OrdenHistorial(
+    recientes: Boolean,
+    onOrdenar: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Orden", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = estado.ordenRecientes,
+            BotonOrden(
+                texto = "Más reciente",
+                seleccionado = recientes,
                 onClick = { onOrdenar(true) },
-                label = { Text("Más reciente") },
-                modifier = Modifier.testTag("rf18.orden.reciente")
+                tag = "rf18.orden.reciente"
             )
-            FilterChip(
-                selected = !estado.ordenRecientes,
+            BotonOrden(
+                texto = "Más antiguo",
+                seleccionado = !recientes,
                 onClick = { onOrdenar(false) },
-                label = { Text("Más antiguo") },
-                modifier = Modifier.testTag("rf18.orden.antiguo")
+                tag = "rf18.orden.antiguo"
             )
         }
     }
 }
 
 @Composable
+private fun BotonOrden(texto: String, seleccionado: Boolean, onClick: () -> Unit, tag: String) {
+    val forma = RoundedCornerShape(10.dp)
+    val padding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+    if (seleccionado) {
+        Button(
+            onClick = onClick,
+            modifier = Modifier.heightIn(min = 40.dp).testTag(tag),
+            shape = forma,
+            contentPadding = padding,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) { Text(texto, fontWeight = FontWeight.Bold) }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = Modifier.heightIn(min = 40.dp).testTag(tag),
+            shape = forma,
+            contentPadding = padding,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
+        ) { Text(texto, fontWeight = FontWeight.Medium) }
+    }
+}
+
+@Composable
 private fun EstadoVacioMantenimientos() {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
@@ -422,11 +542,11 @@ private fun EstadoVacioMantenimientos() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(shape = CircleShape, color = Color(0xFFE8F1FA)) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                 Icon(
                     Icons.Filled.Build,
                     contentDescription = null,
-                    tint = CelesteHistorial,
+                    tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(16.dp).size(36.dp)
                 )
             }
@@ -434,7 +554,7 @@ private fun EstadoVacioMantenimientos() {
                 "Aún no tienes mantenimientos registrados para este vehículo",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = AzulHistorial,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Text(
@@ -463,8 +583,8 @@ private fun PestanasHistorial(activa: PestanaHistorial, onCambiar: (PestanaHisto
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AzulHistorial,
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Text(
@@ -481,10 +601,10 @@ private fun PestanasHistorial(activa: PestanaHistorial, onCambiar: (PestanaHisto
                     modifier = Modifier.weight(1f).heightIn(min = 44.dp).testTag(etiqueta.second),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
-                    border = BorderStroke(1.dp, AzulHistorial.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White,
-                        contentColor = AzulHistorial
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     )
                 ) {
                     Text(
@@ -509,14 +629,14 @@ private fun TarjetaMantenimientoHistorial(
     Card(
         Modifier.fillMaxWidth().testTag("rf18.registro.${m.id}"),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Text(
                 m.titulo,
                 style = MaterialTheme.typography.titleMedium,
-                color = AzulHistorial,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -541,7 +661,7 @@ private fun TarjetaMantenimientoHistorial(
             Text(
                 if (m.costo == null) "Costo: No registrado"
                 else "Costo: S/ ${m.costo.setScale(2, RoundingMode.UNNECESSARY).toPlainString()}",
-                color = AzulHistorial,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium
             )
             m.taller?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
@@ -561,7 +681,6 @@ private fun ContenidoKilometrajeHistorial(
     estado: EstadoHistorial,
     onRecargarKm: () -> Unit,
     onReintentar: () -> Unit,
-    onOrdenar: (Boolean) -> Unit,
     onCorregirKm: ((Long) -> Unit)? = null,
     vehiculoActivo: Boolean = false
 ) {
@@ -570,7 +689,7 @@ private fun ContenidoKilometrajeHistorial(
             "Historial de kilometraje",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = AzulHistorial
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (estado.seleccionado == null) {
             MensajeHistorial("Elige un vehículo", "Selecciona un vehículo para ver sus lecturas de kilometraje.")
@@ -584,8 +703,8 @@ private fun ContenidoKilometrajeHistorial(
         }
         when (estado.faseKm) {
             FaseKilometrajeHistorial.IDLE, FaseKilometrajeHistorial.CARGANDO -> {
-                LinearProgressIndicator(Modifier.fillMaxWidth(), color = CelesteHistorial)
-                Text("Cargando lecturas…", color = AzulHistorial)
+                LinearProgressIndicator(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.secondary)
+                Text("Cargando lecturas…", color = MaterialTheme.colorScheme.onSurface)
             }
             FaseKilometrajeHistorial.ERROR -> {
                 MensajeHistorial("No se pudo cargar el kilometraje", estado.mensajeKm ?: "Inténtalo de nuevo") {
@@ -599,18 +718,6 @@ private fun ContenidoKilometrajeHistorial(
                 )
             }
             FaseKilometrajeHistorial.LISTO -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = estado.ordenRecientes,
-                        onClick = { onOrdenar(true) },
-                        label = { Text("Más reciente") }
-                    )
-                    FilterChip(
-                        selected = !estado.ordenRecientes,
-                        onClick = { onOrdenar(false) },
-                        label = { Text("Más antiguo") }
-                    )
-                }
                 val idUltima = estado.lecturasKm.maxWithOrNull(
                     compareBy<LecturaKilometrajeHistorial>({ it.fechaUtc.orEmpty() }, { it.id })
                 )?.id
@@ -623,7 +730,7 @@ private fun ContenidoKilometrajeHistorial(
                     Card(
                         Modifier.fillMaxWidth().testTag("rf15.lectura.${l.id}"),
                         shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(
@@ -634,13 +741,13 @@ private fun ContenidoKilometrajeHistorial(
                                     Text(
                                         "${kilometrajeHistorial(l.km)} km",
                                         fontWeight = FontWeight.SemiBold,
-                                        color = AzulHistorial
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     if (esUltima) {
                                         Text(
                                             if (yaCorregida) "Última lectura · Ya corregida" else "Última lectura",
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = CelesteHistorial
+                                            color = MaterialTheme.colorScheme.secondary
                                         )
                                     }
                                 }
@@ -668,22 +775,22 @@ private fun ContenidoKilometrajeHistorial(
                             Text(
                                 "Origen: ${etiquetaOrigenKm(l.origen)}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF6881A5)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             l.fechaUtc?.let {
-                                Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (l.kmAnteriorCorreccion != null) {
                                 Text(
                                     "Corregido desde ${kilometrajeHistorial(l.kmAnteriorCorreccion)} km",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF6881A5)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 l.motivoCorreccion?.let {
                                     Text(
                                         "Motivo: $it",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF6881A5)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -714,14 +821,14 @@ private fun MensajeHistorial(titulo: String, texto: String, acciones: @Composabl
     OutlinedCard(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.outlinedCardColors(containerColor = Color.White)
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
                 titulo,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = AzulHistorial
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(texto, style = MaterialTheme.typography.bodyMedium)
             acciones()

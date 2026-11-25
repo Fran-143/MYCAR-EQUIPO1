@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,8 +23,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.mycar.app.features.inicio.ui.MyCarNavigation
-import com.mycar.app.ui.theme.AparienciaPreferencias
-import com.mycar.app.ui.theme.ModoApariencia
 import com.mycar.app.ui.theme.MyCarTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.features.autenticacion.ui.AuthGate
@@ -68,7 +65,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
-        AparienciaPreferencias.cargar(this)
         aplicarIntentPush(intent)
         comprobarRedLocal()
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -77,8 +73,8 @@ class MainActivity : ComponentActivity() {
             permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
         setContent {
-            val modo by AparienciaPreferencias.flujo.collectAsState()
-            MyCarTheme(darkTheme = modo == ModoApariencia.OSCURO, dynamicColor = false) {
+            // Tema fijo claro MyCar (sin selector claro/oscuro).
+            MyCarTheme(darkTheme = false, dynamicColor = false) {
             if (redLocalDisponible) {
                 val sesion: SesionVehiculosViewModel = viewModel()
                 AuthGate {

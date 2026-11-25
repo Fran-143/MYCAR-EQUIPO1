@@ -41,7 +41,9 @@ fun RegistrarMantenimientoRoute(
     onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null,
     desdeAlerta: ContextoDesdeAlerta? = null,
     atenderAlerta: AtenderAlertaDesdeFormulario? = null,
-    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
+    /** false mientras el overlay de kilometraje cubre el formulario (el atrás no cierra el registro). */
+    retrocesoHabilitado: Boolean = true
 ) {
     val context = LocalContext.current.applicationContext
     val factory = remember(
@@ -77,16 +79,20 @@ fun RegistrarMantenimientoRoute(
     LaunchedEffect(state.contexto, state.cargando) {
         if (state.contexto != null || !state.cargando) resumeListo = true
     }
-    DisposableEffect(lifecycleOwner, vm) {
+    DisposableEffect(lifecycleOwner, vm, retrocesoHabilitado) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && resumeListo) vm.recargar()
+            if (event == Lifecycle.Event.ON_RESUME && resumeListo) {
+                vm.recargar(conservarBorrador = !retrocesoHabilitado)
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    LaunchedEffect(recargaToken) { if (recargaToken > 0) vm.recargar() }
+    // El overlay de KM no pausa la Activity, así que ON_RESUME no refresca el km.
+    // El token llega solo al confirmar la lectura y conserva el borrador.
+    LaunchedEffect(recargaToken) { if (recargaToken > 0) vm.recargar(conservarBorrador = true) }
     val cerrarConfirmado = { vm.finalizarConfirmacion(); onCerrar() }
-    BackHandler {
+    BackHandler(enabled = retrocesoHabilitado) {
         when {
             state.resultado != null -> cerrarConfirmado()
             state.editable -> vm.solicitarSalir()
