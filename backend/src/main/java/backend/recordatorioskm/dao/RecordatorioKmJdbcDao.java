@@ -68,6 +68,7 @@ public class RecordatorioKmJdbcDao {
                 LEFT JOIN mycar.config_recordatorio_km c ON c.id_vehiculo = v.id_vehiculo
                 WHERE v.id_usuario = ?
                   AND v.estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                 ORDER BY v.es_principal DESC, v.marca, v.modelo, v.id_vehiculo
                 """, (rs, n) -> new VehiculoConfigRow(
                 rs.getLong("id_vehiculo"),
