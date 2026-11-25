@@ -119,20 +119,41 @@ public class EliminacionVehiculoDao {
                 USING mycar.alerta a
                 WHERE c.id_alerta = a.id_alerta AND a.id_vehiculo = ?
                 """, idVehiculo);
+        // Outbox → notificaciones del vehículo (RF43 KM y resúmenes)
+        jdbc.update("""
+                DELETE FROM mycar.outbox_push_notificacion opn
+                USING mycar.notificacion n
+                WHERE opn.id_notificacion = n.id_notificacion AND n.id_vehiculo = ?
+                """, idVehiculo);
+        jdbc.update("""
+                UPDATE mycar.outbox_push o
+                SET id_alerta = NULL,
+                    id_notificacion = CASE
+                        WHEN o.id_notificacion IN (
+                            SELECT n.id_notificacion FROM mycar.notificacion n WHERE n.id_vehiculo = ?
+                        ) THEN NULL ELSE o.id_notificacion END,
+                    estado = CASE WHEN o.estado IN ('PENDIENTE', 'ERROR') THEN 'OMITIDO' ELSE o.estado END,
+                    actualizado_utc = clock_timestamp()
+                WHERE o.id_alerta IN (SELECT id_alerta FROM mycar.alerta WHERE id_vehiculo = ?)
+                   OR o.id_notificacion IN (SELECT id_notificacion FROM mycar.notificacion WHERE id_vehiculo = ?)
+                """, idVehiculo, idVehiculo, idVehiculo);
+        // Resúmenes pendientes que aún referencian alertas de este vehículo (junction)
+        jdbc.update("""
+                UPDATE mycar.outbox_push o
+                SET estado = 'OMITIDO',
+                    actualizado_utc = clock_timestamp()
+                WHERE o.estado IN ('PENDIENTE', 'ERROR')
+                  AND EXISTS (
+                    SELECT 1 FROM mycar.outbox_push_alerta opa
+                    JOIN mycar.alerta a ON a.id_alerta = opa.id_alerta
+                    WHERE opa.id_outbox = o.id_outbox AND a.id_vehiculo = ?
+                  )
+                """, idVehiculo);
         jdbc.update("""
                 DELETE FROM mycar.notificacion
                 WHERE id_vehiculo = ?
                    OR id_alerta IN (SELECT id_alerta FROM mycar.alerta WHERE id_vehiculo = ?)
                 """, idVehiculo, idVehiculo);
-        // outbox_push.id_alerta es ON DELETE SET NULL; limpiamos pendientes ligados al vehículo
-        jdbc.update("""
-                UPDATE mycar.outbox_push o
-                SET id_alerta = NULL,
-                    estado = CASE WHEN o.estado IN ('PENDIENTE', 'ERROR') THEN 'OMITIDO' ELSE o.estado END,
-                    actualizado_utc = clock_timestamp()
-                FROM mycar.alerta a
-                WHERE o.id_alerta = a.id_alerta AND a.id_vehiculo = ?
-                """, idVehiculo);
         jdbc.update("DELETE FROM mycar.alerta WHERE id_vehiculo = ?", idVehiculo);
 
         // SOAT / TIVE (tras alertas por FK RESTRICT)

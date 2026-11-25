@@ -136,6 +136,10 @@ public class OutboxPushService {
                 outbox.marcar(f.idOutbox(), "OMITIDO", "rf48_off");
                 continue;
             }
+            if (!sigueVigenteParaEnvio(f)) {
+                outbox.marcar(f.idOutbox(), "OMITIDO", "vehiculo_o_alerta_no_vigente");
+                continue;
+            }
             if (simularEnvio || "NONE".equals(sender.proveedor())) {
                 outbox.marcar(f.idOutbox(), "ENVIADO", "simulado");
                 registrarControlTrasEnvio(f);
@@ -241,6 +245,68 @@ public class OutboxPushService {
      * Revalidación inmediata antes de envío.
      * KILOMETRAJE: interruptor RF43 (config_recordatorio_km_usuario), no kilometraje_on heredado.
      */
+    /**
+     * No despachar si la alerta ya no es operativa o el vehículo dejó de estar VIGENTE.
+     * Resúmenes sin id_alerta: se validan vía junction outbox_push_alerta.
+     */
+    private boolean sigueVigenteParaEnvio(OutboxFila f) {
+        if (f.idAlerta() != null) {
+            Boolean ok = jdbc.query("""
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM mycar.alerta a
+                        JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
+                        WHERE a.id_alerta = ?
+                          AND a.estado IN ('PROXIMA', 'PENDIENTE', 'VENCIDA')
+                          AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
+                          AND v.estado_vehiculo = 'ACTIVO'
+                    )
+                    """, rs -> rs.next() && rs.getBoolean(1), f.idAlerta());
+            return Boolean.TRUE.equals(ok);
+        }
+        if (f.idNotificacion() != null) {
+            Boolean ok = jdbc.query("""
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM mycar.notificacion n
+                        LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = n.id_vehiculo
+                        WHERE n.id_notificacion = ?
+                          AND n.estado_gestion = 'PENDIENTE'
+                          AND (
+                            n.id_vehiculo IS NULL
+                            OR (
+                              COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
+                              AND v.estado_vehiculo = 'ACTIVO'
+                            )
+                          )
+                    )
+                    """, rs -> rs.next() && rs.getBoolean(1), f.idNotificacion());
+            return Boolean.TRUE.equals(ok);
+        }
+        // Resumen: si tiene alertas vinculadas, al menos una debe seguir operativa
+        List<Long> ids = outbox.alertasDeOutbox(f.idOutbox());
+        if (!ids.isEmpty()) {
+            for (Long idAlerta : ids) {
+                Boolean ok = jdbc.query("""
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM mycar.alerta a
+                            JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
+                            WHERE a.id_alerta = ?
+                              AND a.estado IN ('PROXIMA', 'PENDIENTE', 'VENCIDA')
+                              AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
+                              AND v.estado_vehiculo = 'ACTIVO'
+                        )
+                        """, rs -> rs.next() && rs.getBoolean(1), idAlerta);
+                if (Boolean.TRUE.equals(ok)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
     private boolean rf48Permite(long usuario, String categoria) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
