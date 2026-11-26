@@ -58,6 +58,11 @@ public class PlanesService {
         reconciliarVencimiento(idUsuario);
         SuscripcionRow s = dao.suscripcionActiva(idUsuario)
                 .orElseThrow(() -> new ErrorPlanes("NO_ENCONTRADO", "No hay suscripción activa."));
+        // Autocura: Free con varios ACTIVO (p. ej. tras rechazo/apagar) → solo el principal.
+        if ("FREE".equals(s.planCodigo())) {
+            exigirLimiteActivosPlanFree(idUsuario);
+            s = dao.suscripcionActiva(idUsuario).orElse(s);
+        }
         return toMiSuscripcion(s);
     }
 
@@ -392,7 +397,7 @@ public class PlanesService {
         long idFree = asegurarFree(idUsuario);
         dao.registrarEvento(idUsuario, idFree, null, "FREE_REACTIVADA", "post_cancelacion_admin");
         // FREE: un solo vehículo activo (principal); el resto pasa a INACTIVO.
-        dao.reconciliarActivosFree(idUsuario, 1);
+        exigirLimiteActivosPlanFree(idUsuario);
         return new ContratoPlanes.DecisionResponse(
                 null, "CANCELADA",
                 "Premium cancelado por administración. Usuario en FREE; solo queda 1 vehículo activo.",
@@ -419,6 +424,8 @@ public class PlanesService {
         }
         dao.registrarEvento(sol.idUsuario(), null, sol.idOperacionPago(),
                 "SOLICITUD_RECHAZADA", "motivo=" + motivo.strip());
+        // Si queda en Free (o nunca salió de Free), forzar 1 vehículo activo.
+        exigirLimiteActivosPlanFree(sol.idUsuario());
         return new ContratoPlanes.DecisionResponse(
                 codigo, "RECHAZADA", "Solicitud rechazada.", null, sol.modalidad());
     }
@@ -663,6 +670,7 @@ public class PlanesService {
     private long asegurarFree(long idUsuario) {
         SuscripcionRow activa = dao.suscripcionActiva(idUsuario).orElse(null);
         if (activa != null && "FREE".equals(activa.planCodigo()) && vigente(activa)) {
+            exigirLimiteActivosPlanFree(idUsuario);
             return activa.idSuscripcion();
         }
         if (activa != null) {
@@ -670,7 +678,22 @@ public class PlanesService {
         }
         PlanRow free = dao.porCodigo("FREE")
                 .orElseThrow(() -> new ErrorPlanes("CONFIGURACION_PENDIENTE", "Plan FREE no disponible."));
-        return dao.insertarSuscripcion(idUsuario, free.idPlan(), "REGISTRO", "FREE", null, null);
+        long id = dao.insertarSuscripcion(idUsuario, free.idPlan(), "REGISTRO", "FREE", null, null);
+        exigirLimiteActivosPlanFree(idUsuario);
+        return id;
+    }
+
+    /** Free: como máximo 1 vehículo ACTIVO (principal). Los demás pasan a INACTIVO. */
+    private void exigirLimiteActivosPlanFree(long idUsuario) {
+        SuscripcionRow s = dao.suscripcionActiva(idUsuario).orElse(null);
+        if (s == null || !"FREE".equals(s.planCodigo())) {
+            return;
+        }
+        if (dao.contarVehiculosActivos(idUsuario) > 1) {
+            dao.reconciliarActivosFree(idUsuario, 1);
+            dao.registrarEvento(idUsuario, s.idSuscripcion(), null,
+                    "VEHICULOS_RECONCILIADOS_FREE", "limite_activos=1");
+        }
     }
 
     private void exigirSandbox() {
