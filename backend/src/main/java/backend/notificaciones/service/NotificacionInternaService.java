@@ -113,6 +113,13 @@ public class NotificacionInternaService {
                 refresco.idVehiculo());
     }
 
+    @Transactional
+    public ContratoNotificaciones.LeerTodasResponse marcarTodasLeidas(long usuario) {
+        int marcadas = dao.marcarTodasLeidas(usuario);
+        return new ContratoNotificaciones.LeerTodasResponse(
+                marcadas, dao.contarNoLeidas(usuario), dao.contarLeidas(usuario));
+    }
+
     /** Detalle vigente (relee alerta/KM); no muta LEÍDA. */
     @Transactional(readOnly = true)
     public ContratoNotificaciones.DetalleNotificacionDto consultarDetalle(long usuario, long idNotificacion) {

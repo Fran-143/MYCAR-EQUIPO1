@@ -122,5 +122,7 @@ public final class ContratoNotificaciones {
             Long idVehiculo
     ) { }
 
+    public record LeerTodasResponse(int marcadas, int contadorNoLeidasGlobal, int contadorLeidasGlobal) { }
+
     public record ErrorResponse(String codigo, String mensaje, boolean resultadoIncierto) { }
 }

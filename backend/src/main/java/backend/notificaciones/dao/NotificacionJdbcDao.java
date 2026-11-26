@@ -376,6 +376,15 @@ public class NotificacionJdbcDao {
                 """, usuario, idNotificacion);
     }
 
+    /** Marca como leídas todas las no leídas del titular. */
+    public int marcarTodasLeidas(long usuario) {
+        return jdbc.update("""
+                UPDATE mycar.notificacion
+                SET leida = TRUE, fecha_actualizacion_utc = clock_timestamp()
+                WHERE id_usuario = ? AND leida = FALSE
+                """, usuario);
+    }
+
     public record AlertaContexto(
             long idAlerta, Long idVehiculo, long idUsuario, String estado,
             String categoria, String placa, String etiquetaServicio

@@ -43,6 +43,11 @@ public class NotificacionesController {
         return servicio.consultarDetalle(usuario(auth), idNotificacion);
     }
 
+    @PostMapping("/leer-todas")
+    public ContratoNotificaciones.LeerTodasResponse leerTodas(Authentication auth) {
+        return servicio.marcarTodasLeidas(usuario(auth));
+    }
+
     @PostMapping("/{idNotificacion}/leer")
     public ContratoNotificaciones.LeerResponse leer(
             Authentication auth, @PathVariable long idNotificacion) {
