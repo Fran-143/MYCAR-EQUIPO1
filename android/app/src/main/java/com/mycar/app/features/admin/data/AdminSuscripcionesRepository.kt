@@ -61,13 +61,19 @@ class AdminSuscripcionesRepository(private val api: AdminSuscripcionesApi) {
 
     private fun errorMsg(raw: String?, code: Int): String {
         if (raw.isNullOrBlank()) {
-            return if (code == 403) "Sin permiso (403). En local reinicia el backend o vuelve a iniciar sesión como admin."
-            else "Error HTTP $code"
+            return when (code) {
+                401 -> "Sesión caducada. Vuelve a iniciar sesión como administrador."
+                403 -> "Sin permiso (403). Confirma MFA o vuelve a iniciar sesión como admin."
+                else -> "Error HTTP $code"
+            }
         }
         val codigo = Regex("\"codigo\"\\s*:\\s*\"([^\"]+)\"").find(raw)?.groupValues?.get(1)
         val mensaje = Regex("\"mensaje\"\\s*:\\s*\"([^\"]+)\"").find(raw)?.groupValues?.get(1)
         if (codigo == "MFA_STEP_UP_REQUERIDO" || raw.contains("MFA", ignoreCase = true)) {
             return mensaje ?: "Confirma MFA reciente (últimos 10 minutos) e inténtalo de nuevo."
+        }
+        if (codigo == "SESION_NO_VALIDA" || code == 401) {
+            return mensaje ?: "Sesión caducada. Vuelve a iniciar sesión como administrador."
         }
         return mensaje ?: raw
     }
@@ -80,7 +86,13 @@ fun adminSuscripcionesRepository(
     val authRepo = AuthGraph.repository(context)
     val cliente = ClienteVehiculosAutenticado(
         BuildConfig.API_BASE_URL,
-        autorizacion = { runBlocking { authRepo.authorization(auth) } }
+        // Siempre el contexto vigente + renovación; evita SESION_NO_VALIDA al quedar el snapshot viejo.
+        autorizacion = {
+            runBlocking {
+                val ctx = authRepo.authenticatedContext() ?: auth
+                authRepo.authorization(ctx)
+            }
+        }
     )
     return AdminSuscripcionesRepository(cliente.retrofit.create(AdminSuscripcionesApi::class.java))
 }

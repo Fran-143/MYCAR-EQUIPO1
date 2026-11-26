@@ -947,8 +947,11 @@ private fun TabPlanUsuario(
             Text("Sin solicitud Premium pendiente.", color = scheme.onSurfaceVariant)
         }
 
-        val puedeCancelar = mapBool(s, "puedeCancelarAdmin")
-        if (suscripcionesRepository != null && puedeCancelar) {
+        val planActivo = (s?.get("plan") as? String).orEmpty()
+        val puedeCancelar = suscripcionesRepository != null &&
+            planActivo == "PREMIUM" &&
+            mapBool(s, "puedeCancelarAdmin")
+        if (puedeCancelar) {
             Surface(
                 color = Danger.copy(alpha = 0.14f),
                 shape = RoundedCornerShape(14.dp),
@@ -958,9 +961,9 @@ private fun TabPlanUsuario(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Cancel, null, tint = Danger, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Cancelar Premium (prueba/sandbox)", fontWeight = FontWeight.SemiBold, color = Danger)
+                        Text("Apagar plan Premium", fontWeight = FontWeight.SemiBold, color = Danger)
                     }
-                    Text("El usuario vuelve a FREE y se concilian vehículos activos.", color = scheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text("El usuario vuelve a FREE y se concilian vehículos activos. El botón desaparece al quedar en Free.", color = scheme.onSurfaceVariant, fontSize = 13.sp)
                     if (confirmCancel) {
                         OutlinedTextField(
                             value = motivoCancel,
@@ -1005,7 +1008,7 @@ private fun TabPlanUsuario(
                             enabled = !busy,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Danger)
-                        ) { Text("Anular Premium / detener experiencia") }
+                        ) { Text("Apagar plan") }
                     }
                 }
             }
@@ -1062,6 +1065,13 @@ private fun UsuariosGestionScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text("Estado actual: ${estado.replace('_', ' ')}", fontWeight = FontWeight.Bold, color = scheme.onSurface)
+            val visible = (detalle.estadoVisible ?: detalle.estado).orEmpty()
+            if (visible.isNotBlank() && !visible.equals(estado, ignoreCase = true)) {
+                Text(
+                    "Estado visible: ${visible.replace('_', ' ')} (no administrativo)",
+                    color = scheme.onSurfaceVariant
+                )
+            }
             when (estado) {
                 "ACTIVA" -> {
                     AccionBtn("Suspender cuenta", Danger, onSuspender, Icons.Outlined.PauseCircle)
@@ -1090,8 +1100,14 @@ private fun UsuariosGestionScreen(
                 is Boolean -> b
                 else -> b?.toString().equals("true", ignoreCase = true)
             }
-            if (estado == "ACTIVA" && bloqueado) {
-                Text("Bloqueo de recuperación activo (no impide login).", color = scheme.onSurfaceVariant)
+            if (bloqueado == true) {
+                val hasta = recup?.get("bloqueadoHastaUtc")?.toString()
+                Text(
+                    "Restricción temporal de recuperación activa" +
+                        (if (!hasta.isNullOrBlank()) " hasta $hasta" else "") +
+                        ". Desbloquear administrativo no la retira.",
+                    color = scheme.onSurfaceVariant
+                )
                 AccionBtn("Ver historial", scheme.primary, onHistorial)
             }
             Spacer(Modifier.weight(1f, fill = true))

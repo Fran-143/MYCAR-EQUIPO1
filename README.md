@@ -1,189 +1,91 @@
 # MyCar
 
-App de gestión vehicular: registro de vehículos, kilometraje, mantenimientos y
-alertas preventivas. El MVP cubre 11 de los 65 requerimientos funcionales (RF).
+Aplicación Android de gestión vehicular académica: registro de vehículos,
+kilometraje, mantenimientos, documentos (SOAT, TIVE, licencia), alertas y
+notificaciones. Proyecto universitario — **no es un producto comercial** y
+**no procesa pagos reales**.
 
-## Estado actual (verificado en `main`)
+## Versión actual
 
-| RF | Funcionalidad | Responsable | Estado en `main` |
-|---|---|---|---|
-| RF01 | Registro de cuenta | Elsa | Backend y Android |
-| RF02 | Inicio de sesión | Elsa | Backend y Android |
-| RF06 | Cierre de sesión | Elsa | Backend y Android |
-| RF08 | Registrar vehículo (cupo plan Free) | Francesca | Backend y Android |
-| RF09 | Listar vehículos | Francesca | Backend y Android |
-| RF10 | Detalle de vehículo | Francesca | Backend y Android |
-| RF14 | Actualizar kilometraje | Francesca | Backend y Android |
-| RF17 | Registrar mantenimiento | Nayu | Backend y Android |
-| RF18 | Historial de mantenimientos | Nayu | Backend y Android |
-| RF22 | Programar alerta preventiva | Nayu | Backend y Android |
-| RF23 | Consultar / sincronizar alertas | Nayu | Backend y Android |
-| RF50 | Inicio y navegación común | Francesca | Android |
+| Ítem | Valor |
+|---|---|
+| App | **MyCar 1.0.8** (`versionCode` **79**) |
+| applicationId | `com.mycar.app` |
+| Backend Render | rama `deploy/render-free` (tip reciente: planes Free/Premium simulados) |
+| API | `https://mycar-backend-1dxi.onrender.com` |
 
-Los otros RF del catálogo RF01–RF65 permanecen documentados y pendientes de desarrollo.
+APK release verificada (local):
 
-Planes e integración de la BD y el backend: Sebastián (ver
-[Planes e integración](#planes-e-integración-sebastián)).
+`dist/release/MyCar-v1.0.8-release.apk`
 
-## Tecnología
+## Tecnologías
 
-- Android: Kotlin y Jetpack Compose.
-- Backend: Java 21 y Spring Boot 3.5.
-- Base de datos: PostgreSQL 17 en Docker. Base de desarrollo `mycar_mvp`, esquema `mycar`.
-- Migraciones: Flyway en `backend/src/main/resources/db/mvp` (**V1 a V9**). V6 RF22 POR_TIEMPO sin lectura; V7 placa dual; V8 OTP esquema; V9 RF22 `origen_calculo` dual.
+- Android: Kotlin, Jetpack Compose.
+- Backend: Java 21, Spring Boot 3.x.
+- Base de datos: PostgreSQL (Neon en hosting; Docker en local).
+- Migraciones: Flyway en `backend/src/main/resources/db/mvp`.
+- Push: Firebase Cloud Messaging (datos / outbox).
+- Cron alertas: Cloudflare Worker (opcional).
 
-Documentación de la base: [docs/db/mvp/README.md](docs/db/mvp/README.md).  
-Guía RF22/RF23: [docs/vehiculos/GUIA_RF22_RF23.md](docs/vehiculos/GUIA_RF22_RF23.md).
+## Funcionalidades implementadas
 
-## Estructura del repositorio
+- Cuenta: registro, login, cierre de sesión, recuperación, privacidad 1.0.
+- Vehículos: alta, listado, detalle, estado activo/inactivo, eliminación lógica (RF62).
+- Kilometraje: actualización y corrección con reglas de negocio.
+- Mantenimientos: registro, historial, anulación; export PDF Premium.
+- SOAT y recordatorios asociados.
+- TIVE / soporte de corrección VIN (flujos de incidencias).
+- Licencia de conducir y recordatorios.
+- Alertas preventivas (programación y consulta) + notificaciones en app / FCM.
+- Fotografías de perfil y de vehículo (almacenamiento controlado).
+- Administración: usuarios, catálogos, incidencias, **suscripciones**.
 
-- `android/`: app Android.
-- `backend/`: API REST (controladores, servicios, DAO).
-- `docs/`: documentación por módulo (`db`, `vehiculos`, `inicio`, `requisitos`).
-- `scripts/`: pruebas con PostgreSQL desechable y auxiliares de integración local.
-- `compose.yml`: PostgreSQL de desarrollo.
+## Planes Free y Premium (simulado)
 
-## Actualizar el proyecto (compañeras del equipo)
+| Plan | Reglas |
+|---|---|
+| **Free** | Cupo de registro limitado; **solo 1 vehículo ACTIVO**. Si hay más, se conserva el principal ACTIVO y el resto pasa a **INACTIVO** (no se borran ni pierden historial). |
+| **Prueba gratuita** | Una sola vez por cuenta · **14 días** · requiere aprobación admin · vence sola → Free. |
+| **Premium sandbox** | Solicitud de pago **simulado** (sin cobro real) · admin aprueba/rechaza · vigente **hasta que admin apague** el plan. |
 
-Si ya tienen el repo clonado y **no les aparecen alertas RF22/RF23**, estaban en `main` antiguo.
-Ahora RF10, RF14, RF22 y RF23 están en **`main`**. En PowerShell, desde la carpeta del proyecto:
+Cola admin **Solicitudes**: solo pendientes. Lo aprobado/rechazado se administra en **Suscripciones** (p. ej. apagar plan).
 
-```powershell
-cd RUTA\MYCAR-EQUIPO1
-git fetch origin
-git checkout main
-git pull origin main
-```
+## Cómo conseguir la APK
 
-Comprobar que llegaron las alertas:
+1. Compilar release en Android Studio / Gradle (`:app:assembleRelease`), o
+2. Usar el artefacto versionado en Releases (cuando se publique el draft `v1.0.8`).
 
-```powershell
-Test-Path .\android\app\src\main\java\com\mycar\app\features\alertas
-Test-Path .\backend\src\main\java\backend\alertas
-Test-Path .\backend\src\main\resources\db\mvp\V6__rf22_tiempo_sin_lectura.sql
-```
+Firma release: `CN=MyCar Release` (keystore del equipo; **no** se publica en el repo).
 
-Los tres deben devolver `True`.
-
-Si tienen cambios locales sin subir y `git pull` falla:
-
-```powershell
-git stash push -u -m "backup-local"
-git pull origin main
-git stash pop
-```
-
-Clon nuevo:
+## Instalación (desarrollo)
 
 ```powershell
 git clone https://github.com/Fran-143/MYCAR-EQUIPO1.git
 cd MYCAR-EQUIPO1
-git checkout main
-git pull origin main
-```
-
-## Requisitos
-
-- Git.
-- Docker Desktop.
-- JDK 21.
-- Python 3.12 (para los scripts de `scripts/`).
-- Android Studio y Android SDK.
-
-## Configuración local
-
-```powershell
 Copy-Item .env.example .env
-notepad .env
-```
-
-Configurar:
-
-- POSTGRES_DB=mycar_mvp
-- POSTGRES_USER=mycar
-- POSTGRES_PASSWORD con una contraseña local propia.
-- POSTGRES_PORT=5432
-
-No subir `.env` a GitHub.
-No sobrescribir un `.env` existente sin revisar sus valores.
-
-## Iniciar PostgreSQL
-
-```powershell
+# Completar secretos locales; NUNCA subir .env
 docker compose up -d --wait postgres
-docker compose ps
-```
-
-El servicio debe aparecer `healthy`.
-
-## Probar la app como usuario
-
-1. Levantar PostgreSQL.
-2. Iniciar el backend de integración local (terminal abierta):
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\iniciar_backend_integracion_local.ps1 -VersionPrivacidad '1.0'
-```
-
-   Puerto **8081**. Health: `Invoke-RestMethod http://localhost:8081/actuator/health` → `status UP`.
-
-3. En Android Studio abrir `android`, emulador, run debug (`http://10.0.2.2:8081/`).
-
-4. Recorrido: crear cuenta, login, registrar vehículo, detalle, actualizar km, mantenimientos, **programar alerta (RF22)** y **Mis alertas (RF23)**, cerrar sesión.
-
-Más detalle: [Integración Elsa RF50](docs/inicio/INTEGRACION_ELSA_RF50.md), [Probar RF08](docs/vehiculos/PROBAR_RF08_EN_APP.md), [Guía RF22/RF23](docs/vehiculos/GUIA_RF22_RF23.md).
-
-## Iniciar solo el backend (puerto 8080)
-
-```powershell
 cd backend
 .\mvnw.cmd spring-boot:run
 ```
 
-Flyway aplicará migraciones pendientes (hasta V9).
+Android Studio → abrir `android` → run debug apuntando al backend local o a Render.
 
-## Pruebas
+## Política de Privacidad
 
-```powershell
-cd backend
-.\mvnw.cmd test
-```
+Texto embebido en la app (`android/app/src/main/res/raw/mycar_privacy_1_0.txt`) y pantallas de consentimiento en registro / ajustes.
 
-Pruebas con PostgreSQL desechable (Docker + Python), desde la raíz:
+## Seguridad del repositorio
 
-```powershell
-python scripts/test_mvp_db.py
-python scripts/test_rf08_api.py --incluir-rf09 --incluir-sesion
-python scripts/test_rf01.py
-python scripts/test_rf02.py
-python scripts/test_rf06.py
-```
+No subir: keystores, `.env`, credenciales Neon/Supabase/Firebase Admin, `CRON_SECRET`, Brevo, tokens, PII, fotos de usuarios ni respaldos de producción. Ver `.gitignore`.
 
-## Planes e integración (Sebastián)
+## Ramas
 
-En el MVP solo el plan **Free** está operativo (se muestra como «Gratis»). Premium
-queda para una entrega posterior.
+- `main`: integración del equipo (actualizar vía PR desde `deploy/render-free` / `release/v1.0.8`).
+- `deploy/render-free`: despliegue backend en Render.
+- `release/v1.0.8`: empaquetado Android 1.0.8 + backend alineado.
 
-Reglas:
+## Documentación adicional
 
-- Free permite 1 vehículo registrado en total, contando activos e inactivos.
-- El límite se valida solo al registrar un vehículo (RF08), no al desactivarlo.
-- La suscripción Free ACTIVA la crea el backend en la misma transacción del registro
-  de cuenta (RF01). La app no envía el plan y no hay trigger en la base de datos.
-- Solo puede existir una suscripción ACTIVA por usuario (índice único parcial).
-- El id del usuario sale siempre de la sesión validada, nunca de la petición.
-
-API:
-
-- `GET /api/v1/vehiculos/cupo-registro` devuelve `plan`, `limite`, `registrados` y
-  `puedeRegistrar`. Es orientativa y no reserva cupo.
-- `POST /api/v1/vehiculos` responde 409 `LIMITE_FREE` si ya llegó al límite y 409
-  `PLAN_FREE_NO_DISPONIBLE` si no hay una suscripción Free vigente.
-
-## Trabajo compartido
-
-- Crear una rama por tarea.
-- Integrar mediante pull request revisado.
-- Coordinar el número de cada migración nueva.
-- No modificar una migración que ya fue aplicada.
-- No subir contraseñas, tokens, registros de ejecución ni respaldos de la base de datos.
+- `docs/` — guías por módulo (vehículos, alertas, inicio, planes).
+- `docs/RELEASE_DRAFT_v1.0.8.md` — borrador de GitHub Release (**no publicar** sin revisión).

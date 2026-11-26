@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.mycar.app.BuildConfig
 import com.mycar.app.core.FechaMyCar
 import com.mycar.app.features.planes.data.PlanDto
 import com.mycar.app.features.planes.domain.PlanesRepository
@@ -59,7 +58,8 @@ fun PlanesRoute(
         when (estado.pantalla) {
             PantallaPlanes.CATALOGO -> CatalogoScreen(estado, vm, onVolver)
             PantallaPlanes.PRUEBA_RESUMEN -> PruebaResumenScreen(estado, vm)
-            // Flujos legacy de escenarios sandbox: redirigidos al catálogo (pago = un toque).
+            PantallaPlanes.PAGO_CONFIRMAR -> PagoSimuladoConfirmarScreen(estado, vm)
+            // Escenarios local-test solo en sidecar; en release se redirige al catálogo.
             PantallaPlanes.CONTRATAR, PantallaPlanes.ESCENARIOS -> CatalogoScreen(estado, vm, onVolver)
             PantallaPlanes.PROCESANDO -> ProcesandoScreen()
             PantallaPlanes.RESULTADO -> ResultadoScreen(estado, vm)
@@ -75,7 +75,21 @@ private fun CatalogoScreen(estado: EstadoPlanes, vm: PlanesViewModel, onVolver: 
         TextButton(onClick = onVolver) { Text("Volver", color = Navy) }
         Text("Planes y suscripción", color = Navy, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Text("El plan efectivo lo define el servidor.", color = Mute, fontSize = 14.sp)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
+        Surface(
+            color = Color(0xFFE8F4FC),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "Pago simulado — Proyecto académico",
+                color = Blue,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(12.dp)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
         if (estado.cargando) {
             Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Teal)
@@ -132,69 +146,67 @@ private fun CatalogoScreen(estado: EstadoPlanes, vm: PlanesViewModel, onVolver: 
             Text("Mi suscripción y solicitudes", color = Navy)
         }
         Spacer(Modifier.height(12.dp))
-        if (BuildConfig.LOCAL_TEST_TOOLS) {
-            val solAbierta = estado.mia?.codigoSolicitudAbierta
-            if (!solAbierta.isNullOrBlank()) {
-                Surface(
-                    color = Color(0xFFFFF3E0),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text("Ya solicitaste Premium", color = Color(0xFFE65100), fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Código $solAbierta · pendiente de revisión administrativa.",
-                            color = Mute, fontSize = 13.sp
-                        )
-                        TextButton(onClick = { vm.abrirDetalleSolicitud(solAbierta) }) {
-                            Text("Ver mi solicitud", color = Teal)
-                        }
+        val solAbierta = estado.mia?.codigoSolicitudAbierta
+        if (!solAbierta.isNullOrBlank()) {
+            Surface(
+                color = Color(0xFFFFF3E0),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("Solicitud Premium en curso", color = Color(0xFFE65100), fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Código $solAbierta · sin cobro real.",
+                        color = Mute, fontSize = 13.sp
+                    )
+                    TextButton(onClick = { vm.abrirDetalleSolicitud(solAbierta) }) {
+                        Text("Ver mi solicitud", color = Teal)
                     }
                 }
             }
-            val puedePrueba = estado.mia?.puedeSolicitarPruebaGratuita == true
-            val puedeSandbox = estado.mia?.puedeContratarSandbox == true
-            val prem = estado.catalogo?.planes?.firstOrNull { it.codigo == "PREMIUM" }
+        }
+        val puedePrueba = estado.mia?.puedeSolicitarPruebaGratuita == true
+        val puedeSandbox = estado.mia?.puedeContratarSandbox == true
+        val prem = estado.catalogo?.planes?.firstOrNull { it.codigo == "PREMIUM" }
+        // Solo visible si aún es elegible (una sola vez por cuenta).
+        if (puedePrueba) {
             Button(
                 onClick = vm::abrirPruebaGratuita,
-                enabled = puedePrueba,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Blue),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Solicitar prueba gratuita (14 días)") }
             Text(
-                when {
-                    !solAbierta.isNullOrBlank() -> "Ya tienes una solicitud abierta."
-                    puedePrueba -> "Una sola vez por cuenta. Admin aprueba → Premium 14 días. Si rechazan, no puedes pedir otra prueba."
-                    (estado.mia?.motivoNoPruebaGratuita ?: "").contains("utilizaste", ignoreCase = true) ->
-                        "Ya utilizaste tu prueba gratuita Premium."
-                    else -> estado.mia?.motivoNoPruebaGratuita ?: "No disponible"
-                },
+                "Una sola vez por cuenta · 14 días · requiere aprobación admin · sin cobro real.",
                 color = Mute, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
             )
-            Button(
-                onClick = vm::enviarPagoSimulado,
-                enabled = puedeSandbox && !estado.procesando,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Teal),
-                shape = RoundedCornerShape(12.dp)
-            ) { Text(if (estado.procesando) "Enviando…" else "Pagar Premium (simulado · 30 días)") }
+        } else {
             Text(
                 when {
-                    !solAbierta.isNullOrBlank() -> "Espera la decisión admin o revisa tu solicitud."
-                    puedeSandbox -> "Sin cobro real · ${prem?.moneda ?: ""} ${prem?.precioDemo ?: "—"} · admin aprueba o rechaza la activación."
-                    else -> estado.mia?.motivoNoSandbox ?: "No disponible"
+                    !solAbierta.isNullOrBlank() -> "Ya tienes una solicitud abierta. Admin puede aprobar o rechazar."
+                    (estado.mia?.motivoNoPruebaGratuita ?: "").contains("utilizaste", ignoreCase = true) ->
+                        "Ya utilizaste tu prueba gratuita Premium (solo una vez)."
+                    else -> estado.mia?.motivoNoPruebaGratuita ?: "Prueba gratuita no disponible."
                 },
-                color = Mute, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)
+                color = Mute, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp)
             )
-        } else {
-            Surface(color = Color(0xFFE8EEF5), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Próximamente — contratación Premium en la versión general.",
-                    color = Mute, modifier = Modifier.padding(14.dp), fontSize = 13.sp
-                )
-            }
         }
+        Button(
+            onClick = vm::abrirConfirmacionPagoSimulado,
+            enabled = puedeSandbox && !estado.procesando,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Teal),
+            shape = RoundedCornerShape(12.dp)
+        ) { Text("Probar Premium (simulado)") }
+        Text(
+            when {
+                !solAbierta.isNullOrBlank() -> "Espera la decisión admin (aprobar/rechazar) o revisa tu solicitud."
+                puedeSandbox ->
+                    "Varias veces · vigente hasta que admin apague · ${prem?.moneda ?: ""} ${prem?.precioDemo ?: "—"} · sin cobro real."
+                else -> estado.mia?.motivoNoSandbox ?: "No disponible"
+            },
+            color = Mute, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)
+        )
         TextButton(onClick = vm::cargar, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Reintentar", color = Teal)
         }
@@ -245,25 +257,30 @@ private fun PruebaResumenScreen(estado: EstadoPlanes, vm: PlanesViewModel) {
     Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
         TextButton(onClick = vm::volverAtras) { Text("Cancelar", color = Navy) }
         Text("Solicitar Premium de prueba", color = Navy, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Surface(color = Color(0xFFE8F4FC), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "Pago simulado — Proyecto académico",
+                color = Blue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                modifier = Modifier.padding(12.dp)
+            )
+        }
         Spacer(Modifier.height(12.dp))
         Surface(color = CardBg, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Text("Plan: Premium", color = Navy, fontWeight = FontWeight.SemiBold)
-                Text("Importe: S/ 0", color = Mute)
-                Text("Duración: 14 días (luego vuelves a FREE)", color = Mute)
+                Text("Importe: S/ 0 (simulado)", color = Mute)
+                Text("Duración: 14 días (luego vuelves a FREE automáticamente)", color = Mute)
                 Text("Config: ${prem?.vigenciaPruebaConfigurada ?: "P14D"}", color = Mute, fontSize = 12.sp)
                 Text("Cupo: ${prem?.maxVehiculosRegistrados ?: "—"} vehículos", color = Mute)
                 prem?.descripcionBeneficios?.let { Text(it, color = Mute, fontSize = 13.sp) }
                 Spacer(Modifier.height(8.dp))
-                Text("La activación comenzará cuando Administración apruebe.", color = Blue, fontSize = 13.sp)
-                Text("El vencimiento se calcula desde la aprobación.", color = Mute, fontSize = 12.sp)
+                Text(
+                    "Esta operación es una simulación académica. No se realizará ningún cobro real.",
+                    color = Blue, fontSize = 13.sp
+                )
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "Tu solicitud será revisada por el equipo de MyCar. Los beneficios Premium se activarán cuando sea aprobada.",
-            color = Mute, fontSize = 13.sp
-        )
         Spacer(Modifier.height(16.dp))
         Button(
             onClick = vm::enviarPruebaGratuita,
@@ -271,7 +288,72 @@ private fun PruebaResumenScreen(estado: EstadoPlanes, vm: PlanesViewModel) {
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Blue),
             shape = RoundedCornerShape(12.dp)
-        ) { Text(if (estado.procesando) "Enviando…" else "Enviar solicitud") }
+        ) { Text(if (estado.procesando) "Enviando…" else "Confirmar simulación") }
+        estado.mensaje?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+        }
+    }
+}
+
+@Composable
+private fun PagoSimuladoConfirmarScreen(estado: EstadoPlanes, vm: PlanesViewModel) {
+    val prem = estado.catalogo?.planes?.firstOrNull { it.codigo == "PREMIUM" }
+    Column(Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState())) {
+        TextButton(onClick = vm::volverAtras) { Text("Cancelar", color = Navy) }
+        Text("Confirmar Premium simulado", color = Navy, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Surface(color = Color(0xFFE8F4FC), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "Pago simulado — Proyecto académico",
+                color = Blue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                modifier = Modifier.padding(12.dp)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Surface(color = CardBg, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Plan: Premium", color = Navy, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Importe demo: ${prem?.moneda ?: "PEN"} ${prem?.precioDemo ?: "—"} · ${prem?.periodicidad ?: ""}",
+                    color = Mute
+                )
+                Text(
+                    "Vigencia: ${
+                        prem?.vigenciaSandboxConfigurada?.takeIf {
+                            it.isNotBlank() && !it.equals("ILIMITADA", true)
+                        } ?: "hasta que admin apague el plan"
+                    }",
+                    color = Mute
+                )
+                Text("Cupo: hasta ${prem?.maxVehiculosRegistrados ?: "—"} vehículos", color = Mute)
+                prem?.descripcionBeneficios?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = Mute, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Esta operación es una simulación académica. No se realizará ningún cobro real.",
+                    color = Blue, fontSize = 13.sp, fontWeight = FontWeight.Medium
+                )
+                Text(
+                    "No se solicitan tarjeta, CVV ni credenciales bancarias. Cualquier comprobante es SIMULADO y SIN VALIDEZ DE PAGO.",
+                    color = Mute, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = vm::confirmarPagoSimulado,
+            enabled = !estado.procesando,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Teal),
+            shape = RoundedCornerShape(12.dp)
+        ) { Text(if (estado.procesando) "Procesando…" else "Confirmar simulación") }
+        OutlinedButton(
+            onClick = vm::volverAtras,
+            enabled = !estado.procesando,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) { Text("Cancelar", color = Navy) }
         estado.mensaje?.let {
             Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
         }
@@ -522,6 +604,6 @@ private fun DetalleSolicitudScreen(estado: EstadoPlanes, vm: PlanesViewModel) {
 
 private fun etiquetaModalidad(m: String?): String = when (m) {
     "PRUEBA_GRATUITA" -> "Prueba gratuita (14 días)"
-    "PAGO_SANDBOX" -> "Pago simulado (30 días)"
+    "PAGO_SANDBOX" -> "Pago simulado (hasta que admin apague)"
     else -> m ?: "—"
 }

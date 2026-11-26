@@ -120,6 +120,7 @@ fun MyCarNavigation(
     }
     var recargaAlertas by rememberSaveable { mutableIntStateOf(0) }
     var alertasFiltroTodasTrasExito by rememberSaveable { mutableStateOf(false) }
+    var alertasOrdenRecientesTrasExito by rememberSaveable { mutableStateOf(false) }
     var formularioAbierto by remember { mutableStateOf(false) }
     var formularioAtencionAlerta by remember { mutableStateOf(false) }
     var detalleAlertaTrasAtencion by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -205,6 +206,7 @@ fun MyCarNavigation(
         navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
     }
     fun abrirProgramarDesdeRf17(oferta: OfertaProgramarAlerta) {
+        // Compatibilidad residual: RF17 crea la alerta en flujo; este fallback abre RF22.
         val intervalo = oferta.proximoKm?.let { pk -> (pk - oferta.kmServicio).takeIf { it > 0 } }
         val criterio = when {
             intervalo != null && oferta.proximaFecha != null -> "AMBOS"
@@ -424,6 +426,7 @@ fun MyCarNavigation(
                                         return PerfilViewModel(
                                             cuenta.perfil,
                                             fotos = cuenta.fotos,
+                                            planes = cuenta.planes,
                                             onNombreActualizado = { nombre ->
                                                 cuenta.nombrePresentacion.value = nombre
                                             },
@@ -903,8 +906,9 @@ fun MyCarNavigation(
                                         onRegistroAbierto={ formularioAbierto=it },
                                         onFormularioOverlay={ formularioAbierto=it },
                                         recargaRegistroToken = recargaMantenimiento,
-                                        onProgramarAlerta = { abrirProgramarDesdeRf17(it) },
+                                        onProgramarAlerta = null,
                                         talleresRepository = cuenta.talleres,
+                                        alertasRepository = cuenta.alertas,
                                         onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
                                         onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },
                                         abrirEnTalleres = abrirHistorialEnTalleres,
@@ -916,6 +920,13 @@ fun MyCarNavigation(
                                         onVerPlanes = {
                                             perfilAbrirPlanes = true
                                             navegar(navegacion.abrir(SecundariaMyCar.PERFIL))
+                                        },
+                                        onVerMisAlertas = { idVehiculo ->
+                                            vehiculoAlertas = idVehiculo
+                                            alertasFiltroTodasTrasExito = true
+                                            alertasOrdenRecientesTrasExito = true
+                                            recargaAlertas++
+                                            navegar(navegacion.abrir(SeccionMyCar.ALERTAS))
                                         })
                                     if (idKmOverlay != null) {
                                         BackHandler { kmOverlayMantenimiento = null }
@@ -988,6 +999,8 @@ fun MyCarNavigation(
                                         recargaToken = recargaAlertas,
                                         reiniciarFiltroTodas = alertasFiltroTodasTrasExito,
                                         onReinicioFiltroConsumido = { alertasFiltroTodasTrasExito = false },
+                                        aplicarOrdenRecientes = alertasOrdenRecientesTrasExito,
+                                        onOrdenRecientesConsumido = { alertasOrdenRecientesTrasExito = false },
                                         talleresRepository = cuenta.talleres,
                                         onNotificaciones={ navegar(navegacion.abrir(SecundariaMyCar.NOTIFICACIONES)) },
                                         onPerfil={ navegar(navegacion.abrir(SecundariaMyCar.PERFIL)) },

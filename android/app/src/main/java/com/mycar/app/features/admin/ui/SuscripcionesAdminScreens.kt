@@ -182,10 +182,10 @@ private fun ListaHub(
             Spacer(Modifier.height(8.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (estado.pestana == PestanaAdminSuscripciones.SOLICITUDES) {
-                    ChipFiltro("Todas", estado.filtro == null) { vm.setFiltro(null) }
-                    ChipFiltro("Pendientes", estado.filtro == "PENDIENTES") { vm.setFiltro("PENDIENTES") }
-                    ChipFiltro("Aprobadas", estado.filtro == "APROBADA") { vm.setFiltro("APROBADA") }
-                    ChipFiltro("Rechazadas", estado.filtro == "RECHAZADA") { vm.setFiltro("RECHAZADA") }
+                    // Solo pendientes: lo resuelto se administra en Suscripciones.
+                    ChipFiltro("Pendientes", estado.filtro == null || estado.filtro == "PENDIENTES") {
+                        vm.setFiltro("PENDIENTES")
+                    }
                 } else {
                     ChipFiltro("Todas", estado.filtro == null) { vm.setFiltro(null) }
                     ChipFiltro("FREE", estado.filtro == "FREE") { vm.setFiltro("FREE") }
@@ -389,10 +389,10 @@ private fun DetalleSuscripcion(estado: EstadoAdminSuscripciones, vm: Suscripcion
             ) {
                 Icon(Icons.Outlined.Cancel, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Anular Premium / detener experiencia")
+                Text("Apagar plan")
             }
             Text(
-                "Quita beneficios Premium (prueba o pago simulado) y deja solo el vehículo principal.",
+                "Quita beneficios Premium (prueba o pago simulado) y deja Free. El botón desaparece al apagar.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 6.dp)
@@ -423,7 +423,7 @@ private fun DetalleSuscripcion(estado: EstadoAdminSuscripciones, vm: Suscripcion
 private fun DialogoAnularPremium(estado: EstadoAdminSuscripciones, vm: SuscripcionesAdminViewModel) {
     AlertDialog(
         onDismissRequest = vm::cancelarModales,
-        title = { Text("Anular Premium") },
+        title = { Text("Apagar plan") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Finaliza los beneficios Premium (prueba o pago simulado) y regresa la cuenta a FREE.")
@@ -554,32 +554,31 @@ private fun DetalleSolicitudAdmin(estado: EstadoAdminSuscripciones, vm: Suscripc
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp)
             )
         } else if (s?.estado == "APROBADA") {
-            Text("Solicitud aprobada", color = Teal, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = vm::pedirCancelarPremium,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Danger),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Outlined.Cancel, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Anular Premium / detener experiencia")
-            }
+            Text("Solicitud ya resuelta (aprobada).", color = Teal, fontWeight = FontWeight.SemiBold)
             Text(
-                "Para pruebas: quita el Premium concedido (prueba 14d o pago 30d) y vuelve a FREE.",
+                "Administra o apaga el Premium en la pestaña Suscripciones.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 modifier = Modifier.padding(top = 6.dp)
             )
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = {
+                    val id = d.idUsuario
+                    if (id > 0) vm.abrirDetalleUsuario(id)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("Ir a suscripción del usuario") }
+        } else if (s?.estado == "RECHAZADA" || s?.estado == "CANCELADA") {
+            Text("Solicitud ya resuelta (${s?.estado}).", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
             Text(
-                "Requiere MFA confirmado en los últimos 10 minutos.",
+                "Ya no forma parte de la cola de solicitudes.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 4.dp)
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 6.dp)
             )
-        } else if (s?.estado == "RECHAZADA") {
-            Text("Solicitud rechazada", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(12.dp))
         OutlinedButton(
@@ -703,6 +702,6 @@ private fun etiquetaEvento(tipo: String?): String = when (tipo) {
 
 private fun etiquetaModalidad(m: String?): String = when (m) {
     "PRUEBA_GRATUITA" -> "Prueba gratuita (14 días)"
-    "PAGO_SANDBOX" -> "Pago simulado (30 días)"
+    "PAGO_SANDBOX" -> "Pago simulado (hasta que admin apague)"
     else -> m ?: "—"
 }

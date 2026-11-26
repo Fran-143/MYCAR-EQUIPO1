@@ -22,11 +22,23 @@ enum class PantallaPerfil {
     ELIMINAR_CUENTA
 }
 
+data class ResumenPlanPerfil(
+    val planCodigo: String,
+    val planNombre: String?,
+    val estadoUi: String?,
+    val modalidad: String?,
+    val maxVehiculos: Int?,
+    val vehiculosRegistrados: Long,
+    val diasRestantes: Int?,
+    val solicitudAbierta: String?
+)
+
 data class EstadoPerfil(
     val pantalla: PantallaPerfil = PantallaPerfil.HUB,
     val cargando: Boolean = false,
     val guardando: Boolean = false,
     val perfil: DatosPerfil? = null,
+    val plan: ResumenPlanPerfil? = null,
     val formulario: FormularioEdicionPerfil = FormularioEdicionPerfil(),
     val errores: Map<String, String> = emptyMap(),
     val mensaje: String? = null,
@@ -47,6 +59,7 @@ data class EstadoPerfil(
 class PerfilViewModel(
     private val repository: PerfilRepository,
     private val fotos: FotoPersonalizadaRepository? = null,
+    private val planes: com.mycar.app.features.planes.domain.PlanesRepository? = null,
     private val onNombreActualizado: (String) -> Unit = {},
     private val onAvatarActualizado: (ByteArray?) -> Unit = {}
 ) : ViewModel() {
@@ -67,9 +80,25 @@ class PerfilViewModel(
                     }
                 } else null
                 onAvatarActualizado(bytes)
+                val plan = planes?.let { repo ->
+                    runCatching {
+                        val mia = repo.miSuscripcion()
+                        ResumenPlanPerfil(
+                            planCodigo = mia.planCodigo ?: "FREE",
+                            planNombre = mia.planNombre,
+                            estadoUi = mia.estadoSuscripcionUi ?: mia.estado,
+                            modalidad = mia.modalidad,
+                            maxVehiculos = mia.maxVehiculosRegistrados,
+                            vehiculosRegistrados = mia.vehiculosRegistrados,
+                            diasRestantes = mia.diasRestantes,
+                            solicitudAbierta = mia.codigoSolicitudAbierta
+                        )
+                    }.getOrNull()
+                }
                 _estado.value = _estado.value.copy(
                     cargando = false,
                     perfil = datos,
+                    plan = plan,
                     fotoBytes = bytes,
                     mensaje = null,
                     mensajeFoto = null

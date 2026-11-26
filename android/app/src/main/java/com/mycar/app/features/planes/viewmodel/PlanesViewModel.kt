@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 enum class PantallaPlanes {
-    CATALOGO, PRUEBA_RESUMEN, CONTRATAR, ESCENARIOS, PROCESANDO, RESULTADO,
+    CATALOGO, PRUEBA_RESUMEN, PAGO_CONFIRMAR, CONTRATAR, ESCENARIOS, PROCESANDO, RESULTADO,
     MI_SUSCRIPCION, DETALLE_SOLICITUD
 }
 
@@ -40,7 +40,8 @@ data class EstadoPlanes(
 class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
     private val _estado = MutableStateFlow(EstadoPlanes(cargando = true))
     val estado: StateFlow<EstadoPlanes> = _estado.asStateFlow()
-    val hotfixSandbox: Boolean = BuildConfig.LOCAL_TEST_TOOLS
+    /** Escenarios local-test / sidecar hotfix (no requerido para simulación académica en release). */
+    val herramientasLocalTest: Boolean = BuildConfig.LOCAL_TEST_TOOLS
 
     init { cargar() }
 
@@ -71,10 +72,6 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
     }
 
     fun abrirPruebaGratuita() {
-        if (!hotfixSandbox) {
-            _estado.value = _estado.value.copy(mensaje = "Próximamente")
-            return
-        }
         if (_estado.value.mia?.puedeSolicitarPruebaGratuita != true) {
             _estado.value = _estado.value.copy(
                 mensaje = _estado.value.mia?.motivoNoPruebaGratuita
@@ -115,10 +112,6 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
     }
 
     fun abrirContratarSandbox() {
-        if (!hotfixSandbox) {
-            _estado.value = _estado.value.copy(mensaje = "Próximamente")
-            return
-        }
         if (_estado.value.mia?.puedeContratarSandbox != true) {
             _estado.value = _estado.value.copy(
                 mensaje = _estado.value.mia?.motivoNoSandbox
@@ -126,17 +119,31 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
             )
             return
         }
+        // Flujo académico: confirmación explícita (no escenarios local-test).
+        abrirConfirmacionPagoSimulado()
+    }
+
+    /** Resumen + confirmación expresa antes de la simulación académica. */
+    fun abrirConfirmacionPagoSimulado() {
+        val abierta = _estado.value.mia?.codigoSolicitudAbierta
+        if (!abierta.isNullOrBlank()) {
+            abrirDetalleSolicitud(abierta)
+            return
+        }
+        if (_estado.value.mia?.puedeContratarSandbox != true) {
+            _estado.value = _estado.value.copy(
+                mensaje = _estado.value.mia?.motivoNoSandbox ?: "No disponible."
+            )
+            return
+        }
         _estado.value = _estado.value.copy(
-            pantalla = PantallaPlanes.CONTRATAR, mensaje = null, operacion = null
+            pantalla = PantallaPlanes.PAGO_CONFIRMAR, mensaje = null, operacion = null
         )
     }
 
-    /** Un toque: solicita pago simulado → pendiente de aprobación admin (sin escenarios). */
-    fun enviarPagoSimulado() {
-        if (!hotfixSandbox) {
-            _estado.value = _estado.value.copy(mensaje = "Próximamente")
-            return
-        }
+    /** Confirma simulación → backend (idempotente). Sin cobro real ni datos bancarios. */
+    fun confirmarPagoSimulado() {
+        if (_estado.value.procesando) return
         val abierta = _estado.value.mia?.codigoSolicitudAbierta
         if (!abierta.isNullOrBlank()) {
             abrirDetalleSolicitud(abierta)
@@ -149,11 +156,16 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
             return
         }
         viewModelScope.launch {
-            _estado.value = _estado.value.copy(procesando = true, mensaje = null)
+            _estado.value = _estado.value.copy(
+                procesando = true, mensaje = null, pantalla = PantallaPlanes.PROCESANDO
+            )
             try {
                 val sol = repository.solicitarPagoSimulado()
                 val sols = runCatching { repository.solicitudes() }.getOrDefault(listOf(sol))
                 val mia = runCatching { repository.miSuscripcion() }.getOrNull() ?: _estado.value.mia
+                val estadoSol = sol.estado?.uppercase().orEmpty()
+                val premiumOk = mia?.planCodigo.equals("PREMIUM", ignoreCase = true) &&
+                    estadoSol == "APROBADA"
                 _estado.value = _estado.value.copy(
                     procesando = false,
                     pantalla = PantallaPlanes.RESULTADO,
@@ -161,13 +173,19 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
                     solicitudes = sols,
                     mia = mia,
                     exito = true,
-                    resultadoTitulo = "Pago simulado enviado",
-                    resultadoDetalle = "Tu solicitud Premium está pendiente de aprobación administrativa. Sin cobro real."
+                    resultadoTitulo = if (premiumOk) "Premium activado" else "Solicitud enviada",
+                    resultadoDetalle = if (premiumOk)
+                        "Premium activo (simulación académica). Sin cobro real. Comprobante: SIMULADO · SIN VALIDEZ DE PAGO."
+                    else
+                        "Solicitud ${sol.codigo} pendiente de aprobación administrativa. Sin cobro real. Puedes volver a solicitar pago simulado cuando se decida o se anule el plan."
                 )
             } catch (e: Exception) {
-                val msg = e.message ?: "No se pudo enviar el pago simulado."
-                _estado.value = _estado.value.copy(procesando = false, mensaje = msg)
-                // Si ya había solicitud abierta, refrescar mia y abrirla.
+                val msg = e.message ?: "No se pudo completar la simulación."
+                _estado.value = _estado.value.copy(
+                    procesando = false,
+                    pantalla = PantallaPlanes.PAGO_CONFIRMAR,
+                    mensaje = msg
+                )
                 runCatching { repository.miSuscripcion() }.onSuccess { mia ->
                     _estado.value = _estado.value.copy(mia = mia)
                     mia.codigoSolicitudAbierta?.takeIf { it.isNotBlank() }?.let { abrirDetalleSolicitud(it) }
@@ -175,6 +193,9 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
             }
         }
     }
+
+    @Deprecated("Usar confirmarPagoSimulado / abrirConfirmacionPagoSimulado")
+    fun enviarPagoSimulado() = abrirConfirmacionPagoSimulado()
 
     fun abrirMiSuscripcion() {
         viewModelScope.launch {
@@ -229,7 +250,7 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
     }
 
     fun simularEscenario(escenario: String) {
-        if (!hotfixSandbox) return
+        if (!herramientasLocalTest) return
         viewModelScope.launch {
             _estado.value = _estado.value.copy(
                 pantalla = PantallaPlanes.PROCESANDO, procesando = true, mensaje = null
@@ -291,7 +312,7 @@ class PlanesViewModel(private val repository: PlanesRepository) : ViewModel() {
             PantallaPlanes.RESULTADO, PantallaPlanes.MI_SUSCRIPCION -> volverCatalogo()
             PantallaPlanes.DETALLE_SOLICITUD ->
                 _estado.value = _estado.value.copy(pantalla = PantallaPlanes.MI_SUSCRIPCION)
-            PantallaPlanes.PRUEBA_RESUMEN, PantallaPlanes.CONTRATAR ->
+            PantallaPlanes.PRUEBA_RESUMEN, PantallaPlanes.PAGO_CONFIRMAR, PantallaPlanes.CONTRATAR ->
                 _estado.value = _estado.value.copy(pantalla = PantallaPlanes.CATALOGO)
             PantallaPlanes.ESCENARIOS ->
                 _estado.value = _estado.value.copy(pantalla = PantallaPlanes.CONTRATAR)

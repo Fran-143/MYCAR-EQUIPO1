@@ -29,7 +29,8 @@ data class EstadoAdminSuscripciones(
     val resumen: AdminSuscripcionesResumenDto? = null,
     val items: List<AdminSuscripcionItemDto> = emptyList(),
     val solicitudes: List<AdminSolicitudItemDto> = emptyList(),
-    val filtro: String? = null,
+    /** Solicitudes: solo PENDIENTES. Suscripciones: FREE / PREMIUM_*. */
+    val filtro: String? = "PENDIENTES",
     val q: String = "",
     val detalle: AdminSuscripcionDetalleDto? = null,
     val detalleSolicitud: AdminSolicitudDetalleDto? = null,
@@ -52,7 +53,8 @@ class SuscripcionesAdminViewModel(
     init { refrescar() }
 
     fun setPestana(p: PestanaAdminSuscripciones) {
-        _estado.value = _estado.value.copy(pestana = p, filtro = null, q = "")
+        val filtroIni = if (p == PestanaAdminSuscripciones.SOLICITUDES) "PENDIENTES" else null
+        _estado.value = _estado.value.copy(pestana = p, filtro = filtroIni, q = "")
         refrescar()
     }
 
@@ -209,14 +211,24 @@ class SuscripcionesAdminViewModel(
 
     fun confirmarAprobar() {
         val codigo = _estado.value.detalleSolicitud?.solicitud?.codigo ?: return
+        val idUsuario = _estado.value.detalleSolicitud?.idUsuario
         viewModelScope.launch {
             try {
                 val d = repository.aprobar(codigo, null)
-                val det = repository.detalleSolicitud(codigo)
+                // Resuelta: sale de Solicitudes → Suscripciones (administrar / apagar ahí).
                 _estado.value = _estado.value.copy(
-                    decision = d, detalleSolicitud = det,
-                    mostrarAprobar = false, mensaje = d.mensaje
+                    decision = d,
+                    mostrarAprobar = false,
+                    pestana = PestanaAdminSuscripciones.SUSCRIPCIONES,
+                    filtro = null,
+                    pantalla = PantallaAdminSuscripciones.LISTA,
+                    detalleSolicitud = null,
+                    mensaje = d.mensaje ?: "Aprobada. Gestiona el Premium en Suscripciones."
                 )
+                refrescar()
+                if (idUsuario != null && idUsuario > 0) {
+                    abrirDetalleUsuario(idUsuario)
+                }
             } catch (e: Exception) {
                 _estado.value = _estado.value.copy(
                     mostrarAprobar = false,
@@ -236,11 +248,17 @@ class SuscripcionesAdminViewModel(
         viewModelScope.launch {
             try {
                 val d = repository.rechazar(codigo, motivo)
-                val det = repository.detalleSolicitud(codigo)
+                // Resuelta: vuelve a la cola de pendientes (ya no aparece).
                 _estado.value = _estado.value.copy(
-                    decision = d, detalleSolicitud = det,
-                    mostrarRechazar = false, mensaje = d.mensaje
+                    decision = d,
+                    mostrarRechazar = false,
+                    pantalla = PantallaAdminSuscripciones.LISTA,
+                    pestana = PestanaAdminSuscripciones.SOLICITUDES,
+                    filtro = "PENDIENTES",
+                    detalleSolicitud = null,
+                    mensaje = d.mensaje ?: "Solicitud rechazada."
                 )
+                refrescar()
             } catch (e: Exception) {
                 _estado.value = _estado.value.copy(
                     mostrarRechazar = false,
