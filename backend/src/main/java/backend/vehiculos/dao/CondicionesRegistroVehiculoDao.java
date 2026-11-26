@@ -43,7 +43,7 @@ public class CondicionesRegistroVehiculoDao {
         }
 
         var limites = jdbc.query("""
-                SELECT p.max_vehiculos_registrados
+                SELECT p.codigo, p.max_vehiculos_registrados
                 FROM mycar.suscripcion s
                 JOIN mycar.plan p ON p.id_plan = s.id_plan
                 WHERE s.id_usuario = ?
@@ -53,10 +53,19 @@ public class CondicionesRegistroVehiculoDao {
                   AND p.codigo IN ('FREE', 'PREMIUM')
                   AND p.activo
                 FOR SHARE OF s, p
-                """, (rs, fila) -> rs.getInt(1), idUsuario);
-        if (limites.size() != 1 || limites.getFirst() <= 0) {
+                """, (rs, fila) -> new Object[]{rs.getString(1), rs.getInt(2)}, idUsuario);
+        if (limites.isEmpty()) {
             throw new ErrorRegistroVehiculo("PLAN_FREE_NO_DISPONIBLE");
         }
-        return limites.getFirst();
+        // Preferir PREMIUM si coexisten filas ACTIVA (p. ej. FREE residual tras aprobación).
+        Object[] elegido = limites.stream()
+                .filter(r -> "PREMIUM".equals(r[0]))
+                .findFirst()
+                .orElse(limites.getFirst());
+        int max = (Integer) elegido[1];
+        if (max <= 0) {
+            throw new ErrorRegistroVehiculo("PLAN_FREE_NO_DISPONIBLE");
+        }
+        return max;
     }
 }

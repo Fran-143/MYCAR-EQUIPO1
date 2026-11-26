@@ -24,6 +24,7 @@ public class ConsultaRegistroVehiculoDao {
     }
 
     public DatosCupoRegistro consultarCupo(long idUsuario) {
+        // Si hay más de una ACTIVA (p. ej. FREE residual + PREMIUM recién aprobado), prioriza PREMIUM.
         var resultados = jdbc.query("""
                 SELECT p.codigo AS plan,
                        p.max_vehiculos_registrados AS limite,
@@ -38,11 +39,13 @@ public class ConsultaRegistroVehiculoDao {
                   AND (s.fin_utc IS NULL OR s.fin_utc > clock_timestamp())
                   AND p.codigo IN ('FREE', 'PREMIUM')
                   AND p.activo
+                ORDER BY CASE WHEN p.codigo = 'PREMIUM' THEN 0 ELSE 1 END, s.inicio_utc DESC
+                LIMIT 1
                 """, (rs, fila) -> new DatosCupoRegistro(
                         rs.getString("plan"), rs.getInt("limite"), rs.getLong("registrados"),
                         rs.getLong("registrados") < rs.getInt("limite")
                 ), idUsuario);
-        if (resultados.size() != 1 || resultados.getFirst().limite() <= 0) {
+        if (resultados.isEmpty() || resultados.getFirst().limite() <= 0) {
             throw new ErrorRegistroVehiculo("PLAN_FREE_NO_DISPONIBLE");
         }
         return resultados.getFirst();

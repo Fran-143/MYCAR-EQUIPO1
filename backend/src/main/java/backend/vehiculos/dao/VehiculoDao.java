@@ -20,6 +20,7 @@ public class VehiculoDao {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /** Placa ocupada solo si existe otro vehículo VIGENTE (RF62 libera ELIMINADO). */
     public boolean existePlaca(String placa) {
         Boolean existe = jdbcTemplate.queryForObject(
                 """
@@ -27,6 +28,7 @@ public class VehiculoDao {
                     SELECT 1
                     FROM mycar.vehiculo
                     WHERE placa = ?
+                      AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 )
                 """,
                 Boolean.class,
@@ -47,6 +49,7 @@ public class VehiculoDao {
                     SELECT 1
                     FROM mycar.vehiculo
                     WHERE numero_vin = ?
+                      AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 )
                 """,
                 Boolean.class,
@@ -56,7 +59,7 @@ public class VehiculoDao {
         return Boolean.TRUE.equals(existe);
     }
 
-    /** Unicidad global de VIN excluyendo el propio vehículo (RF11). */
+    /** Unicidad de VIN entre vigentes, excluyendo el propio vehículo (RF11). */
     public boolean existeVinEnOtro(String numeroVin, long idVehiculo) {
         if (numeroVin == null) {
             return false;
@@ -68,6 +71,7 @@ public class VehiculoDao {
                     FROM mycar.vehiculo
                     WHERE numero_vin = ?
                       AND id_vehiculo <> ?
+                      AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 )
                 """,
                 Boolean.class,
@@ -459,11 +463,15 @@ public class VehiculoDao {
                 (rs, fila) -> new Object[]{rs.getString(1), rs.getInt(2)},
                 idUsuario
         );
-        if (filas.size() != 1) {
+        if (filas.isEmpty()) {
             throw new backend.vehiculos.domain.ErrorRegistroVehiculo("PLAN_FREE_NO_DISPONIBLE");
         }
-        String codigo = (String) filas.getFirst()[0];
-        int maxPlan = (Integer) filas.getFirst()[1];
+        Object[] elegido = filas.stream()
+                .filter(r -> "PREMIUM".equals(r[0]))
+                .findFirst()
+                .orElse(filas.getFirst());
+        String codigo = (String) elegido[0];
+        int maxPlan = (Integer) elegido[1];
         if ("FREE".equals(codigo)) {
             return 1;
         }
