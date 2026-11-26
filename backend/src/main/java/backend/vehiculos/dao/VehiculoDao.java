@@ -463,11 +463,15 @@ public class VehiculoDao {
                 (rs, fila) -> new Object[]{rs.getString(1), rs.getInt(2)},
                 idUsuario
         );
-        if (filas.size() != 1) {
+        if (filas.isEmpty()) {
             throw new backend.vehiculos.domain.ErrorRegistroVehiculo("PLAN_FREE_NO_DISPONIBLE");
         }
-        String codigo = (String) filas.getFirst()[0];
-        int maxPlan = (Integer) filas.getFirst()[1];
+        Object[] elegido = filas.stream()
+                .filter(r -> "PREMIUM".equals(r[0]))
+                .findFirst()
+                .orElse(filas.getFirst());
+        String codigo = (String) elegido[0];
+        int maxPlan = (Integer) elegido[1];
         if ("FREE".equals(codigo)) {
             return 1;
         }

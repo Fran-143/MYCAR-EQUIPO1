@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -51,6 +54,15 @@ fun PlanesRoute(
     )
     val estado by vm.estado.collectAsState()
     LaunchedEffect(estado.sesionInvalida) { if (estado.sesionInvalida) onSesionInvalida() }
+    // Tras aprobación admin u otra sesión: refrescar al volver a Planes.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, vm) {
+        val obs = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.cargar()
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     BackHandler(enabled = estado.pantalla != PantallaPlanes.PROCESANDO) {
         if (estado.pantalla == PantallaPlanes.CATALOGO) onVolver() else vm.volverAtras()
     }
@@ -119,7 +131,7 @@ private fun CatalogoScreen(estado: EstadoPlanes, vm: PlanesViewModel, onVolver: 
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Plan actual", color = Mute, fontSize = 12.sp)
                     Text(
-                        "${mia.planNombre ?: mia.planCodigo} · ${mia.estadoSuscripcionUi ?: mia.estado}",
+                        "${mia.planNombre ?: mia.planCodigo} · ${etiquetaEstadoSuscripcion(mia.estadoSuscripcionUi ?: mia.estado)}",
                         color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 18.sp
                     )
                     mia.modalidad?.let { Text("Modalidad: $it", color = Teal, fontSize = 12.sp) }
@@ -502,7 +514,10 @@ private fun MiSuscripcionScreen(estado: EstadoPlanes, vm: PlanesViewModel) {
             }
             Surface(color = CardBg, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("${mia.planNombre} · ${mia.estadoSuscripcionUi}", color = Navy, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${mia.planNombre} · ${etiquetaEstadoSuscripcion(mia.estadoSuscripcionUi)}",
+                        color = Navy, fontWeight = FontWeight.Bold
+                    )
                     Text("Modalidad: ${mia.modalidad ?: "—"}", color = Mute, fontSize = 13.sp)
                     Text("Inicio: ${FechaMyCar.fechaHora(mia.inicioUtc)}", color = Mute, fontSize = 13.sp)
                     Text("Fin: ${FechaMyCar.fechaHora(mia.finUtc)}", color = Mute, fontSize = 13.sp)
@@ -660,4 +675,18 @@ private fun etiquetaModalidad(m: String?): String = when (m) {
     "PRUEBA_GRATUITA" -> "Prueba gratuita (14 días)"
     "PAGO_SANDBOX" -> "Pago simulado (hasta que admin apague)"
     else -> m ?: "—"
+}
+
+private fun etiquetaEstadoSuscripcion(estado: String?): String = when (estado?.uppercase()) {
+    "FREE" -> "Free"
+    "PREMIUM" -> "Premium activo"
+    "PREMIUM_PRUEBA_ACTIVA" -> "Premium (prueba activa)"
+    "PREMIUM_SANDBOX_ACTIVA" -> "Premium (simulado activo)"
+    "PREMIUM_VENCIDA" -> "Premium vencido"
+    "PREMIUM_CANCELACION_PROGRAMADA" -> "Premium (cancelación programada)"
+    "ACTIVA" -> "Activa"
+    "APROBADA" -> "Aprobada"
+    "PENDIENTE_APROBACION" -> "Pendiente de aprobación"
+    "RECHAZADA" -> "Rechazada"
+    else -> estado ?: "—"
 }
