@@ -1,5 +1,6 @@
 package backend.push.service;
 
+import backend.notificaciones.dao.PreferenciaNotificacionJdbcDao;
 import backend.push.PushNotificationSender;
 import backend.push.PushNotificationSender.MensajePush;
 import backend.push.PushNotificationSender.ResultadoEnvio;
@@ -15,10 +16,15 @@ import org.springframework.util.StringUtils;
 public class DispositivoPushService {
     private final DispositivoPushJdbcDao dao;
     private final PushNotificationSender sender;
+    private final PreferenciaNotificacionJdbcDao preferencias;
 
-    public DispositivoPushService(DispositivoPushJdbcDao dao, @Lazy PushNotificationSender sender) {
+    public DispositivoPushService(
+            DispositivoPushJdbcDao dao,
+            @Lazy PushNotificationSender sender,
+            PreferenciaNotificacionJdbcDao preferencias) {
         this.dao = dao;
         this.sender = sender;
+        this.preferencias = preferencias;
     }
 
     @Transactional
@@ -34,8 +40,22 @@ public class DispositivoPushService {
             throw new IllegalArgumentException("proveedor no soportado");
         }
         dao.upsert(usuario, instalacion, prov, token.trim());
+        // Registrar un dispositivo implica poder recibir: no dejar RF48 en NO_SOLICITADO.
+        // No pisa DENEGADO explícito del usuario.
+        promoverPermisoSiPendiente(usuario);
         // Tras recuperar token activo, reencolar omisiones recientes por sin_tokens (misma TX).
         dao.reencolarOmitidosSinTokens(usuario);
+    }
+
+    private void promoverPermisoSiPendiente(long usuario) {
+        preferencias.asegurarFila(usuario);
+        var pref = preferencias.consultar(usuario).orElse(null);
+        if (pref == null) {
+            return;
+        }
+        if ("NO_SOLICITADO".equalsIgnoreCase(pref.permisoDispositivo())) {
+            preferencias.actualizarSoloPermiso(usuario, "CONCEDIDO");
+        }
     }
 
     @Transactional

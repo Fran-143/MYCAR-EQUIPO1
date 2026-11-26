@@ -38,7 +38,7 @@ public class ErrorAlertas extends RuntimeException {
         return switch (campo) {
             case "intervaloKm" -> "Indica un intervalo entero positivo.";
             case "cantidadTiempo" -> "Indica una cantidad entera positiva.";
-            case "unidadTiempo" -> "Usa SEMANAS o MESES.";
+            case "unidadTiempo" -> "Usa DIAS, SEMANAS o MESES.";
             case "codigoTipoMantenimiento" -> "Selecciona un tipo activo.";
             case "criterio" -> "Selecciona POR_TIEMPO, POR_KILOMETRAJE o AMBOS.";
             default -> "Revisa este campo.";

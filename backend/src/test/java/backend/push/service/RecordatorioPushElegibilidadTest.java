@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class RecordatorioPushElegibilidadTest {
     private final RecordatorioPushService svc = new RecordatorioPushService(
-            null, null, null, null, null, 25, true);
+            null, null, null, null, null, null, 25, true);
     private final LocalDate hoy = LocalDate.of(2026, 11, 12);
 
     private static AlertaActiva alerta(String estado) {

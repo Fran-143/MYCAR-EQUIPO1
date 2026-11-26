@@ -310,8 +310,19 @@ public class OutboxPushService {
     private boolean rf48Permite(long usuario, String categoria) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
-        if (pref == null || !"CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo())) {
+        if (pref == null) {
             return false;
+        }
+        String permiso = pref.permisoDispositivo();
+        // DENEGADO explícito bloquea. CONCEDIDO permite.
+        // NO_SOLICITADO + al menos un token activo: el celular ya se registró → permitir a todos.
+        if ("DENEGADO".equalsIgnoreCase(permiso)) {
+            return false;
+        }
+        if (!"CONCEDIDO".equalsIgnoreCase(permiso)) {
+            if (dispositivos.listarActivos(usuario, sender.proveedor()).isEmpty()) {
+                return false;
+            }
         }
         return switch (categoria == null ? "" : categoria) {
             case "MANTENIMIENTO" -> pref.mantenimiento();

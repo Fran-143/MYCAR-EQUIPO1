@@ -3,6 +3,7 @@ package backend.push.service;
 import backend.notificaciones.dao.PreferenciaNotificacionJdbcDao;
 import backend.push.dao.AlertaPushControlJdbcDao;
 import backend.push.dao.AlertaPushControlJdbcDao.Control;
+import backend.push.dao.DispositivoPushJdbcDao;
 import backend.push.dao.RecordatorioPushJdbcDao;
 import backend.push.dao.RecordatorioPushJdbcDao.AlertaActiva;
 import backend.push.dao.RecordatorioPushJdbcDao.NotifKmElegible;
@@ -55,6 +56,7 @@ public class RecordatorioPushService {
     private final AlertaPushControlJdbcDao control;
     private final OutboxPushService outbox;
     private final PreferenciaNotificacionJdbcDao preferencias;
+    private final DispositivoPushJdbcDao dispositivos;
     private final VentanaPushLima ventana;
     private final int loteDespacho;
     private final boolean forzarVentana;
@@ -65,6 +67,7 @@ public class RecordatorioPushService {
             AlertaPushControlJdbcDao control,
             OutboxPushService outbox,
             PreferenciaNotificacionJdbcDao preferencias,
+            DispositivoPushJdbcDao dispositivos,
             VentanaPushLima ventana,
             @Value("${mycar.fcm.worker-lote:25}") int loteDespacho,
             @Value("${mycar.fcm.forzar-ventana:false}") boolean forzarVentana) {
@@ -72,6 +75,7 @@ public class RecordatorioPushService {
         this.control = control;
         this.outbox = outbox;
         this.preferencias = preferencias;
+        this.dispositivos = dispositivos;
         this.ventana = ventana;
         this.loteDespacho = loteDespacho;
         this.forzarVentana = forzarVentana;
@@ -406,17 +410,13 @@ public class RecordatorioPushService {
     private boolean prefMantOk(long usuario) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
-        return pref != null
-                && pref.mantenimiento()
-                && "CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo());
+        return pref != null && pref.mantenimiento() && permisoPermiteEnvio(usuario, pref.permisoDispositivo());
     }
 
     private boolean prefSoatOk(long usuario) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
-        return pref != null
-                && pref.soat()
-                && "CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo());
+        return pref != null && pref.soat() && permisoPermiteEnvio(usuario, pref.permisoDispositivo());
     }
 
     /** Push KM: interruptor RF43 + permiso dispositivo. Ignora kilometraje_on heredado. */
@@ -426,7 +426,21 @@ public class RecordatorioPushService {
         }
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
-        return pref != null && "CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo());
+        return pref != null && permisoPermiteEnvio(usuario, pref.permisoDispositivo());
+    }
+
+    /**
+     * DENEGADO bloquea. CONCEDIDO permite.
+     * NO_SOLICITADO con tokens activos: cualquier celular ya registrado recibe (multi-dispositivo).
+     */
+    private boolean permisoPermiteEnvio(long usuario, String permiso) {
+        if ("DENEGADO".equalsIgnoreCase(permiso)) {
+            return false;
+        }
+        if ("CONCEDIDO".equalsIgnoreCase(permiso)) {
+            return true;
+        }
+        return !dispositivos.listarActivos(usuario, "FCM").isEmpty();
     }
 
     static String claveIndividual(String prefijo, long idAlerta, LocalDate hoy, Motivo motivo) {
