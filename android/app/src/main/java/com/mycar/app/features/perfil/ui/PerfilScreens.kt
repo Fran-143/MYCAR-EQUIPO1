@@ -314,6 +314,53 @@ private fun PerfilHubScreen(estado: EstadoPerfil, vm: PerfilViewModel, onVolver:
                                 fontSize = 18.sp
                             )
                             Text(perfil.correo, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+                            estado.plan?.let { plan ->
+                                val esPremium = plan.planCodigo.equals("PREMIUM", ignoreCase = true)
+                                Spacer(Modifier.height(12.dp))
+                                Surface(
+                                    onClick = vm::abrirPlanes,
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = if (esPremium) Color(0xFFFFF8E1) else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (esPremium) Color(0xFFFFB300) else MaterialTheme.colorScheme.outlineVariant
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.WorkspacePremium,
+                                            contentDescription = null,
+                                            tint = if (esPremium) Color(0xFFF9A825) else MaterialTheme.colorScheme.primary
+                                        )
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                if (esPremium) "Plan Premium" else "Plan Free",
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                buildString {
+                                                    append(plan.estadoUi ?: plan.planCodigo)
+                                                    plan.diasRestantes?.let { append(" · $it día(s) restantes") }
+                                                    plan.solicitudAbierta?.let { append(" · solicitud $it") }
+                                                },
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Icon(
+                                            Icons.Outlined.ChevronRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(Modifier.height(16.dp))
                             OutlinedButton(
                                 onClick = vm::abrirDatos,

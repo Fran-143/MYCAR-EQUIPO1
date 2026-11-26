@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mycar.app.features.fotos.domain.ErrorFotoPersonalizada
 import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
+import com.mycar.app.features.fotos.domain.ResultadoFotoPersonalizada
 import com.mycar.app.features.perfil.domain.DatosPerfil
 import com.mycar.app.features.perfil.domain.ErrorPerfil
 import com.mycar.app.features.perfil.domain.FormularioEdicionPerfil
@@ -22,11 +23,23 @@ enum class PantallaPerfil {
     ELIMINAR_CUENTA
 }
 
+data class ResumenPlanPerfil(
+    val planCodigo: String,
+    val planNombre: String?,
+    val estadoUi: String?,
+    val modalidad: String?,
+    val maxVehiculos: Int?,
+    val vehiculosRegistrados: Long,
+    val diasRestantes: Int?,
+    val solicitudAbierta: String?
+)
+
 data class EstadoPerfil(
     val pantalla: PantallaPerfil = PantallaPerfil.HUB,
     val cargando: Boolean = false,
     val guardando: Boolean = false,
     val perfil: DatosPerfil? = null,
+    val plan: ResumenPlanPerfil? = null,
     val formulario: FormularioEdicionPerfil = FormularioEdicionPerfil(),
     val errores: Map<String, String> = emptyMap(),
     val mensaje: String? = null,
@@ -47,6 +60,7 @@ data class EstadoPerfil(
 class PerfilViewModel(
     private val repository: PerfilRepository,
     private val fotos: FotoPersonalizadaRepository? = null,
+    private val planes: com.mycar.app.features.planes.domain.PlanesRepository? = null,
     private val onNombreActualizado: (String) -> Unit = {},
     private val onAvatarActualizado: (ByteArray?) -> Unit = {}
 ) : ViewModel() {
@@ -67,9 +81,25 @@ class PerfilViewModel(
                     }
                 } else null
                 onAvatarActualizado(bytes)
+                val plan = planes?.let { repo ->
+                    runCatching {
+                        val mia = repo.miSuscripcion()
+                        ResumenPlanPerfil(
+                            planCodigo = mia.planCodigo ?: "FREE",
+                            planNombre = mia.planNombre,
+                            estadoUi = mia.estadoSuscripcionUi ?: mia.estado,
+                            modalidad = mia.modalidad,
+                            maxVehiculos = mia.maxVehiculosRegistrados,
+                            vehiculosRegistrados = mia.vehiculosRegistrados,
+                            diasRestantes = mia.diasRestantes,
+                            solicitudAbierta = mia.codigoSolicitudAbierta
+                        )
+                    }.getOrNull()
+                }
                 _estado.value = _estado.value.copy(
                     cargando = false,
                     perfil = datos,
+                    plan = plan,
                     fotoBytes = bytes,
                     mensaje = null,
                     mensajeFoto = null
@@ -90,8 +120,7 @@ class PerfilViewModel(
         viewModelScope.launch {
             _estado.value = _estado.value.copy(ocupadoFoto = true, mensajeFoto = null, errorFoto = false)
             try {
-                val r = if (tenia) repo.actualizarPerfil(bytes, contentType, nombre)
-                else repo.registrarPerfil(bytes, contentType, nombre)
+                val r = guardarPerfilConReintento(repo, tenia, bytes, contentType, nombre)
                 val perfil = _estado.value.perfil?.copy(tieneFoto = true)
                 onAvatarActualizado(bytes)
                 _estado.value = _estado.value.copy(
@@ -358,14 +387,21 @@ class PerfilViewModel(
         _estado.value = _estado.value.copy(pantalla = PantallaPerfil.HUB, exitoDatos = false, mensaje = null)
     }
 
-    /** Al reabrir Perfil desde cabecera/navegación: siempre el hub, no la última subpantalla. */
+    /**
+     * Al reabrir Perfil desde cabecera/navegación: hub (no subpantalla stale).
+     * No pisa PLANES/LICENCIA si ya se abrieron en este frame (perfilAbrir*).
+     */
     fun resetAlAbrir() {
+        val pant = _estado.value.pantalla
+        if (pant == PantallaPerfil.PLANES || pant == PantallaPerfil.LICENCIA) return
         _estado.value = _estado.value.copy(
             pantalla = PantallaPerfil.HUB,
             exitoDatos = false,
             mensaje = null,
             confirmarCierre = false
         )
+        // Refrescar plan (p. ej. admin aprobó Premium mientras la app estaba abierta).
+        cargar()
     }
 
     fun volverAtras() {
@@ -382,4 +418,23 @@ class PerfilViewModel(
 
     fun pedirCerrarSesion() { _estado.value = _estado.value.copy(confirmarCierre = true) }
     fun cancelarCierre() { _estado.value = _estado.value.copy(confirmarCierre = false) }
+
+    private suspend fun guardarPerfilConReintento(
+        repo: FotoPersonalizadaRepository,
+        tenia: Boolean,
+        bytes: ByteArray,
+        contentType: String,
+        nombre: String
+    ): ResultadoFotoPersonalizada {
+        return try {
+            if (tenia) repo.actualizarPerfil(bytes, contentType, nombre)
+            else repo.registrarPerfil(bytes, contentType, nombre)
+        } catch (e: ErrorFotoPersonalizada.Conflicto) {
+            // Estado local desfasado: ya existe en servidor → actualizar.
+            if (!tenia) repo.actualizarPerfil(bytes, contentType, nombre) else throw e
+        } catch (e: ErrorFotoPersonalizada.NoEncontrada) {
+            // Creía que había foto y el servidor no → registrar.
+            if (tenia) repo.registrarPerfil(bytes, contentType, nombre) else throw e
+        }
+    }
 }

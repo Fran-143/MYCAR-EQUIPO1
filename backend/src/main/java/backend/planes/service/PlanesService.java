@@ -951,11 +951,23 @@ public class PlanesService {
             aviso = "Tu Premium fue cancelado por un administrador. Volviste al plan Free "
                     + "(1 vehículo activo; no puedes registrar más autos).";
         }
+        boolean cancelProg = esPremiumActivo(s)
+                && dao.ultimoEventoTipoReciente(s.idUsuario(), "PREMIUM_CANCELACION_USUARIO").isPresent()
+                && !dao.huboEventoTras(s.idUsuario(), "PREMIUM_ACTIVADO", "PREMIUM_CANCELACION_USUARIO");
+        if (cancelProg && aviso == null) {
+            aviso = dias == null
+                    ? "Cancelaste Premium. Conservas los beneficios hasta la fecha de fin."
+                    : "Cancelaste Premium. Te quedan " + dias
+                    + " día(s) de beneficios; luego pasarás a Free automáticamente.";
+        }
+        boolean puedeCancelar = esPremiumActivo(s) && !cancelProg
+                && ("PRUEBA_GRATUITA".equals(s.modalidad()) || "PAGO_SANDBOX".equals(s.modalidad()));
+        String ui = cancelProg ? "PREMIUM_CANCELACION_PROGRAMADA" : estadoUi(s);
         return new ContratoPlanes.MiSuscripcionResponse(
                 s.planCodigo(),
                 s.planNombre(),
                 s.modalidad() == null ? ("FREE".equals(s.planCodigo()) ? "FREE" : null) : s.modalidad(),
-                estadoUi(s),
+                ui,
                 s.estado(),
                 s.origen(),
                 s.inicioUtc() == null ? null : s.inicioUtc().toString(),
@@ -971,8 +983,47 @@ public class PlanesService {
                 motivoSandbox,
                 refUltima,
                 solAbierta,
-                aviso
+                aviso,
+                puedeCancelar,
+                cancelProg
         );
+    }
+
+    /**
+     * Usuario cancela Premium (prueba o sandbox): sigue vigente hasta finUtc.
+     * Admin cancelarPremiumActivo sigue siendo inmediata a FREE.
+     */
+    @Transactional
+    public ContratoPlanes.DecisionResponse cancelarPremiumUsuario(long idUsuario) {
+        SuscripcionRow s = dao.suscripcionActiva(idUsuario)
+                .orElseThrow(() -> new ErrorPlanes("NO_ENCONTRADO", "Sin suscripción activa."));
+        if (!esPremiumActivo(s)) {
+            throw new ErrorPlanes("ESTADO_INVALIDO", "No hay Premium activo para cancelar.");
+        }
+        if (!"PRUEBA_GRATUITA".equals(s.modalidad()) && !"PAGO_SANDBOX".equals(s.modalidad())) {
+            throw new ErrorPlanes("ESTADO_INVALIDO", "Esta suscripción no admite cancelación desde la app.");
+        }
+        boolean ya = dao.ultimoEventoTipoReciente(idUsuario, "PREMIUM_CANCELACION_USUARIO").isPresent()
+                && !dao.huboEventoTras(idUsuario, "PREMIUM_ACTIVADO", "PREMIUM_CANCELACION_USUARIO");
+        if (ya) {
+            throw new ErrorPlanes("ESTADO_INVALIDO", "Ya programaste la cancelación de Premium.");
+        }
+        Integer dias = null;
+        if (s.finUtc() != null) {
+            long d = ChronoUnit.DAYS.between(Instant.now().truncatedTo(ChronoUnit.DAYS),
+                    s.finUtc().truncatedTo(ChronoUnit.DAYS));
+            dias = (int) Math.max(0, d);
+        }
+        dao.registrarEvento(idUsuario, s.idSuscripcion(), s.idOperacionPago(),
+                "PREMIUM_CANCELACION_USUARIO",
+                "modalidad=" + s.modalidad() + ";dias_restantes=" + (dias == null ? "?" : dias));
+        String msg = dias == null
+                ? "Cancelación registrada. Conservas Premium hasta la fecha de fin."
+                : "Cancelación registrada. Te quedan " + dias
+                + " día(s) de Premium; luego pasarás a Free automáticamente.";
+        return new ContratoPlanes.DecisionResponse(
+                null, "CANCELACION_PROGRAMADA", msg,
+                s.finUtc() == null ? null : s.finUtc().toString(), s.modalidad());
     }
 
     private static String estadoUi(SuscripcionRow s) {

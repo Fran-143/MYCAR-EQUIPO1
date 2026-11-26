@@ -43,8 +43,11 @@ object PushTokenSync {
             return
         }
         try {
+            // Con forzar: regenerar token (segundo dispositivo / token stale que FCM ya invalidó).
+            if (forzar) {
+                runCatching { regenerarTokenFcm() }
+            }
             // Preferir token vivo de FCM; el pendiente solo cubre rotación antes del login.
-            // Reintento: en dispositivos lentos el primer getToken puede fallar/timeout.
             val fcm = obtenerTokenFcm()
                 ?: obtenerTokenFcm()
                 ?: tokenPendiente(context)
@@ -203,4 +206,16 @@ object PushTokenSync {
                     }
             }
         }
+
+    private suspend fun regenerarTokenFcm() {
+        withTimeoutOrNull(FCM_TOKEN_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                FirebaseMessaging.getInstance().deleteToken()
+                    .addOnCompleteListener {
+                        if (cont.isActive) cont.resume(Unit)
+                    }
+            }
+        }
+        Log.i(TAG, "token FCM regenerado (deleteToken)")
+    }
 }

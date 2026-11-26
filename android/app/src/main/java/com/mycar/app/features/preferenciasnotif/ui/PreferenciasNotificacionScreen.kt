@@ -66,6 +66,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.features.preferenciasnotif.domain.PermisoDispositivo
 import com.mycar.app.features.preferenciasnotif.domain.PreferenciasNotificacionRepository
 import com.mycar.app.features.preferenciasnotif.viewmodel.PreferenciasNotificacionViewModel
+import com.mycar.app.features.push.data.PushTokenSync
 import com.mycar.app.ui.theme.MyCarBg
 import com.mycar.app.ui.theme.MyCarMuted
 import com.mycar.app.ui.theme.MyCarNavy
@@ -73,7 +74,9 @@ import com.mycar.app.ui.theme.MyCarStatusActivo
 import com.mycar.app.ui.theme.MyCarTeal
 import com.mycar.app.ui.theme.MyCarTile
 import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
 @Composable
@@ -110,14 +113,19 @@ fun PreferenciasNotificacionRoute(
         }
     }
 
-    val factory = remember(repository) {
+    val factory = remember(repository, context) {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return PreferenciasNotificacionViewModel(
                     repository,
                     consultarPermisoOs = { permisoOsActual() },
-                    solicitarPermisoOs = { solicitarPermiso() }
+                    solicitarPermisoOs = { solicitarPermiso() },
+                    onPermisoConcedidoParaPush = {
+                        withContext(Dispatchers.IO) {
+                            PushTokenSync.registrarSiSesionActiva(context.applicationContext, forzar = true)
+                        }
+                    }
                 ) as T
             }
         }
@@ -129,8 +137,8 @@ fun PreferenciasNotificacionRoute(
     PreferenciasNotificacionScreen(
         estado = estado,
         onVolver = onVolver,
-        onMantenimiento = vm::setMantenimiento,
-        onSoat = vm::setSoat,
+        onMantenimiento = vm::cambiarMantenimiento,
+        onSoat = vm::cambiarSoat,
         onGuardar = vm::guardar,
         modifier = modifier
     )
@@ -200,7 +208,7 @@ private fun PreferenciasNotificacionScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                "Activa o desactiva el envío externo por categoría. Los avisos dentro de la app no se borran.",
+                "Cada interruptor se guarda al cambiarlo. Si el permiso del dispositivo está denegado, no recibirás push aunque el switch esté activo.",
                 color = MyCarMuted,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -261,17 +269,27 @@ private fun PreferenciasNotificacionScreen(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Button(
-                onClick = onGuardar,
-                enabled = !estado.guardando,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
-            ) {
-                Text(
-                    if (estado.guardando) "Guardando…" else "Guardar preferencias",
-                    fontWeight = FontWeight.SemiBold
-                )
+            if (estado.guardando) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(Modifier.size(22.dp), color = MyCarNavy, strokeWidth = 2.dp)
+                    Spacer(Modifier.size(10.dp))
+                    Text("Guardando…", color = MyCarMuted)
+                }
+            }
+            if (estado.permisoDispositivo == PermisoDispositivo.DENEGADO) {
+                Button(
+                    onClick = onGuardar,
+                    enabled = !estado.guardando,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
+                ) {
+                    Text("Activar permiso de notificaciones", fontWeight = FontWeight.SemiBold)
+                }
             }
             Spacer(Modifier.height(16.dp))
         }

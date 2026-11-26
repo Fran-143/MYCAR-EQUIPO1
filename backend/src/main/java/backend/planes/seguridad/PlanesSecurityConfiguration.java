@@ -38,6 +38,7 @@ public class PlanesSecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/suscripciones/mia",
                                 "/api/v1/suscripciones/mia/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/suscripciones/solicitudes/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/suscripciones/mia/cancelar").authenticated()
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(sesiones, json), AnonymousAuthenticationFilter.class)
                 .build();

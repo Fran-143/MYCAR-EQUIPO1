@@ -29,6 +29,9 @@ interface PlanesApi {
     @POST("api/v1/suscripciones/solicitudes/pago-simulado")
     suspend fun solicitarPagoSimulado(): Response<SolicitudSuscripcionDto>
 
+    @POST("api/v1/suscripciones/mia/cancelar")
+    suspend fun cancelarPremium(): Response<CancelarPremiumResponse>
+
     @POST("api/v1/local-test/pagos-prueba")
     suspend fun crearPago(
         @Header("X-MyCar-Local-Test") token: String,

@@ -31,7 +31,9 @@ data class EstadoPreferenciasNotificacion(
 class PreferenciasNotificacionViewModel(
     private val repository: PreferenciasNotificacionRepository,
     private val consultarPermisoOs: () -> PermisoDispositivo,
-    private val solicitarPermisoOs: suspend () -> PermisoDispositivo
+    private val solicitarPermisoOs: suspend () -> PermisoDispositivo,
+    /** Tras conceder OS + guardar ON: re-registrar FCM para que llegue el push. */
+    private val onPermisoConcedidoParaPush: (suspend () -> Unit)? = null
 ) : ViewModel() {
     private val _estado = MutableStateFlow(EstadoPreferenciasNotificacion())
     val estado: StateFlow<EstadoPreferenciasNotificacion> = _estado.asStateFlow()
@@ -64,6 +66,17 @@ class PreferenciasNotificacionViewModel(
     fun setSoat(v: Boolean) = editar { it.copy(soat = v, mensajeError = null, mensajeExito = null) }
     fun setKilometraje(v: Boolean) = editar { it.copy(kilometraje = v, mensajeError = null, mensajeExito = null) }
 
+    /** Switch UI: aplica y guarda de inmediato (antes el usuario debía pulsar Guardar). */
+    fun cambiarMantenimiento(v: Boolean) {
+        setMantenimiento(v)
+        guardar()
+    }
+
+    fun cambiarSoat(v: Boolean) {
+        setSoat(v)
+        guardar()
+    }
+
     fun guardar() {
         if (_estado.value.guardando || _estado.value.cargando) return
         viewModelScope.launch {
@@ -94,8 +107,12 @@ class PreferenciasNotificacionViewModel(
                 aplicar(
                     guardado,
                     avisoSiDenegado = permiso == PermisoDispositivo.DENEGADO && algunaOn,
-                    exito = "Preferencias guardadas."
+                    exito = "Preferencias guardadas. Los push usan estos interruptores."
                 )
+                // Con permiso OS concedido, asegurar token FCM activo (segundo celular / amiga).
+                if (permiso == PermisoDispositivo.CONCEDIDO && algunaOn) {
+                    onPermisoConcedidoParaPush?.invoke()
+                }
             } catch (e: ErrorPreferencias.Sesion) {
                 _estado.value = _estado.value.copy(guardando = false, sesionInvalida = true, mensajeError = e.message)
             } catch (e: Exception) {
@@ -107,7 +124,8 @@ class PreferenciasNotificacionViewModel(
                     soat = revert.soat,
                     kilometraje = revert.kilometraje,
                     permisoDispositivo = revert.permisoDispositivo,
-                    mensajeError = "No pudimos guardar tus preferencias",
+                    mensajeError = e.message?.takeIf { it.isNotBlank() }
+                        ?: "No pudimos guardar tus preferencias",
                     mensajeExito = null
                 )
             }

@@ -38,9 +38,9 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        // 85 / 1.0.13: consistencia estado alertas (detalle/notif) + carga «Todos» en paralelo.
-        versionCode = 85
-        versionName = "1.0.13"
+        // 86 / 1.0.14: Premium en perfil, cancelación usuario, prefs push auto-save, cupo→planes.
+        versionCode = 86
+        versionName = "1.0.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Política académica v1.0 embebida (local-academic) en release y debug.

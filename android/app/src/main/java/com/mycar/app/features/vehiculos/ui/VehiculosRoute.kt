@@ -44,6 +44,7 @@ fun VehiculosRoute(
     onFormularioAbierto: (Boolean) -> Unit = {},
     onNotificaciones: (() -> Unit)? = null,
     onPerfil: (() -> Unit)? = null,
+    onVerPlanes: (() -> Unit)? = null,
     fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
     avatarBytes: ByteArray? = null,
     iniciales: String? = null
@@ -100,7 +101,13 @@ fun VehiculosRoute(
                 cupo = cupo,
                 azul = azul,
                 teal = teal,
-                onDismiss = { cupoBloqueo = null }
+                onDismiss = { cupoBloqueo = null },
+                onVerPlanes = onVerPlanes?.let { ir ->
+                    {
+                        cupoBloqueo = null
+                        ir()
+                    }
+                }
             )
         }
         mensajeError?.let { texto ->
@@ -121,7 +128,8 @@ private fun ModalCupoVehiculos(
     cupo: CupoRegistroDto,
     azul: Color,
     teal: Color,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onVerPlanes: (() -> Unit)? = null
 ) {
     val plan = cupo.plan.ifBlank { "tu plan" }
     val esPremium = plan.equals("PREMIUM", ignoreCase = true)
@@ -202,12 +210,22 @@ private fun ModalCupoVehiculos(
             }
         },
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = acento),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Entendido") }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!esPremium && onVerPlanes != null) {
+                    Button(
+                        onClick = onVerPlanes,
+                        colors = ButtonDefaults.buttonColors(containerColor = teal),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Ver planes Premium") }
+                }
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = acento),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Entendido") }
+            }
         }
     )
 }
