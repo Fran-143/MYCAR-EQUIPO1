@@ -30,6 +30,9 @@ class RemotePlanesRepository(private val api: PlanesApi) : PlanesRepository {
     override suspend fun solicitarPagoSimulado(): SolicitudSuscripcionDto =
         leer(api.solicitarPagoSimulado()) { it ?: throw ErrorPlanes("VACIO", "Sin solicitud.") }
 
+    override suspend fun cancelarPremium(): CancelarPremiumResponse =
+        leer(api.cancelarPremium()) { it ?: throw ErrorPlanes("VACIO", "Sin respuesta de cancelación.") }
+
     override suspend fun crearPagoSimulador(): OperacionPagoDto =
         leer(
             api.crearPago(LocalTestClient.QA_TOKEN, CrearPagoBody(proveedor = "SIMULADOR_LOCAL"))

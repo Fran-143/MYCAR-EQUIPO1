@@ -15,6 +15,7 @@ interface PlanesRepository {
     suspend fun solicitudDetalle(codigo: String): SolicitudDetalleDto
     suspend fun solicitarPruebaGratuita(): SolicitudSuscripcionDto
     suspend fun solicitarPagoSimulado(): SolicitudSuscripcionDto
+    suspend fun cancelarPremium(): com.mycar.app.features.planes.data.CancelarPremiumResponse
     suspend fun crearPagoSimulador(): OperacionPagoDto
     suspend fun simular(referencia: String, escenario: String): OperacionPagoDto
     suspend fun consultar(referencia: String): OperacionPagoDto

@@ -75,6 +75,18 @@ public class PlanesController {
                 .body(service.solicitarPagoSimulado(id));
     }
 
+    /**
+     * Cancelación voluntaria: Premium sigue vigente hasta finUtc; luego FREE.
+     * No sustituye la cancelación inmediata del administrador.
+     */
+    @PostMapping(value = "/suscripciones/mia/cancelar", produces = "application/json")
+    public ResponseEntity<ContratoPlanes.DecisionResponse> cancelarMia(
+            @AuthenticationPrincipal SessionAuthentication.Principal principal) {
+        long id = exigir(principal);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(service.cancelarPremiumUsuario(id));
+    }
+
     private static long exigir(SessionAuthentication.Principal principal) {
         if (principal == null || principal.userId() <= 0) {
             throw new ErrorPlanes("NO_AUTORIZADO", "Sesión requerida.");

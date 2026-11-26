@@ -53,7 +53,11 @@ public final class ContratoPlanes {
             String referenciaOperacionUltima,
             String codigoSolicitudAbierta,
             /** Aviso visible al usuario (p. ej. Premium cancelado por admin). */
-            String avisoUsuario
+            String avisoUsuario,
+            /** Usuario puede programar el fin de Premium (sigue vigente hasta finUtc). */
+            boolean puedeCancelar,
+            /** Ya pidió cancelación: conserva beneficios hasta la fecha de fin. */
+            boolean cancelacionProgramada
     ) { }
 
     public record EventoDto(

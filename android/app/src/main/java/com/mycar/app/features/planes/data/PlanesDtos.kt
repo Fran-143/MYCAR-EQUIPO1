@@ -45,7 +45,17 @@ data class MiSuscripcionDto(
     val motivoNoSandbox: String? = null,
     val referenciaOperacionUltima: String? = null,
     val codigoSolicitudAbierta: String? = null,
-    val avisoUsuario: String? = null
+    val avisoUsuario: String? = null,
+    val puedeCancelar: Boolean = false,
+    val cancelacionProgramada: Boolean = false
+)
+
+data class CancelarPremiumResponse(
+    val codigo: String? = null,
+    val estado: String? = null,
+    val mensaje: String? = null,
+    val finUtc: String? = null,
+    val modalidad: String? = null
 )
 
 data class EventoSuscripcionDto(
