@@ -411,7 +411,7 @@ public class AlertasJdbcDao {
                       AND mycar.normalizar_servicio_otro(COALESCE(m.servicio_otro, ''))
                         = mycar.normalizar_servicio_otro(?)
                     ORDER BY m.fecha_servicio DESC, m.id_mantenimiento DESC
-                    LIMIT 3
+                    LIMIT 20
                     """, (rs, n) -> new ContratoRf22.ReferenciaDto(
                     rs.getLong(1), rs.getString(2),
                     rs.getObject(3, LocalDate.class),
@@ -424,7 +424,7 @@ public class AlertasJdbcDao {
                 JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = m.id_tipo_mantenimiento
                 WHERE m.id_vehiculo = ? AND m.estado = 'REALIZADO' AND tm.codigo = ?
                 ORDER BY m.fecha_servicio DESC, m.id_mantenimiento DESC
-                LIMIT 3
+                LIMIT 20
                 """, (rs, n) -> new ContratoRf22.ReferenciaDto(
                 rs.getLong(1), rs.getString(2),
                 rs.getObject(3, LocalDate.class),

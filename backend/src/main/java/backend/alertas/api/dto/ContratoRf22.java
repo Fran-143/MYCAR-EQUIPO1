@@ -41,6 +41,7 @@ public final class ContratoRf22 {
             String servicioOtro
     ) { }
     public record ContextoResponse(
+            @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
             LocalDate fechaServidor,
             String zonaHoraria,
             Integer kmActual,
