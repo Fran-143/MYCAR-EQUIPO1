@@ -28,6 +28,9 @@ class CoordinadorHistorialTest {
             consultas += idVehiculo
             return respuesta(idVehiculo)
         }
+        override suspend fun detalle(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
+        override suspend fun modificar(idVehiculo: Long, idMantenimiento: Long, datos: ModificarMantenimientoDatos) = error("no usado")
+        override suspend fun anular(idVehiculo: Long, idMantenimiento: Long) = error("no usado")
     }
 
     @Test fun principalCargaAutomaticamenteYSinPrincipalEsperaEleccion() = runBlocking {

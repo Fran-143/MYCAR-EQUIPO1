@@ -23,8 +23,15 @@ public class HistorialSecurityConfiguration {
     @Bean @Order(18)
     SecurityFilterChain historialSecurity(HttpSecurity http, SessionAuthentication sesiones, ObjectMapper json) throws Exception {
         return http.securityMatcher("/api/v1/rf18/**")
-                .authorizeHttpRequests(a -> a.requestMatchers(HttpMethod.GET,
-                        "/api/v1/rf18/contexto", "/api/v1/rf18/vehiculos/*/mantenimientos").authenticated()
+                .authorizeHttpRequests(a -> a
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/rf18/contexto",
+                                "/api/v1/rf18/vehiculos/*/mantenimientos",
+                                "/api/v1/rf18/vehiculos/*/mantenimientos/*").authenticated()
+                        .requestMatchers(HttpMethod.PATCH,
+                                "/api/v1/rf18/vehiculos/*/mantenimientos/*").authenticated()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/rf18/vehiculos/*/mantenimientos/*/anular").authenticated()
                         .anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)

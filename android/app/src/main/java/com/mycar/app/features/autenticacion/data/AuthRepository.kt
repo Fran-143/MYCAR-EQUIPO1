@@ -19,17 +19,37 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-enum class SessionPhase { CHECKING, SIGNED_OUT, AUTHENTICATED, RETRY, CLEAR_FAILED }
+enum class SessionPhase { CHECKING, SIGNED_OUT, AUTHENTICATED, RETRY, CLEAR_FAILED, MFA_FLOW }
+enum class MfaStep {
+    ENROLL_INTRO, ENROLL_QR, ENROLL_CONFIRM, RECOVERY_CODES,
+    VERIFY, BLOCKED, RECOVER, RECONFIGURE
+}
+data class MfaUiState(
+    val step: MfaStep,
+    val desafioId: String? = null,
+    val otpauthUri: String? = null,
+    val secretoManual: String? = null,
+    val recoveryCodes: List<String> = emptyList(),
+    val intento: Int? = null,
+    val maxIntentos: Int = 5,
+    val bloqueoHastaUtc: String? = null,
+    val error: String? = null,
+    val busy: Boolean = false
+)
 data class SessionState(
     val phase: SessionPhase, val message: String? = null, val contextVersion: Long = 0,
-    val hasLocalSession: Boolean = false
+    val hasLocalSession: Boolean = false,
+    val alcance: String? = null,
+    val mfa: MfaUiState? = null
 ) {
     // RETRY no implica revocación: permite limpiar credenciales existentes aun sin conexión.
     val canRequestLogout: Boolean get() = phase == SessionPhase.AUTHENTICATED ||
-        phase == SessionPhase.CLEAR_FAILED || (phase == SessionPhase.RETRY && hasLocalSession)
+        phase == SessionPhase.CLEAR_FAILED || phase == SessionPhase.MFA_FLOW ||
+        (phase == SessionPhase.RETRY && hasLocalSession)
+    val isAdminSession: Boolean get() = phase == SessionPhase.AUTHENTICATED && alcance == "ADMIN"
 }
 
-class AuthProblem(message: String) : Exception(message)
+class AuthProblem(message: String, val codigo: String? = null) : Exception(message)
 
 /** Identifica un ciclo validado; no contiene credenciales ni autoriza al backend por sí mismo. */
 data class AuthenticatedContext(val sessionId: Long, val version: Long)
@@ -45,47 +65,179 @@ class AuthRepository(
     private val store: CredentialStore,
     private val clock: Clock = Clock.systemUTC(),
     private val registrationPolicy: PrivacyPolicyConfiguration = PrivacyPolicyConfiguration(),
-    private val clearPrivateData: () -> Unit = {}
+    private val clearPrivateData: () -> Unit = {},
+    private val onSessionReady: suspend (accessToken: String, installation: String) -> Unit = { _, _ -> },
+    private val onSessionClosing: suspend (accessToken: String?, installation: String) -> Unit = { _, _ -> }
 ) : RegistrationService {
     private val registrationMutex = Mutex()
 
-    override suspend fun register(request: RegistrationRequest) = withContext(Dispatchers.IO) {
-        if (!registrationPolicy.available) throw RegistrationFailure(RegistrationFailureKind.PRIVACY_PENDING)
-        if (request.consentimientoPrivacidad.version != registrationPolicy.version)
-            throw RegistrationFailure(RegistrationFailureKind.VERSION_MISMATCH)
-        if (!request.consentimientoPrivacidad.aceptado)
-            throw RegistrationFailure(RegistrationFailureKind.VALIDATION,
-                mapOf("privacidadAceptada" to RegistrationValidator.messages.getValue("privacidadAceptada")))
+    override suspend fun register(request: RegistrationRequest) {
+        // Registro directo deshabilitado en backend (OTP obligatorio).
+        throw RegistrationFailure(RegistrationFailureKind.UNAVAILABLE)
+    }
+
+    override suspend fun startEmailVerification(request: RegistrationRequest): VerificationSession =
+        withContext(Dispatchers.IO) {
+            guardRegistration(request)
+            if (!registrationMutex.tryLock()) throw RegistrationFailure(RegistrationFailureKind.IN_PROGRESS)
+            try {
+                val origin = api.verificationOrigin()
+                if (!origin.isSuccessful) throw mapRegistrationHttp(origin.code(), origin.errorBody()?.string())
+                val o = origin.body()
+                if (o?.idOrigen.isNullOrBlank() || o?.secretoOrigen.isNullOrBlank())
+                    throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+                emitVerification(
+                    VerificationEmitRequest(
+                        idOrigen = o.idOrigen!!,
+                        secretoOrigen = o.secretoOrigen!!,
+                        idSolicitud = UUID.randomUUID().toString(),
+                        revision = 0,
+                        formulario = request
+                    )
+                )
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (known: RegistrationFailure) { throw known
+            } catch (_: IOException) { throw RegistrationFailure(RegistrationFailureKind.NETWORK)
+            } catch (_: Exception) { throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+            } finally { registrationMutex.unlock() }
+        }
+
+    override suspend fun resendEmailCode(
+        session: VerificationSession,
+        request: RegistrationRequest
+    ): VerificationSession = withContext(Dispatchers.IO) {
+        guardRegistration(request)
         if (!registrationMutex.tryLock()) throw RegistrationFailure(RegistrationFailureKind.IN_PROGRESS)
         try {
-            val response = api.register(request)
+            emitVerification(
+                VerificationEmitRequest(
+                    idOrigen = session.idOrigen,
+                    secretoOrigen = session.secretoOrigen,
+                    idOperacion = session.idOperacion,
+                    secretoOperacion = session.secretoOperacion,
+                    idSolicitud = UUID.randomUUID().toString(),
+                    revision = session.revision,
+                    formulario = request
+                )
+            )
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (known: RegistrationFailure) { throw known
+        } catch (_: IOException) { throw RegistrationFailure(RegistrationFailureKind.NETWORK)
+        } catch (_: Exception) { throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+        } finally { registrationMutex.unlock() }
+    }
+
+    override suspend fun completeEmailVerification(
+        session: VerificationSession,
+        code: String,
+        request: RegistrationRequest
+    ) = withContext(Dispatchers.IO) {
+        guardRegistration(request)
+        if (!registrationMutex.tryLock()) throw RegistrationFailure(RegistrationFailureKind.IN_PROGRESS)
+        try {
+            val response = api.verificationComplete(
+                VerificationCompleteRequest(
+                    idOperacion = session.idOperacion,
+                    secretoOperacion = session.secretoOperacion,
+                    idSolicitud = UUID.randomUUID().toString(),
+                    revision = session.revision,
+                    idEmision = session.idEmision,
+                    codigo = code.trim(),
+                    formulario = request
+                )
+            )
             if (response.code() == 201) {
                 val body = response.body()
                 if (body?.resultado != "CUENTA_CREADA" || body.destino != "INICIO_SESION")
                     throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
-                // No se llama a login, persist, load ni se modifica el estado de sesión.
             } else {
-                val error = response.errorBody()?.use { body ->
-                    try { Gson().fromJson(body.string(), RegistrationError::class.java) }
-                    catch (_: Exception) { null }
-                }
-                throw when (response.code()) {
-                    400 -> {
-                        val fields = error?.erroresPorCampo?.keys.orEmpty()
-                            .mapNotNull { key -> RegistrationValidator.messages[key]?.let { key to it } }.toMap()
-                        RegistrationFailure(if ("versionPrivacidad" in fields) RegistrationFailureKind.VERSION_MISMATCH
-                            else RegistrationFailureKind.VALIDATION, fields)
-                    }
-                    409 -> RegistrationFailure(RegistrationFailureKind.EMAIL_UNAVAILABLE)
-                    503, 500 -> RegistrationFailure(RegistrationFailureKind.UNAVAILABLE)
-                    else -> RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
-                }
+                throw mapRegistrationHttp(response.code(), response.errorBody()?.string())
             }
         } catch (cancelled: CancellationException) { throw cancelled
         } catch (known: RegistrationFailure) { throw known
         } catch (_: IOException) { throw RegistrationFailure(RegistrationFailureKind.NETWORK)
         } catch (_: Exception) { throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
         } finally { registrationMutex.unlock() }
+    }
+
+    private fun guardRegistration(request: RegistrationRequest) {
+        if (!registrationPolicy.available) throw RegistrationFailure(RegistrationFailureKind.PRIVACY_PENDING)
+        if (request.consentimientoPrivacidad.version != registrationPolicy.version)
+            throw RegistrationFailure(RegistrationFailureKind.VERSION_MISMATCH)
+        if (!request.consentimientoPrivacidad.aceptado)
+            throw RegistrationFailure(RegistrationFailureKind.VALIDATION,
+                mapOf("privacidadAceptada" to RegistrationValidator.messages.getValue("privacidadAceptada")))
+    }
+
+    private suspend fun emitVerification(body: VerificationEmitRequest): VerificationSession {
+        val response = api.verificationEmit(body)
+        if (response.code() != 202 && response.code() != 200) {
+            throw mapRegistrationHttp(response.code(), response.errorBody()?.string())
+        }
+        val emit = response.body()
+        if (emit?.resultado != "EMISION_CREADA" ||
+            emit.idOperacion.isNullOrBlank() ||
+            emit.secretoOperacion.isNullOrBlank() ||
+            emit.idEmision.isNullOrBlank()) {
+            throw RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+        }
+        return VerificationSession(
+            idOrigen = body.idOrigen,
+            secretoOrigen = body.secretoOrigen,
+            idOperacion = emit.idOperacion!!,
+            secretoOperacion = emit.secretoOperacion!!,
+            idEmision = emit.idEmision!!,
+            revision = emit.revision,
+            codigoDesarrollo = emit.codigoDesarrollo
+        )
+    }
+
+    private fun mapRegistrationHttp(code: Int, raw: String?): RegistrationFailure {
+        val error = try {
+            raw?.let { Gson().fromJson(it, RegistrationError::class.java) }
+        } catch (_: Exception) { null }
+        val codigo = error?.codigo.orEmpty()
+        val mensajeServidor = error?.mensaje?.takeIf { it.isNotBlank() }
+        return when {
+            code == 400 -> {
+                val fields = error?.erroresPorCampo?.keys.orEmpty()
+                    .mapNotNull { key -> RegistrationValidator.messages[key]?.let { key to it } }.toMap()
+                RegistrationFailure(if ("versionPrivacidad" in fields) RegistrationFailureKind.VERSION_MISMATCH
+                    else RegistrationFailureKind.VALIDATION, fields)
+            }
+            code == 409 -> RegistrationFailure(RegistrationFailureKind.EMAIL_UNAVAILABLE)
+            code == 429 || codigo in RATE_LIMIT_CODES -> RegistrationFailure(
+                RegistrationFailureKind.RATE_LIMITED,
+                detail = mensajeServidor ?: messageForRateLimit(codigo)
+            )
+            code == 422 -> RegistrationFailure(
+                RegistrationFailureKind.VALIDATION,
+                detail = mensajeServidor ?: "Código incorrecto o solicitud inválida."
+            )
+            code == 503 || code == 500 || code == 410 ->
+                RegistrationFailure(RegistrationFailureKind.UNAVAILABLE)
+            else -> RegistrationFailure(RegistrationFailureKind.UNCONFIRMED)
+        }
+    }
+
+    private companion object {
+        val RATE_LIMIT_CODES = setOf(
+            "ESPERA_REENVIO", "LIMITE_ENVIO", "LIMITE_TECNICO",
+            "RESERVA_PENDIENTE", "PAUSA_TECNICA", "BLOQUEO_ACTIVO", "BLOQUEO_INICIADO"
+        )
+
+        fun messageForRateLimit(codigo: String) = when (codigo) {
+            "ESPERA_REENVIO" ->
+                "Ya enviamos un código a este correo. Espera 10 minutos antes de pedir otro."
+            "LIMITE_ENVIO", "LIMITE_TECNICO" ->
+                "Alcanzaste el límite de envíos. Espera un rato e inténtalo de nuevo."
+            "RESERVA_PENDIENTE", "PAUSA_TECNICA" ->
+                "Hay un envío en curso. Espera unos segundos e inténtalo de nuevo."
+            "BLOQUEO_ACTIVO", "BLOQUEO_INICIADO" ->
+                "Demasiados intentos fallidos. Espera aproximadamente 1 hora antes de reintentar."
+            else ->
+                "Ya enviamos un código a este correo. Espera 10 minutos antes de pedir otro."
+        }
     }
 
     private val mutex = Mutex()
@@ -130,7 +282,15 @@ class AuthRepository(
             if (!clock.instant().isBefore(Instant.parse(previous.accessTokenExpiraUtc).minusSeconds(10))) {
                 try { renew(previous, context.version) }
                 catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { retry(context.version) }
+                catch (_: Exception) {
+                    retry(context.version)
+                    // Temporal: no SessionRequired (evita 401 sintético / “sesión inválida”).
+                    throw IOException("No se pudo renovar la sesión. Revisa la conexión.")
+                }
+                // renew() ante HTTP 5xx → RETRY sin lanzar; 401/403 → SIGNED_OUT (SessionRequired abajo).
+                if (synchronized(localLock) { mutableSession.value.phase == SessionPhase.RETRY }) {
+                    throw IOException("No se pudo renovar la sesión. Revisa la conexión.")
+                }
             }
             synchronized(localLock) {
                 ensureContext(context)
@@ -143,44 +303,260 @@ class AuthRepository(
             throw SessionRequired()
         when (mutableSession.value.phase) {
             SessionPhase.AUTHENTICATED -> Unit
-            SessionPhase.RETRY -> throw IOException("No se pudo validar la sesión; vuelve a intentarlo.")
+            // RETRY: forzar revalidación vía 401 sintético, no confundir con fallo de red del API.
+            SessionPhase.RETRY -> throw SessionRequired()
             else -> throw SessionRequired()
         }
     }
 
     suspend fun login(email: String, password: String) {
         val expected = version()
+        var pushSync: Pair<String, String>? = null
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 try {
                     synchronized(localLock) { ensureCurrent(expected) }
                     val response = api.login(LoginRequest(email.trim(), password, load().installation))
                     if (!response.isSuccessful) {
-                        response.errorBody()?.close()
-                        throw AuthProblem(when (response.code()) {
-                            400 -> "Revisa el correo y la contraseña."
-                            401 -> "Correo o contraseña incorrectos."
-                            403 -> "La cuenta no está habilitada para iniciar sesión."
+                        val raw = response.errorBody()?.string()
+                        val json = try { org.json.JSONObject(raw ?: "{}") } catch (_: Exception) { null }
+                        val codigo = json?.optString("codigo").orEmpty()
+                        val mensaje = json?.optString("mensaje")?.takeIf { it.isNotBlank() }
+                        // Priorizar codigo tipado antes que HTTP genérico (401/403).
+                        // No anexar timestamps UTC ni contadores exactos a la UI de login.
+                        throw AuthProblem(when {
+                            codigo == "CUENTA_SUSPENDIDA" ->
+                                mensaje ?: "Tu cuenta está SUSPENDIDA por Administración."
+                            codigo == "LOGIN_BLOQUEADO" ->
+                                mensaje
+                                    ?: "Tu cuenta está bloqueada temporalmente por seguridad. Podrás volver a intentarlo en unos minutos."
+                            codigo == "CUENTA_BLOQUEADA" ->
+                                mensaje
+                                    ?: "Tu cuenta está bloqueada temporalmente por Administración. Contacta con Soporte MyCar si necesitas asistencia."
+                            codigo == "CUENTA_PENDIENTE_ELIMINACION" ->
+                                mensaje
+                                    ?: "Tu cuenta está PENDIENTE DE ELIMINACIÓN. Puedes recuperarla dentro del plazo establecido."
+                            codigo == "CREDENCIALES_INVALIDAS" || response.code() == 401 ->
+                                "Correo o contraseña incorrectos."
+                            response.code() == 400 -> mensaje ?: "Revisa el correo y la contraseña."
+                            response.code() == 403 ->
+                                mensaje ?: "La cuenta no está habilitada para iniciar sesión."
                             else -> "No se pudo iniciar sesión. Inténtalo de nuevo."
-                        })
+                        }, codigo = codigo.ifBlank { null })
                     }
-                    val tokens = response.body().toStored()
-                    withContext(NonCancellable) { persist(tokens, expected) }
-                    publish(expected, SessionState(SessionPhase.AUTHENTICATED))
+                    val body = response.body()
+                    val estado = body?.estado
+                    when (estado) {
+                        "MFA_ENROLL_REQUERIDO" -> {
+                            val tokens = body.toStoredChallenge()
+                            withContext(NonCancellable) { persist(tokens, expected) }
+                            publish(expected, SessionState(
+                                SessionPhase.MFA_FLOW,
+                                alcance = tokens.alcance,
+                                hasLocalSession = true,
+                                mfa = MfaUiState(MfaStep.ENROLL_INTRO, desafioId = tokens.desafioId)
+                            ))
+                        }
+                        "MFA_REQUERIDO" -> {
+                            val tokens = body.toStoredChallenge()
+                            withContext(NonCancellable) { persist(tokens, expected) }
+                            publish(expected, SessionState(
+                                SessionPhase.MFA_FLOW,
+                                alcance = tokens.alcance,
+                                hasLocalSession = true,
+                                mfa = MfaUiState(MfaStep.VERIFY, desafioId = tokens.desafioId)
+                            ))
+                        }
+                        "AUTENTICADO" -> {
+                            val tokens = body.toStored()
+                            val installation = load().installation
+                            withContext(NonCancellable) { persist(tokens, expected) }
+                            publish(expected, SessionState(SessionPhase.AUTHENTICATED, alcance = tokens.alcance))
+                            pushSync = tokens.accessToken to installation
+                        }
+                        else -> throw AuthProblem("No se pudo completar el inicio de sesión de forma segura.")
+                    }
                 } catch (cancelled: CancellationException) { throw cancelled
                 } catch (known: AuthProblem) { throw known
                 } catch (_: IOException) { throw AuthProblem("No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.")
                 } catch (_: Exception) { throw AuthProblem("No se pudo completar el inicio de sesión de forma segura.") }
             }
+            notifySessionReadyOutsideMutex(pushSync)
         }
     }
 
-    suspend fun validateSession() {
+    suspend fun mfaStartEnroll() = mfaAction { expected, bearer, mfa ->
+        val response = api.mfaEnrollStart(bearer)
+        if (!response.isSuccessful) throw mapMfaError(response.code(), response.errorBody()?.string())
+        val body = response.body()
+        if (body?.otpauthUri.isNullOrBlank() || body?.secretoManual.isNullOrBlank())
+            throw AuthProblem("No se pudo generar el autenticador.")
+        publish(expected, mutableSession.value.copy(
+            mfa = mfa.copy(
+                step = MfaStep.ENROLL_QR,
+                otpauthUri = body.otpauthUri,
+                secretoManual = body.secretoManual,
+                error = null,
+                busy = false
+            )
+        ))
+    }
+
+    suspend fun mfaConfirmEnroll(codigo: String) = mfaAction { expected, bearer, mfa ->
+        val response = api.mfaEnrollConfirm(bearer, MfaCodigoRequest(codigo.trim()))
+        if (!response.isSuccessful) throw mapMfaError(response.code(), response.errorBody()?.string())
+        val codes = response.body()?.codigosRecuperacion.orEmpty()
+        if (codes.isEmpty()) throw AuthProblem("No se recibieron códigos de recuperación.")
+        publish(expected, mutableSession.value.copy(
+            mfa = mfa.copy(step = MfaStep.RECOVERY_CODES, recoveryCodes = codes, error = null, busy = false)
+        ))
+    }
+
+    suspend fun mfaConfirmBackup() = mfaAction { expected, bearer, _ ->
+        val response = api.mfaEnrollConfirmBackup(bearer)
+        if (!response.isSuccessful) throw mapMfaError(response.code(), response.errorBody()?.string())
+        val tokens = response.body().toStored()
+        withContext(NonCancellable) { persist(tokens, expected) }
+        publish(expected, SessionState(SessionPhase.AUTHENTICATED, alcance = tokens.alcance))
+        notifySessionReadyOutsideMutex(tokens.accessToken to load().installation)
+    }
+
+    suspend fun mfaVerify(codigo: String) = mfaAction { expected, bearer, mfa ->
+        val desafioId = mfa.desafioId ?: load().tokens?.desafioId
+            ?: throw AuthProblem("Desafío MFA no disponible. Inicia sesión de nuevo.")
+        val response = api.mfaVerify(bearer, MfaVerificarRequest(desafioId, codigo.trim()))
+        if (!response.isSuccessful) {
+            val err = parseMfaError(response.code(), response.errorBody()?.string())
+            if (err.codigo == "MFA_BLOQUEO") {
+                publish(expected, mutableSession.value.copy(
+                    mfa = mfa.copy(step = MfaStep.BLOCKED, bloqueoHastaUtc = err.bloqueoHastaUtc,
+                        error = err.mensaje, busy = false)
+                ))
+                return@mfaAction
+            }
+            publish(expected, mutableSession.value.copy(
+                mfa = mfa.copy(intento = err.intento, maxIntentos = err.maxIntentos ?: 5,
+                    error = err.mensaje, busy = false)
+            ))
+            throw AuthProblem(err.mensaje)
+        }
+        val tokens = response.body().toStored()
+        withContext(NonCancellable) { persist(tokens, expected) }
+        publish(expected, SessionState(SessionPhase.AUTHENTICATED, alcance = tokens.alcance))
+        notifySessionReadyOutsideMutex(tokens.accessToken to load().installation)
+    }
+
+    suspend fun mfaRecover(codigoRespaldo: String) = mfaAction { expected, bearer, mfa ->
+        val desafioId = mfa.desafioId ?: load().tokens?.desafioId
+            ?: throw AuthProblem("Desafío MFA no disponible. Inicia sesión de nuevo.")
+        val response = api.mfaRecover(bearer, MfaRecuperarRequest(desafioId, codigoRespaldo.trim()))
+        if (!response.isSuccessful) throw mapMfaError(response.code(), response.errorBody()?.string())
+        val tokens = response.body().toStoredChallenge(forceAlcance = "MFA_REENROLL")
+        withContext(NonCancellable) { persist(tokens, expected) }
+        publish(expected, SessionState(
+            SessionPhase.MFA_FLOW,
+            alcance = "MFA_REENROLL",
+            hasLocalSession = true,
+            mfa = MfaUiState(MfaStep.RECONFIGURE)
+        ))
+    }
+
+    fun mfaGoToRecover() {
+        val expected = version()
+        synchronized(localLock) {
+            val mfa = mutableSession.value.mfa ?: return
+            publish(expected, mutableSession.value.copy(
+                mfa = mfa.copy(step = MfaStep.RECOVER, error = null)
+            ))
+        }
+    }
+
+    fun mfaContinueFromIntro() {
+        val expected = version()
+        synchronized(localLock) {
+            val mfa = mutableSession.value.mfa ?: return
+            publish(expected, mutableSession.value.copy(
+                mfa = mfa.copy(step = MfaStep.ENROLL_QR, error = null)
+            ))
+        }
+    }
+
+    fun mfaContinueToConfirm() {
+        val expected = version()
+        synchronized(localLock) {
+            val mfa = mutableSession.value.mfa ?: return
+            publish(expected, mutableSession.value.copy(
+                mfa = mfa.copy(step = MfaStep.ENROLL_CONFIRM, error = null)
+            ))
+        }
+    }
+
+    private suspend fun mfaAction(block: suspend (Long, String, MfaUiState) -> Unit) {
         val expected = version()
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 try {
-                    synchronized(localLock) { ensureCurrent(expected) }
+                    val mfa = synchronized(localLock) {
+                        ensureCurrent(expected)
+                        val current = mutableSession.value.mfa
+                            ?: throw AuthProblem("Flujo MFA no activo.")
+                        publish(expected, mutableSession.value.copy(mfa = current.copy(busy = true, error = null)))
+                        current
+                    }
+                    val tokens = load().tokens ?: throw AuthProblem("Sesión MFA no disponible.")
+                    block(expected, "Bearer ${tokens.accessToken}", mfa)
+                } catch (cancelled: CancellationException) { throw cancelled
+                } catch (known: AuthProblem) {
+                    synchronized(localLock) {
+                        val current = mutableSession.value.mfa
+                        if (current != null && expected == generation)
+                            publish(expected, mutableSession.value.copy(
+                                mfa = current.copy(busy = false, error = known.message)
+                            ))
+                    }
+                    throw known
+                } catch (_: IOException) {
+                    throw AuthProblem("No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.")
+                } catch (_: Exception) {
+                    throw AuthProblem("No se pudo completar la verificación MFA.")
+                }
+            }
+        }
+    }
+
+    private data class MfaErr(
+        val codigo: String, val mensaje: String, val intento: Int? = null,
+        val maxIntentos: Int? = null, val bloqueoHastaUtc: String? = null
+    )
+    private fun parseMfaError(code: Int, raw: String?): MfaErr {
+        val parsed = try { raw?.let { Gson().fromJson(it, Map::class.java) } } catch (_: Exception) { null }
+        val codigo = parsed?.get("codigo")?.toString().orEmpty()
+        val mensaje = parsed?.get("mensaje")?.toString()?.takeIf { it.isNotBlank() }
+            ?: when (code) {
+                401 -> "Código incorrecto."
+                403 -> "Operación no permitida."
+                429 -> "Demasiados intentos. Espera e inténtalo de nuevo."
+                503 -> "MFA no disponible en el servidor."
+                else -> "No se pudo verificar el código."
+            }
+        val intento = (parsed?.get("intento") as? Number)?.toInt()
+        val max = (parsed?.get("maxIntentos") as? Number)?.toInt()
+        val bloqueo = parsed?.get("bloqueoHastaUtc")?.toString()
+        return MfaErr(codigo, if (intento != null && max != null)
+            "Código incorrecto. Intento $intento de $max." else mensaje, intento, max, bloqueo)
+    }
+    private fun mapMfaError(code: Int, raw: String?): AuthProblem = AuthProblem(parseMfaError(code, raw).mensaje)
+
+    suspend fun validateSession() {
+        val expected = version()
+        var pushSync: Pair<String, String>? = null
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                try {
+                    val previousPhase = synchronized(localLock) {
+                        ensureCurrent(expected)
+                        mutableSession.value.phase
+                    }
                     val tokens = load().tokens
                     if (tokens == null) {
                         // Conserva el aviso RF06 mientras no se haya iniciado otra sesión.
@@ -196,11 +572,36 @@ class AuthRepository(
                         response.errorBody()?.close()
                         synchronized(localLock) { ensureCurrent(expected) }
                         renew(tokens, expected)
+                        // Tras renovación: sync push opcional con access nuevo (fuera del mutex).
+                        pushSync = synchronized(localLock) {
+                            if (mutableSession.value.phase == SessionPhase.AUTHENTICATED)
+                                vault?.tokens?.let { it.accessToken to load().installation }
+                            else null
+                        }
                     } else if (response.isSuccessful) {
                         val body = response.body()
                         check(body?.vigente == true && body.idSesion == tokens.idSesion &&
                             Instant.parse(body.sesionExpiraUtc) == Instant.parse(tokens.sesionExpiraUtc))
-                        publish(expected, SessionState(SessionPhase.AUTHENTICATED))
+                        val alcance = body.alcance ?: tokens.alcance
+                        if (alcance == "MFA_CHALLENGE" || alcance == "MFA_REENROLL") {
+                            val step = when {
+                                alcance == "MFA_REENROLL" -> MfaStep.RECONFIGURE
+                                mutableSession.value.mfa?.step != null -> mutableSession.value.mfa!!.step
+                                else -> MfaStep.VERIFY
+                            }
+                            publish(expected, SessionState(
+                                SessionPhase.MFA_FLOW,
+                                alcance = alcance,
+                                hasLocalSession = true,
+                                mfa = mutableSession.value.mfa?.copy(step = step)
+                                    ?: MfaUiState(step, desafioId = tokens.desafioId)
+                            ))
+                        } else {
+                            publish(expected, SessionState(SessionPhase.AUTHENTICATED, alcance = alcance))
+                            if (previousPhase != SessionPhase.AUTHENTICATED && alcance != "ADMIN") {
+                                pushSync = tokens.accessToken to load().installation
+                            }
+                        }
                     } else {
                         response.errorBody()?.close()
                         retry(expected)
@@ -211,7 +612,14 @@ class AuthRepository(
                     throw cancelled
                 } catch (_: Exception) { retry(expected) }
             }
+            notifySessionReadyOutsideMutex(pushSync)
         }
+    }
+
+    /** Push/FCM es opcional: fallos o demoras no retienen el mutex ni invalidan la sesión. */
+    private suspend fun notifySessionReadyOutsideMutex(pushSync: Pair<String, String>?) {
+        val ready = pushSync ?: return
+        runCatching { onSessionReady(ready.first, ready.second) }
     }
 
     private suspend fun renew(previous: StoredTokens, expected: Long) {
@@ -249,6 +657,7 @@ class AuthRepository(
      */
     suspend fun logout() = withContext(Dispatchers.IO + NonCancellable) {
         var proof: String? = null
+        var installation = ""
         val closedVersion = synchronized(localLock) {
             val existing = load()
             if (existing.tokens == null && !cleanupBlocked) return@withContext
@@ -256,6 +665,7 @@ class AuthRepository(
             cleanupBlocked = true // Invalida inmediatamente las operaciones iniciadas antes del cierre.
             try {
                 proof = existing.tokens?.accessToken
+                installation = existing.installation
                 // Primero cerrar escritores y limpiar RF08/RF17; un fallo bloquea el cambio de cuenta.
                 clearPrivateData()
                 store.clearSession(existing.installation)
@@ -274,6 +684,7 @@ class AuthRepository(
         try {
             val captured = proof
             if (captured != null) {
+                runCatching { onSessionClosing(captured, installation) }
                 val response = api.logout("Bearer $captured")
                 response.errorBody()?.close()
                 synchronized(localLock) {
@@ -305,10 +716,36 @@ class AuthRepository(
         }
     }
 
+    suspend fun loadAdminHub(context: AuthenticatedContext): AdminHubResponse = withContext(Dispatchers.IO) {
+        val bearer = authorization(context)
+        val response = api.adminHub(bearer)
+        if (!response.isSuccessful) {
+            response.errorBody()?.close()
+            throw AuthProblem(
+                if (response.code() == 403) "No tienes acceso de administrador."
+                else "No se pudo cargar Administración."
+            )
+        }
+        response.body() ?: throw AuthProblem("No se pudo cargar Administración.")
+    }
+
     private fun TokenResponse?.toStored(): StoredTokens {
         check(this?.estado == "AUTENTICADO")
         return StoredTokens(requireNotNull(this?.idSesion), requireNotNull(this?.accessToken),
             requireNotNull(this?.accessTokenExpiraUtc), requireNotNull(this?.refreshToken),
-            requireNotNull(this?.sesionExpiraUtc)).validate()
+            requireNotNull(this?.sesionExpiraUtc),
+            alcance = this?.alcance ?: "USUARIO",
+            desafioId = this?.desafioId).validate()
+    }
+
+    private fun TokenResponse?.toStoredChallenge(forceAlcance: String? = null): StoredTokens {
+        val estado = this?.estado
+        check(estado == "MFA_REQUERIDO" || estado == "MFA_ENROLL_REQUERIDO" ||
+            estado == "MFA_REENROLL_REQUERIDO" || forceAlcance != null)
+        return StoredTokens(requireNotNull(this?.idSesion), requireNotNull(this?.accessToken),
+            requireNotNull(this?.accessTokenExpiraUtc), requireNotNull(this?.refreshToken),
+            requireNotNull(this?.sesionExpiraUtc),
+            alcance = forceAlcance ?: this?.alcance ?: "MFA_CHALLENGE",
+            desafioId = this?.desafioId).validate()
     }
 }

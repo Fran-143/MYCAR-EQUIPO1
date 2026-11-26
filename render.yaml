@@ -1,0 +1,78 @@
+# Blueprint Render — MyCar backend (Free) + Neon externo
+# Región virginia ≈ AWS us-east-1 (Neon). Plan free = US$0.
+# Secretos: SOLO Dashboard (sync: false). No poner passwords aquí.
+
+services:
+  - type: web
+    name: mycar-backend
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Liveness (sin JDBC): /actuator/health puede superar el timeout HTTP 5s de Render con Neon cold.
+    healthCheckPath: /actuator/health/liveness
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: neon,render
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: MYCAR_AUTH_JWT_SECRET_BASE64
+        sync: false
+      - key: MYCAR_AUTH_ACCESS_TTL
+        value: PT2H
+      - key: MYCAR_AUTH_SESSION_TTL
+        value: P1D
+      # Correo producción: Brevo HTTPS (no SMTP). Secretos solo Dashboard.
+      - key: MYCAR_VERIFICACION_MAIL_MODO
+        value: brevo
+      - key: MYCAR_VERIFICACION_BREVO_API_KEY
+        sync: false
+      - key: MYCAR_VERIFICACION_MAIL_FROM
+        sync: false
+      - key: MYCAR_RECUPERACION_DESARROLLO
+        value: "false"
+      - key: MYCAR_RF23_EVALUACION_DIARIA_HABILITADA
+        value: "false"
+      - key: SPRING_FLYWAY_ENABLED
+        value: "false"
+      # Secreto admin catálogo oficial (Dashboard only; nunca en Git).
+      - key: MYCAR_TALLER_ADMIN_SECRET
+        sync: false
+      # SOAT documentos — Supabase Storage (secretos solo Dashboard).
+      - key: MYCAR_DOCUMENTOS_MODO
+        value: supabase
+      - key: MYCAR_DOCUMENTOS_SUPABASE_URL
+        sync: false
+      - key: MYCAR_DOCUMENTOS_SUPABASE_SECRET
+        sync: false
+      - key: MYCAR_DOCUMENTOS_SUPABASE_BUCKET
+        value: mycar-documentos-privados
+      # Fotos privadas perfil/vehículo (bucket dedicado; URL/SECRET caen a DOCUMENTOS si no se definen).
+      - key: MYCAR_FOTOS_MODO
+        value: supabase
+      - key: MYCAR_FOTOS_SUPABASE_BUCKET
+        value: mycar-fotos-privadas
+      # Cifrado SOAT/Licencia (AES-GCM). Los 4 valores van en Dashboard (sync:false).
+      # Si ENABLED=true sin AES/BLIND el arranque falla; no forzar enabled aquí.
+      - key: MYCAR_DATOS_SENSIBLES_ENABLED
+        sync: false
+      - key: MYCAR_DATOS_SENSIBLES_KEY_ID
+        sync: false
+      - key: MYCAR_DATOS_SENSIBLES_AES_KEY
+        sync: false
+      - key: MYCAR_DATOS_SENSIBLES_BLIND_KEY
+        sync: false
+      # MFA TOTP ADMIN (valores solo Dashboard; no regenerar en deploys).
+      - key: MYCAR_MFA_ENABLED
+        value: "true"
+      - key: MYCAR_MFA_KEY_ID
+        sync: false
+      - key: MYCAR_MFA_AES_KEY
+        sync: false
+      - key: JAVA_TOOL_OPTIONS
+        value: "-XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError"

@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -34,7 +35,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.R
 import com.mycar.app.BuildConfig
+import com.mycar.app.core.SoporteMyCar
 import com.mycar.app.features.autenticacion.domain.PrivacyPolicyConfiguration
+import com.mycar.app.features.autenticacion.domain.RegistrationValidator
 import com.mycar.app.features.autenticacion.data.AuthGraph
 import com.mycar.app.features.autenticacion.data.SessionPhase
 
@@ -46,7 +49,10 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
     val policy = remember { AuthGraph.privacyPolicy() }
     val registration: RegistrationViewModel = viewModel(
         factory = RegistrationViewModel.Factory(AuthGraph.repository(context), policy))
+    val recovery: RecoveryViewModel = viewModel(
+        factory = RecoveryViewModel.Factory(AuthGraph.recovery(context)))
     val registrationState by registration.state.collectAsStateWithLifecycle()
+    val recoveryState by recovery.state.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
     val login by vm.login.collectAsStateWithLifecycle()
     val logout by vm.logout.collectAsStateWithLifecycle()
@@ -56,7 +62,9 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { vm.maintainSession() }
     }
     LaunchedEffect(session.phase, session.contextVersion) {
-        if (session.phase == SessionPhase.AUTHENTICATED) { page = "welcome"; registration.reset() }
+        if (session.phase == SessionPhase.AUTHENTICATED || session.phase == SessionPhase.MFA_FLOW) {
+            page = "welcome"; registration.reset()
+        }
         if (session.phase == SessionPhase.SIGNED_OUT && session.contextVersion > 0) {
             page = "welcome"
             registration.reset()
@@ -65,15 +73,46 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
         }
     }
     when (session.phase) {
-        SessionPhase.AUTHENTICATED -> Column(Modifier.fillMaxSize()) {
-            Surface(tonalElevation = 2.dp) {
-                Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("MyCar", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = vm::requestLogout, enabled = !logout.busy) { Text("Cerrar sesión") }
+        SessionPhase.MFA_FLOW -> {
+            val mfa = session.mfa
+            if (mfa == null) {
+                LaunchedEffect(Unit) { vm.executeLogout() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                MfaFlowScreen(
+                    state = mfa,
+                    onStartEnroll = vm::mfaStartEnroll,
+                    onContinueIntro = vm::mfaContinueFromIntro,
+                    onContinueToConfirm = vm::mfaContinueToConfirm,
+                    onConfirmEnroll = vm::mfaConfirmEnroll,
+                    onConfirmBackup = vm::mfaConfirmBackup,
+                    onVerify = vm::mfaVerify,
+                    onRecover = vm::mfaRecover,
+                    onGoRecover = vm::mfaGoToRecover,
+                    onLogout = vm::executeLogout
+                )
+            }
+        }
+        SessionPhase.AUTHENTICATED -> {
+            // RF06: cierre confirmado desde Perfil. Callback estable (no capturar logout.busy en cada recomposición).
+            val confirmedLogout = remember(vm) { { vm.executeLogout() } }
+            CompositionLocalProvider(LocalConfirmedLogout provides confirmedLogout) {
+                Box(Modifier.fillMaxSize()) {
+                    key(session.contextVersion) {
+                        if (session.isAdminSession) {
+                            val ctx = remember(session.contextVersion) { vm.authenticatedContext() }
+                            if (ctx != null) {
+                                com.mycar.app.features.admin.ui.AdministracionHubScreen(
+                                    authContext = ctx,
+                                    onLogout = confirmedLogout
+                                )
+                            } else content()
+                        } else content()
+                    }
                 }
             }
-            Box(Modifier.weight(1f)) { key(session.contextVersion) { content() } }
         }
         SessionPhase.CLEAR_FAILED -> Scaffold { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(24.dp),
@@ -104,7 +143,44 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
         }
         SessionPhase.SIGNED_OUT -> when (page) {
             "login" -> LoginScreen(login, onBack = { vm.clearErrors(); page = "welcome" },
-                onSubmit = vm::signIn, onEdit = vm::clearErrors)
+                onSubmit = vm::signIn, onEdit = vm::clearErrors,
+                onForgot = { recovery.reset(); page = "recovery" },
+                onRecuperarCuenta = { page = "reactivar" },
+                onPruebasLocales = if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
+                    { page = "pruebas_locales" }
+                } else null)
+            "reactivar" -> com.mycar.app.features.cuenta.ui.ReactivarCuentaRoute(
+                onBack = { page = "login" },
+                onIrLogin = { page = "login" },
+                onAbrirBandeja = if (com.mycar.app.BuildConfig.LOCAL_TEST_TOOLS) {
+                    { page = "pruebas_bandeja_rf51" }
+                } else null
+            )
+            "pruebas_locales" -> com.mycar.app.features.localtest.PruebasLocalesRoute(
+                onVolver = { page = "login" }
+            )
+            "pruebas_bandeja_rf51" -> com.mycar.app.features.localtest.PruebasLocalesRoute(
+                onVolver = { page = "reactivar" },
+                destinatarioInicial = null,
+                finalidadInicial = "REACTIVAR_CUENTA"
+            )
+            "recovery" -> RecoveryFlow(
+                state = recoveryState,
+                onEditEmail = recovery::editEmail,
+                onEmit = recovery::emitir,
+                onEditCode = recovery::editCode,
+                onVerify = recovery::verificar,
+                onEditPassword = { n, c -> recovery.editPassword(n, c) },
+                onReset = recovery::restablecer,
+                onBack = {
+                    when (recoveryState.step) {
+                        RecoveryStep.EMAIL, RecoveryStep.SUCCESS, RecoveryStep.BLOQUEADO -> {
+                            recovery.reset(); page = "login"
+                        }
+                        else -> recovery.back()
+                    }
+                },
+                onLogin = { recovery.reset(); page = "login" })
             "registration" -> RegistrationContent(
                 registrationState, policy, registration::edit, registration::submit,
                 onBack = { registration.reset(); page = "welcome" },
@@ -117,15 +193,21 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(policy.documentUrl))
                             .addCategory(Intent.CATEGORY_BROWSABLE))
                     } catch (_: Exception) { registration.policyOpenFailed() }
-                })
+                },
+                onCodeChange = registration::editCode,
+                onConfirmCode = registration::confirmCode,
+                onResendCode = registration::resendCode,
+                onBackFromCode = registration::backFromCode)
+
             else -> WelcomeScreen(session.message, onLogin = { page = "login" },
                 onRegister = { registration.reset(); page = "registration" })
         }
     }
-    if (logout.confirmation) {
+    // Diálogo de AuthGate solo para RETRY/CLEAR_FAILED (barra global retirada en AUTHENTICATED).
+    if (logout.confirmation && session.phase != SessionPhase.AUTHENTICATED) {
         AlertDialog(onDismissRequest = vm::cancelLogout,
-            title = { Text("¿Cerrar sesión?") },
-            text = { Text("Cerrarás sesión y se eliminarán los borradores y solicitudes pendientes de vehículos y mantenimientos de este dispositivo. Los registros guardados en el servidor se conservan.") },
+            title = { Text("Cerrar sesión") },
+            text = { Text("¿Estás seguro de que deseas cerrar sesión? Tus datos quedarán guardados.") },
             confirmButton = { TextButton(onClick = vm::confirmedLogout) { Text("Cerrar sesión") } },
             dismissButton = { TextButton(onClick = vm::cancelLogout) { Text("Cancelar") } })
     }
@@ -133,39 +215,63 @@ fun AuthGate(onLocalSessionCleared: () -> Unit = {}, content: @Composable () -> 
 
 @Composable
 private fun WelcomeScreen(message: String?, onLogin: () -> Unit, onRegister: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    Scaffold(containerColor = colors.primaryContainer) { padding ->
+    val navy = Color(0xFF12285F)
+    val teal = Color(0xFF007E98)
+    val bg = Color(0xFFF0F5FA)
+    Scaffold(containerColor = bg) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
             .heightIn(min = maxHeight).padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(64.dp))
-            Surface(shape = RoundedCornerShape(24.dp), color = colors.surface) {
-                Icon(painterResource(R.drawable.ic_auth_car), contentDescription = "MyCar",
-                    modifier = Modifier.padding(22.dp).size(48.dp), tint = colors.primary)
-            }
-            Spacer(Modifier.height(24.dp))
-            Text("MyCar", style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold, color = colors.onPrimaryContainer)
-            Spacer(Modifier.height(12.dp))
-            Text("Tu vehículo, organizado en un solo lugar.",
-                style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
-                color = colors.onPrimaryContainer)
             Spacer(Modifier.height(48.dp))
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = navy,
+                shadowElevation = 2.dp
+            ) {
+                Icon(painterResource(R.drawable.ic_auth_car), contentDescription = "MyCar",
+                    modifier = Modifier.padding(18.dp).size(40.dp), tint = Color.White)
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("MyCar", style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold, color = navy)
+            Spacer(Modifier.height(8.dp))
+            Text("Controla tu vehículo, siempre al día",
+                style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center,
+                color = Color(0xFF5A6B7D))
+            Spacer(Modifier.height(28.dp))
+            Icon(painterResource(R.drawable.ic_auth_car), contentDescription = null,
+                modifier = Modifier.size(120.dp), tint = teal)
+            Spacer(Modifier.height(16.dp))
+            Text("Gestiona mantenimientos, kilometraje y alertas preventivas",
+                style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
+                color = Color(0xFF5A6B7D))
+            Spacer(Modifier.height(24.dp))
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
             message?.let {
-                Text(it, color = colors.onPrimaryContainer, textAlign = TextAlign.Center)
+                Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
             }
-            Button(onClick = onLogin, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                shape = RoundedCornerShape(16.dp)) { Text("Iniciar sesión") }
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onRegister,
+            Button(
+                onClick = onLogin,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                shape = RoundedCornerShape(16.dp)) { Text("Crear cuenta") }
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = navy,
+                    contentColor = Color.White
+                )
+            ) { Text("Iniciar sesión", fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onRegister,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = navy)
+            ) { Text("Crear una cuenta", fontWeight = FontWeight.Medium) }
             Spacer(Modifier.height(32.dp))
             }
         }
@@ -176,7 +282,9 @@ private fun WelcomeScreen(message: String?, onLogin: () -> Unit, onRegister: () 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LoginScreen(state: LoginState, onBack: () -> Unit,
-    onSubmit: (String, String) -> Unit, onEdit: () -> Unit) {
+    onSubmit: (String, String) -> Unit, onEdit: () -> Unit, onForgot: () -> Unit,
+    onRecuperarCuenta: () -> Unit = {},
+    onPruebasLocales: (() -> Unit)? = null) {
     // Nunca rememberSaveable: la contraseña no entra en Bundle, rutas ni estado persistente.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -206,14 +314,24 @@ private fun LoginScreen(state: LoginState, onBack: () -> Unit,
             Spacer(Modifier.height(8.dp))
             Text("Ingresa tus datos para continuar.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(28.dp))
-            OutlinedTextField(value = email, onValueChange = { email = it; onEdit() },
+            OutlinedTextField(
+                value = email,
+                onValueChange = {
+                    email = RegistrationValidator.limitCodePoints(it, RegistrationValidator.MAX_CORREO)
+                    onEdit()
+                },
                 label = { Text("Correo electrónico") }, singleLine = true,
                 enabled = !state.busy, isError = state.emailError != null,
                 supportingText = state.emailError?.let { { Text(it) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
             Spacer(Modifier.height(16.dp))
-            OutlinedTextField(value = password, onValueChange = { password = it; onEdit() },
+            OutlinedTextField(
+                value = password,
+                onValueChange = {
+                    password = RegistrationValidator.limitCodePoints(it, RegistrationValidator.MAX_CONTRASENA)
+                    onEdit()
+                },
                 label = { Text("Contraseña") }, singleLine = true, enabled = !state.busy,
                 isError = state.passwordError != null,
                 supportingText = state.passwordError?.let { { Text(it) } },
@@ -227,13 +345,43 @@ private fun LoginScreen(state: LoginState, onBack: () -> Unit,
                     autoCorrectEnabled = false, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (!state.busy) submit() }),
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+            TextButton(onClick = onForgot, enabled = !state.busy, modifier = Modifier.align(Alignment.End)) {
+                Text("Olvidé mi contraseña")
+            }
+            TextButton(onClick = onRecuperarCuenta, enabled = !state.busy, modifier = Modifier.align(Alignment.End)) {
+                Text("Recuperar cuenta pendiente de eliminación")
+            }
+            if (onPruebasLocales != null) {
+                TextButton(onClick = onPruebasLocales, enabled = !state.busy, modifier = Modifier.align(Alignment.End)) {
+                    Text("Pruebas locales")
+                }
+            }
             state.error?.let {
                 Spacer(Modifier.height(16.dp))
                 Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp)) {
-                    Text(it, modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(it, color = MaterialTheme.colorScheme.onErrorContainer)
+                        val codigo = state.errorCodigo.orEmpty()
+                        if (codigo == "CUENTA_PENDIENTE_ELIMINACION"
+                            || it.contains("PENDIENTE", ignoreCase = true)
+                            || it.contains("eliminación", ignoreCase = true)
+                        ) {
+                            TextButton(onClick = onRecuperarCuenta) { Text("Recuperar cuenta") }
+                        }
+                        if (codigo == "CUENTA_SUSPENDIDA"
+                            || codigo == "CUENTA_BLOQUEADA"
+                            || codigo == "LOGIN_BLOQUEADO"
+                            || it.contains("SUSPENDIDA", ignoreCase = true)
+                            || it.contains("BLOQUEADA", ignoreCase = true)
+                        ) {
+                            TextButton(onClick = { SoporteMyCar.abrirCorreo(context) }) {
+                                Text("Contactar soporte")
+                            }
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
             Button(onClick = { submit() }, enabled = !state.busy,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 shape = RoundedCornerShape(16.dp)) {
@@ -243,7 +391,7 @@ private fun LoginScreen(state: LoginState, onBack: () -> Unit,
                 }
                 Text(if (state.busy) "Ingresando…" else "Ingresar")
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(32.dp))
         }
     }
 }

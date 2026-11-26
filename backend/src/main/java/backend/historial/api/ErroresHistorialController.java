@@ -1,9 +1,12 @@
 package backend.historial.api;
 
+import backend.historial.model.AnulacionBloqueadaPorAlerta;
 import backend.historial.model.HistorialInconsistente;
 import backend.historial.model.HistorialNoDisponible;
+import backend.historial.model.MantenimientoNoDisponible;
 import backend.mantenimiento.api.IntegracionRf17PendienteException;
 import backend.mantenimiento.seguridad.SesionMantenimientoNoValidada;
+import backend.talleres.model.TallerNoDisponible;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.access.AccessDeniedException;
@@ -12,7 +15,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 @RestControllerAdvice(assignableTypes = HistorialMantenimientoController.class)
 public class ErroresHistorialController {
-    public record Error(String codigo, String mensaje) { }
+    public record Error(String codigo, String mensaje, Long idAlerta) {
+        public Error(String codigo, String mensaje) { this(codigo, mensaje, null); }
+    }
 
     @ExceptionHandler({SesionMantenimientoNoValidada.class, AuthenticationException.class})
     ResponseEntity<Error> sesion(Exception ex) {
@@ -22,6 +27,24 @@ public class ErroresHistorialController {
     @ExceptionHandler({HistorialNoDisponible.class, AccessDeniedException.class})
     ResponseEntity<Error> vehiculo(Exception ex) {
         return error(404, "VEHICULO_NO_DISPONIBLE", "El vehículo no está disponible");
+    }
+
+    @ExceptionHandler(MantenimientoNoDisponible.class)
+    ResponseEntity<Error> mantenimiento(Exception ex) {
+        return error(404, "MANTENIMIENTO_NO_DISPONIBLE", "El mantenimiento no está disponible");
+    }
+
+    @ExceptionHandler(TallerNoDisponible.class)
+    ResponseEntity<Error> taller(Exception ex) {
+        return error(404, "TALLER_NO_DISPONIBLE", "El taller no está disponible");
+    }
+
+    @ExceptionHandler(AnulacionBloqueadaPorAlerta.class)
+    ResponseEntity<Error> alertaActiva(AnulacionBloqueadaPorAlerta ex) {
+        return ResponseEntity.status(409).body(new Error(
+                "ALERTA_ACTIVA_REFERENCIA",
+                "No puedes anular este mantenimiento mientras exista una alerta activa que lo referencia. Atiende o anula esa alerta primero.",
+                ex.idAlerta()));
     }
 
     @ExceptionHandler(IntegracionRf17PendienteException.class)

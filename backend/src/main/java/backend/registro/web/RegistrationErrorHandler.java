@@ -31,6 +31,15 @@ public class RegistrationErrorHandler {
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<RegistrationError> databaseUnavailable() { return unavailable(); }
 
+    @ExceptionHandler(UnsupportedOperationException.class)
+    public ResponseEntity<RegistrationError> otpRequired(UnsupportedOperationException ex) {
+        if ("REGISTRO_REQUIERE_VERIFICACION".equals(ex.getMessage())) {
+            return error(HttpStatus.GONE, "REGISTRO_REQUIERE_VERIFICACION",
+                    "El registro requiere verificación de correo.", Map.of());
+        }
+        return unexpected();
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<RegistrationError> unexpected() {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "ERROR_INTERNO", "No se pudo completar el registro.", Map.of());

@@ -1,8 +1,8 @@
 # RF22 / RF23 — Guía para el equipo (ejecutar en local)
 
-Rama: **`feat/mantenimientos-rf22-rf23`**
+Código en **`main`** (antes vivía en `feat/mantenimientos-rf22-rf23`).
 
-Esta guía sirve para que cualquiera del equipo pueda clonar/actualizar la rama, levantar backend + Postgres y probar **programar alertas (RF22)** y **Mis alertas (RF23)** en el emulador.
+Esta guía sirve para levantar backend + Postgres y probar **programar alertas (RF22)** y **Mis alertas (RF23)** en el emulador.
 
 ## Qué incluye esta rama
 
@@ -15,23 +15,21 @@ Esta guía sirve para que cualquiera del equipo pueda clonar/actualizar la rama,
 | **G89** | Si cambian fecha o km entre revisión y guardar → reconfirmación (no guardado silencioso) |
 | **Idempotencia** | Mismo `idOperacion` en reintento; cliente recupera operación si la respuesta se pierde |
 
-Regla de negocio clave (Excel consolidado RF22!G61):  
-`fecha_objetivo = fecha_actual + intervalo` · `km_objetivo = último_km_RF08/RF14 + intervalo_km` · el último mantenimiento **no** es base de cálculo · Ambos = **una** alerta y manda lo que ocurra primero.
+Regla de negocio clave (G61 actualizado — origen de cálculo dual, V9):
 
-## 1. Traer la rama
+- **DESDE_HOY:** `fecha_objetivo = hoy_Lima + intervalo` · `km_objetivo = último_km_RF14 + intervalo_km` · sin `id_mantenimiento_referencia`.
+- **DESDE_MANTENIMIENTO:** `fecha_objetivo = fecha_servicio + intervalo` · `km_objetivo = km_servicio + intervalo_km` · referencia REALIZADO elegible (mismo tipo/OTRO), no solo el último.
+- Ambos criterios = **una** alerta; RF23 usa lo que ocurra primero sobre los objetivos persistidos.
+- `creada_utc` sigue siendo el instante real del COMMIT (no la fecha del servicio).
+- Objetivo ya alcanzado (fecha ≤ hoy o km_objetivo ≤ km vigente) → rechazar en RF22.
+
+## 1. Actualizar `main`
 
 ```powershell
 cd C:\Proyectos\MyCarEquipo1
 git fetch origin
-git checkout feat/mantenimientos-rf22-rf23
-git pull origin feat/mantenimientos-rf22-rf23
-```
-
-Si aún no existe localmente:
-
-```powershell
-git fetch origin
-git checkout -b feat/mantenimientos-rf22-rf23 origin/feat/mantenimientos-rf22-rf23
+git checkout main
+git pull origin main
 ```
 
 ## 2. Requisitos
@@ -50,7 +48,7 @@ docker compose up -d --wait postgres
 ```
 
 - El script arranca el backend en el puerto **8081** con JWT local y RF17/RF18/**RF22** activos.  
-- Flyway aplicará migraciones hasta **V6** (`V6__rf22_tiempo_sin_lectura.sql`).  
+- Flyway aplicará migraciones hasta **V9** (`V9__rf22_origen_calculo.sql`: `origen_calculo` DESDE_HOY / DESDE_MANTENIMIENTO).  
 - Health: `http://localhost:8081/actuator/health` → `{"status":"UP"}`.
 
 Tras cambios Java: Ctrl+C y vuelve a ejecutar el script.
@@ -91,6 +89,28 @@ Permiso de red local (API 37):
 5. Si cambias km (RF14) entre revisar y confirmar → debe pedir **reconfirmación** (G89).  
 6. Segunda alerta equivalente activa → conflicto; tras REALIZADA/ANULADA se puede programar otro ciclo.  
 7. Abrir RF14 no guarda solo; cancelar no escribe lectura.
+
+### Simulación rápida de estados (km)
+
+No hace falta esperar meses: usa **POR_KILOMETRAJE** y sube el odómetro con **RF14**. Cada vez que abres **Mis alertas**, RF23 sincroniza estados.
+
+Arranque: Docker Postgres + `.\scripts\iniciar_backend_integracion_local.ps1` (puerto **8081**) + app debug.
+
+| Paso | Acción | Estado esperado en RF23 |
+|-----:|--------|-------------------------|
+| 1a | RF22 DESDE_HOY AMBOS: 6 meses + 5000 km desde hoy/km vigente | Objetivos = hoy+6m / km+5000 |
+| 1b | RF22 DESDE_MANTENIMIENTO AMBOS: ref histórica 20/10 + 6m + 5000 | Objetivos desde fecha/km servicio |
+| 1 | RF22: alerta por km, intervalo **5000** (si base = 20000 → objetivo **25000**) | **Programada** |
+| 2 | Abrir Alertas | Sigue **Programada** |
+| 3 | RF14 → **24500** (faltan ≤10 % del intervalo) → **salir y volver a Alertas** | **Próxima** |
+| 4 | RF14 → **25000** → volver a Alertas | **Pendiente** |
+| 5 | RF14 → **25500** (≥ objetivo + 10 % del intervalo) → volver a Alertas | **Vencida** |
+
+Umbral KM (diccionario): **Pendiente** al llegar al objetivo; **Vencida** recién al superar el margen del 10 % del intervalo (con 5000 → objetivo+500). Tras RF14 hay que **reabrir Mis alertas** para que RF23 sincronice (no basta mirar la tarjeta en caché).
+
+También útil: una alerta **POR_TIEMPO** solo para ver creación; y G89 (cambiar km en revisión debe pedir reconfirmación).
+
+Prioridad de RF posteriores (principal, activar/desactivar, historial km, detalle mantenimiento, atender): ver [RF_SIGUIENTES_FRANCESCA.md](RF_SIGUIENTES_FRANCESCA.md).
 
 ## 6. Pruebas automáticas
 
@@ -137,7 +157,7 @@ ORDER BY a.creada_utc DESC;
 | App no conecta | Puerto **8081** + `10.0.2.2` + permiso `ACCESS_LOCAL_NETWORK`. |
 | «No se pudo validar la sesión» | Docker/Postgres y Spring Boot UP. |
 | Alertas vacías / sin vehículos | Entrar antes a Inicio o Mantenimientos para cargar contexto; vehículo **ACTIVO**. |
-| Flyway / V6 | Reiniciar backend tras pull para aplicar la migración. |
+| Flyway / V6–V9 | Reiniciar backend tras pull para aplicar migraciones (RF22 origen dual en V9). **No aplicar V9 a BD compartida sin avisar.** |
 
 ## Autoría
 

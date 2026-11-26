@@ -1,6 +1,7 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 // Sólo valores legales aprobados externamente; nunca se proporciona una versión ficticia.
@@ -18,8 +19,8 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 79
+        versionName = "1.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.
@@ -28,10 +29,19 @@ android {
             legalConfigString(providers.gradleProperty("mycar.privacy.version").getOrElse("")))
         buildConfigField("String", "PRIVACY_DOCUMENT_URL",
             legalConfigString(providers.gradleProperty("mycar.privacy.documentUrl").getOrElse("")))
+        buildConfigField("boolean", "LOCAL_TEST_TOOLS", "false")
     }
 
     buildTypes {
         debug {
+            // Sufijo solo si -Pmycar.hotfixSidecar=true (coexistencia con Release en el mismo dispositivo).
+            // Por defecto (emulador) conserva com.mycar.app para no pelear con google-services.json.
+            // Nota: com.mycar.app.hotfix exige cliente en google-services.json (FCM puede fallar; sesión no).
+            val hotfix = providers.gradleProperty("mycar.hotfixSidecar").orNull == "true"
+            if (hotfix) {
+                applicationIdSuffix = ".hotfix"
+            }
+            buildConfigField("boolean", "LOCAL_TEST_TOOLS", if (hotfix) "true" else "false")
             buildConfigField("String", "PRIVACY_SOURCE",
                 legalConfigString(providers.gradleProperty("mycar.privacy.source").getOrElse("local-academic")))
             buildConfigField(
@@ -42,10 +52,13 @@ android {
         }
 
         release {
+            // HTTPS público (Render). Override: -Pmycar.apiBaseUrl=https://otro-host/
+            // Debug local sigue en 10.0.2.2:8081 (no se altera).
+            buildConfigField("boolean", "LOCAL_TEST_TOOLS", "false")
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"https://api.example.invalid/\""
+                "\"${providers.gradleProperty("mycar.apiBaseUrl").getOrElse("https://mycar-backend-1dxi.onrender.com/")}\""
             )
 
             optimization {
@@ -73,9 +86,13 @@ android {
 }
 
 dependencies {
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -88,6 +105,7 @@ dependencies {
 
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+    implementation("com.google.zxing:core:3.5.3")
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

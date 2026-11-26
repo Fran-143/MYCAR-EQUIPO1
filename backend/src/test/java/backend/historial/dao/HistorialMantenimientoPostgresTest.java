@@ -127,7 +127,7 @@ class HistorialMantenimientoPostgresTest {
         var gestor = new DataSourceTransactionManager(fuente); gestor.setEnforceReadOnly(true);
         var interceptor = new TransactionInterceptor(); interceptor.setTransactionManager(gestor);
         interceptor.setTransactionAttributeSource(new AnnotationTransactionAttributeSource()); interceptor.afterPropertiesSet();
-        var proxy = new ProxyFactory(new HistorialMantenimientoService(dao)); proxy.setProxyTargetClass(true); proxy.addAdvice(interceptor);
+        var proxy = new ProxyFactory(new HistorialMantenimientoService(dao, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class))); proxy.setProxyTargetClass(true); proxy.addAdvice(interceptor);
         return (HistorialMantenimientoService) proxy.getProxy();
     }
 

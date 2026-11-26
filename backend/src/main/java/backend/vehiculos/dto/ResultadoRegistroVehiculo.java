@@ -1,5 +1,6 @@
 package backend.vehiculos.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -9,7 +10,7 @@ public record ResultadoRegistroVehiculo(
         long idVehiculo,
         String placa,
         boolean principal,
-        int kilometrajeActual,
+        BigDecimal kilometrajeActual,
         long idLecturaKm,
         Instant fechaLectura,
         int versionKm

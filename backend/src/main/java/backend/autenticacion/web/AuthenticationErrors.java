@@ -1,6 +1,7 @@
 package backend.autenticacion.web;
 
 import backend.autenticacion.AuthenticationFailure;
+import backend.mfa.MfaFailure;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.dao.DataAccessException;
@@ -18,8 +19,20 @@ public final class AuthenticationErrors {
                 case INVALID_INPUT -> body(400,"VALIDACION",failure.getMessage(),failure.fields());
                 case INVALID_CREDENTIALS -> body(401,"CREDENCIALES_INVALIDAS",failure.getMessage(),Map.of());
                 case INVALID_SESSION -> body(401,"SESION_INVALIDA",failure.getMessage(),Map.of());
-                case ACCOUNT_NOT_ENABLED -> body(403,"CUENTA_NO_HABILITADA",failure.getMessage(),Map.of());
+                case ACCOUNT_NOT_ENABLED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case ACCOUNT_SUSPENDED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case ACCOUNT_BLOCKED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case ACCOUNT_PENDING_DELETION -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
+                case LOGIN_TEMPORARILY_LOCKED -> body(403,failure.codigo(),failure.getMessage(),failure.fields());
                 case UNAVAILABLE -> body(503,"AUTENTICACION_NO_DISPONIBLE","Autenticación no disponible.",Map.of());
+            };
+        }
+        if(ex instanceof MfaFailure mfa){
+            return switch(mfa.reason()){
+                case UNAVAILABLE -> body(503,"MFA_NO_DISPONIBLE",mfa.getMessage(),Map.of());
+                case FORBIDDEN -> body(403,"MFA_PROHIBIDO",mfa.getMessage(),Map.of());
+                case INVALID_INPUT -> body(400,"VALIDACION",mfa.getMessage(),mfa.fields());
+                default -> body(401,"MFA_REQUERIDO_FALLIDO",mfa.getMessage(),Map.of());
             };
         }
         if(ex instanceof DataAccessException)return body(503,"AUTENTICACION_NO_DISPONIBLE","Autenticación no disponible.",Map.of());

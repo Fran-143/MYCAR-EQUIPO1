@@ -64,8 +64,7 @@ class RegistroMantenimientoServiceTest {
                 vehiculos,
                 tipos,
                 lecturas,
-                dao, operaciones
-        );
+                dao, operaciones, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class));
 
         when(vehiculos.obtenerVehiculoPropioActivoParaRegistro(1L, 10L))
                 .thenReturn(
@@ -178,8 +177,7 @@ class RegistroMantenimientoServiceTest {
                         Instant.parse("2026-10-26T15:00:00Z"),
                         ZoneId.of("America/Lima")
                 )),
-                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones
-        );
+                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class));
 
         assertThrows(IllegalArgumentException.class,
                 () -> servicioConValidadorReal.registrar(1L, solicitud));
@@ -235,8 +233,7 @@ class RegistroMantenimientoServiceTest {
                         Instant.parse("2026-10-26T15:00:00Z"),
                         ZoneId.of("America/Lima")
                 )),
-                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones
-        );
+                validadorRepuesto, vehiculos, tipos, lecturas, dao, operaciones, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class));
 
         assertThrows(IllegalArgumentException.class,
                 () -> servicioConValidadorReal.registrar(1L, solicitud));
@@ -252,8 +249,7 @@ class RegistroMantenimientoServiceTest {
         );
         var servicioConValidadorReal = new RegistroMantenimientoService(
                 validador, new ValidadorRepuesto(), vehiculos,
-                tipos, lecturas, dao, operaciones
-        );
+                tipos, lecturas, dao, operaciones, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class));
 
         assertThrows(IllegalArgumentException.class,
                 () -> servicioConValidadorReal.registrar(1L, solicitud));

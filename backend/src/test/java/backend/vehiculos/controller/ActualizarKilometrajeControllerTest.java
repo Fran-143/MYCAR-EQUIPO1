@@ -6,6 +6,7 @@ import backend.vehiculos.dto.DatosActualizarKilometraje;
 import backend.vehiculos.dto.ResultadoActualizarKilometraje;
 import backend.vehiculos.seguridad.IdentidadVehiculos;
 import backend.vehiculos.service.ActualizarKilometrajeService;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -38,14 +39,15 @@ class ActualizarKilometrajeControllerTest {
         when(identidad.exigirUsuarioAutenticado(any())).thenReturn(17L);
         servicio = mock(ActualizarKilometrajeService.class);
         auth = UsernamePasswordAuthenticationToken.authenticated("fixture", null, List.of());
-        mvc = MockMvcBuilders.standaloneSetup(new KilometrajeVehiculoController(proveedor, servicio))
+        mvc = MockMvcBuilders.standaloneSetup(new KilometrajeVehiculoController(
+                        proveedor, servicio, mock(backend.vehiculos.service.CorregirKilometrajeService.class)))
                 .setControllerAdvice(new ErroresVehiculosController()).build();
     }
 
     @Test void consultaActualUsaPropietarioDeSesion() throws Exception {
         // Arrange
         when(servicio.consultarActual(17, 5)).thenReturn(new ContextoKilometrajeActual(
-                5, 9, 50000, Instant.parse("2020-01-01T00:00:00Z"), 0, "ACTIVO"));
+                5, 9, BigDecimal.valueOf(50000), Instant.parse("2020-01-01T00:00:00Z"), 0, "ACTIVO"));
 
         // Act + Assert
         mvc.perform(get("/api/v1/vehiculos/5/kilometraje/actual").principal(auth))

@@ -2,7 +2,6 @@ package backend.vehiculos.controller;
 
 import backend.vehiculos.dto.DatosDetalleVehiculo;
 import backend.vehiculos.dto.DatosListadoVehiculos;
-import java.time.Instant;
 import backend.vehiculos.domain.ErrorRegistroVehiculo;
 import backend.vehiculos.seguridad.IdentidadVehiculos;
 import backend.vehiculos.service.*;
@@ -32,7 +31,9 @@ class ListadoVehiculosControllerTest {
         consultas = mock(ConsultaRegistroVehiculoService.class);
         auth = UsernamePasswordAuthenticationToken.authenticated("fixture", null, List.of());
         mvc = MockMvcBuilders.standaloneSetup(new VehiculosController(proveedor,
-                mock(RegistroVehiculoService.class), consultas))
+                mock(RegistroVehiculoService.class), consultas,
+                mock(ActualizacionVehiculoService.class),
+                mock(EstadoOperativoVehiculoService.class)))
                 .setControllerAdvice(new ErroresVehiculosController()).build();
     }
     @Test void listadoUsaPropietarioDeSesionIgnorandoIdentificadoresLibres() throws Exception {
@@ -61,8 +62,8 @@ class ListadoVehiculosControllerTest {
     }
     @Test void detalleUsaPropietarioDeSesion() throws Exception {
         var detalle = new DatosDetalleVehiculo(5, "A1B234", "Toyota", "Corolla", 2020, "Particular", "Gris",
-                "Combustión", "Gasolina", "ACTIVO", true, 50000, Instant.parse("2020-01-01T00:00:00Z"),
-                null, null, null, null, false);
+                "Combustión", "Gasolina", "ACTIVO", true, java.math.BigDecimal.valueOf(50000), "2020-01-01T00:00:00Z",
+                null, null, null, null, false, "PARTICULAR", 1L, 1L, null, null, null, null, false, false);
         when(consultas.consultarDetalle(17, 5)).thenReturn(detalle);
         mvc.perform(get("/api/v1/vehiculos/5").principal(auth).header("X-Usuario-Id", "999"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.placa").value("A1B234"));

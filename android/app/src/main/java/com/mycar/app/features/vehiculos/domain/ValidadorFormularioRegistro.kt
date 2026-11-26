@@ -5,7 +5,7 @@ import java.time.Year
 import java.time.ZoneId
 
 object ValidadorFormularioRegistro {
-    private val placa = Regex("[A-Z][0-9][A-Z][0-9]{3}")
+    private val placa = Regex("(?:[A-Z][0-9][A-Z][0-9]{3}|[A-Z]{3}[0-9]{3})")
     private val vin = Regex("[A-HJ-NPR-Z0-9]{17}")
     private val motor = Regex("[A-Z0-9 -]{5,15}")
     private val serie = Regex("[A-Z0-9]{6,80}")
@@ -19,7 +19,7 @@ object ValidadorFormularioRegistro {
                 errores[campo] = "Completa este campo (máximo $maximo caracteres)."
         }
         texto("marca", f.marca, 100); texto("modelo", f.modelo, 100); texto("color", f.color, 80)
-        if (!placa.matches(f.placa)) errores["placa"] = "Usa el formato A1B234, sin espacios ni guiones."
+        if (!placa.matches(f.placa)) errores["placa"] = "Usa A1B234 o ABC123, sin espacios ni guiones."
         if (!entero.matches(f.anioFabricacion) || f.anioFabricacion.toIntOrNull()?.let { it > 0 && it <= anioActual } != true)
             errores["anioFabricacion"] = "Ingresa un año positivo que no sea futuro."
         if (!entero.matches(f.kilometrajeInicial) || f.kilometrajeInicial.toIntOrNull()?.let { it > 0 } != true)
@@ -53,15 +53,23 @@ object ValidadorFormularioRegistro {
         val combustible = c.combustibles.find { it.idCombustible.toString() == f.idCombustible }
         val aceite = c.tiposAceite.find { it.idTipoAceite.toString() == f.idTipoAceite }
         return SolicitudRegistroVehiculoDto(
-            idOperacion, f.marca, f.modelo, f.usoVehiculoCodigo, f.placa, f.anioFabricacion.toInt(),
-            f.color, tipo.idTipoMotor, if (tipo.esElectrico) null else combustible?.idCombustible,
-            f.kilometrajeInicial.toInt(), f.numeroVin.takeIf { it.isNotEmpty() },
-            f.numeroSerie.takeIf { it.isNotEmpty() },
-            if (tipo.esElectrico) null else f.numeroMotor.takeIf { it.isNotEmpty() },
+            idOperacion,
+            f.marca.uppercase(),
+            f.modelo.uppercase(),
+            f.usoVehiculoCodigo,
+            f.placa.uppercase(),
+            f.anioFabricacion.toInt(),
+            f.color.uppercase(),
+            tipo.idTipoMotor,
+            if (tipo.esElectrico) null else combustible?.idCombustible,
+            f.kilometrajeInicial.toInt(),
+            f.numeroVin.takeIf { it.isNotEmpty() }?.uppercase(),
+            f.numeroSerie.takeIf { it.isNotEmpty() }?.uppercase(),
+            if (tipo.esElectrico) null else f.numeroMotor.takeIf { it.isNotEmpty() }?.uppercase(),
             if (tipo.esElectrico) null else aceite?.idTipoAceite,
-            if (tipo.codigo == "OTRO") f.tipoMotorOtro else null,
-            if (!tipo.esElectrico && combustible?.codigo == "OTRO") f.combustibleOtro else null,
-            if (!tipo.esElectrico && aceite?.codigo == "OTRO") f.tipoAceiteOtro else null
+            if (tipo.codigo == "OTRO") f.tipoMotorOtro.uppercase() else null,
+            if (!tipo.esElectrico && combustible?.codigo == "OTRO") f.combustibleOtro.uppercase() else null,
+            if (!tipo.esElectrico && aceite?.codigo == "OTRO") f.tipoAceiteOtro.uppercase() else null
         )
     }
 }

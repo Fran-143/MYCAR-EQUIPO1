@@ -20,6 +20,7 @@ import com.mycar.app.features.historial.domain.HistorialRepository
 import com.mycar.app.features.historial.viewmodel.HistorialViewModel
 import com.mycar.app.features.mantenimiento.domain.MantenimientoRepository
 import com.mycar.app.features.mantenimiento.ui.EntradaRegistroMantenimiento
+import com.mycar.app.features.mantenimiento.viewmodel.OfertaProgramarAlerta
 
 /** Host de producción. El equipo inyecta ambos repositorios autenticados y la clave opaca de cuenta. */
 @Composable
@@ -28,26 +29,69 @@ fun FlujoHistorialMantenimiento(
     modifier: Modifier = Modifier,
     historialRepository: HistorialRepository? = null,
     mantenimientoRepository: MantenimientoRepository? = null,
+    kilometrajeRepository: com.mycar.app.features.vehiculos.domain.ActualizarKilometrajeRepository? = null,
     claveCuenta: String? = null,
     onIniciarSesion: (() -> Unit)? = null,
     onActualizarKm: ((Long) -> Unit)? = null,
+    /** true mientras Actualizar KM cubre el historial: el formulario sigue montado. */
+    kmEncima: Boolean = false,
     idVehiculoInicial: Long? = null,
     archivoPendiente: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
     estadoEnSistema: Boolean = true,
     onRegistroAbierto: (Boolean) -> Unit = {},
-    recargaRegistroToken: Int = 0
+    /** Incluye formulario/detalle de taller embebido (oculta barra inferior). */
+    onFormularioOverlay: (Boolean) -> Unit = {},
+    recargaRegistroToken: Int = 0,
+    onProgramarAlerta: ((OfertaProgramarAlerta) -> Unit)? = null,
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
+    onNotificaciones: (() -> Unit)? = null,
+    onPerfil: (() -> Unit)? = null,
+    abrirEnTalleres: Boolean = false,
+    onAbrirEnTalleresConsumido: () -> Unit = {},
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
+    exportarRepository: com.mycar.app.features.historial.export.ExportarHistorialRepository? = null,
+    fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
+    onVerPlanes: (() -> Unit)? = null,
 ) {
     key(claveCuenta) {
         var registrando by rememberSaveable { mutableStateOf(false) }
         var vehiculoElegido by rememberSaveable { mutableStateOf<Long?>(idVehiculoInicial) }
-        LaunchedEffect(registrando) { onRegistroAbierto(registrando) }
+        var tiposCatalogo by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+        LaunchedEffect(mantenimientoRepository) {
+            val repo = mantenimientoRepository ?: return@LaunchedEffect
+            tiposCatalogo = runCatching {
+                repo.contexto().tipos.mapNotNull { tipo ->
+                    val codigo = tipo.codigo.trim()
+                    val nombre = tipo.nombre.trim()
+                    if (codigo.isEmpty() || nombre.isEmpty()) null else codigo to nombre
+                }
+            }.getOrDefault(emptyList())
+        }
+        var tallerOverlay by remember { mutableStateOf(false) }
+        LaunchedEffect(registrando, tallerOverlay) {
+            onRegistroAbierto(registrando)
+            onFormularioOverlay(registrando || tallerOverlay)
+        }
         if (registrando) {
             AmbitoHistorial {
                 EntradaRegistroMantenimiento(onCerrar = { registrando = false }, modifier = modifier,
                     repository = mantenimientoRepository, claveCuentaBorrador = claveCuenta,
-                    idVehiculoInicial = vehiculoElegido, onActualizarKm = onActualizarKm,
+                    idVehiculoInicial = vehiculoElegido,
+                    onActualizarKm = onActualizarKm?.let { abrir ->
+                        { id ->
+                            registrando = true
+                            abrir(id)
+                        }
+                    },
                     onSesionRequerida = onIniciarSesion, archivoPendiente = archivoPendiente,
-                    estadoEnSistema = estadoEnSistema, recargaToken = recargaRegistroToken)
+                    estadoEnSistema = estadoEnSistema, recargaToken = recargaRegistroToken,
+                    retrocesoHabilitado = !kmEncima,
+                    onProgramarAlerta = { oferta ->
+                        registrando = false
+                        onProgramarAlerta?.invoke(oferta)
+                    },
+                    talleresRepository = talleresRepository)
             }
         } else {
             AmbitoHistorial {
@@ -55,7 +99,22 @@ fun FlujoHistorialMantenimiento(
                     idInicial = vehiculoElegido, onSeleccionConfirmada = { vehiculoElegido = it },
                     onVolver = onVolverInicio, modifier = modifier,
                     registroDisponible = mantenimientoRepository != null && !claveCuenta.isNullOrBlank(),
-                    onRegistrar = { vehiculoElegido = it; registrando = true }, onIniciarSesion = onIniciarSesion)
+                    onRegistrar = { vehiculoElegido = it; registrando = true }, onIniciarSesion = onIniciarSesion,
+                    kilometrajeRepository = kilometrajeRepository,
+                    onActualizarKm = onActualizarKm,
+                    talleresRepository = talleresRepository,
+                    onNotificaciones = onNotificaciones,
+                    onPerfil = onPerfil,
+                    abrirEnTalleres = abrirEnTalleres,
+                    onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido,
+                    avatarBytes = avatarBytes,
+                    iniciales = iniciales,
+                    tiposCatalogo = tiposCatalogo,
+                    onFormularioTallerAbierto = { tallerOverlay = it },
+                    kmEncima = kmEncima,
+                    exportarRepository = exportarRepository,
+                    fotosRepository = fotosRepository,
+                    onVerPlanes = onVerPlanes)
             }
         }
     }
@@ -83,20 +142,66 @@ fun EntradaHistorialMantenimiento(
     repository: HistorialRepository?, claveCuenta: String?, idInicial: Long?,
     onSeleccionConfirmada: (Long) -> Unit, onVolver: () -> Unit, onRegistrar: (Long) -> Unit,
     modifier: Modifier = Modifier, registroDisponible: Boolean = false,
-    onIniciarSesion: (() -> Unit)? = null
+    onIniciarSesion: (() -> Unit)? = null,
+    kilometrajeRepository: com.mycar.app.features.vehiculos.domain.ActualizarKilometrajeRepository? = null,
+    onActualizarKm: ((Long) -> Unit)? = null,
+    talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
+    onNotificaciones: (() -> Unit)? = null,
+    onPerfil: (() -> Unit)? = null,
+    abrirEnTalleres: Boolean = false,
+    onAbrirEnTalleresConsumido: () -> Unit = {},
+    avatarBytes: ByteArray? = null,
+    iniciales: String? = null,
+    tiposCatalogo: List<Pair<String, String>> = emptyList(),
+    onFormularioTallerAbierto: (Boolean) -> Unit = {},
+    kmEncima: Boolean = false,
+    exportarRepository: com.mycar.app.features.historial.export.ExportarHistorialRepository? = null,
+    fotosRepository: com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository? = null,
+    onVerPlanes: (() -> Unit)? = null
 ) {
-    BackHandler(onBack = onVolver)
+    var detalleId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var correccionLecturaId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var exportandoId by rememberSaveable { mutableStateOf<Long?>(null) }
+    BackHandler(enabled = !kmEncima, onBack = {
+        when {
+            exportandoId != null -> exportandoId = null
+            correccionLecturaId != null -> correccionLecturaId = null
+            detalleId != null -> detalleId = null
+            else -> onVolver()
+        }
+    })
     if (repository == null || claveCuenta.isNullOrBlank()) {
-        HistorialMantenimientoScreen(EstadoHistorial(), onVolver, {}, {}, {}, {}, modifier,
-            registroDisponible = false, onIniciarSesion = onIniciarSesion)
+        HistorialMantenimientoScreen(
+            EstadoHistorial(), onVolver, {}, {}, {}, {}, modifier,
+            registroDisponible = false, onIniciarSesion = onIniciarSesion,
+            onNotificaciones = onNotificaciones, onPerfil = onPerfil,
+            abrirEnTalleres = abrirEnTalleres,
+            onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido,
+            avatarBytes = avatarBytes,
+            iniciales = iniciales,
+            tiposCatalogo = tiposCatalogo,
+            onFormularioTallerAbierto = onFormularioTallerAbierto
+        )
         return
     }
-    val factory = remember(repository, claveCuenta, idInicial) {
+    val fuenteKm = remember(kilometrajeRepository) {
+        kilometrajeRepository?.let { repo ->
+            com.mycar.app.features.historial.domain.FuenteLecturasKilometraje { id ->
+                repo.listarLecturas(id).map {
+                    com.mycar.app.features.historial.domain.LecturaKilometrajeHistorial(
+                        it.idLectura, it.valorKm, it.origen, it.fechaLecturaUtc,
+                        it.kmAnteriorCorreccion, it.motivoCorreccion, it.fechaRectificacionUtc
+                    )
+                }
+            }
+        }
+    }
+    val factory = remember(repository, claveCuenta, idInicial, fuenteKm) {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 require(modelClass.isAssignableFrom(HistorialViewModel::class.java))
-                return HistorialViewModel(repository, idInicial) as T
+                return HistorialViewModel(repository, idInicial, fuenteKm) as T
             }
         }
     }
@@ -104,7 +209,11 @@ fun EntradaHistorialMantenimiento(
     val estado by vm.estado.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, vm) {
-        val observer = LifecycleEventObserver { _, evento -> if (evento == Lifecycle.Event.ON_RESUME) vm.recargar() }
+        val observer = LifecycleEventObserver { _, evento ->
+            if (evento == Lifecycle.Event.ON_RESUME && detalleId == null && correccionLecturaId == null) {
+                vm.recargar()
+            }
+        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -112,6 +221,87 @@ fun EntradaHistorialMantenimiento(
         if (estado.fase == com.mycar.app.features.historial.domain.FaseHistorial.LISTO)
             estado.seleccionado?.id?.let(onSeleccionConfirmada)
     }
-    HistorialMantenimientoScreen(estado, onVolver, vm::seleccionar, vm::reintentar, vm::recargar,
-        onRegistrar, modifier, registroDisponible, onIniciarSesion)
+    val idVehiculoDetalle = estado.seleccionado?.id
+    val idCorreccion = correccionLecturaId
+    val idExport = exportandoId
+    LaunchedEffect(idExport) {
+        onFormularioTallerAbierto(idExport != null)
+    }
+    when {
+        idExport != null && exportarRepository != null -> {
+            com.mycar.app.features.historial.export.ExportarHistorialRoute(
+                idVehiculo = idExport,
+                repository = exportarRepository,
+                onVolver = { exportandoId = null },
+                onVerPlanes = {
+                    exportandoId = null
+                    onVerPlanes?.invoke()
+                },
+                onIniciarSesion = { onIniciarSesion?.invoke() },
+                fotosRepository = fotosRepository,
+                modifier = modifier
+            )
+        }
+        idCorreccion != null && idVehiculoDetalle != null && kilometrajeRepository != null -> {
+            com.mycar.app.features.vehiculos.ui.CorregirKilometrajeRoute(
+                clave = claveCuenta,
+                idVehiculo = idVehiculoDetalle,
+                idLectura = idCorreccion,
+                repository = kilometrajeRepository,
+                onVolver = { correccionLecturaId = null },
+                onIniciarSesion = { onIniciarSesion?.invoke() },
+                onVerHistorial = {
+                    correccionLecturaId = null
+                    vm.recargarKilometraje()
+                },
+                onVolverVehiculo = {
+                    correccionLecturaId = null
+                    onVolver()
+                },
+                modifier = modifier
+            )
+        }
+        detalleId != null && idVehiculoDetalle != null -> {
+            DetalleMantenimientoRoute(
+                repository = repository,
+                idVehiculo = idVehiculoDetalle,
+                idMantenimiento = detalleId!!,
+                onVolver = {
+                    detalleId = null
+                    vm.recargar()
+                },
+                modifier = modifier,
+                talleresRepository = talleresRepository
+            )
+        }
+        else -> {
+            HistorialMantenimientoScreen(
+                estado, onVolver, vm::seleccionar, vm::reintentar, vm::recargar,
+                onRegistrar, modifier, registroDisponible, onIniciarSesion,
+                onVerDetalle = { detalleId = it },
+                onOrdenar = vm::ordenar,
+                onFiltrarTipo = vm::filtrarTipo,
+                onRecargarKm = vm::recargarKilometraje,
+                onActualizarKm = onActualizarKm,
+                onCorregirKm = { idLectura ->
+                    if (kilometrajeRepository != null) correccionLecturaId = idLectura
+                },
+                vehiculoActivo = estado.seleccionado?.activo == true,
+                talleresRepository = talleresRepository,
+                onNotificaciones = onNotificaciones,
+                onPerfil = onPerfil,
+                abrirEnTalleres = abrirEnTalleres,
+                onAbrirEnTalleresConsumido = onAbrirEnTalleresConsumido,
+                avatarBytes = avatarBytes,
+                iniciales = iniciales,
+                tiposCatalogo = tiposCatalogo,
+                onFormularioTallerAbierto = onFormularioTallerAbierto,
+                onExportar = if (exportarRepository != null) {
+                    {
+                        estado.seleccionado?.id?.let { exportandoId = it }
+                    }
+                } else null
+            )
+        }
+    }
 }

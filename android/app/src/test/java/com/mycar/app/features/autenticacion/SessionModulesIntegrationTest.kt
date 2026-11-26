@@ -27,6 +27,16 @@ class SessionModulesIntegrationTest {
         var failingSession = false
         var id = 7L
         override suspend fun register(request: RegistrationRequest): Response<RegistrationResponse> = error("No registration")
+        override suspend fun verificationOrigin(): Response<VerificationOriginResponse> = error("No verification")
+        override suspend fun verificationEmit(body: VerificationEmitRequest): Response<VerificationEmitResponse> = error("No verification")
+        override suspend fun verificationResend(body: VerificationEmitRequest): Response<VerificationEmitResponse> = error("No verification")
+        override suspend fun verificationComplete(body: VerificationCompleteRequest): Response<RegistrationResponse> = error("No verification")
+        override suspend fun mfaEnrollStart(bearer: String) = error("No MFA")
+        override suspend fun mfaEnrollConfirm(bearer: String, body: MfaCodigoRequest) = error("No MFA")
+        override suspend fun mfaEnrollConfirmBackup(bearer: String) = error("No MFA")
+        override suspend fun mfaVerify(bearer: String, body: MfaVerificarRequest) = error("No MFA")
+        override suspend fun mfaRecover(bearer: String, body: MfaRecuperarRequest) = error("No MFA")
+        override suspend fun adminHub(bearer: String) = error("No admin")
         override suspend fun login(request: LoginRequest) = Response.success(response())
         override suspend fun session(bearer: String): Response<SessionResponse> {
             if (failingSession) throw IOException("fixture")

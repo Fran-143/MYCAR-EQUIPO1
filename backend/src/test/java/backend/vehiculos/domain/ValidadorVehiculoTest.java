@@ -47,7 +47,7 @@ class ValidadorVehiculoTest {
 
         // ACT
         boolean resultado =
-                ValidadorVehiculo.esKilometrajeInicialValido(kilometraje);
+                ValidadorVehiculo.esKilometrajeInicialValido(java.math.BigDecimal.valueOf(kilometraje));
 
         // ASSERT
         assertTrue(resultado);
@@ -63,7 +63,8 @@ class ValidadorVehiculoTest {
 
         // ACT
         boolean resultado =
-                ValidadorVehiculo.esKilometrajeInicialValido(kilometraje);
+                ValidadorVehiculo.esKilometrajeInicialValido(
+                        kilometraje == null ? null : java.math.BigDecimal.valueOf(kilometraje));
 
         // ASSERT
         assertFalse(resultado);

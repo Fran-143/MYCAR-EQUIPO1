@@ -14,10 +14,13 @@ class ValidadorPlacaTest {
     @ValueSource(strings = {
             "A1B234",
             "Z9X000",
-            "M0N999"
+            "M0N999",
+            "ABC123",
+            "XYZ000",
+            "QWE999"
     })
     void aceptaPlacasConElFormatoAcordado(String placa) {
-        // Arrange: placa válida parametrizada
+        // Arrange: placa válida parametrizada (A1B234 o ABC123)
 
         // Act
         boolean ok = ValidadorPlaca.esValida(placa);
@@ -31,12 +34,15 @@ class ValidadorPlacaTest {
     @ValueSource(strings = {
             " ",
             "A1B-234",
+            "ABC-123",
             "a1b234",
+            "abc123",
             " A1B234",
             "A1B234 ",
             "A1B23",
             "A1B2345",
-            "ABC123",
+            "AB1234",
+            "ABCD12",
             "A1B23X",
             "A1B234\n"
     })

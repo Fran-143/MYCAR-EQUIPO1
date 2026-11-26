@@ -15,10 +15,30 @@ class RemoteActualizarKilometrajeRepositoryTest {
         var post: Response<ResultadoActualizarKmDto>? = null
     ) : KilometrajeApi {
         override suspend fun contexto(idVehiculo: Long) = ctx
+        override suspend fun listarLecturas(idVehiculo: Long) =
+            Response.success(emptyList<LecturaKilometrajeDto>())
         override suspend fun registrar(idVehiculo: Long, solicitud: SolicitudActualizarKmDto) =
             post ?: Response.success(ResultadoActualizarKmDto(UUID.randomUUID(), idVehiculo, 1, solicitud.kmNuevo, null, "CONFIRMADA"))
         override suspend fun operacion(idOperacion: UUID) =
             Response.success(EstadoOperacionKmDto(idOperacion, "EN_PROCESO", null))
+        override suspend fun contextoCorreccion(idVehiculo: Long, idLectura: Long) =
+            Response.success(
+                ContextoCorreccionKmDto(
+                    idVehiculo, "ABC", "M", "X", idLectura, 1.0, 2.0, 1, true, null
+                )
+            )
+        override suspend fun corregir(
+            idVehiculo: Long,
+            idLectura: Long,
+            solicitud: SolicitudCorregirKmDto
+        ) = Response.success(
+            ResultadoCorregirKmDto(
+                solicitud.idOperacion, idVehiculo, idLectura, 1, 2.0, 1.0, 1.0,
+                solicitud.motivo, null, null, "CONFIRMADA"
+            )
+        )
+        override suspend fun operacionCorreccion(idOperacion: UUID) =
+            Response.success(EstadoOperacionCorreccionKmDto(idOperacion, "EN_PROCESO", null))
     }
 
     @Test fun contextoValido() = runBlocking {

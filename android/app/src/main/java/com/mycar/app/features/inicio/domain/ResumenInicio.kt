@@ -6,11 +6,28 @@ import java.time.Instant
 
 enum class FaseInicio { SIN_SESION, CARGANDO, SIN_VEHICULOS, LISTO, ERROR, INCONSISTENTE }
 enum class DisponibilidadInicio { CARGANDO, DISPONIBLE, NO_DISPONIBLE }
+data class ResumenAlertaInicio(
+    val id: Long,
+    val titulo: String,
+    val estado: String
+)
+/** Último taller activo del catálogo del usuario (mayor id = el más reciente registrado). */
+data class ResumenTallerInicio(
+    val id: Long,
+    val nombre: String,
+    val origen: String? = null,
+    val direccion: String? = null
+)
 data class BloquesInicio(
     val kilometraje: Int?, val fechaLectura: Instant? = null,
     val ultimoMantenimiento: MantenimientoHistorial? = null,
     val historial: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
-    val lectura: DisponibilidadInicio = DisponibilidadInicio.CARGANDO
+    val lectura: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
+    val alertas: List<ResumenAlertaInicio> = emptyList(),
+    val alertasDisponibilidad: DisponibilidadInicio = DisponibilidadInicio.CARGANDO,
+    val totalAlertas: Int = 0,
+    val ultimoTaller: ResumenTallerInicio? = null,
+    val talleresDisponibilidad: DisponibilidadInicio = DisponibilidadInicio.CARGANDO
 )
 data class EstadoResumenInicio(
     val fase: FaseInicio = FaseInicio.SIN_SESION,
@@ -22,6 +39,8 @@ data class EstadoResumenInicio(
 }
 interface ResumenInicioRepository {
     suspend fun vehiculosActivos(): List<VehiculoResumenDto>
+    /** Incluye inactivos para detectar principal inactivo (RF50 + historial). */
+    suspend fun vehiculosTodos(): List<VehiculoResumenDto> = emptyList()
     suspend fun bloques(vehiculo: VehiculoResumenDto): BloquesInicio
 }
 class ErrorResumenInicio(val sesion: Boolean = false, val inconsistente: Boolean = false) : Exception()

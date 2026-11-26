@@ -4,6 +4,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.*;
@@ -47,7 +48,7 @@ class MvpDatabaseTest {
             exec(db, "CREATE TABLE public.evidencia_preservada(valor TEXT PRIMARY KEY)");
             exec(db, "INSERT INTO public.evidencia_preservada VALUES ('no modificar')");
         }
-        assertEquals(4, flyway(url, null).migrate().migrationsExecuted);
+        assertEquals(25, flyway(url, null).migrate().migrationsExecuted);
         flyway(url, null).validate();
     }
 
@@ -175,7 +176,7 @@ class MvpDatabaseTest {
                 "Blanco",
                 idMotor,
                 idCombustible,
-                50000,
+                new BigDecimal("50000"),
                 "1HGCM82633A004352",
                 "SERIE123",
                 "MOTOR123",
@@ -929,11 +930,13 @@ class MvpDatabaseTest {
         assertEquals("", text(c, "SELECT mycar.normalizar_servicio_otro('')"));
     }
 
-    @Test void rf22ReferenciaUltimaNormalizadaYNoOtroVehiculo() throws Exception {
+    @Test void rf22ReferenciaElegibleNoSoloUltimaYNoOtroVehiculo() throws Exception {
         Vehicle a = fixture(c), b = otherFixture(c);
-        long first = maintenance(c, a, a.reading, 20000, "OTRO", "Straße  correa");
+        long first = maintenance(c, a, a.reading, 20000, "OTRO", "Strasse  correa");
         long last = maintenance(c, a, a.reading, 20000, "OTRO", "STRASSE correa");
-        invalid(null, () -> alert(c, a, "OTRO", "straße correa", first, "a".repeat(64)));
+        // V9: cualquier REALIZADO elegible (no solo el último) con DESDE_MANTENIMIENTO.
+        long idFirst = alert(c, a, "OTRO", "straße correa", first, "a".repeat(64));
+        assertEquals("DESDE_MANTENIMIENTO", text(c, "SELECT origen_calculo FROM mycar.alerta WHERE id_alerta=?", idFirst));
         invalid(null, () -> alert(c, b, "OTRO", "straße correa", last, "b".repeat(64)));
         long id = alert(c, a, "OTRO", "straße correa", last, "c".repeat(64));
         assertEquals("straße correa", text(c, "SELECT servicio_otro FROM mycar.alerta WHERE id_alerta=?", id));
@@ -963,17 +966,16 @@ class MvpDatabaseTest {
         invalid(null, () -> exec(c, "UPDATE mycar.historial_alerta SET motivo='Modificar' WHERE id_alerta=?", id));
     }
 
-    @Test void rf23VeintinueveVsTreintaDiasDesdeEvidenciaNoDesdeCommit() throws Exception {
+    @Test void rf23VeintinueveYTreintaDiasPermanecenVencidasSinAnulacionAutomatica() throws Exception {
         Vehicle v = fixture(c);
         long day29 = historicTimeAlert(c, v, 29, "a".repeat(64));
         long day30 = historicTimeAlert(c, v, 30, "b".repeat(64));
         assertEquals(2, number(c, "SELECT mycar.sincronizar_alertas_vehiculo(?,?)", v.id, v.user));
         assertEquals("VENCIDA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", day29));
-        assertEquals("ANULADA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", day30));
-        assertEquals(1, number(c, "SELECT count(*) FROM mycar.historial_alerta WHERE id_alerta=? AND estado_anterior IS NOT NULL", day30));
+        assertEquals("VENCIDA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", day30));
         assertEquals(0, number(c, "SELECT mycar.sincronizar_alertas_vehiculo(?,?)", v.id, v.user));
+        assertEquals(0, number(c, "SELECT count(*) FROM mycar.historial_alerta WHERE motivo='VENCIMIENTO_30_DIAS'"));
         invalid(null, () -> exec(c, "UPDATE mycar.alerta SET fecha_vencida_verificable=fecha_vencida_verificable+1 WHERE id_alerta=?", day30));
-        assertEquals(1, number(c, "SELECT count(*) FROM mycar.historial_alerta WHERE id_alerta=? AND motivo='VENCIMIENTO_30_DIAS'", day30));
     }
 
     @Test void rf23RechazaTitularAjenoYRollbackSiFallaHistorial() throws Exception {
@@ -992,7 +994,7 @@ class MvpDatabaseTest {
         long first = historicalReading(c, v, 21381, 30);
         long later = historicalReading(c, v, 22000, 15);
         assertEquals(1, number(c, "SELECT mycar.sincronizar_alertas_vehiculo(?,?)", v.id, v.user));
-        assertEquals("ANULADA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", id));
+        assertEquals("VENCIDA", text(c, "SELECT estado FROM mycar.alerta WHERE id_alerta=?", id));
         assertEquals(first, number(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", id));
         assertEquals(LocalDate.now(LIMA).minusDays(30).toString(), text(c, "SELECT fecha_vencida_verificable FROM mycar.alerta WHERE id_alerta=?", id));
         invalid(null, () -> exec(c, "UPDATE mycar.alerta SET id_lectura_vencida_evidencia=? WHERE id_alerta=?", later, id));
@@ -1020,7 +1022,8 @@ class MvpDatabaseTest {
         assertNull(text(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", timeFirst));
         assertNull(text(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", tie));
         assertEquals(proof, number(c, "SELECT id_lectura_vencida_evidencia FROM mycar.alerta WHERE id_alerta=?", kmFirst));
-        assertEquals(3, number(c, "SELECT count(*) FROM mycar.alerta WHERE estado='ANULADA'"));
+        assertEquals(3, number(c, "SELECT count(*) FROM mycar.alerta WHERE estado='VENCIDA'"));
+        assertEquals(0, number(c, "SELECT count(*) FROM mycar.alerta WHERE estado='ANULADA'"));
     }
 
     @Test void esquemaNoVacioSeRechazaSinModificarFilaExistente() throws Exception {
@@ -1190,7 +1193,8 @@ class MvpDatabaseTest {
     }
     static long part(Connection db, long u) throws SQLException { return insertId(db, "INSERT INTO mycar.repuesto(id_usuario,nombre) VALUES (?,'Filtro') RETURNING id_repuesto", u); }
     static long alert(Connection db, Vehicle v, String type, String other, Long ref, String signature) throws SQLException {
-        long id = insertId(db, "INSERT INTO mycar.alerta(id_vehiculo,id_tipo_mantenimiento,criterio,unidad_tiempo,cantidad_tiempo,fecha_base,fecha_objetivo,estado,firma_equivalencia,servicio_otro,id_mantenimiento_referencia) SELECT ?,id_tipo_mantenimiento,'POR_TIEMPO','SEMANAS',1,?,?,'PENDIENTE',?,?,? FROM mycar.tipo_mantenimiento WHERE codigo=? RETURNING id_alerta", v.id, LocalDate.now(LIMA), LocalDate.now(LIMA).plusDays(7), signature, other, ref, type);
+        String origen = ref == null ? "DESDE_HOY" : "DESDE_MANTENIMIENTO";
+        long id = insertId(db, "INSERT INTO mycar.alerta(id_vehiculo,id_tipo_mantenimiento,criterio,origen_calculo,unidad_tiempo,cantidad_tiempo,fecha_base,fecha_objetivo,estado,firma_equivalencia,servicio_otro,id_mantenimiento_referencia) SELECT ?,id_tipo_mantenimiento,'POR_TIEMPO',?,'SEMANAS',1,?,?,'PENDIENTE',?,?,? FROM mycar.tipo_mantenimiento WHERE codigo=? RETURNING id_alerta", v.id, origen, LocalDate.now(LIMA), LocalDate.now(LIMA).plusDays(7), signature, other, ref, type);
         history(db, id, "PENDIENTE"); return id;
     }
     static void history(Connection db, long id, String state) throws SQLException { exec(db, "INSERT INTO mycar.historial_alerta(id_alerta,estado_nuevo,motivo,version_destino) VALUES (?,?,'INICIAL_RF22',0)", id, state); }

@@ -1,5 +1,7 @@
 package backend.vehiculos.controller;
 
+import backend.vehiculos.dto.DatosActualizacionVehiculo;
+import backend.vehiculos.dto.DatosCambioEstadoVehiculo;
 import backend.vehiculos.dto.DatosCatalogosVehiculo;
 import backend.vehiculos.dto.DatosDetalleVehiculo;
 import backend.vehiculos.dto.DatosListadoVehiculos;
@@ -9,7 +11,9 @@ import backend.vehiculos.dto.DatosRegistroVehiculo;
 import backend.vehiculos.dto.ResultadoRegistroVehiculo;
 import backend.vehiculos.seguridad.IdentidadVehiculos;
 import backend.vehiculos.seguridad.SesionVehiculosNoValidada;
+import backend.vehiculos.service.ActualizacionVehiculoService;
 import backend.vehiculos.service.ConsultaRegistroVehiculoService;
+import backend.vehiculos.service.EstadoOperativoVehiculoService;
 import backend.vehiculos.service.RegistroVehiculoService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
@@ -25,15 +29,21 @@ public class VehiculosController {
     private final ObjectProvider<IdentidadVehiculos> identidades;
     private final RegistroVehiculoService registro;
     private final ConsultaRegistroVehiculoService consultas;
+    private final ActualizacionVehiculoService actualizacion;
+    private final EstadoOperativoVehiculoService estadoOperativo;
 
     public VehiculosController(
             ObjectProvider<IdentidadVehiculos> identidades,
             RegistroVehiculoService registro,
-            ConsultaRegistroVehiculoService consultas
+            ConsultaRegistroVehiculoService consultas,
+            ActualizacionVehiculoService actualizacion,
+            EstadoOperativoVehiculoService estadoOperativo
     ) {
         this.identidades = identidades;
         this.registro = registro;
         this.consultas = consultas;
+        this.actualizacion = actualizacion;
+        this.estadoOperativo = estadoOperativo;
     }
 
     public record IdentidadCuenta(long idUsuario) { }
@@ -48,6 +58,37 @@ public class VehiculosController {
     @GetMapping("/{idVehiculo}")
     public DatosDetalleVehiculo detalle(Authentication autenticacion, @PathVariable long idVehiculo) {
         return consultas.consultarDetalle(usuario(autenticacion), idVehiculo);
+    }
+
+    @PutMapping("/{idVehiculo}")
+    public DatosDetalleVehiculo actualizar(
+            Authentication autenticacion,
+            @PathVariable long idVehiculo,
+            @RequestBody DatosActualizacionVehiculo datos
+    ) {
+        return actualizacion.actualizar(usuario(autenticacion), idVehiculo, datos);
+    }
+
+    /** RF13: establece el vehículo como principal exclusivo (solo ACTIVO propio). */
+    @PutMapping("/{idVehiculo}/principal")
+    public DatosDetalleVehiculo establecerPrincipal(
+            Authentication autenticacion, @PathVariable long idVehiculo
+    ) {
+        return estadoOperativo.establecerPrincipal(usuario(autenticacion), idVehiculo);
+    }
+
+    /** RF12: activa o desactiva un vehículo propio. */
+    @PutMapping("/{idVehiculo}/estado")
+    public DatosDetalleVehiculo cambiarEstado(
+            Authentication autenticacion,
+            @PathVariable long idVehiculo,
+            @RequestBody DatosCambioEstadoVehiculo datos
+    ) {
+        return estadoOperativo.cambiarEstado(
+                usuario(autenticacion),
+                idVehiculo,
+                datos == null ? null : datos.estadoVehiculo()
+        );
     }
 
     @GetMapping

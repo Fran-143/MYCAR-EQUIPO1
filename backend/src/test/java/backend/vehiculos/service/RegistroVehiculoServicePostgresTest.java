@@ -75,7 +75,7 @@ class RegistroVehiculoServicePostgresTest {
         assertTrue(resultado.idVehiculo() > 0);
         assertTrue(resultado.principal());
         assertEquals(datos.placa(), resultado.placa());
-        assertEquals(datos.kilometrajeInicial().intValue(), resultado.kilometrajeActual());
+        assertEquals(0, datos.kilometrajeInicial().compareTo(resultado.kilometrajeActual()));
         assertEquals(0, resultado.versionKm());
         assertNotNull(resultado.fechaLectura());
         assertEquals(1, contar("SELECT count(*) FROM mycar.vehiculo WHERE id_vehiculo=? AND id_usuario=? AND es_principal AND estado_vehiculo='ACTIVO'", resultado.idVehiculo(), usuario));
@@ -208,8 +208,8 @@ class RegistroVehiculoServicePostgresTest {
         RegistroInicialVehiculoDao objetivo = AopTestUtils.getUltimateTargetObject(inicial);
         doAnswer(invocacion -> {
             invocacion.callRealMethod();
-            throw new DataAccessResourceFailureException("Fallo simulado después de persistir lectura y configuración");
-        }).when(objetivo).registrar(anyLong(), anyInt(), eq(datos.idOperacion()));
+            throw new DataAccessResourceFailureException("Fallo simulado despues de persistir lectura y configuracion");
+        }).when(objetivo).registrar(anyLong(), any(java.math.BigDecimal.class), eq(datos.idOperacion()));
         assertThrows(DataAccessResourceFailureException.class, () -> servicio.registrar(usuario, datos));
         assertEquals(0, vehiculos(usuario));
         assertSinOperacion(datos);
@@ -250,7 +250,7 @@ class RegistroVehiculoServicePostgresTest {
 
     @Test void daoDeEscrituraExigeTransaccionSpring() {
         assertThrows(IllegalTransactionStateException.class,
-                () -> inicial.registrar(-1, 100, UUID.randomUUID()));
+                () -> inicial.registrar(-1, java.math.BigDecimal.valueOf(100), UUID.randomUUID()));
     }
 
     @Test void operacionPreexistenteEnProcesoNoSePresentaComoExitoNiSeDuplica() {
@@ -311,7 +311,7 @@ class RegistroVehiculoServicePostgresTest {
         Long idMotor = jdbc.queryForObject("SELECT id_tipo_motor FROM mycar.tipo_motor WHERE codigo=?", Long.class, motor);
         Long combustible = "ELECTRICO".equals(motor) ? null : jdbc.queryForObject("SELECT id_combustible FROM mycar.combustible WHERE codigo='GASOLINA'", Long.class);
         return new DatosRegistroVehiculo(operacion, "Toyota", "Corolla", "PARTICULAR", placa,
-                2020, color, idMotor, combustible, 50000, vin, "SERIE123",
+                2020, color, idMotor, combustible, java.math.BigDecimal.valueOf(50000), vin, "SERIE123",
                 "ELECTRICO".equals(motor) ? null : "MOTOR123", null, null, null, null);
     }
 

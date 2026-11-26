@@ -30,26 +30,64 @@ import com.mycar.app.features.sesion.viewmodel.SesionVehiculosViewModel
 
 class MainActivity : ComponentActivity() {
     private var solicitudesVehiculos by mutableIntStateOf(0)
+    private var solicitudesNotificaciones by mutableIntStateOf(0)
+    private var pushIdVehiculo by mutableStateOf<Long?>(null)
+    private var pushIdAlerta by mutableStateOf<Long?>(null)
+    private var pushIdNotificacion by mutableStateOf<Long?>(null)
+    private var pushCategoria by mutableStateOf<String?>(null)
     private var redLocalDisponible by mutableStateOf(true)
     private val permisoRedLocal = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         redLocalDisponible = it
     }
+    private val permisoNotificaciones = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* RF48 actualiza permiso vía Preferencias; aquí solo concedemos el OS. */ }
     private fun necesitaPermisoRedLocal() = PoliticaRedLocal.requierePermiso(
         BuildConfig.DEBUG, Build.VERSION.SDK_INT, BuildConfig.API_BASE_URL)
     private fun comprobarRedLocal() {
         redLocalDisponible = !necesitaPermisoRedLocal() ||
             checkSelfPermission(PoliticaRedLocal.PERMISO) == PackageManager.PERMISSION_GRANTED
     }
+    private fun aplicarIntentPush(intent: Intent?) {
+        if (intent == null) return
+        if (intent.getBooleanExtra("abrir_vehiculos", false)) solicitudesVehiculos++
+        if (intent.getBooleanExtra("abrir_desde_push", false)) {
+            solicitudesNotificaciones++
+            pushIdVehiculo = intent.getLongExtra("id_vehiculo", -1L).takeIf { it > 0 }
+            pushIdAlerta = intent.getLongExtra("id_alerta", -1L).takeIf { it > 0 }
+            pushIdNotificacion = intent.getLongExtra("id_notificacion", -1L).takeIf { it > 0 }
+            pushCategoria = intent.getStringExtra("categoria_push")
+                ?: intent.getStringExtra("destino_push")?.takeIf { it in listOf("MANTENIMIENTO", "SOAT", "LICENCIA", "KILOMETRAJE") }
+            intent.getStringExtra("categoria")?.let { pushCategoria = it }
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
-        if(intent.getBooleanExtra("abrir_vehiculos",false)) solicitudesVehiculos++
+        aplicarIntentPush(intent)
         comprobarRedLocal()
-        setContent { MyCarTheme(dynamicColor=false) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED) {
+            permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        setContent {
+            // Tema fijo claro MyCar (sin selector claro/oscuro).
+            MyCarTheme(darkTheme = false, dynamicColor = false) {
             if (redLocalDisponible) {
                 val sesion: SesionVehiculosViewModel = viewModel()
-                AuthGate { MyCarNavigation(solicitudesVehiculos, sesion) }
+                AuthGate {
+                    MyCarNavigation(
+                        solicitudesVehiculos,
+                        sesion,
+                        solicitudesNotificaciones = solicitudesNotificaciones,
+                        pushIdVehiculo = pushIdVehiculo,
+                        pushIdAlerta = pushIdAlerta,
+                        pushIdNotificacion = pushIdNotificacion,
+                        pushCategoria = pushCategoria
+                    )
+                }
             } else PermisoRedLocalScreen(
                 onSolicitar = { permisoRedLocal.launch(PoliticaRedLocal.PERMISO) },
                 onAjustes = { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
@@ -65,7 +103,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if(intent.getBooleanExtra("abrir_vehiculos",false)) solicitudesVehiculos++
+        aplicarIntentPush(intent)
     }
 }
 

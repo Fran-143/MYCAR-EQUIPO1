@@ -1,0 +1,77 @@
+{
+  "fecha": "2026-11-03",
+  "zona": "America/Bogota",
+  "rama": "codex/elsa-continuacion",
+  "HEAD": "84641c7e041984b287cea1ed90445ecb770ec75b",
+  "archivos_nuevos_locales_no_seguidos": [
+    "backend/src/main/java/backend/registro/verificacion/MailGateway.java",
+    "backend/src/main/java/backend/registro/verificacion/VerificationCrypto.java",
+    "backend/src/main/java/backend/registro/verificacion/VerificationDispatcher.java",
+    "backend/src/main/java/backend/registro/verificacion/VerificationPolicy.java",
+    "backend/src/main/java/backend/registro/verificacion/VerificationRepository.java",
+    "backend/src/main/java/backend/registro/verificacion/VerificationService.java",
+    "backend/src/main/resources/db/rf01-verificacion/V7__rf01_verificacion_aislada.sql",
+    "backend/src/test/java/backend/registro/verificacion/ControlledMailGateway.java",
+    "backend/src/test/java/backend/registro/verificacion/VerificationPostgresTest.java",
+    "docs/diseno/RF01_verificacion_etapa1.md"
+  ],
+  "modificacion_previa_conservada": "android/gradle.properties (contenido no incluido)",
+  "migracion_origen": "backend/src/main/resources/db/rf01-verificacion/V7__rf01_verificacion_aislada.sql",
+  "ruta_flyway_activa_observada": "classpath:db/mvp",
+  "migracion_en_ruta_activa": false,
+  "estado_aplicacion_actual": {
+    "estado": "Consulta de solo lectura completada el 2026-11-03",
+    "base": "privada local prevista, puerto 5440",
+    "V7_exitosa_en_historial": false,
+    "columna_nueva_presente": false,
+    "tablas_nuevas_presentes": 0,
+    "alcance": "No se consultaron bases compartidas."
+  },
+  "estado_remoto": "No consultado en esta tarea; versión disponible en main debe revisarse por Cursor.",
+  "pruebas_previas": [
+    {
+      "class": "VerificationPostgresTest",
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "RegistrationIntegrationTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "RegisterAccountTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "RegistrationValidatorTest",
+      "tests": 25,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "RegistrationWebTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "pruebas_reejecutadas_al_empaquetar": false,
+  "bases_y_rol_de_pruebas_previos_retirados": true,
+  "archivos_de_referencia_no_son_solicitud_de_integrar_backend": true,
+  "campos_por_tabla": {
+    "control_verificacion": 16,
+    "operacion_verificacion": 13,
+    "emision_codigo": 29,
+    "intento_verificacion": 13
+  }
+}

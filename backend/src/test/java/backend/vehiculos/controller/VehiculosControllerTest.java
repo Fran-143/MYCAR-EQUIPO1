@@ -4,7 +4,9 @@ import backend.vehiculos.domain.ErrorRegistroVehiculo;
 import backend.vehiculos.dto.*;
 import backend.vehiculos.seguridad.IdentidadVehiculos;
 import backend.vehiculos.seguridad.SesionVehiculosNoValidada;
+import backend.vehiculos.service.ActualizacionVehiculoService;
 import backend.vehiculos.service.ConsultaRegistroVehiculoService;
+import backend.vehiculos.service.EstadoOperativoVehiculoService;
 import backend.vehiculos.service.RegistroVehiculoService;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,30 +64,33 @@ class VehiculosControllerTest {
         autenticacion = UsernamePasswordAuthenticationToken.authenticated("fixture-solo-test", null, List.of());
         when(proveedores.getIfAvailable()).thenReturn(identidad);
         when(identidad.exigirUsuarioAutenticado(any())).thenReturn(17L);
-        mvc = MockMvcBuilders.standaloneSetup(new VehiculosController(proveedores, registro, consultas))
+        mvc = MockMvcBuilders.standaloneSetup(new VehiculosController(
+                        proveedores, registro, consultas,
+                        mock(ActualizacionVehiculoService.class),
+                        mock(EstadoOperativoVehiculoService.class)))
                 .setControllerAdvice(new ErroresVehiculosController())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(json)).build();
     }
 
     @Test void registroUsaIdentidadDelServidorYDevuelve201() throws Exception {
-        when(registro.registrar(17L, datos())).thenReturn(resultado());
+        when(registro.registrar(eq(17L), any())).thenReturn(resultado());
         mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
                         .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(datos())))
                 .andExpect(status().isCreated()).andExpect(jsonPath("idVehiculo").value(81))
                 .andExpect(jsonPath("idOperacion").value(OP.toString()))
                 .andExpect(jsonPath("kilometrajeActual").value(50000));
-        verify(registro).registrar(17L, datos());
+        verify(registro).registrar(eq(17L), any());
     }
 
     @Test void idUsuarioEnJsonQueryOCabeceraNoCambiaElPropietario() throws Exception {
         ObjectNode cuerpo = json.valueToTree(datos());
         cuerpo.put("idUsuario", 999);
-        when(registro.registrar(17L, datos())).thenReturn(resultado());
+        when(registro.registrar(eq(17L), any())).thenReturn(resultado());
         mvc.perform(post("/api/v1/vehiculos?idUsuario=999").principal(autenticacion)
                         .header("X-Usuario-Id", "999").contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(cuerpo)))
                 .andExpect(status().isCreated());
-        verify(registro).registrar(17L, datos());
+        verify(registro).registrar(eq(17L), any());
         verify(registro, never()).registrar(eq(999L), any());
     }
 
@@ -181,7 +186,7 @@ class VehiculosControllerTest {
     }
 
     @Test void validacionDevuelveLosNombresDeCampos() throws Exception {
-        when(registro.registrar(17L, datos())).thenThrow(new ErrorRegistroVehiculo("DATOS_INVALIDOS", Set.of("numeroVin")));
+        when(registro.registrar(eq(17L), any())).thenThrow(new ErrorRegistroVehiculo("DATOS_INVALIDOS", Set.of("numeroVin")));
         mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
                         .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(datos())))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("campos", hasItem("numeroVin")));
@@ -192,7 +197,7 @@ class VehiculosControllerTest {
             "PLACA_DUPLICADA,409", "VIN_DUPLICADO,409", "CONFLICTO_REGISTRO,409",
             "CONFLICTO_IDEMPOTENCIA,409", "OPERACION_EN_PROCESO,409"})
     void erroresFuncionalesTienenEstadoHttp(String codigo, int estado) throws Exception {
-        when(registro.registrar(17L, datos())).thenThrow(new ErrorRegistroVehiculo(codigo));
+        when(registro.registrar(eq(17L), any())).thenThrow(new ErrorRegistroVehiculo(codigo));
         mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
                         .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(datos())))
                 .andExpect(status().is(estado)).andExpect(jsonPath("codigo").value(codigo));
@@ -207,7 +212,7 @@ class VehiculosControllerTest {
     }
 
     @Test void falloInesperadoNoSePresentaComoExitoNiExponeDetalles() throws Exception {
-        when(registro.registrar(17L, datos())).thenThrow(new IllegalStateException("secreto-interno"));
+        when(registro.registrar(eq(17L), any())).thenThrow(new IllegalStateException("secreto-interno"));
         mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
                         .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(datos())))
                 .andExpect(status().isInternalServerError()).andExpect(jsonPath("codigo").value("ERROR_INTERNO"))
@@ -215,7 +220,7 @@ class VehiculosControllerTest {
     }
 
     @Test void mismaRespuestaDeRegistroNoSeReemplazaPorOtraEnElControlador() throws Exception {
-        when(registro.registrar(17L, datos())).thenReturn(resultado());
+        when(registro.registrar(eq(17L), any())).thenReturn(resultado());
         String uno = mvc.perform(post("/api/v1/vehiculos").principal(autenticacion)
                         .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(datos())))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
@@ -226,8 +231,8 @@ class VehiculosControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"anioFabricacion,2020.7", "kilometrajeInicial,50000.9", "idTipoMotor,1.7",
-            "idCombustible,1.7", "idTipoAceite,1.7", "anioFabricacion,2020.0", "kilometrajeInicial,50000.0"})
+    @CsvSource({"anioFabricacion,2020.7", "idTipoMotor,1.7",
+            "idCombustible,1.7", "idTipoAceite,1.7", "anioFabricacion,2020.0", "kilometrajeInicial,50000.999"})
     void decimalesNoSeTruncanNiLleganAlServicio(String campo, String numero) throws Exception {
         ObjectNode cuerpo = json.valueToTree(datos());
         cuerpo.put(campo, new BigDecimal(numero));
@@ -249,7 +254,7 @@ class VehiculosControllerTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"anioFabricacion,2147483648", "kilometrajeInicial,2147483648",
+    @CsvSource({"anioFabricacion,2147483648",
             "idTipoMotor,9223372036854775808", "idCombustible,9223372036854775808", "idTipoAceite,9223372036854775808"})
     void enterosFueraDeRangoSeRechazanAntesDelServicio(String campo, String numero) throws Exception {
         ObjectNode cuerpo = json.valueToTree(datos());
@@ -285,11 +290,11 @@ class VehiculosControllerTest {
 
     private DatosRegistroVehiculo datos() {
         return new DatosRegistroVehiculo(OP, "Toyota", "Corolla", "PARTICULAR", "A1B234", 2020,
-                "Azul", 1L, 1L, 50000, null, null, null, null, null, null, null);
+                "Azul", 1L, 1L, new BigDecimal("50000.00"), null, null, null, null, null, null, null);
     }
 
     private ResultadoRegistroVehiculo resultado() {
-        return new ResultadoRegistroVehiculo(OP, 81, "A1B234", true, 50000,
+        return new ResultadoRegistroVehiculo(OP, 81, "A1B234", true, new BigDecimal("50000.00"),
                 300, Instant.parse("2026-10-27T12:00:00Z"), 0);
     }
 }

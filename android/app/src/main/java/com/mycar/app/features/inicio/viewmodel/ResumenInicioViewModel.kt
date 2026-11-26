@@ -9,4 +9,5 @@ class ResumenInicioViewModel(repository: ResumenInicioRepository) : ViewModel() 
     val estado=coordinador.estado
     fun cargar() { coordinador.cargar() }
     fun seleccionar(id: Long) { coordinador.seleccionar(id) }
+    fun actualizarNombreUsuario(nombre: String?) { coordinador.actualizarNombreUsuario(nombre) }
 }

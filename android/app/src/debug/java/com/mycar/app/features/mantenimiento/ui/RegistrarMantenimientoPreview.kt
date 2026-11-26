@@ -122,11 +122,15 @@ private class ControlPreview(private val inicial: MantenimientoUiState) : Accion
         editarRepuesto()
         estado.editor?.let { estado = estado.copy(editor = it.copy(nombre = aceite)) }
     }
-    override fun guardar() {
+    override fun guardar(programarAlerta: Boolean) {
         if (!estado.editable || estado.cargando || estado.contexto?.registroDisponible != true) return
         val errores = ValidacionFormularioMantenimiento.formulario(estado.borrador, estado.contexto)
         estado = if (errores.isNotEmpty()) estado.copy(errores = errores)
-            else estado.copy(resultado = resultadoPreview(estado.borrador), errores = emptyMap())
+            else estado.copy(
+                resultado = resultadoPreview(estado.borrador),
+                errores = emptyMap(),
+                programarAlertaTrasExito = programarAlerta
+            )
     }
     override fun reintentarMismaOperacion() { estado = estado.copy(mensaje = "Vista previa: no se envió ninguna petición.") }
     override fun consultarOperacion() { estado = estado.copy(mensaje = "Vista previa: el resultado continúa pendiente. No se consultó un servidor.") }

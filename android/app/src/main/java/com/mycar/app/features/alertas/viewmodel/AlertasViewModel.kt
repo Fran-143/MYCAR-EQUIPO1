@@ -4,11 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mycar.app.features.alertas.domain.AlertasRepository
 import com.mycar.app.features.alertas.domain.DatosAlerta
+import com.mycar.app.features.alertas.domain.SolicitudAtenderAlerta
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 enum class FaseAlertas { CARGANDO, LISTO, ERROR, VACIO }
+
+/** Ámbito RF23: consulta vehicular vs personal de licencia. */
+enum class AmbitoAlertas { VEHICULOS, LICENCIA }
 
 /** Filtros RF23!G45. ANULADA no es chip (G43). */
 enum class FiltroAlertas(val etiqueta: String, val estadoApi: String?) {
@@ -21,37 +26,96 @@ enum class FiltroAlertas(val etiqueta: String, val estadoApi: String?) {
 }
 
 data class EstadoAlertas(
+    val ambito: AmbitoAlertas = AmbitoAlertas.VEHICULOS,
     val fase: FaseAlertas = FaseAlertas.CARGANDO,
     val vehiculoId: Long? = null,
     val sincronizadas: Int = 0,
     val alertas: List<DatosAlerta> = emptyList(),
     val visibles: List<DatosAlerta> = emptyList(),
+    /** Mapa idAlerta → idVehiculo (útil con «Todos mis vehículos»). */
+    val alertaPorVehiculo: Map<Long, Long> = emptyMap(),
     val filtro: FiltroAlertas = FiltroAlertas.TODAS,
     val mensaje: String? = null,
-    val generacion: Int = 0
-)
+    val avisoAccion: String? = null,
+    val ocupadoAccion: Boolean = false,
+    val generacion: Int = 0,
+    /** RF23 LICENCIA: estado independiente del vehículo. */
+    val faseLicencia: FaseAlertas = FaseAlertas.VACIO,
+    val mensajeLicencia: String? = MENSAJE_SIN_ALERTAS_LICENCIA,
+    val alertasLicencia: List<DatosAlerta> = emptyList(),
+    val sincronizadasLicencia: Int = 0,
+    val generacionLicencia: Int = 0
+) {
+    val esTodosVehiculos: Boolean get() = vehiculoId == ID_TODOS_VEHICULOS
+    fun idVehiculoDeAlerta(idAlerta: Long): Long? =
+        alertaPorVehiculo[idAlerta] ?: vehiculoId?.takeIf { it != ID_TODOS_VEHICULOS }
+
+    companion object {
+        /** Selector «Todos mis vehículos»: agrega listados autorizados en cliente. */
+        const val ID_TODOS_VEHICULOS = -1L
+        const val MENSAJE_SIN_ALERTAS_LICENCIA =
+            "No tienes alertas de licencia configuradas. Puedes activarlas desde Perfil → Licencia."
+        const val TITULO_SIN_ALERTAS_LICENCIA = "Sin alertas de licencia"
+        const val MENSAJE_SIN_VEHICULOS =
+            "Necesitas un vehículo activo para consultar sus alertas."
+        const val TITULO_SIN_VEHICULOS = "No hay vehículos activos disponibles"
+        const val MENSAJE_SIN_ALERTAS_VEHICULO =
+            "No se encontraron alertas para este vehículo."
+        const val MENSAJE_SIN_ALERTAS_TODOS =
+            "No se encontraron alertas en tus vehículos."
+    }
+}
 
 class AlertasViewModel(
     private val repository: AlertasRepository,
     private val vehiculos: List<Pair<Long, String>>,
     idInicial: Long?
 ) : ViewModel() {
-    private val mutable = MutableStateFlow(EstadoAlertas(vehiculoId = idInicial ?: vehiculos.firstOrNull()?.first))
+    private val mutable = MutableStateFlow(
+        EstadoAlertas(
+            vehiculoId = idInicial ?: vehiculos.firstOrNull()?.first,
+            fase = if (vehiculos.isEmpty() && idInicial == null) FaseAlertas.VACIO else FaseAlertas.CARGANDO,
+            mensaje = if (vehiculos.isEmpty() && idInicial == null) EstadoAlertas.MENSAJE_SIN_VEHICULOS else null
+        )
+    )
     val estado = mutable.asStateFlow()
 
-    init { mutable.value.vehiculoId?.let { cargar(it) } }
+    init {
+        mutable.value.vehiculoId?.let { cargar(it) }
+            ?: run {
+                if (vehiculos.isEmpty()) {
+                    mutable.value = mutable.value.copy(
+                        fase = FaseAlertas.VACIO,
+                        mensaje = EstadoAlertas.MENSAJE_SIN_VEHICULOS
+                    )
+                }
+            }
+    }
+
+    fun cambiarAmbito(ambito: AmbitoAlertas) {
+        if (mutable.value.ambito == ambito) return
+        mutable.value = mutable.value.copy(ambito = ambito, avisoAccion = null)
+        if (ambito == AmbitoAlertas.LICENCIA) {
+            cargarLicencia()
+        }
+    }
 
     fun seleccionar(id: Long) {
-        if (mutable.value.vehiculoId == id &&
-            (mutable.value.fase == FaseAlertas.LISTO || mutable.value.fase == FaseAlertas.VACIO)) return
+        // RF23: al abrir/cambiar vehículo siempre vuelve a listar (sincroniza estados tras RF14).
+        val cambioVehiculo = mutable.value.vehiculoId != id
         mutable.value = mutable.value.copy(
-            vehiculoId = id, fase = FaseAlertas.CARGANDO, filtro = FiltroAlertas.TODAS
+            vehiculoId = id,
+            fase = FaseAlertas.CARGANDO,
+            filtro = if (cambioVehiculo) FiltroAlertas.TODAS else mutable.value.filtro,
+            mensaje = null,
+            alertaPorVehiculo = emptyMap()
         )
-        cargar(id)
+        if (id == EstadoAlertas.ID_TODOS_VEHICULOS) cargarTodos() else cargar(id)
     }
 
     fun cambiarFiltro(filtro: FiltroAlertas) {
         val s = mutable.value
+        if (s.ambito != AmbitoAlertas.VEHICULOS) return
         val visibles = filtrar(s.alertas, filtro)
         mutable.value = s.copy(
             filtro = filtro,
@@ -60,20 +124,130 @@ class AlertasViewModel(
                 s.fase == FaseAlertas.ERROR || s.fase == FaseAlertas.CARGANDO -> s.fase
                 visibles.isEmpty() -> FaseAlertas.VACIO
                 else -> FaseAlertas.LISTO
-            }
+            },
+            mensaje = if (visibles.isEmpty() && s.fase != FaseAlertas.ERROR && s.fase != FaseAlertas.CARGANDO)
+                EstadoAlertas.MENSAJE_SIN_ALERTAS_VEHICULO else s.mensaje
         )
     }
 
     /** G108: al volver de programar, filtro Todas. */
     fun reiniciarFiltroTodasYRecargar() {
-        mutable.value = mutable.value.copy(filtro = FiltroAlertas.TODAS)
+        mutable.value = mutable.value.copy(
+            ambito = AmbitoAlertas.VEHICULOS,
+            filtro = FiltroAlertas.TODAS
+        )
         recargar()
     }
 
     fun recargar() {
-        val id = mutable.value.vehiculoId ?: vehiculos.firstOrNull()?.first ?: return
-        mutable.value = mutable.value.copy(vehiculoId = id, fase = FaseAlertas.CARGANDO)
-        cargar(id)
+        when (mutable.value.ambito) {
+            AmbitoAlertas.LICENCIA -> cargarLicencia()
+            AmbitoAlertas.VEHICULOS -> {
+                val id = mutable.value.vehiculoId ?: vehiculos.firstOrNull()?.first
+                if (id == null) {
+                    mutable.value = mutable.value.copy(
+                        fase = FaseAlertas.VACIO,
+                        mensaje = EstadoAlertas.MENSAJE_SIN_VEHICULOS,
+                        alertas = emptyList(),
+                        visibles = emptyList(),
+                        alertaPorVehiculo = emptyMap()
+                    )
+                    return
+                }
+                mutable.value = mutable.value.copy(vehiculoId = id, fase = FaseAlertas.CARGANDO, mensaje = null)
+                if (id == EstadoAlertas.ID_TODOS_VEHICULOS) cargarTodos() else cargar(id)
+            }
+        }
+    }
+
+    fun atender(idAlerta: Long, kmServicio: Int, fechaServicio: String = LocalDate.now().toString(),
+                costo: String? = null, observaciones: String? = null) {
+        if (mutable.value.ambito != AmbitoAlertas.VEHICULOS) return
+        val vehiculo = mutable.value.idVehiculoDeAlerta(idAlerta) ?: return
+        if (mutable.value.ocupadoAccion || kmServicio <= 0) return
+        mutable.value = mutable.value.copy(ocupadoAccion = true, avisoAccion = null)
+        viewModelScope.launch {
+            try {
+                repository.atender(
+                    vehiculo, idAlerta,
+                    SolicitudAtenderAlerta(
+                        idOperacion = java.util.UUID.randomUUID().toString(),
+                        fechaServicio = fechaServicio,
+                        kmServicio = kmServicio,
+                        costoTotal = costo,
+                        observaciones = observaciones
+                    )
+                )
+                mutable.value = mutable.value.copy(ocupadoAccion = false, avisoAccion = "Alerta atendida")
+                if (mutable.value.ambito == AmbitoAlertas.VEHICULOS) recargar()
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    ocupadoAccion = false,
+                    avisoAccion = e.message ?: "No se pudo atender la alerta"
+                )
+            }
+        }
+    }
+
+    fun anular(idAlerta: Long, motivo: String) {
+        if (mutable.value.ambito != AmbitoAlertas.VEHICULOS) return
+        val vehiculo = mutable.value.idVehiculoDeAlerta(idAlerta) ?: return
+        if (mutable.value.ocupadoAccion) return
+        val motivoOk = motivo.trim()
+        if (motivoOk.isEmpty()) {
+            mutable.value = mutable.value.copy(avisoAccion = "Indica el motivo de la anulación.")
+            return
+        }
+        if (motivoOk.length > 48) {
+            mutable.value = mutable.value.copy(avisoAccion = "El motivo no puede superar 48 caracteres.")
+            return
+        }
+        mutable.value = mutable.value.copy(ocupadoAccion = true, avisoAccion = null)
+        viewModelScope.launch {
+            try {
+                repository.anular(vehiculo, idAlerta, motivoOk, "")
+                mutable.value = mutable.value.copy(ocupadoAccion = false, avisoAccion = "Alerta anulada")
+                if (mutable.value.ambito == AmbitoAlertas.VEHICULOS) recargar()
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    ocupadoAccion = false,
+                    avisoAccion = e.message ?: "No se pudo anular la alerta"
+                )
+            }
+        }
+    }
+
+    /** RF23 LICENCIA: listado personal + sync (sin idVehiculo). */
+    private fun cargarLicencia() {
+        val gen = mutable.value.generacionLicencia + 1
+        mutable.value = mutable.value.copy(
+            generacionLicencia = gen,
+            faseLicencia = FaseAlertas.CARGANDO,
+            mensajeLicencia = null
+        )
+        viewModelScope.launch {
+            try {
+                val (sync, lista) = repository.listarLicencia()
+                val s = mutable.value
+                if (s.generacionLicencia != gen || s.ambito != AmbitoAlertas.LICENCIA) return@launch
+                val sinAnuladas = lista.filter { it.estado != "ANULADA" }
+                mutable.value = s.copy(
+                    sincronizadasLicencia = sync,
+                    alertasLicencia = sinAnuladas,
+                    faseLicencia = if (sinAnuladas.isEmpty()) FaseAlertas.VACIO else FaseAlertas.LISTO,
+                    mensajeLicencia = if (sinAnuladas.isEmpty()) {
+                        EstadoAlertas.MENSAJE_SIN_ALERTAS_LICENCIA
+                    } else null
+                )
+            } catch (e: Exception) {
+                val s = mutable.value
+                if (s.generacionLicencia != gen || s.ambito != AmbitoAlertas.LICENCIA) return@launch
+                mutable.value = s.copy(
+                    faseLicencia = FaseAlertas.ERROR,
+                    mensajeLicencia = e.message ?: "No se pudieron cargar las alertas de licencia"
+                )
+            }
+        }
     }
 
     private fun cargar(id: Long) {
@@ -83,6 +257,7 @@ class AlertasViewModel(
             try {
                 val (sync, lista) = repository.listar(id)
                 val s = mutable.value
+                // Anti-carrera: ignorar si cambió vehículo o llegó otra generación.
                 if (s.vehiculoId != id || s.generacion != gen) return@launch
                 val sinAnuladas = lista.filter { it.estado != "ANULADA" }
                 val visibles = filtrar(sinAnuladas, s.filtro)
@@ -90,12 +265,55 @@ class AlertasViewModel(
                     sincronizadas = sync,
                     alertas = sinAnuladas,
                     visibles = visibles,
+                    alertaPorVehiculo = sinAnuladas.associate { it.id to id },
                     fase = if (visibles.isEmpty()) FaseAlertas.VACIO else FaseAlertas.LISTO,
-                    mensaje = null
+                    mensaje = if (visibles.isEmpty()) EstadoAlertas.MENSAJE_SIN_ALERTAS_VEHICULO else null
                 )
             } catch (e: Exception) {
                 val s = mutable.value
                 if (s.vehiculoId != id || s.generacion != gen) return@launch
+                mutable.value = s.copy(
+                    fase = FaseAlertas.ERROR,
+                    mensaje = e.message ?: "No se pudieron cargar las alertas"
+                )
+            }
+        }
+    }
+
+    /** Agrega alertas de todos los vehículos autorizados ya conocidos (sin cambiar reglas RF23). */
+    private fun cargarTodos() {
+        val gen = mutable.value.generacion + 1
+        mutable.value = mutable.value.copy(generacion = gen)
+        viewModelScope.launch {
+            try {
+                var syncTotal = 0
+                val acumuladas = LinkedHashMap<Long, DatosAlerta>()
+                val mapa = LinkedHashMap<Long, Long>()
+                for ((idVehiculo, _) in vehiculos) {
+                    val (sync, lista) = repository.listar(idVehiculo)
+                    syncTotal += sync
+                    lista.filter { it.estado != "ANULADA" }.forEach { a ->
+                        if (!acumuladas.containsKey(a.id)) {
+                            acumuladas[a.id] = a
+                            mapa[a.id] = idVehiculo
+                        }
+                    }
+                }
+                val s = mutable.value
+                if (s.vehiculoId != EstadoAlertas.ID_TODOS_VEHICULOS || s.generacion != gen) return@launch
+                val sinAnuladas = acumuladas.values.toList()
+                val visibles = filtrar(sinAnuladas, s.filtro)
+                mutable.value = s.copy(
+                    sincronizadas = syncTotal,
+                    alertas = sinAnuladas,
+                    visibles = visibles,
+                    alertaPorVehiculo = mapa,
+                    fase = if (visibles.isEmpty()) FaseAlertas.VACIO else FaseAlertas.LISTO,
+                    mensaje = if (visibles.isEmpty()) EstadoAlertas.MENSAJE_SIN_ALERTAS_TODOS else null
+                )
+            } catch (e: Exception) {
+                val s = mutable.value
+                if (s.vehiculoId != EstadoAlertas.ID_TODOS_VEHICULOS || s.generacion != gen) return@launch
                 mutable.value = s.copy(
                     fase = FaseAlertas.ERROR,
                     mensaje = e.message ?: "No se pudieron cargar las alertas"

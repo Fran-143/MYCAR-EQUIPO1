@@ -1,18 +1,27 @@
 package backend.historial.service;
 
 import backend.historial.dao.HistorialMantenimientoDao;
+import backend.historial.model.AnulacionBloqueadaPorAlerta;
 import backend.historial.model.DatosHistorial.*;
 import backend.historial.model.HistorialInconsistente;
 import backend.historial.model.HistorialNoDisponible;
+import backend.historial.model.MantenimientoNoDisponible;
+import backend.talleres.service.TallerService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
 public class HistorialMantenimientoService {
     private final HistorialMantenimientoDao dao;
-    public HistorialMantenimientoService(HistorialMantenimientoDao dao) { this.dao = dao; }
+    private final TallerService talleres;
+
+    public HistorialMantenimientoService(HistorialMantenimientoDao dao, TallerService talleres) {
+        this.dao = dao;
+        this.talleres = talleres;
+    }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Contexto contexto(long usuario) {
@@ -48,6 +57,97 @@ public class HistorialMantenimientoService {
         }
         // Contador y tarjetas pertenecen al mismo resultado/snapshot de lectura.
         return new Resultado(vehiculo, registros.size(), registros);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public DetalleMantenimiento detalle(long usuario, long idVehiculo, long idMantenimiento) {
+        exigirUsuario(usuario);
+        if (idVehiculo <= 0 || idMantenimiento <= 0) {
+            throw new IllegalArgumentException("Identificadores inválidos");
+        }
+        dao.vehiculoPropio(usuario, idVehiculo).orElseThrow(HistorialNoDisponible::new);
+        return dao.detallePropio(usuario, idVehiculo, idMantenimiento)
+                .orElseThrow(MantenimientoNoDisponible::new);
+    }
+
+    /** RF20: solo costo, observaciones y taller (catálogo RF34 o Sin taller / Mantener). */
+    @Transactional
+    public DetalleMantenimiento modificar(long usuario, long idVehiculo, long idMantenimiento,
+                                          ModificarMantenimientoRequest body) {
+        exigirUsuario(usuario);
+        if (idVehiculo <= 0 || idMantenimiento <= 0) {
+            throw new IllegalArgumentException("Identificadores inválidos");
+        }
+        if (body == null) throw new IllegalArgumentException("Solicitud obligatoria");
+        if (body.costoTotal() != null && body.costoTotal().signum() < 0) {
+            throw new IllegalArgumentException("El costo no puede ser negativo");
+        }
+        if (Boolean.TRUE.equals(body.sinTaller()) && body.idTaller() != null) {
+            throw new IllegalArgumentException("No combines sinTaller con idTaller");
+        }
+        String obs = body.observaciones() == null || body.observaciones().isBlank()
+                ? null : body.observaciones().trim();
+        var vehiculo = dao.vehiculoPropio(usuario, idVehiculo).orElseThrow(HistorialNoDisponible::new);
+        if (!"ACTIVO".equals(vehiculo.estado())) {
+            throw new MantenimientoNoDisponible(); // EA05: no editable si vehículo inactivo
+        }
+        var actual = dao.detallePropio(usuario, idVehiculo, idMantenimiento)
+                .orElseThrow(MantenimientoNoDisponible::new);
+        if (!actual.editable()) throw new MantenimientoNoDisponible();
+        BigDecimal costo = body.costoTotal() != null ? body.costoTotal() : actual.costoTotal();
+        if (obs == null && body.observaciones() == null) obs = actual.observaciones();
+
+        Long idTaller;
+        String nombreTaller;
+        if (Boolean.TRUE.equals(body.sinTaller())) {
+            idTaller = null;
+            nombreTaller = null;
+        } else if (body.idTaller() != null) {
+            var t = talleres.exigirActivoPropioSiPresente(usuario, body.idTaller());
+            idTaller = t.idTaller();
+            nombreTaller = t.nombre();
+        } else {
+            // Mantener asociación actual (incl. taller INACTIVO o legacy texto).
+            idTaller = actual.idTaller();
+            nombreTaller = actual.taller();
+        }
+        if (!dao.modificarCamposAutorizados(usuario, idVehiculo, idMantenimiento, costo, obs, idTaller, nombreTaller)) {
+            throw new MantenimientoNoDisponible();
+        }
+        return dao.detallePropio(usuario, idVehiculo, idMantenimiento)
+                .orElseThrow(MantenimientoNoDisponible::new);
+    }
+
+    /** RF21: anulación lógica; bloquea si hay alerta activa referenciando. */
+    @Transactional
+    public AnularMantenimientoResponse anular(long usuario, long idVehiculo, long idMantenimiento) {
+        exigirUsuario(usuario);
+        if (idVehiculo <= 0 || idMantenimiento <= 0) {
+            throw new IllegalArgumentException("Identificadores inválidos");
+        }
+        var vehiculo = dao.vehiculoPropio(usuario, idVehiculo).orElseThrow(HistorialNoDisponible::new);
+        if (!"ACTIVO".equals(vehiculo.estado())) {
+            throw new MantenimientoNoDisponible(); // RF21: anulación solo con vehículo ACTIVO
+        }
+        var actual = dao.detallePropio(usuario, idVehiculo, idMantenimiento)
+                .orElseThrow(MantenimientoNoDisponible::new);
+        if (!actual.anulable() && actual.bloqueadoPorAlertaActiva()) {
+            throw new AnulacionBloqueadaPorAlerta(
+                    dao.alertaActivaReferenciando(idMantenimiento).orElse(0L));
+        }
+        if (!"REALIZADO".equals(actual.estado()) || !actual.anulable()) {
+            throw new MantenimientoNoDisponible();
+        }
+        try {
+            if (!dao.anularSiSinAlertaActiva(usuario, idVehiculo, idMantenimiento)) {
+                throw new MantenimientoNoDisponible();
+            }
+        } catch (AnulacionBloqueadaPorAlerta ex) {
+            throw ex;
+        }
+        var anulado = dao.detallePropio(usuario, idVehiculo, idMantenimiento)
+                .orElseThrow(MantenimientoNoDisponible::new);
+        return new AnularMantenimientoResponse(idMantenimiento, "ANULADO", anulado.anuladoUtc());
     }
 
     private void exigirUsuario(long usuario) {

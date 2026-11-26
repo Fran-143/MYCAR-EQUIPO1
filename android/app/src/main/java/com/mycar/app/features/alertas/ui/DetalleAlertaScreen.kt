@@ -1,0 +1,932 @@
+package com.mycar.app.features.alertas.ui
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.mycar.app.features.alertas.domain.AlertasRepository
+import com.mycar.app.features.alertas.domain.ContactoTallerAlerta
+import com.mycar.app.features.alertas.domain.DetalleAlerta
+import com.mycar.app.features.alertas.domain.etiquetaServicioAlerta
+import com.mycar.app.features.talleres.domain.Taller
+import com.mycar.app.features.talleres.domain.TalleresRepository
+import com.mycar.app.features.talleres.domain.PoliticaContactoTaller
+import com.mycar.app.features.talleres.domain.WhatsAppEnlace
+import com.mycar.app.ui.theme.MyCarStatusPendiente
+import com.mycar.app.ui.theme.MyCarStatusProgramada
+import com.mycar.app.ui.theme.MyCarStatusProxima
+import com.mycar.app.ui.theme.MyCarStatusRealizada
+import com.mycar.app.ui.theme.MyCarStatusVencida
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+private val Fondo = Color(0xFFF0F5FA)
+private val Azul = Color(0xFF12285F)
+private val Celeste = Color(0xFF007E98)
+private val RojoAnular = Color(0xFFC62828)
+enum class FaseDetalleAlerta { CARGANDO, LISTO, ERROR }
+
+data class EstadoDetalleAlerta(
+    val fase: FaseDetalleAlerta = FaseDetalleAlerta.CARGANDO,
+    val detalle: DetalleAlerta? = null,
+    val mensaje: String? = null,
+    val ocupado: Boolean = false,
+    val aviso: String? = null
+)
+
+class DetalleAlertaViewModel(
+    private val repository: AlertasRepository,
+    private val idVehiculo: Long,
+    private val idAlerta: Long
+) : ViewModel() {
+    private val mutable = MutableStateFlow(EstadoDetalleAlerta())
+    val estado = mutable.asStateFlow()
+
+    init { cargar() }
+
+    fun cargar() {
+        mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.CARGANDO)
+        viewModelScope.launch {
+            try {
+                val d = repository.detalle(idVehiculo, idAlerta)
+                mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.LISTO, detalle = d)
+            } catch (e: Exception) {
+                mutable.value = EstadoDetalleAlerta(
+                    fase = FaseDetalleAlerta.ERROR,
+                    mensaje = e.message ?: "No se pudo cargar el detalle."
+                )
+            }
+        }
+    }
+
+    fun anular(motivo: String) {
+        val actual = mutable.value
+        if (actual.ocupado || actual.detalle?.puedeAnular != true) return
+        val motivoOk = motivo.trim()
+        if (motivoOk.isEmpty()) {
+            mutable.value = actual.copy(aviso = "Indica el motivo de la anulación.")
+            return
+        }
+        if (motivoOk.length > 48) {
+            mutable.value = actual.copy(aviso = "El motivo no puede superar 48 caracteres.")
+            return
+        }
+        mutable.value = actual.copy(ocupado = true, aviso = null)
+        viewModelScope.launch {
+            try {
+                repository.anular(idVehiculo, idAlerta, motivoOk, "")
+                val d = runCatching { repository.detalle(idVehiculo, idAlerta) }.getOrNull()
+                mutable.value = EstadoDetalleAlerta(
+                    fase = FaseDetalleAlerta.LISTO,
+                    detalle = d,
+                    mensaje = "Alerta anulada.",
+                    aviso = "La alerta quedó ANULADA."
+                )
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    ocupado = false,
+                    aviso = e.message ?: "No se pudo anular la alerta."
+                )
+            }
+        }
+    }
+
+    fun elegirContacto(idTaller: Long) {
+        val actual = mutable.value
+        if (actual.ocupado) return
+        mutable.value = actual.copy(ocupado = true, aviso = null)
+        viewModelScope.launch {
+            try {
+                val d = repository.elegirContactoTaller(idVehiculo, idAlerta, idTaller)
+                mutable.value = EstadoDetalleAlerta(
+                    fase = FaseDetalleAlerta.LISTO,
+                    detalle = d,
+                    aviso = "Taller de contacto actualizado solo para esta alerta."
+                )
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    ocupado = false,
+                    aviso = e.message ?: "No se pudo cambiar el taller de contacto."
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DetalleAlertaRoute(
+    repository: AlertasRepository,
+    idVehiculo: Long,
+    idAlerta: Long,
+    onVolver: () -> Unit,
+    /** RF24: abrir RF17 DESDE_ALERTA en lugar del diálogo rápido. */
+    onRegistrarComoRealizado: (DetalleAlerta) -> Unit = {},
+    onAbrirSoat: (() -> Unit)? = null,
+    talleresRepository: TalleresRepository? = null,
+    modifier: Modifier = Modifier
+) {
+    val vm: DetalleAlertaViewModel = viewModel(key = "rf24-$idVehiculo-$idAlerta") {
+        DetalleAlertaViewModel(repository, idVehiculo, idAlerta)
+    }
+    val estado by vm.estado.collectAsStateWithLifecycle()
+    var preferenciaContactoAplicada by remember(idAlerta) { mutableStateOf(false) }
+    // Prioridad: favorito del usuario (cualquiera) → si no hay, taller de sistema (Prueba).
+    LaunchedEffect(estado.fase, estado.detalle?.contactoTaller, talleresRepository) {
+        if (preferenciaContactoAplicada) return@LaunchedEffect
+        if (estado.fase != FaseDetalleAlerta.LISTO) return@LaunchedEffect
+        val cat = estado.detalle?.categoria.orEmpty()
+        if (cat.equals("SOAT", true) || cat.equals("LICENCIA", true)) {
+            preferenciaContactoAplicada = true
+            return@LaunchedEffect
+        }
+        val repo = talleresRepository ?: return@LaunchedEffect
+        val c = estado.detalle?.contactoTaller
+        preferenciaContactoAplicada = true
+        val lista = runCatching {
+            repo.listarActivos(com.mycar.app.features.talleres.domain.FiltroOrigenTaller.TODOS)
+        }.getOrElse { emptyList() }
+        val favorito = lista.firstOrNull { it.favorito }
+        if (favorito != null) {
+            if (c?.idTaller != favorito.id) vm.elegirContacto(favorito.id)
+            return@LaunchedEffect
+        }
+        if (PoliticaContactoTaller.puedeContactar(c)) return@LaunchedEffect
+        val prueba = lista.firstOrNull {
+            it.esAsociado && it.contactoAutorizado &&
+                it.nombre.contains("PRUEBA", ignoreCase = true)
+        } ?: lista.firstOrNull { it.esAsociado && it.contactoAutorizado }
+        if (prueba != null && prueba.id != c?.idTaller) {
+            vm.elegirContacto(prueba.id)
+        }
+    }
+    DetalleAlertaScreen(
+        estado = estado,
+        onVolver = onVolver,
+        onRecargar = vm::cargar,
+        onRegistrarComoRealizado = onRegistrarComoRealizado,
+        onAnular = vm::anular,
+        onElegirContacto = { idTaller -> vm.elegirContacto(idTaller) },
+        onAbrirDocumento = onAbrirSoat,
+        talleresRepository = talleresRepository,
+        modifier = modifier
+    )
+}
+
+class DetalleAlertaLicenciaViewModel(
+    private val repository: AlertasRepository,
+    private val idAlerta: Long
+) : ViewModel() {
+    private val mutable = MutableStateFlow(EstadoDetalleAlerta())
+    val estado = mutable.asStateFlow()
+
+    init { cargar() }
+
+    fun cargar() {
+        mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.CARGANDO)
+        viewModelScope.launch {
+            try {
+                val d = repository.detalleLicencia(idAlerta)
+                mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.LISTO, detalle = d)
+            } catch (e: Exception) {
+                mutable.value = EstadoDetalleAlerta(
+                    fase = FaseDetalleAlerta.ERROR,
+                    mensaje = e.message ?: "No se pudo cargar el detalle."
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DetalleAlertaLicenciaRoute(
+    repository: AlertasRepository,
+    idAlerta: Long,
+    onVolver: () -> Unit,
+    onAbrirLicencia: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val vm: DetalleAlertaLicenciaViewModel = viewModel(key = "rf23-lic-$idAlerta") {
+        DetalleAlertaLicenciaViewModel(repository, idAlerta)
+    }
+    val estado by vm.estado.collectAsStateWithLifecycle()
+    DetalleAlertaScreen(
+        estado = estado,
+        onVolver = onVolver,
+        onRecargar = vm::cargar,
+        onRegistrarComoRealizado = {},
+        onAnular = {},
+        onAbrirDocumento = onAbrirLicencia,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun DetalleAlertaScreen(
+    estado: EstadoDetalleAlerta,
+    onVolver: () -> Unit,
+    onRecargar: () -> Unit,
+    onRegistrarComoRealizado: (DetalleAlerta) -> Unit,
+    onAnular: (String) -> Unit,
+    onElegirContacto: (Long) -> Unit = {},
+    onAbrirDocumento: (() -> Unit)? = null,
+    talleresRepository: TalleresRepository? = null,
+    modifier: Modifier = Modifier
+) {
+    var dialogAnular by remember { mutableStateOf(false) }
+    var motivoAnular by remember { mutableStateOf("") }
+    var dialogCambiarTaller by remember { mutableStateOf(false) }
+    var avisoContacto by remember { mutableStateOf<String?>(null) }
+    var telefonoFallback by remember { mutableStateOf<String?>(null) }
+    var talleresDisponibles by remember { mutableStateOf<List<Taller>>(emptyList()) }
+    val context = LocalContext.current
+
+    Column(modifier.fillMaxSize().background(Fondo)) {
+        Surface(color = Color.White, shadowElevation = 1.dp) {
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onVolver) { Text("Volver") }
+                Text(
+                    "Detalle de alerta",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Azul,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+        }
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            when (estado.fase) {
+                FaseDetalleAlerta.CARGANDO -> {
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = Celeste)
+                    Text("Consultando alerta…", color = Azul)
+                }
+                FaseDetalleAlerta.ERROR -> {
+                    Text(estado.mensaje ?: "No se pudo cargar el detalle.", color = Azul)
+                    OutlinedButton(onClick = onRecargar) { Text("Reintentar") }
+                }
+                FaseDetalleAlerta.LISTO -> {
+                    estado.aviso?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Celeste)
+                    }
+                    val d = estado.detalle
+                    if (d == null) {
+                        Text(estado.mensaje ?: "Sin datos de la alerta.", color = Azul)
+                    } else {
+                        ContenidoDetalleAlerta(d)
+                        val esDocumento = d.categoria.equals("SOAT", true)
+                            || d.categoria.equals("LICENCIA", true)
+                        if (!esDocumento) {
+                            ContactoTallerAlertaCard(
+                                contacto = d.contactoTaller,
+                                ocupado = estado.ocupado,
+                                onWhatsApp = { tel ->
+                                    val error = WhatsAppEnlace.abrir(context, tel)
+                                    if (error != null) {
+                                        avisoContacto = error
+                                        telefonoFallback = WhatsAppEnlace.normalizarPeruE164(tel)
+                                    }
+                                },
+                                onLlamar = { tel ->
+                                    val llamada = WhatsAppEnlace.uriLlamada(tel)
+                                    if (llamada == null) {
+                                        avisoContacto = "Número telefónico no disponible."
+                                        return@ContactoTallerAlertaCard
+                                    }
+                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(llamada)))
+                                },
+                                onCambiarTaller = {
+                                    dialogCambiarTaller = true
+                                    if (talleresRepository != null) {
+                                        // Carga diferida en efecto abajo
+                                    }
+                                }
+                            )
+                        }
+                        if (esDocumento && onAbrirDocumento != null) {
+                            val etiqueta = if (d.categoria.equals("LICENCIA", true)) {
+                                "Ir a licencia de conducir"
+                            } else {
+                                "Ir al SOAT del vehículo"
+                            }
+                            Button(
+                                onClick = onAbrirDocumento,
+                                enabled = !estado.ocupado,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Azul),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                    .testTag("rf23.abrir.documento")
+                            ) { Text(etiqueta, fontWeight = FontWeight.SemiBold) }
+                        }
+                        if (d.estado == "VENCIDA" && d.puedeAtender) {
+                            Text(
+                                "Esta alerta está VENCIDA. Al registrar el mantenimiento se conservará la evidencia de atención tardía.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = RojoAnular,
+                                modifier = Modifier.testTag("rf24.aviso.vencida")
+                            )
+                        }
+                        if (d.puedeAtender) {
+                            Button(
+                                onClick = { onRegistrarComoRealizado(d) },
+                                enabled = !estado.ocupado,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Azul),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("rf24.registrar")
+                            ) { Text("Registrar como realizado", fontWeight = FontWeight.SemiBold) }
+                        }
+                        if (d.puedeAnular) {
+                            OutlinedButton(
+                                onClick = { dialogAnular = true },
+                                enabled = !estado.ocupado,
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, Azul),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Azul),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("rf24.anular")
+                            ) { Text("Anular alerta", fontWeight = FontWeight.SemiBold) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(dialogCambiarTaller, talleresRepository) {
+        if (dialogCambiarTaller && talleresRepository != null) {
+            talleresDisponibles = runCatching { talleresRepository.listarActivos() }.getOrDefault(emptyList())
+        }
+    }
+
+    if (dialogCambiarTaller) {
+        val scheme = MaterialTheme.colorScheme
+        AlertDialog(
+            onDismissRequest = { if (!estado.ocupado) dialogCambiarTaller = false },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = scheme.surface,
+            titleContentColor = scheme.onSurface,
+            textContentColor = scheme.onSurface,
+            iconContentColor = scheme.primary,
+            icon = {
+                Surface(shape = CircleShape, color = scheme.primary.copy(alpha = 0.12f)) {
+                    Icon(
+                        Icons.Outlined.Storefront,
+                        contentDescription = null,
+                        tint = scheme.primary,
+                        modifier = Modifier.padding(10.dp).size(24.dp)
+                    )
+                }
+            },
+            title = { Text("Cambiar taller", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "La elección aplica solo a esta alerta. No modifica el mantenimiento histórico ni el favorito.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant
+                    )
+                    if (talleresDisponibles.isEmpty()) {
+                        Text("No hay talleres en tu catálogo personal.", color = scheme.onSurfaceVariant)
+                    } else {
+                        Column(
+                            Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            talleresDisponibles.forEach { t ->
+                                FilaEleccionTaller(
+                                    taller = t,
+                                    enabled = !estado.ocupado,
+                                    onClick = {
+                                        dialogCambiarTaller = false
+                                        onElegirContacto(t.id)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { dialogCambiarTaller = false },
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Cerrar") }
+            }
+        )
+    }
+
+    avisoContacto?.let { msg ->
+        val scheme = MaterialTheme.colorScheme
+        val tel = telefonoFallback
+        AlertDialog(
+            onDismissRequest = { avisoContacto = null; telefonoFallback = null },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = scheme.surface,
+            titleContentColor = scheme.onSurface,
+            textContentColor = scheme.onSurface,
+            iconContentColor = scheme.primary,
+            icon = {
+                Icon(
+                    if (tel != null) Icons.Outlined.Phone else Icons.Outlined.Info,
+                    contentDescription = null
+                )
+            },
+            title = { Text("Contacto", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(msg, color = scheme.onSurface)
+                    if (tel != null) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = scheme.surfaceVariant,
+                            border = BorderStroke(1.dp, scheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(Icons.Outlined.Phone, contentDescription = "Teléfono", tint = scheme.primary)
+                                    Text("Número: +$tel", color = scheme.onSurface, fontWeight = FontWeight.SemiBold)
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    MarcaWhatsApp(Modifier.size(22.dp))
+                                    Text("WhatsApp", color = scheme.onSurface, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (tel != null) {
+                    Button(
+                        onClick = {
+                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$tel")))
+                            avisoContacto = null
+                            telefonoFallback = null
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = scheme.primary,
+                            contentColor = scheme.onPrimary
+                        )
+                    ) {
+                        Icon(Icons.Outlined.Phone, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Llamar")
+                    }
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { avisoContacto = null; telefonoFallback = null },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Cerrar")
+                }
+            }
+        )
+    }
+
+    if (dialogAnular) {
+        AlertDialog(
+            onDismissRequest = { if (!estado.ocupado) dialogAnular = false },
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("¿Anular alerta?", fontWeight = FontWeight.Bold, color = Azul) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("La alerta quedará ANULADA. El mantenimiento histórico de referencia no se anula.")
+                    OutlinedTextField(
+                        value = motivoAnular,
+                        onValueChange = { if (it.length <= 48) motivoAnular = it },
+                        label = { Text("Motivo") },
+                        singleLine = true,
+                        enabled = !estado.ocupado,
+                        modifier = Modifier.fillMaxWidth().testTag("rf24.anular.motivo")
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val m = motivoAnular.trim()
+                        if (m.isNotEmpty()) {
+                            dialogAnular = false
+                            onAnular(m)
+                            motivoAnular = ""
+                        }
+                    },
+                    enabled = !estado.ocupado && motivoAnular.trim().isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = RojoAnular),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Anular") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { dialogAnular = false; motivoAnular = "" },
+                    enabled = !estado.ocupado,
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Cancelar") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun FilaEleccionTaller(
+    taller: Taller,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().testTag("rf24.contacto.elegir.${taller.id}"),
+        shape = RoundedCornerShape(14.dp),
+        color = scheme.surfaceVariant,
+        contentColor = scheme.onSurface,
+        border = BorderStroke(1.dp, scheme.outlineVariant)
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(shape = CircleShape, color = scheme.primary.copy(alpha = 0.12f)) {
+                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Outlined.Storefront,
+                        contentDescription = "Taller",
+                        tint = scheme.primary
+                    )
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "${taller.nombre}${if (taller.esAsociado) " (Asociado)" else ""}",
+                    fontWeight = FontWeight.SemiBold,
+                    color = scheme.onSurface
+                )
+                if (!taller.telefono.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Phone,
+                            contentDescription = "Teléfono",
+                            tint = scheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            taller.telefono,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (taller.tieneWhatsapp) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        MarcaWhatsApp(Modifier.size(16.dp))
+                        Text(
+                            "WhatsApp",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF128C7E)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarcaWhatsApp(modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = CircleShape, color = Color(0xFF128C7E)) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                "WA",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ContactoTallerAlertaCard(
+    contacto: ContactoTallerAlerta?,
+    ocupado: Boolean,
+    onWhatsApp: (String) -> Unit,
+    onLlamar: (String) -> Unit,
+    onCambiarTaller: () -> Unit
+) {
+    var sheetOpen by remember { mutableStateOf(false) }
+    val puedeWa = PoliticaContactoTaller.puedeWhatsApp(contacto)
+    val puedeLlamar = PoliticaContactoTaller.puedeLlamar(contacto)
+    val puedeContactar = puedeWa || puedeLlamar
+
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("rf24.contacto"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Taller sugerido", fontWeight = FontWeight.Bold, color = Celeste)
+            Text(
+                "Contacto voluntario: no marca la alerta como atendida ni envía datos al taller.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF6881A5)
+            )
+            if (contacto == null || contacto.origenSugerencia == "NINGUNO" || contacto.idTaller == null) {
+                Text("Sin taller sugerido.", color = Azul)
+                TextButton(onClick = onCambiarTaller, enabled = !ocupado, modifier = Modifier.testTag("rf24.contacto.cambiar")) {
+                    Text("Elegir taller")
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Build, null, tint = Azul, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(contacto.nombre ?: "Taller", fontWeight = FontWeight.SemiBold, color = Azul)
+                        Text(
+                            when (contacto.origenSugerencia) {
+                                "EXPLICITO" -> "Elegido para esta alerta"
+                                "MANTENIMIENTO_REF" -> "Taller del último mantenimiento"
+                                "FAVORITO" -> "Tu taller favorito"
+                                "SISTEMA" -> "Taller MyCar de prueba"
+                                else -> contacto.origenSugerencia
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF6881A5)
+                        )
+                    }
+                }
+                // Seguridad V26: no mostrar teléfono accionable si no está autorizado.
+                if (puedeContactar && !contacto.telefono.isNullOrBlank()) {
+                    Text(contacto.telefono, color = Color(0xFF6881A5))
+                    if (puedeWa) {
+                        Text(
+                            "Este número también tiene WhatsApp",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF128C7E)
+                        )
+                    }
+                } else {
+                    val motivo = when {
+                        !contacto.origen.equals("ASOCIADO", ignoreCase = true) ->
+                            "Contacto WhatsApp/llamada solo para talleres asociados autorizados."
+                        !contacto.contactoAutorizado ->
+                            "Este taller asociado no tiene contacto autorizado."
+                        else -> "Sin contacto disponible"
+                    }
+                    Text(motivo, color = RojoAnular, modifier = Modifier.testTag("rf24.contacto.sin"))
+                }
+                TextButton(
+                    onClick = onCambiarTaller,
+                    enabled = !ocupado,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.testTag("rf24.contacto.cambiar")
+                ) { Text("Cambiar taller", color = Celeste, fontWeight = FontWeight.SemiBold) }
+            }
+        }
+    }
+
+    if (puedeContactar) {
+        Button(
+            onClick = { sheetOpen = true },
+            enabled = !ocupado,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("rf24.contacto.abrir"),
+            colors = ButtonDefaults.buttonColors(containerColor = Azul),
+            shape = RoundedCornerShape(12.dp)
+        ) { Text("Contactar taller", fontWeight = FontWeight.SemiBold) }
+    }
+
+    if (sheetOpen && contacto != null && puedeContactar) {
+        ModalBottomSheet(
+            onDismissRequest = { sheetOpen = false },
+            containerColor = Color.White
+        ) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Contactar taller",
+                        Modifier.weight(1f),
+                        fontWeight = FontWeight.Bold,
+                        color = Azul,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    IconButton(onClick = { sheetOpen = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar")
+                    }
+                }
+                if (puedeWa) {
+                    ListItem(
+                        headlineContent = { Text("WhatsApp", fontWeight = FontWeight.Medium) },
+                        leadingContent = {
+                            Text("WA", color = Color(0xFF128C7E), fontWeight = FontWeight.Bold)
+                        },
+                        trailingContent = { Text("›", color = Color(0xFF6881A5)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("rf24.contacto.whatsapp")
+                            .clickableSafe {
+                                sheetOpen = false
+                                onWhatsApp(contacto.telefono.orEmpty())
+                            }
+                    )
+                }
+                if (puedeLlamar) {
+                    ListItem(
+                        headlineContent = { Text("Llamar", fontWeight = FontWeight.Medium) },
+                        leadingContent = { Icon(Icons.Default.Phone, null, tint = Azul) },
+                        trailingContent = { Text("›", color = Color(0xFF6881A5)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("rf24.contacto.llamar")
+                            .clickableSafe {
+                                sheetOpen = false
+                                onLlamar(contacto.telefono.orEmpty())
+                            }
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+private fun Modifier.clickableSafe(onClick: () -> Unit): Modifier =
+    this.padding(vertical = 4.dp).clickable(onClick = onClick)
+
+@Composable
+private fun ContenidoDetalleAlerta(d: DetalleAlerta) {
+    val badge = when (d.estado) {
+        "PROGRAMADA" -> MyCarStatusProgramada
+        "PROXIMA" -> MyCarStatusProxima
+        "PENDIENTE" -> MyCarStatusPendiente
+        "VENCIDA" -> MyCarStatusVencida
+        "REALIZADA" -> MyCarStatusRealizada
+        else -> MyCarStatusRealizada
+    }
+    val etiquetaEstado = when (d.estado) {
+        "PROGRAMADA" -> "Programada"
+        "PROXIMA" -> "Próxima"
+        "PENDIENTE" -> "Pendiente"
+        "VENCIDA" -> "Vencida"
+        "REALIZADA" -> "Realizada"
+        "ANULADA" -> "Anulada"
+        else -> d.estado
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        etiquetaServicioAlerta(d.codigoTipo, d.tipo, d.servicioOtro),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Azul
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(d.vehiculoEtiqueta, color = Color(0xFF6881A5), style = MaterialTheme.typography.bodyMedium)
+                }
+                Surface(shape = RoundedCornerShape(50), color = badge.copy(alpha = 0.18f)) {
+                    Text(
+                        etiquetaEstado,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = badge
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color(0xFFE3ECF5))
+
+            FilaCompacta("Criterio", etiquetaCriterioDetalle(d.criterio))
+            d.fechaObjetivo?.let { FilaCompacta("Fecha objetivo", it) }
+            d.kmObjetivo?.let { FilaCompacta("Kilometraje objetivo", "%,d km".format(it).replace(',', ' ')) }
+            etiquetaMantenimientoReferencia(d)?.let { FilaCompacta("Último servicio", it) }
+            if (d.unidadTiempo != null && d.cantidadTiempo != null) {
+                FilaCompacta("Intervalo temporal", "${d.cantidadTiempo} ${d.unidadTiempo.lowercase()}")
+            }
+            d.intervaloKm?.let { FilaCompacta("Intervalo km", "%,d km".format(it).replace(',', ' ')) }
+            FilaCompacta("Origen de cálculo", etiquetaOrigenDetalle(d))
+            if (d.codigoTipo == "OTRO") {
+                d.servicioOtro?.takeIf { it.isNotBlank() }?.let { FilaCompacta("Servicio (otro)", it) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilaCompacta(etiqueta: String, valor: String) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            etiqueta,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF6881A5),
+            modifier = Modifier.weight(0.42f)
+        )
+        Text(
+            valor,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Azul,
+            modifier = Modifier.weight(0.58f)
+        )
+    }
+}
+
+private fun etiquetaCriterioDetalle(criterio: String): String = when (criterio) {
+    "POR_TIEMPO" -> "Por tiempo"
+    "POR_KILOMETRAJE" -> "Por kilometraje"
+    "AMBOS" -> "Por tiempo y kilometraje"
+    else -> criterio.ifBlank { "—" }
+}
+
+private fun etiquetaOrigenDetalle(d: DetalleAlerta): String = when (d.origenCalculo) {
+    "DESDE_HOY" -> "Desde hoy"
+    "DESDE_MANTENIMIENTO" -> etiquetaMantenimientoReferencia(d)?.let { "Desde: $it" }
+        ?: "Desde un mantenimiento realizado"
+    else -> d.origenCalculo.ifBlank { "—" }
+}
+
+private fun etiquetaMantenimientoReferencia(d: DetalleAlerta): String? {
+    if (d.idMantenimientoReferencia == null && d.fechaBase.isNullOrBlank() && d.kmBase == null) {
+        return null
+    }
+    val nombre = etiquetaServicioAlerta(d.codigoTipo, d.tipo, d.servicioOtro)
+    val partes = buildList {
+        add(nombre)
+        d.fechaBase?.take(10)?.takeIf { it.isNotBlank() }?.let { add(it) }
+        d.kmBase?.let { add("%,d km".format(it).replace(',', ' ')) }
+    }
+    return partes.joinToString(" · ")
+}

@@ -55,7 +55,8 @@ public class MantenimientoConfiguracion {
             TipoMantenimientoService tipos,
             LecturaKmMantenimientoService lecturas,
             RegistroMantenimientoDao dao,
-            OperacionMantenimientoDao operaciones
+            OperacionMantenimientoDao operaciones,
+            backend.talleres.service.TallerService talleres
     ) {
         return new RegistroMantenimientoService(
                 validador,
@@ -64,7 +65,8 @@ public class MantenimientoConfiguracion {
                 tipos,
                 lecturas,
                 dao,
-                operaciones
+                operaciones,
+                talleres
         );
     }
 }

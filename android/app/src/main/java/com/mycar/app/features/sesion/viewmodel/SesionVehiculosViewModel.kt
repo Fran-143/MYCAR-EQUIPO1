@@ -6,6 +6,7 @@ import com.mycar.app.BuildConfig
 import com.mycar.app.features.autenticacion.data.*
 import com.mycar.app.features.sesion.data.*
 import com.mycar.app.features.vehiculos.data.*
+import com.mycar.app.features.vehiculos.domain.RemoteCompartirVehiculoRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,17 +16,59 @@ import java.util.UUID
 class CuentaVehiculos(val usuario: Long, val ciclo: String,
     val cliente: ClienteVehiculosAutenticado, val pendientes: PendientesSesionVehiculos,
     val modelos: ViewModelStore = ViewModelStore(),
-    val archivoMantenimiento: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null) : ViewModelStoreOwner {
+    val archivoMantenimiento: com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente? = null,
+    val cacheFotos: com.mycar.app.features.fotos.data.CacheFotosSesion) : ViewModelStoreOwner {
     override val viewModelStore get() = modelos
     val registro = RemoteRegistroVehiculoRepository(cliente.retrofit.create(RegistroVehiculoApi::class.java))
     val listado = RemoteListadoVehiculosRepository(cliente.retrofit.create(ListadoVehiculosApi::class.java))
-    val detalle = RemoteDetalleVehiculosRepository(cliente.retrofit.create(DetalleVehiculoApi::class.java))
+    val compartir = RemoteCompartirVehiculoRepository(cliente.retrofit.create(CompartirVehiculoApi::class.java))
+    val detalleApi = cliente.retrofit.create(DetalleVehiculoApi::class.java)
+    val detalle = RemoteDetalleVehiculosRepository(detalleApi)
+    val edicion = RemoteEditarVehiculoRepository(
+        detalleApi,
+        cliente.retrofit.create(RegistroVehiculoApi::class.java)
+    )
     val kilometraje = RemoteActualizarKilometrajeRepository(cliente.retrofit.create(KilometrajeApi::class.java))
+    val soat = com.mycar.app.features.soat.data.RemoteSoatRepository(
+        cliente.retrofit.create(com.mycar.app.features.soat.data.SoatApi::class.java)
+    )
+    val licencia = com.mycar.app.features.licencia.data.RemoteLicenciaRepository(
+        cliente.retrofit.create(com.mycar.app.features.licencia.data.LicenciaApi::class.java)
+    )
+    val tive = com.mycar.app.features.tive.data.RemoteTiveRepository(
+        cliente.retrofit.create(com.mycar.app.features.tive.data.TiveApi::class.java)
+    )
+    val soporte = com.mycar.app.features.soporte.data.RemoteSoporteRepository(
+        cliente.retrofit.create(com.mycar.app.features.soporte.data.SoporteApi::class.java)
+    )
+    val planes = com.mycar.app.features.planes.data.RemotePlanesRepository(
+        cliente.retrofit.create(com.mycar.app.features.planes.data.PlanesApi::class.java)
+    )
     val mantenimiento = com.mycar.app.features.mantenimiento.data.MantenimientoApiAdapter.desde(cliente.retrofit)
     val historial = com.mycar.app.features.historial.data.HistorialApiAdapter.desde(cliente.retrofit)
+    val exportarHistorial = com.mycar.app.features.historial.export.RemoteExportarHistorialRepository.desde(cliente.retrofit)
+    val talleres = com.mycar.app.features.talleres.data.TalleresApiAdapter.desde(cliente)
     val alertas = com.mycar.app.features.alertas.data.RemoteAlertasRepository(
         cliente.retrofit.create(com.mycar.app.features.alertas.data.AlertasApi::class.java))
-    val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(listado,historial,mantenimiento)
+    val notificaciones = com.mycar.app.features.notificaciones.data.RemoteNotificacionesRepository(
+        cliente.retrofit.create(com.mycar.app.features.notificaciones.data.NotificacionesApi::class.java))
+    val perfil = com.mycar.app.features.perfil.data.RemotePerfilRepository(
+        cliente.retrofit.create(com.mycar.app.features.perfil.data.PerfilApi::class.java))
+    val preferenciasNotificacion = com.mycar.app.features.preferenciasnotif.data.RemotePreferenciasNotificacionRepository(
+        cliente.retrofit.create(com.mycar.app.features.preferenciasnotif.data.PreferenciasNotificacionApi::class.java))
+    val recordatoriosKm = com.mycar.app.features.recordatorioskm.data.RemoteRecordatoriosKmRepository(
+        cliente.retrofit.create(com.mycar.app.features.recordatorioskm.data.RecordatoriosKmApi::class.java))
+    val fotos = com.mycar.app.features.fotos.data.RemoteFotoPersonalizadaRepository(
+        cliente.retrofit.create(com.mycar.app.features.fotos.data.FotoPerfilApi::class.java),
+        cliente.retrofit.create(com.mycar.app.features.fotos.data.FotoVehiculoApi::class.java),
+        cacheFotos
+    )
+    val nombrePresentacion = MutableStateFlow<String?>(null)
+    val avatarPresentacion = MutableStateFlow<ByteArray?>(null)
+    val inicialesPresentacion = MutableStateFlow<String?>(null)
+    val resumen = com.mycar.app.features.inicio.data.RemoteResumenInicioRepository(
+        listado, historial, mantenimiento, alertas, talleres
+    )
     override fun toString() = "CuentaVehiculos[REDACTED]"
 }
 
@@ -73,15 +116,24 @@ class SesionVehiculosViewModel(application: Application) : AndroidViewModel(appl
                     val archivo = ArchivoSolicitudRegistroPendiente(getApplication(), BuildConfig.API_BASE_URL, usuario)
                     val archivoMantenimiento = com.mycar.app.features.mantenimiento.data.ArchivoRegistroPendiente(
                         getApplication(), "${BuildConfig.API_BASE_URL}|$usuario")
+                    val dirFotos = java.io.File(
+                        getApplication<Application>().noBackupFilesDir,
+                        "fotos-sesion/$ciclo"
+                    )
+                    val cacheFotos = com.mycar.app.features.fotos.data.CacheFotosSesion(dirFotos)
                     val creada = CuentaVehiculos(usuario, ciclo,
                         ClienteVehiculosAutenticado(BuildConfig.API_BASE_URL,
                             autorizacion = { runBlocking { auth.authorization(actual) } },
                             alCaducar = { viewModelScope.launch { sesionRequerida(ciclo) } }),
                         PendientesSesionVehiculos(archivo, archivo::borrarAlCerrarSesion),
-                        archivoMantenimiento = archivoMantenimiento)
+                        archivoMantenimiento = archivoMantenimiento,
+                        cacheFotos = cacheFotos)
                     // Migrar solo con el cierre ya registrado y sin soltar el bloqueo de la limpieza.
                     DatosPrivadosSesion.registrar(ciclo, { borrar ->
                         creada.cliente.cancelar()
+                        creada.cacheFotos.limpiar()
+                        creada.avatarPresentacion.value = null
+                        creada.inicialesPresentacion.value = null
                         val vehiculos = runCatching { creada.pendientes.cerrar(borrar) }
                         val mantenimiento = runCatching { creada.archivoMantenimiento?.cerrar(borrar) }
                         vehiculos.getOrThrow(); mantenimiento.getOrThrow()

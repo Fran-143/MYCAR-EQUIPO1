@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.neon.example
 **/local.properties
 *.jks
 *.keystore
@@ -28,6 +29,10 @@
 Thumbs.db
 # Auditoría local temporal (no compartir)
 .cursor_apf3_audit/
+
+# Respaldos / extractos locales (pueden contener PII; nunca en Git)
+_tmp_rf_extract/
+**/neon-backups/
 
 
 # Logs locales de instalación Android

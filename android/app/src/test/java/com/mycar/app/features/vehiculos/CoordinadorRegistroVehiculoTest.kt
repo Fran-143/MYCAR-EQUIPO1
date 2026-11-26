@@ -17,7 +17,7 @@ class CoordinadorRegistroVehiculoTest {
     @Test fun cupoLlenoNoAbreFormularioNiCargaCatalogos() = runBlocking<Unit> {
         val r = RepositoryPrueba().apply { cupoValor = CupoRegistroDto("FREE", 1, 1, false) }
         val c = CoordinadorRegistroVehiculo(r, PendientesPrueba()); c.cargar()
-        assertEquals(FaseRegistro.SIN_CUPO, c.estado.fase); assertEquals(0, r.consultasCatalogos); assertTrue(r.envios.isEmpty())
+        assertEquals(FaseRegistro.SIN_CUPO, c.estado.fase); assertTrue(c.estado.mensaje!!.contains("cupo completo")); assertEquals(0, r.consultasCatalogos); assertTrue(r.envios.isEmpty())
     }
     @Test fun sinSesionNoSeInventaAcceso() = runBlocking<Unit> {
         val r = RepositoryPrueba().apply { errorCupo = FalloRegistroVehiculo("SESION_NO_VALIDA", 401) }

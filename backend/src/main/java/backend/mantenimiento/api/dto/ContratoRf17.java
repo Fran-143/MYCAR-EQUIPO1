@@ -35,6 +35,8 @@ public final class ContratoRf17 {
             @JsonAlias("descripcion") String observaciones,
             LocalDate proximaFechaSugerida,
             @Positive Integer proximoKmSugerido,
+            /** RF34: taller ACTIVO propio; null = Sin taller. */
+            @Positive Long idTaller,
             List<@NotNull @Valid RepuestoRequest> repuestos
     ) { }
 

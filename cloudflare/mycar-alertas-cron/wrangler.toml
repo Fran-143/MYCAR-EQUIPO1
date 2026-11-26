@@ -1,0 +1,24 @@
+# Worker existente: mycar-alertas-cron (cuenta mycargarupo1 — NO crear otro).
+# Primera publicación: solo SIMULAR. Cron vacío = sin programación activa.
+name = "mycar-alertas-cron"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+workers_dev = true
+
+[vars]
+BACKEND_URL = "https://mycar-backend-1dxi.onrender.com"
+# Producción autorizada: COMPLETO (Dashboard ya activo). No bajar a SIMULAR.
+# No desplegar con crons=[]: borraría los triggers del Dashboard.
+EVAL_MODO = "COMPLETO"
+# Render Free puede tardar >60s en despertar; 6× con backoff cubre el cold start observado.
+MAX_ATTEMPTS = "6"
+RETRY_BASE_MS = "10000"
+FETCH_TIMEOUT_MS = "45000"
+
+# Conservar exactamente: 00:10 eval (RF23+RF43) + 05:00 push (America/Lima = UTC-5).
+[triggers]
+crons = ["10 5 * * *", "0 10 * * *"]
+
+# Secretos (NO en este archivo):
+#   npx wrangler secret put CRON_SECRET
+# Debe coincidir con MYCAR_CRON_SECRET en Render.

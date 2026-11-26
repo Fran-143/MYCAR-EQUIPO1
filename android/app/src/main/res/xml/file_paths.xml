@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="soat_capture" path="soat_capture/" />
+    <cache-path name="soat_adjuntos" path="soat_adjuntos/" />
+    <cache-path name="fotos_capture" path="fotos_capture/" />
+    <cache-path name="fotos_adjuntos" path="fotos_adjuntos/" />
+    <cache-path name="compartir_pdf" path="compartir_pdf/" />
+    <cache-path name="export_historial_pdf" path="export_historial_pdf/" />
+</paths>

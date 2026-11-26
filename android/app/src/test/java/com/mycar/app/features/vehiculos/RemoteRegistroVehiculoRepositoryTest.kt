@@ -26,6 +26,14 @@ class RemoteRegistroVehiculoRepositoryTest {
     @Test fun cupoRealSeDevuelveSinInventarDatos() = runBlocking<Unit> {
         assertEquals(0, RemoteRegistroVehiculoRepository(ApiPrueba()).cupo().registrados)
     }
+    @Test fun cupoAceptaLimiteAmpliadoDelPlanFree() = runBlocking<Unit> {
+        val api = ApiPrueba().apply {
+            cupoRespuesta = Response.success(CupoRegistroDto("FREE", 20, 0, true))
+        }
+        val cupo = RemoteRegistroVehiculoRepository(api).cupo()
+        assertEquals(20, cupo.limite)
+        assertTrue(cupo.puedeRegistrar)
+    }
     @Test fun errorNoJsonDeSesionSeConvierteEnSesionRequerida() = runBlocking<Unit> {
         val api = ApiPrueba().apply { cupoRespuesta = Response.error(401, "<html>Error</html>".toResponseBody("text/html".toMediaType())) }
         try { RemoteRegistroVehiculoRepository(api).cupo(); fail("Se esperaba error") }

@@ -70,10 +70,16 @@ internal fun RegistrationContent(
     state: RegistrationState, policy: PrivacyPolicyConfiguration,
     onEdit: ((RegistrationForm) -> RegistrationForm) -> Unit,
     onSubmit: () -> Unit, onBack: () -> Unit, onLogin: () -> Unit,
-    onPolicy: () -> Unit, onPolicyBack: () -> Unit, onPolicyLoaded: () -> Unit
+    onPolicy: () -> Unit, onPolicyBack: () -> Unit, onPolicyLoaded: () -> Unit,
+    onCodeChange: (String) -> Unit = {},
+    onConfirmCode: () -> Unit = {},
+    onResendCode: () -> Unit = {},
+    onBackFromCode: () -> Unit = onBack
 ) {
     when {
         state.success -> RegistrationSuccessScreen(onLogin)
+        state.step == RegistrationStep.CODE -> VerificationCodeScreen(
+            state, onCodeChange, onConfirmCode, onResendCode, onBackFromCode)
         state.policyVisible && policy.localDocument != null && policy.available ->
             LocalPrivacyPolicyScreen(policy.localDocument, onPolicyBack, onPolicyLoaded)
         else -> RegistrationScreen(state, policy, onEdit, onSubmit, onBack, onPolicy)

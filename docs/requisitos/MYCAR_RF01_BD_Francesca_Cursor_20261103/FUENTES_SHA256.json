@@ -1,0 +1,37 @@
+[
+  {
+    "archivo_repositorio": "backend/src/main/resources/db/rf01-verificacion/V7__rf01_verificacion_aislada.sql",
+    "archivo_paquete": "sql/V7__rf01_verificacion_aislada.sql",
+    "sha256": "a4538994ad6153f18f2d1aa6f0e3ee2c1baab5dea5949696d6c0b487ad862fd0"
+  },
+  {
+    "archivo_repositorio": "backend/src/main/java/backend/registro/verificacion/MailGateway.java",
+    "archivo_paquete": "referencia_backend/backend/src/main/java/backend/registro/verificacion/MailGateway.java",
+    "sha256": "e24073b00c616710916146b4d04ae1d96ec9e98abd5526fe09ba5572b8c94840"
+  },
+  {
+    "archivo_repositorio": "backend/src/main/java/backend/registro/verificacion/VerificationCrypto.java",
+    "archivo_paquete": "referencia_backend/backend/src/main/java/backend/registro/verificacion/VerificationCrypto.java",
+    "sha256": "3815244b91614e6ce4d15b8af44b590a06356cea4296803da66ac07d62790b3a"
+  },
+  {
+    "archivo_repositorio": "backend/src/main/java/backend/registro/verificacion/VerificationDispatcher.java",
+    "archivo_paquete": "referencia_backend/backend/src/main/java/backend/registro/verificacion/VerificationDispatcher.java",
+    "sha256": "a38ad8db60f52f39d039ff41b2a03b58ebd7766cab775c58946e20cc0d9b94dc"
+  },
+  {
+    "archivo_repositorio": "backend/src/main/java/backend/registro/verificacion/VerificationPolicy.java",
+    "archivo_paquete": "referencia_backend/backend/src/main/java/backend/registro/verificacion/VerificationPolicy.java",
+    "sha256": "c65889cb17e8590189c86d0a1ad82df7911d5217c2c1c732b2cad5651b37b4a6"
+  },
+  {
+    "archivo_repositorio": "backend/src/main/java/backend/registro/verificacion/VerificationRepository.java",
+    "archivo_paquete": "referencia_backend/backend/src/main/java/backend/registro/verificacion/VerificationRepository.java",
+    "sha256": "d8d033430674851bd2dd5699c0e334adaf25520629038b362fdba97b9827cc6b"
+  },
+  {
+    "archivo_repositorio": "backend/src/main/java/backend/registro/verificacion/VerificationService.java",
+    "archivo_paquete": "referencia_backend/backend/src/main/java/backend/registro/verificacion/VerificationService.java",
+    "sha256": "96a760deec92ac430767f6e99c7eb15e847772034df6df579f9d6e76e139207c"
+  }
+]

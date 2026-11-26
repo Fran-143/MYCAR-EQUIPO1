@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 object ClientesSesion {
     fun publico(baseUrl: String): Retrofit = Retrofit.Builder().baseUrl(baseUrl)
         .client(OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false)
-            .followSslRedirects(false).callTimeout(20, TimeUnit.SECONDS).build())
+            .followSslRedirects(false).callTimeout(60, TimeUnit.SECONDS).build())
         .addConverterFactory(GsonConverterFactory.create()).build()
 }
 
@@ -25,20 +25,35 @@ class ClienteVehiculosAutenticado(baseUrl: String, autorizacion: () -> String, a
         baseUrl, { try { credenciales.autorizacion() } catch (_: IOException) { throw SessionRequired() } }, alCaducar)
     private val activo = AtomicBoolean(true)
     private val origen = baseUrl.toHttpUrl()
+    // Render Free puede superar 30s en arranque en frío; 90s evita abortar POST TIVE/SOAT a medias.
     private val cliente = OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false)
-        .followSslRedirects(false).callTimeout(30, TimeUnit.SECONDS)
+        .followSslRedirects(false).callTimeout(90, TimeUnit.SECONDS)
         .addInterceptor { cadena ->
             val r = cadena.request()
             if (r.url.scheme != origen.scheme || r.url.host != origen.host || r.url.port != origen.port)
                 throw IOException("Origen HTTP no autorizado")
-            if (!activo.get()) throw IOException("El ciclo de cuenta terminó")
+            // Cliente ya cerrado (logout / recarga de cuenta): no tumbar la UI con
+            // "ciclo terminó"; devolver 401 para que se reconstruya la sesión.
+            if (!activo.get()) {
+                alCaducar()
+                return@addInterceptor Response.Builder().request(r).protocol(Protocol.HTTP_1_1)
+                    .code(401).message("Sesión requerida")
+                    .body("{\"codigo\":\"SESION_NO_VALIDA\"}".toResponseBody("application/json".toMediaType()))
+                    .build()
+            }
             val prueba = try { autorizacion() } catch (_: SessionRequired) { null }
             if (prueba == null) {
                 alCaducar()
                 Response.Builder().request(r).protocol(Protocol.HTTP_1_1).code(401).message("Sesión requerida")
                     .body("{\"codigo\":\"SESION_NO_VALIDA\"}".toResponseBody("application/json".toMediaType())).build()
             } else {
-                if (!activo.get()) throw IOException("El ciclo de cuenta terminó")
+                if (!activo.get()) {
+                    alCaducar()
+                    return@addInterceptor Response.Builder().request(r).protocol(Protocol.HTTP_1_1)
+                        .code(401).message("Sesión requerida")
+                        .body("{\"codigo\":\"SESION_NO_VALIDA\"}".toResponseBody("application/json".toMediaType()))
+                        .build()
+                }
                 val respuesta=cadena.proceed(r.newBuilder().header("Authorization", prueba).build())
                 if(respuesta.code==401) alCaducar()
                 respuesta

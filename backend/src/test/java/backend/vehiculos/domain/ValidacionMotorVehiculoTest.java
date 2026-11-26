@@ -127,7 +127,7 @@ class ValidacionMotorVehiculoTest {
                 "Blanco",
                 idMotor,
                 idCombustible,
-                1000,
+                java.math.BigDecimal.valueOf(1000),
                 null,
                 null,
                 numeroMotor,

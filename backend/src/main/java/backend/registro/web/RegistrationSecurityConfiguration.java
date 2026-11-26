@@ -18,8 +18,14 @@ public class RegistrationSecurityConfiguration {
     @Bean
     @Order(1)
     SecurityFilterChain registrationSecurity(HttpSecurity http) throws Exception {
-        return http.securityMatcher("/api/v1/auth/registro")
-                .authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.POST, "/api/v1/auth/registro")
+        return http.securityMatcher("/api/v1/auth/registro", "/api/v1/auth/registro/**")
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/auth/registro",
+                                "/api/v1/auth/registro/verificacion/origen",
+                                "/api/v1/auth/registro/verificacion/emitir",
+                                "/api/v1/auth/registro/verificacion/completar",
+                                "/api/v1/auth/registro/verificacion/reenviar")
                         .permitAll().anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
@@ -35,8 +41,13 @@ public class RegistrationSecurityConfiguration {
     SecurityFilterChain registrationFallback(HttpSecurity http) throws Exception {
         // A custom chain disables Boot's default chain. Keep health available and never
         // accidentally expose unmatched routes. Future RFs must provide their own policy.
+        // /error debe ser permitAll: si no, excepciones MVC (p. ej. JSON inválido) se
+        // enmascaran como 403 vacío vía denyAll del fallback (rompe /dispositivos-push/probar).
         return http.authorizeHttpRequests(auth -> auth.requestMatchers(EndpointRequest.to(HealthEndpoint.class))
-                        .permitAll().anyRequest().denyAll())
+                        .permitAll()
+                        .requestMatchers("/error")
+                        .permitAll()
+                        .anyRequest().denyAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

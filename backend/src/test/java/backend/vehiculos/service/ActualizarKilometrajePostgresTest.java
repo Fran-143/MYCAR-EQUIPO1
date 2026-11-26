@@ -4,6 +4,7 @@ import backend.vehiculos.dao.OperacionVehiculoDao;
 import backend.vehiculos.domain.ErrorRegistroVehiculo;
 import backend.vehiculos.dto.DatosActualizarKilometraje;
 import backend.vehiculos.dto.DatosRegistroVehiculo;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Locale;
@@ -47,9 +48,10 @@ class ActualizarKilometrajePostgresTest {
         var alta = registro.registrar(usuario, datos());
         UUID op = UUID.randomUUID();
         var ctx = rf14.consultarActual(usuario, alta.idVehiculo());
+        var esperado = ctx.kmActual().add(BigDecimal.valueOf(500));
         var resultado = rf14.registrar(usuario, alta.idVehiculo(), new DatosActualizarKilometraje(
-                op, ctx.kmActual() + 500, ctx.idLectura(), ctx.versionKm()));
-        assertEquals(ctx.kmActual() + 500, resultado.kmActual());
+                op, esperado, ctx.idLectura(), ctx.versionKm()));
+        assertEquals(0, esperado.compareTo(resultado.kmActual()));
         assertEquals(1, jdbc.queryForObject("SELECT version_km FROM mycar.vehiculo WHERE id_vehiculo=?", Integer.class, alta.idVehiculo()));
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM mycar.lectura_kilometraje WHERE id_vehiculo=?", Long.class, alta.idVehiculo()));
     }
@@ -64,7 +66,7 @@ class ActualizarKilometrajePostgresTest {
                         UUID.randomUUID(), ctx.kmActual(), ctx.idLectura(), ctx.versionKm()))).codigo());
         assertEquals("VEHICULO_NO_ENCONTRADO", assertThrows(ErrorRegistroVehiculo.class, () -> rf14.registrar(
                 dos, propio.idVehiculo(), new DatosActualizarKilometraje(
-                        UUID.randomUUID(), ctx.kmActual() + 1, ctx.idLectura(), ctx.versionKm()))).codigo());
+                        UUID.randomUUID(), ctx.kmActual().add(BigDecimal.ONE), ctx.idLectura(), ctx.versionKm()))).codigo());
         assertNotEquals(ajeno.idVehiculo(), propio.idVehiculo());
     }
 
@@ -73,7 +75,7 @@ class ActualizarKilometrajePostgresTest {
         var alta = registro.registrar(usuario, datos());
         var ctx = rf14.consultarActual(usuario, alta.idVehiculo());
         UUID op = UUID.randomUUID();
-        var solicitud = new DatosActualizarKilometraje(op, ctx.kmActual() + 100, ctx.idLectura(), ctx.versionKm());
+        var solicitud = new DatosActualizarKilometraje(op, ctx.kmActual().add(BigDecimal.valueOf(100)), ctx.idLectura(), ctx.versionKm());
         var primero = rf14.registrar(usuario, alta.idVehiculo(), solicitud);
         var segundo = rf14.registrar(usuario, alta.idVehiculo(), solicitud);
         assertEquals(primero, segundo);
@@ -100,7 +102,6 @@ class ActualizarKilometrajePostgresTest {
         return new DatosRegistroVehiculo(UUID.randomUUID(), "Toyota", "Corolla", "PARTICULAR",
                 String.format(Locale.ROOT, "M8K%03d", PLACAS.incrementAndGet()), 2020, "Azul",
                 jdbc.queryForObject("SELECT id_tipo_motor FROM mycar.tipo_motor WHERE codigo='COMBUSTION'", Long.class),
-                jdbc.queryForObject("SELECT id_combustible FROM mycar.combustible WHERE codigo='GASOLINA'", Long.class),
-                50000, null, null, null, null, null, null, null);
+                jdbc.queryForObject("SELECT id_combustible FROM mycar.combustible WHERE codigo='GASOLINA'", Long.class), java.math.BigDecimal.valueOf(50000), null, null, null, null, null, null, null);
     }
 }

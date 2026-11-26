@@ -46,11 +46,11 @@ public class MantenimientoHttpService {
         if (vehiculo <= 0) throw new IllegalArgumentException("idVehiculo: debe ser positivo");
         var datos=new DatosRegistroMantenimiento(r.codigoTipoMantenimiento(),r.fechaServicio(),
                 r.kmServicio(),r.origenKmServicio(),r.idLecturaKmReferencia(),r.costoTotal(),
-                r.servicioOtro(),r.proximaFechaSugerida(),r.proximoKmSugerido());
+                r.servicioOtro(),r.proximaFechaSugerida(),r.proximoKmSugerido(), r.idTaller());
         var repuestos=r.repuestos()==null ? List.<DatosRepuesto>of() : r.repuestos().stream()
                 .map(p -> new DatosRepuesto(p.nombre(),p.marca(),p.cantidad(),p.precioUnitario())).toList();
         var solicitud=new SolicitudRegistroMantenimiento(r.idOperacion(),vehiculo,datos,
-                r.observaciones(),repuestos);
+                r.observaciones(),repuestos, r.idTaller(), null);
         var adaptador=exigirAdaptador();
         // El adaptador confirmado debe invocar el servicio existente dentro de esta transacción.
         var resultado=adaptador.registrar(usuario,solicitud);

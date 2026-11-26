@@ -90,6 +90,10 @@ public class RegistroVehiculoService {
         if (vehiculos.existePlaca(datos.placa())) {
             throw new ErrorRegistroVehiculo("PLACA_DUPLICADA", Set.of("placa"));
         }
+        if (vehiculos.existeVehiculoIdentico(idUsuarioAutenticado, datos)) {
+            throw new ErrorRegistroVehiculo("VEHICULO_DUPLICADO", Set.of(
+                    "marca", "modelo", "usoVehiculoCodigo", "anioFabricacion", "color"));
+        }
         if (vehiculos.existeVin(datos.numeroVin())) {
             throw new ErrorRegistroVehiculo("VIN_DUPLICADO", Set.of("numeroVin"));
         }

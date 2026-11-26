@@ -1,0 +1,13 @@
+EA MFA administrativo (RF02 A–D) — cobertura en MfaAdminIntegrationTest / TotpServiceTest
+EA01 usuario normal sin TOTP ............ MfaAdminIntegrationTest.ea01
+EA02 credenciales inválidas ............. MfaAdminIntegrationTest.ea02
+EA03 ADMIN sin MFA → enroll, no panel ... MfaAdminIntegrationTest.ea03
+EA04 TOTP malo .......................... incluido en ea04a12EnrollVerifyRecoveryYHub
+EA05–EA08 reuso/caduco/rate limit ....... parcialmente (código malo + bloqueo path); caduco/reuso vía servicio
+EA09–EA10 manipulación rol / 403 admin .. ea03 + hub 403 en challenge/reenroll
+EA11 sin clave MFA fail-closed .......... ea11SinClaveMfaFailClosed
+EA12/EA17 recovery una vez + reenroll ... ea04a12EnrollVerifyRecoveryYHub
+EA13 procedimiento excepcional .......... documentado (bootstrap script; sin bypass por contraseña)
+EA14–EA15 VIN ........................... DIFERIDOS
+EA16 rol revocado ....................... SessionBearerFilter exige role ADMIN vigente
+EA18 logout / expiración ................ logout en flujo ea04a12 + TTL desafío/admin

@@ -2,6 +2,7 @@ package backend.alertas.api;
 
 import backend.alertas.api.dto.ContratoRf22;
 import backend.alertas.seguridad.IdentidadAlertas;
+import backend.alertas.service.AtenderAlertaService;
 import backend.alertas.service.ProgramarAlertaService;
 import backend.alertas.service.SincronizarAlertasService;
 import jakarta.validation.Valid;
@@ -19,25 +20,52 @@ import org.springframework.web.bind.annotation.*;
 public class AlertasController {
     private final ProgramarAlertaService programar;
     private final SincronizarAlertasService sincronizar;
+    private final AtenderAlertaService atender;
     private final ObjectProvider<IdentidadAlertas> identidades;
 
     public AlertasController(
             ProgramarAlertaService programar,
             SincronizarAlertasService sincronizar,
+            AtenderAlertaService atender,
             ObjectProvider<IdentidadAlertas> identidades) {
         this.programar = programar;
         this.sincronizar = sincronizar;
+        this.atender = atender;
         this.identidades = identidades;
     }
 
     @GetMapping("/contexto")
-    public ContratoRf22.ContextoResponse contexto(Authentication auth, @RequestParam long idVehiculo) {
-        return programar.contexto(usuario(auth), idVehiculo);
+    public ContratoRf22.ContextoResponse contexto(
+            Authentication auth,
+            @RequestParam long idVehiculo,
+            @RequestParam(required = false) String codigoTipo,
+            @RequestParam(required = false) String servicioOtro) {
+        return programar.contexto(usuario(auth), idVehiculo, codigoTipo, servicioOtro);
     }
 
     @GetMapping("/vehiculos/{idVehiculo}/alertas")
     public ContratoRf22.ListaResponse listar(Authentication auth, @PathVariable long idVehiculo) {
         return sincronizar.listarMisAlertas(usuario(auth), idVehiculo);
+    }
+
+    /** RF23 — alertas personales de licencia (sin idVehiculo). */
+    @GetMapping("/alertas/licencia")
+    public ContratoRf22.ListaResponse listarLicencia(Authentication auth) {
+        return sincronizar.listarMisAlertasLicencia(usuario(auth));
+    }
+
+    /** RF23/RF24 — detalle de alerta LICENCIA propia. */
+    @GetMapping("/alertas/licencia/{idAlerta}")
+    public ContratoRf22.DetalleAlertaDto detalleLicencia(
+            Authentication auth, @PathVariable long idAlerta) {
+        return sincronizar.consultarDetalleLicencia(usuario(auth), idAlerta);
+    }
+
+    /** RF24 B1 — consultarDetalleAlertaUsuario + sync + acciones. */
+    @GetMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}")
+    public ContratoRf22.DetalleAlertaDto detalle(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta) {
+        return sincronizar.consultarDetalle(usuario(auth), idVehiculo, idAlerta);
     }
 
     @PostMapping("/vehiculos/{idVehiculo}/alertas")
@@ -50,6 +78,30 @@ public class AlertasController {
     @GetMapping("/operaciones/{idOperacion}")
     public ContratoRf22.EstadoResponse operacion(Authentication auth, @PathVariable UUID idOperacion) {
         return programar.consultarOperacion(usuario(auth), idOperacion);
+    }
+
+    /** RF24 acción A — incluye VENCIDA. */
+    @PostMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}/atender")
+    public ContratoRf22.AtenderResponse atender(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta,
+            @Valid @RequestBody ContratoRf22.AtenderRequest body) {
+        return atender.atender(usuario(auth), idVehiculo, idAlerta, body);
+    }
+
+    /** RF24-EA08 — anulación manual; no anula el mantenimiento histórico. */
+    @PostMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}/anular")
+    public ContratoRf22.AnularAlertaResponse anularAlerta(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta,
+            @Valid @RequestBody ContratoRf22.AnularRequest body) {
+        return atender.anular(usuario(auth), idVehiculo, idAlerta, body);
+    }
+
+    /** RF24-EA11 — preferencia de contacto solo para esta alerta (no atiende ni muta historial). */
+    @PostMapping("/vehiculos/{idVehiculo}/alertas/{idAlerta}/contacto-taller")
+    public ContratoRf22.DetalleAlertaDto elegirContactoTaller(
+            Authentication auth, @PathVariable long idVehiculo, @PathVariable long idAlerta,
+            @Valid @RequestBody ContratoRf22.ElegirContactoTallerRequest body) {
+        return sincronizar.elegirContactoTaller(usuario(auth), idVehiculo, idAlerta, body);
     }
 
     private long usuario(Authentication auth) {

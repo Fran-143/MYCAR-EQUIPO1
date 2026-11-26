@@ -1,8 +1,6 @@
 package backend.vehiculos.dto;
 
-import java.time.Instant;
-
-/** Contrato técnico RF10: lectura completa de un vehículo propio. */
+/** Contrato técnico RF10: lectura completa de un vehículo propio (incluye códigos para RF11). */
 public record DatosDetalleVehiculo(
         long idVehiculo,
         String placa,
@@ -15,12 +13,24 @@ public record DatosDetalleVehiculo(
         String combustible,
         String estadoVehiculo,
         boolean principal,
-        Integer kilometrajeActual,
-        Instant fechaUltimaLecturaKm,
+        java.math.BigDecimal kilometrajeActual,
+        /** ISO-8601 UTC; String para que Gson/Android no falle con Instant numérico. */
+        String fechaUltimaLecturaKm,
         String numeroVin,
         String numeroSerie,
         String numeroMotor,
         String tipoAceite,
-        boolean motorElectrico
+        boolean motorElectrico,
+        String usoVehiculoCodigo,
+        Long idTipoMotor,
+        Long idCombustible,
+        Long idTipoAceite,
+        String tipoMotorOtro,
+        String combustibleOtro,
+        String tipoAceiteOtro,
+        /** true si existe fila en mycar.tive (RF52/53/54 entrega TIVE). */
+        boolean tieneTive,
+        /** true si hay imagen principal personalizada vigente. */
+        boolean tieneFoto
 ) {
 }

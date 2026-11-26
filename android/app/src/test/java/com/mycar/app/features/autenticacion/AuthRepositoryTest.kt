@@ -7,6 +7,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -36,9 +37,23 @@ class AuthRepositoryTest {
     }
     private inner class Api : AuthApi {
         override suspend fun logout(bearer: String): Response<Unit> = error("Not part of this regression")
+        override suspend fun mfaEnrollStart(bearer: String) = error("Not part of this regression")
+        override suspend fun mfaEnrollConfirm(bearer: String, body: MfaCodigoRequest) = error("Not part of this regression")
+        override suspend fun mfaEnrollConfirmBackup(bearer: String) = error("Not part of this regression")
+        override suspend fun mfaVerify(bearer: String, body: MfaVerificarRequest) = error("Not part of this regression")
+        override suspend fun mfaRecover(bearer: String, body: MfaRecuperarRequest) = error("Not part of this regression")
+        override suspend fun adminHub(bearer: String) = error("Not part of this regression")
 
         override suspend fun register(request: RegistrationRequest): Response<RegistrationResponse> =
             error("RF02 does not register accounts")
+        override suspend fun verificationOrigin(): Response<VerificationOriginResponse> =
+            error("RF02 does not verify email")
+        override suspend fun verificationEmit(body: VerificationEmitRequest): Response<VerificationEmitResponse> =
+            error("RF02 does not verify email")
+        override suspend fun verificationResend(body: VerificationEmitRequest): Response<VerificationEmitResponse> =
+            error("RF02 does not verify email")
+        override suspend fun verificationComplete(body: VerificationCompleteRequest): Response<RegistrationResponse> =
+            error("RF02 does not verify email")
         var loginCode = 200
         var renewCode = 200
         var networkFailure = false
@@ -173,5 +188,75 @@ class AuthRepositoryTest {
         assertEquals(7L, dto.idSesion)
         assertEquals(expiry, dto.accessTokenExpiraUtc)
         assertEquals(end, dto.sesionExpiraUtc)
+    }
+
+    @Test fun sessionReadyRunsOutsideMutexSoAuthorizationIsNotBlocked() = runBlocking {
+        val store = MemoryStore(CredentialVault(installation, tokens("fixture-access-new")))
+        val enteredReady = CompletableDeferred<Unit>()
+        val releaseReady = CompletableDeferred<Unit>()
+        val readyCalls = AtomicInteger()
+        val repo = AuthRepository(
+            Api(), store, clock,
+            onSessionReady = { _, _ ->
+                readyCalls.incrementAndGet()
+                enteredReady.complete(Unit)
+                releaseReady.await()
+            }
+        )
+        val validating = async { repo.validateSession() }
+        enteredReady.await()
+        assertEquals(SessionPhase.AUTHENTICATED, repo.session.value.phase)
+        val context = requireNotNull(repo.authenticatedContext())
+        // Mientras FCM/push sigue "colgado", authorization ya puede tomar el mutex.
+        assertTrue(repo.authorization(context).startsWith("Bearer "))
+        releaseReady.complete(Unit)
+        validating.await()
+        assertEquals(1, readyCalls.get())
+    }
+
+    @Test fun sessionReadyFailureDoesNotBlockLoginOrAuthorization() = runBlocking {
+        val store = MemoryStore(CredentialVault(installation, null))
+        val repo = AuthRepository(
+            Api(), store, clock,
+            onSessionReady = { _, _ -> error("fixture FCM unavailable") }
+        )
+        repo.login("persona@example.org", "fixture password")
+        assertEquals(SessionPhase.AUTHENTICATED, repo.session.value.phase)
+        val context = requireNotNull(repo.authenticatedContext())
+        assertTrue(repo.authorization(context).startsWith("Bearer "))
+    }
+
+    @Test fun alreadyAuthenticatedValidateDoesNotResyncPush() = runBlocking {
+        val store = MemoryStore(CredentialVault(installation, tokens("fixture-access-new")))
+        val readyCalls = AtomicInteger()
+        val repo = AuthRepository(
+            Api(), store, clock,
+            onSessionReady = { _, _ -> readyCalls.incrementAndGet() }
+        )
+        repo.validateSession()
+        assertEquals(1, readyCalls.get())
+        repo.validateSession()
+        assertEquals(1, readyCalls.get())
+    }
+
+    @Test fun expiredAccessRenewalTriggersPushSyncOutsideMutex() = runBlocking {
+        val store = MemoryStore(CredentialVault(installation, tokens("fixture-access-old")))
+        val enteredReady = CompletableDeferred<Unit>()
+        val releaseReady = CompletableDeferred<Unit>()
+        val repo = AuthRepository(
+            Api(), store, clock,
+            onSessionReady = { access, _ ->
+                assertEquals("fixture-access-new", access)
+                enteredReady.complete(Unit)
+                releaseReady.await()
+            }
+        )
+        val validating = async { repo.validateSession() }
+        enteredReady.await()
+        val context = requireNotNull(repo.authenticatedContext())
+        assertTrue(repo.authorization(context).startsWith("Bearer "))
+        releaseReady.complete(Unit)
+        validating.await()
+        assertEquals(SessionPhase.AUTHENTICATED, repo.session.value.phase)
     }
 }

@@ -1,5 +1,6 @@
 package backend.vehiculos.domain;
 
+import backend.vehiculos.dto.DatosActualizacionVehiculo;
 import backend.vehiculos.dto.DatosCatalogosVehiculo;
 import backend.vehiculos.dto.DatosRegistroVehiculo;
 
@@ -22,10 +23,9 @@ public final class ValidadorVehiculo {
     }
 
     public static boolean esKilometrajeInicialValido(
-            Integer kilometrajeInicial
+            java.math.BigDecimal kilometrajeInicial
     ) {
-        return kilometrajeInicial != null
-                && kilometrajeInicial > 0;
+        return backend.vehiculos.dto.NumerosEnterosRegistroJson.esKilometrajeValido(kilometrajeInicial);
     }
 
     public static Set<String> validarDatosBasicos(
@@ -63,20 +63,78 @@ public final class ValidadorVehiculo {
         return Set.copyOf(errores);
     }
 
+    /** RF11: datos generales sin placa ni kilometraje. */
+    public static Set<String> validarDatosGeneralesEdicion(
+            DatosActualizacionVehiculo datos,
+            int anioActual
+    ) {
+        Objects.requireNonNull(datos, "datos");
+        Set<String> errores = new LinkedHashSet<>();
+        if (!esTextoObligatorioValido(datos.marca(), 100)) {
+            errores.add("marca");
+        }
+        if (!esTextoObligatorioValido(datos.modelo(), 100)) {
+            errores.add("modelo");
+        }
+        if (!esTextoObligatorioValido(datos.color(), 80)) {
+            errores.add("color");
+        }
+        if (!esAnioValido(datos.anioFabricacion(), anioActual)) {
+            errores.add("anioFabricacion");
+        }
+        return Set.copyOf(errores);
+    }
+
     public static Set<String> validarMotor(
             DatosRegistroVehiculo datos,
             DatosCatalogosVehiculo catalogos
     ) {
         Objects.requireNonNull(datos, "datos");
+        return validarMotorCampos(
+                datos.idTipoMotor(),
+                datos.tipoMotorOtro(),
+                datos.idCombustible(),
+                datos.combustibleOtro(),
+                datos.idTipoAceite(),
+                datos.tipoAceiteOtro(),
+                datos.numeroMotor(),
+                catalogos
+        );
+    }
+
+    public static Set<String> validarMotor(
+            DatosActualizacionVehiculo datos,
+            DatosCatalogosVehiculo catalogos
+    ) {
+        Objects.requireNonNull(datos, "datos");
+        return validarMotorCampos(
+                datos.idTipoMotor(),
+                datos.tipoMotorOtro(),
+                datos.idCombustible(),
+                datos.combustibleOtro(),
+                datos.idTipoAceite(),
+                datos.tipoAceiteOtro(),
+                datos.numeroMotor(),
+                catalogos
+        );
+    }
+
+    private static Set<String> validarMotorCampos(
+            Long idTipoMotor,
+            String tipoMotorOtro,
+            Long idCombustible,
+            String combustibleOtro,
+            Long idTipoAceite,
+            String tipoAceiteOtro,
+            String numeroMotor,
+            DatosCatalogosVehiculo catalogos
+    ) {
         Objects.requireNonNull(catalogos, "catalogos");
 
         Set<String> errores = new LinkedHashSet<>();
 
         var motor = catalogos.tiposMotor().stream()
-                .filter(tipo -> Objects.equals(
-                        tipo.idTipoMotor(),
-                        datos.idTipoMotor()
-                ))
+                .filter(tipo -> Objects.equals(tipo.idTipoMotor(), idTipoMotor))
                 .findFirst()
                 .orElse(null);
 
@@ -85,81 +143,59 @@ public final class ValidadorVehiculo {
             return Set.copyOf(errores);
         }
 
-        if (!esEspecificacionValida(
-                "OTRO".equals(motor.codigo()),
-                datos.tipoMotorOtro()
-        )) {
+        if (!esEspecificacionValida("OTRO".equals(motor.codigo()), tipoMotorOtro)) {
             errores.add("tipoMotorOtro");
         }
 
         if (motor.esElectrico()) {
-            if (datos.idCombustible() != null) {
+            if (idCombustible != null) {
                 errores.add("idCombustible");
             }
-
-            if (datos.combustibleOtro() != null) {
+            if (combustibleOtro != null) {
                 errores.add("combustibleOtro");
             }
-
-            if (datos.idTipoAceite() != null) {
+            if (idTipoAceite != null) {
                 errores.add("idTipoAceite");
             }
-
-            if (datos.tipoAceiteOtro() != null) {
+            if (tipoAceiteOtro != null) {
                 errores.add("tipoAceiteOtro");
             }
-
-            if (datos.numeroMotor() != null) {
+            if (numeroMotor != null) {
                 errores.add("numeroMotor");
             }
-
             return Set.copyOf(errores);
         }
 
         var combustible = catalogos.combustibles().stream()
-                .filter(opcion -> Objects.equals(
-                        opcion.idCombustible(),
-                        datos.idCombustible()
-                ))
+                .filter(opcion -> Objects.equals(opcion.idCombustible(), idCombustible))
                 .findFirst()
                 .orElse(null);
 
         if (combustible == null) {
             errores.add("idCombustible");
-        } else if (!esEspecificacionValida(
-                "OTRO".equals(combustible.codigo()),
-                datos.combustibleOtro()
-        )) {
+        } else if (!esEspecificacionValida("OTRO".equals(combustible.codigo()), combustibleOtro)) {
             errores.add("combustibleOtro");
         }
 
-        if (datos.idTipoAceite() == null) {
-            if (datos.tipoAceiteOtro() != null) {
+        if (idTipoAceite == null) {
+            if (tipoAceiteOtro != null) {
                 errores.add("tipoAceiteOtro");
             }
         } else {
             var aceite = catalogos.tiposAceite().stream()
-                    .filter(opcion -> Objects.equals(
-                            opcion.idTipoAceite(),
-                            datos.idTipoAceite()
-                    ))
+                    .filter(opcion -> Objects.equals(opcion.idTipoAceite(), idTipoAceite))
                     .findFirst()
                     .orElse(null);
 
             if (aceite == null) {
                 errores.add("idTipoAceite");
-            } else if (!esEspecificacionValida(
-                    "OTRO".equals(aceite.codigo()),
-                    datos.tipoAceiteOtro()
-            )) {
+            } else if (!esEspecificacionValida("OTRO".equals(aceite.codigo()), tipoAceiteOtro)) {
                 errores.add("tipoAceiteOtro");
             }
         }
 
-        if (datos.numeroMotor() != null
-                && datos.numeroMotor().codePointCount(
-                0, datos.numeroMotor().length()
-        ) > 80) {
+        if (numeroMotor != null
+                && numeroMotor.codePointCount(0, numeroMotor.length()) > 80) {
             errores.add("numeroMotor");
         }
 

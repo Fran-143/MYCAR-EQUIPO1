@@ -17,14 +17,56 @@ class CoordinadorInicio(private val repository: ResumenInicioRepository, private
         return scope.launch {
             try {
                 val lista=repository.vehiculosActivos()
-                val elegido=ReglasResumenInicio.validarYSeleccionar(lista,anterior)
+                if (lista.isEmpty()) {
+                    val todos = runCatching { repository.vehiculosTodos() }.getOrElse { emptyList() }
+                    val principalInactivo = todos.any {
+                        it.principal && it.estadoVehiculo.equals("INACTIVO", ignoreCase = true)
+                    }
+                    if (turno != revision) return@launch
+                    if (principalInactivo) {
+                        mutable.value = EstadoResumenInicio(
+                            fase = FaseInicio.INCONSISTENTE,
+                            mensaje = "Tu vehículo principal está inactivo. Consúltalo en Historial o actívalo en Vehículos."
+                        )
+                        return@launch
+                    }
+                    mutable.value = EstadoResumenInicio(fase = FaseInicio.SIN_VEHICULOS)
+                    return@launch
+                }
+                val elegido=try {
+                    ReglasResumenInicio.validarYSeleccionar(lista,anterior)
+                } catch (e: ErrorResumenInicio) {
+                    if (e.inconsistente) {
+                        val todos = runCatching { repository.vehiculosTodos() }.getOrElse { emptyList() }
+                        if (todos.any { it.principal && it.estadoVehiculo.equals("INACTIVO", ignoreCase = true) }) {
+                            if (turno != revision) return@launch
+                            mutable.value = EstadoResumenInicio(
+                                fase = FaseInicio.INCONSISTENTE,
+                                mensaje = "Tu vehículo principal está inactivo. Consúltalo en Historial o actívalo en Vehículos."
+                            )
+                            return@launch
+                        }
+                    }
+                    throw e
+                }
                 if(turno!=revision) return@launch
-                mutable.value=EstadoResumenInicio(if(elegido==null) FaseInicio.SIN_VEHICULOS else FaseInicio.LISTO,lista,elegido)
+                mutable.value=EstadoResumenInicio(
+                    fase = if(elegido==null) FaseInicio.SIN_VEHICULOS else FaseInicio.LISTO,
+                    vehiculos = lista,
+                    seleccionado = elegido,
+                    nombreUsuario = mutable.value.nombreUsuario
+                )
                 if(elegido!=null) cargarBloques(turno,lista.single { it.idVehiculo==elegido })
             } catch(e: CancellationException) { throw e }
             catch(e: Exception) { if(turno==revision) publicarError(e) }
         }.also { trabajo=it }
     }
+    fun actualizarNombreUsuario(nombre: String?) {
+        val limpio = nombre?.trim()?.takeIf { it.isNotBlank() }
+        if (mutable.value.nombreUsuario == limpio) return
+        mutable.value = mutable.value.copy(nombreUsuario = limpio)
+    }
+
     fun seleccionar(id: Long): Job? {
         val v=mutable.value.vehiculos.firstOrNull { it.idVehiculo==id } ?: return null
         if(mutable.value.seleccionado==id) return null
@@ -41,7 +83,9 @@ class CoordinadorInicio(private val repository: ResumenInicioRepository, private
             if(turno==revision) {
                 if(e is ErrorResumenInicio && e.sesion) publicarError(e)
                 else mutable.value=mutable.value.copy(bloques=BloquesInicio(v.kilometrajeActual,
-                    historial=DisponibilidadInicio.NO_DISPONIBLE,lectura=DisponibilidadInicio.NO_DISPONIBLE))
+                    historial=DisponibilidadInicio.NO_DISPONIBLE,lectura=DisponibilidadInicio.NO_DISPONIBLE,
+                    alertasDisponibilidad=DisponibilidadInicio.NO_DISPONIBLE,
+                    talleresDisponibilidad=DisponibilidadInicio.NO_DISPONIBLE))
             }
         }
     }

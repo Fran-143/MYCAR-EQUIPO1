@@ -12,8 +12,22 @@ public record DatosRegistroMantenimiento(
         BigDecimal costoTotal,
         String servicioOtro,
         LocalDate proximaFechaSugerida,
-        Integer proximoKmSugerido
+        Integer proximoKmSugerido,
+        Long idTaller
 ) {
+    public DatosRegistroMantenimiento(
+            String codigoTipoMantenimiento,
+            LocalDate fechaServicio,
+            Integer kmServicio,
+            OrigenKmServicio origenKmServicio,
+            Long idLecturaKmReferencia,
+            BigDecimal costoTotal,
+            String servicioOtro,
+            LocalDate proximaFechaSugerida,
+            Integer proximoKmSugerido) {
+        this(codigoTipoMantenimiento, fechaServicio, kmServicio, origenKmServicio, idLecturaKmReferencia,
+                costoTotal, servicioOtro, proximaFechaSugerida, proximoKmSugerido, null);
+    }
     public enum OrigenKmServicio {
         LECTURA,
         HISTORICO_MANUAL

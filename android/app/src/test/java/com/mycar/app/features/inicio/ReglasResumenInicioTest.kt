@@ -36,12 +36,20 @@ class ReglasResumenInicioTest {
         assertNull(ReglasResumenInicio.ultimoRealizado(listOf(m(9,"ANULADO","2026-10-27"))))
     }
     @Test fun barraTieneExactamenteLasCuatroSeccionesSolicitadas() {
-        assertEquals(listOf("Inicio","Vehículos","Mantenimientos","Alertas"),SeccionMyCar.entries.map { it.titulo })
+        assertEquals(listOf("Inicio","Vehículos","Historial","Alertas"),SeccionMyCar.entries.map { it.titulo })
     }
     @Test fun atrasSecundariaVuelveASuOrigenSinDuplicarPestanas() {
         val origen=NavegacionInicio().abrir(SeccionMyCar.VEHICULOS)
         assertEquals(origen,origen.abrir(SecundariaMyCar.PERFIL).atras())
         assertEquals(NavegacionInicio(),origen.atras())
         assertEquals(origen,origen.abrir(SeccionMyCar.VEHICULOS))
+    }
+
+    @Test fun atrasSoatVuelveAConfigurarODetalle() {
+        val detalle = NavegacionInicio(SeccionMyCar.VEHICULOS, SecundariaMyCar.DETALLE)
+        val config = detalle.abrir(SecundariaMyCar.SOAT_CONFIGURAR)
+        assertEquals(config, config.abrir(SecundariaMyCar.SOAT_CORREGIR).atras())
+        assertEquals(config, config.abrir(SecundariaMyCar.SOAT_RENOVAR).atras())
+        assertEquals(detalle, config.atras())
     }
 }

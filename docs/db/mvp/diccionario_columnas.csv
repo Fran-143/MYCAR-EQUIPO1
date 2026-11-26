@@ -1,6 +1,7 @@
 tabla,campo,obligatorio,regla,referencia
 usuario,id_usuario,Sí,Identificador interno; Spring Boot obtiene identidad desde sesión.,01_DICCIONARIO!A2:F2
 usuario,correo,Sí,Correo único de modo insensible a mayúsculas/minúsculas y sin espacios perimetrales; validar en servicio y reforzar con índice UNIQUE PostgreSQL sobre lower(btrim(correo)) o CITEXT elegido por equipo. No inventar normalización de alias Gmail.,01_DICCIONARIO!A3:F3
+usuario,correo_verificado_utc,No (NULL si aún no verificó),"RF01 OTP (V8): instante UTC en que el correo quedó verificado por código. Nullable sin backfill: cuentas anteriores a V8 pueden iniciar sesión con NULL. Altas nuevas tras el flujo OTP deben fijar clock_timestamp(). No exigir NOT NULL en RF02.",V8_RF01
 usuario,password_hash,Sí,"Guardar hash seguro, nunca contraseña en claro.",01_DICCIONARIO!A4:F4
 usuario,estado_cuenta,Sí,"Estados de cuenta ACTIVA, SUSPENDIDA y PENDIENTE_ELIMINACION. RF02: SOLO ACTIVA puede iniciar sesión; SUSPENDIDA y PENDIENTE_ELIMINACION no inician sesión incluso tras contraseña correcta. SUSPENDIDA también bloquea operaciones protegidas. Revocación automática de sesiones preexistentes ante suspensión sigue pendiente del RF administrador.",01_DICCIONARIO!A5:F5
 usuario,fecha_registro_utc,Sí,Fecha servidor; alta transaccional con Free y preferencias.,01_DICCIONARIO!A6:F6
@@ -115,6 +116,7 @@ alerta,id_vehiculo,Sí,FK hacia vehículo; Spring Boot autentica propietario. RF
 alerta,id_tipo_mantenimiento,Sí,Catálogo 7 compartido,01_DICCIONARIO!A115:F115
 alerta,criterio,Sí,"Usar códigos lógicos de diagramas: POR_TIEMPO, POR_KILOMETRAJE y AMBOS. TIEMPO ↔ POR_TIEMPO; KM ↔ POR_KILOMETRAJE son alias previos, NO valores adicionales. Unificar persistencia al revisar esquema PostgreSQL.",01_DICCIONARIO!A116:F116
 alerta,origen,Sí,RF22 programa alertas con origen MANUAL; no automático desde RF17.,01_DICCIONARIO!A117:F117
+alerta,origen_calculo,Sí,"V9 RF22: DESDE_HOY o DESDE_MANTENIMIENTO. Define la base de fecha_base/km_base. No confundir con origen=MANUAL. Alertas pre-V9 backfill DESDE_HOY sin reinterpretar referencias. DESDE_HOY exige ref NULL; DESDE_MANTENIMIENTO exige ref REALIZADO elegible (mismo vehículo/tipo/OTRO).",V9_RF22
 alerta,categoria,Sí,RF22 crea alertas categoria MANTENIMIENTO; no implica una tabla adicional.,01_DICCIONARIO!A118:F118
 alerta,servicio_otro,Condicional,"Obligatorio y visible solo cuando tipo=OTRO. Para comparar equivalencia construir copia normalizada (NFKC, casefold, trim y colapso de blancos), dejando texto original sin alterar; misma regla en todas las altas.",01_DICCIONARIO!A119:F119
 alerta,unidad_tiempo,Condicional,"Códigos aprobados en RF22: SEMANAS y MESES para POR_TIEMPO/AMBOS. Cantidad entera positiva. Meses son meses calendarios America/Lima, no 30 días fijos. Correspondencia física por verificar.",01_DICCIONARIO!A120:F120
@@ -150,3 +152,12 @@ alerta,firma_equivalencia,"Sí, NOT NULL al crear alerta","Firma estable SHA-256
 intento_login_fallido,id_intento,Sí,Evento individual de contraseña INCORRECTA en RF02. Solo cuenta existente; nunca guardar password/valor intentado. 3 fallos en ventana móvil de 10 minutos compartida entre dispositivos; insertar con usuario bloqueado transaccionalmente.,01_DICCIONARIO!A153:F153
 intento_login_fallido,id_usuario,Sí,"Cuenta afectada; relacionar la tercera falla con la restricción en usuario.login_bloqueo_hasta_utc. Solo RF02 autentica/verifica, sin enumeración de cuentas.",01_DICCIONARIO!A154:F154
 intento_login_fallido,ocurrido_utc,Sí,"Instante REAL de cada verificación fallida (servidor). Contar filas ocurrido_utc >= ahora-servidor-10 minutos antes de insertar nueva falla. En la tercera dentro de la ventana establecer bloqueo de diez minutos desde ese tercer fallo, en misma TX. No verificar ni insertar nuevas fallas mientras restringido. Purgar eventos antiguos por política segura, sin perder conteos relevantes.",01_DICCIONARIO!A155:F155
+control_verificacion,id_control,S�,PK anti-abuso OTP; l�mites que no se reinician al cambiar correo o reenviar.,V8_RF01
+control_verificacion,proposito,S�,"REGISTRO|RECUPERACION|REACTIVACION|CAMBIO_CORREO",V8_RF01
+control_verificacion,clave_control,S�,Clave opaca del cliente (p. ej. hash instalaci�n); no es el correo.,V8_RF01
+control_verificacion,destinatario_normalizado,No,�ltimo correo normalizado asociado al control; informativo.,V8_RF01
+operacion_verificacion,id_operacion,S�,UUID del proceso pre-usuario; no guarda formulario ni contrase�a.,V8_RF01
+operacion_verificacion,autorizacion_hash,Condicional,Hash hex64 tras CODIGO_VALIDADO; sirve para completar registro.,V8_RF01
+emision_codigo,codigo_hash,S�,SHA-256 hex del c�digo; nunca plaintext en BD.,V8_RF01
+emision_codigo,reintento_tecnico,S�,True si es reintento de env�o del mismo c�digo l�gico.,V8_RF01
+intento_verificacion,id_intento,S�,Clave de idempotencia del cliente; evita doble fallo si se pierde la respuesta.,V8_RF01

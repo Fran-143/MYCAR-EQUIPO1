@@ -321,8 +321,7 @@ class RegistroMantenimientoConcurrenciaTest {
                 new VehiculoMantenimientoService(new VehiculoMantenimientoJdbcDao(jdbc)),
                 new TipoMantenimientoService(new TipoMantenimientoJdbcDao(jdbc)),
                 new LecturaKmMantenimientoService(new LecturaKmMantenimientoJdbcDao(jdbc)),
-                dao, operaciones
-        );
+                dao, operaciones, org.mockito.Mockito.mock(backend.talleres.service.TallerService.class));
         var interceptor = new TransactionInterceptor();
         interceptor.setTransactionManager(new DataSourceTransactionManager(dataSource));
         interceptor.setTransactionAttributeSource(

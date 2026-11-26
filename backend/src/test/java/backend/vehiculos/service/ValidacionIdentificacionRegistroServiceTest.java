@@ -50,7 +50,7 @@ class ValidacionIdentificacionRegistroServiceTest {
                 "Blanco",
                 10L,
                 1L,
-                50000,
+                java.math.BigDecimal.valueOf(50000),
                 vin,
                 numeroSerie,
                 numeroMotor,
