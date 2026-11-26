@@ -38,9 +38,9 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        // 86 / 1.0.14: Premium en perfil, cancelación usuario, prefs push auto-save, cupo→planes.
-        versionCode = 86
-        versionName = "1.0.14"
+        // 87 / 1.0.15: prefs notif cola de guardado (2 switches) + FCM al conceder.
+        versionCode = 87
+        versionName = "1.0.15"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Política académica v1.0 embebida (local-academic) en release y debug.

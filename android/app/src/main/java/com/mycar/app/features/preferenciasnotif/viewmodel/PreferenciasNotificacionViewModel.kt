@@ -39,6 +39,8 @@ class PreferenciasNotificacionViewModel(
     val estado: StateFlow<EstadoPreferenciasNotificacion> = _estado.asStateFlow()
 
     private var snapshotServidor: PreferenciasExternas? = null
+    /** Si el usuario toca otro switch mientras hay un guardar en curso, reintentar al terminar. */
+    private var guardarPendiente = false
 
     init { cargar() }
 
@@ -78,7 +80,15 @@ class PreferenciasNotificacionViewModel(
     }
 
     fun guardar() {
-        if (_estado.value.guardando || _estado.value.cargando) return
+        if (_estado.value.cargando) {
+            guardarPendiente = true
+            return
+        }
+        if (_estado.value.guardando) {
+            // Conservar el valor del switch en UI; al terminar el guardar actual, reenviar.
+            guardarPendiente = true
+            return
+        }
         viewModelScope.launch {
             val antes = _estado.value
             val snapshotUi = PreferenciasExternas(
@@ -104,30 +114,64 @@ class PreferenciasNotificacionViewModel(
                     snapshotUi.mantenimiento, snapshotUi.soat, snapshotUi.kilometraje, permiso
                 )
                 snapshotServidor = guardado
-                aplicar(
-                    guardado,
-                    avisoSiDenegado = permiso == PermisoDispositivo.DENEGADO && algunaOn,
-                    exito = "Preferencias guardadas. Los push usan estos interruptores."
-                )
+                // Si hubo otro toggle mientras guardábamos, no pisar la UI con la respuesta vieja.
+                val uiAhora = _estado.value
+                val huboCambioLocal = uiAhora.mantenimiento != snapshotUi.mantenimiento
+                    || uiAhora.soat != snapshotUi.soat
+                    || uiAhora.kilometraje != snapshotUi.kilometraje
+                if (huboCambioLocal || guardarPendiente) {
+                    _estado.value = uiAhora.copy(
+                        guardando = false,
+                        permisoDispositivo = permiso,
+                        avisoPermiso = if (permiso == PermisoDispositivo.DENEGADO &&
+                            (uiAhora.mantenimiento || uiAhora.soat)
+                        ) {
+                            "Activa los permisos de notificación del dispositivo para recibir avisos externos"
+                        } else null,
+                        mensajeExito = null,
+                        mensajeError = null
+                    )
+                } else {
+                    aplicar(
+                        guardado,
+                        avisoSiDenegado = permiso == PermisoDispositivo.DENEGADO && algunaOn,
+                        exito = "Preferencias guardadas. Los push usan estos interruptores."
+                    )
+                }
                 // Con permiso OS concedido, asegurar token FCM activo (segundo celular / amiga).
                 if (permiso == PermisoDispositivo.CONCEDIDO && algunaOn) {
                     onPermisoConcedidoParaPush?.invoke()
                 }
             } catch (e: ErrorPreferencias.Sesion) {
                 _estado.value = _estado.value.copy(guardando = false, sesionInvalida = true, mensajeError = e.message)
+                guardarPendiente = false
             } catch (e: Exception) {
-                // EA05: restaurar switches al estado anterior (servidor o UI pre-intento).
-                val revert = snapshotServidor ?: snapshotUi
-                _estado.value = _estado.value.copy(
-                    guardando = false,
-                    mantenimiento = revert.mantenimiento,
-                    soat = revert.soat,
-                    kilometraje = revert.kilometraje,
-                    permisoDispositivo = revert.permisoDispositivo,
-                    mensajeError = e.message?.takeIf { it.isNotBlank() }
-                        ?: "No pudimos guardar tus preferencias",
-                    mensajeExito = null
-                )
+                // EA05: restaurar switches al estado anterior (servidor o UI pre-intento),
+                // salvo si el usuario ya cambió otro switch (queda pendiente de reintento).
+                if (guardarPendiente) {
+                    _estado.value = _estado.value.copy(
+                        guardando = false,
+                        mensajeError = e.message?.takeIf { it.isNotBlank() }
+                            ?: "No pudimos guardar tus preferencias",
+                        mensajeExito = null
+                    )
+                } else {
+                    val revert = snapshotServidor ?: snapshotUi
+                    _estado.value = _estado.value.copy(
+                        guardando = false,
+                        mantenimiento = revert.mantenimiento,
+                        soat = revert.soat,
+                        kilometraje = revert.kilometraje,
+                        permisoDispositivo = revert.permisoDispositivo,
+                        mensajeError = e.message?.takeIf { it.isNotBlank() }
+                            ?: "No pudimos guardar tus preferencias",
+                        mensajeExito = null
+                    )
+                }
+            }
+            if (guardarPendiente && !_estado.value.sesionInvalida) {
+                guardarPendiente = false
+                guardar()
             }
         }
     }
