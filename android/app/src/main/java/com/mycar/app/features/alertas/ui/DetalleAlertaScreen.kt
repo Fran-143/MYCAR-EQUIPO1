@@ -69,8 +69,6 @@ class DetalleAlertaViewModel(
     private val mutable = MutableStateFlow(EstadoDetalleAlerta())
     val estado = mutable.asStateFlow()
 
-    init { cargar() }
-
     fun cargar() {
         mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.CARGANDO)
         viewModelScope.launch {
@@ -156,6 +154,11 @@ fun DetalleAlertaRoute(
         DetalleAlertaViewModel(repository, idVehiculo, idAlerta)
     }
     val estado by vm.estado.collectAsStateWithLifecycle()
+    // El ViewModel sobrevive al salir del detalle (p. ej. formulario atender);
+    // hay que releer siempre al entrar para no mostrar PROGRAMADA/PENDIENTE obsoleto.
+    LaunchedEffect(idVehiculo, idAlerta) {
+        vm.cargar()
+    }
     var preferenciaContactoAplicada by remember(idAlerta) { mutableStateOf(false) }
     // Prioridad: favorito del usuario (cualquiera) → si no hay, taller de sistema (Prueba).
     LaunchedEffect(estado.fase, estado.detalle?.contactoTaller, talleresRepository) {
@@ -206,8 +209,6 @@ class DetalleAlertaLicenciaViewModel(
     private val mutable = MutableStateFlow(EstadoDetalleAlerta())
     val estado = mutable.asStateFlow()
 
-    init { cargar() }
-
     fun cargar() {
         mutable.value = EstadoDetalleAlerta(fase = FaseDetalleAlerta.CARGANDO)
         viewModelScope.launch {
@@ -236,6 +237,9 @@ fun DetalleAlertaLicenciaRoute(
         DetalleAlertaLicenciaViewModel(repository, idAlerta)
     }
     val estado by vm.estado.collectAsStateWithLifecycle()
+    LaunchedEffect(idAlerta) {
+        vm.cargar()
+    }
     DetalleAlertaScreen(
         estado = estado,
         onVolver = onVolver,

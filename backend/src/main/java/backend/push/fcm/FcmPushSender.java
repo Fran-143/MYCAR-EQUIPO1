@@ -2,6 +2,7 @@ package backend.push.fcm;
 
 import backend.push.PushNotificationSender;
 import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
@@ -28,10 +29,13 @@ public class FcmPushSender implements PushNotificationSender {
 
     @Override
     public ResultadoEnvio enviar(MensajePush mensaje) {
+        String titulo = mensaje.titulo() == null ? "MyCar" : mensaje.titulo();
+        String cuerpo = mensaje.cuerpo() == null ? "" : mensaje.cuerpo();
         Map<String, String> data = new HashMap<>();
         data.put("destino", mensaje.destino() == null ? "DETALLE_ALERTA" : mensaje.destino());
-        data.put("titulo", mensaje.titulo() == null ? "" : mensaje.titulo());
-        data.put("cuerpo", mensaje.cuerpo() == null ? "" : mensaje.cuerpo());
+        data.put("titulo", titulo);
+        data.put("cuerpo", cuerpo);
+        data.put("abrir_desde_push", "true");
         if (mensaje.idAlerta() != null) {
             data.put("id_alerta", String.valueOf(mensaje.idAlerta()));
         }
@@ -44,14 +48,21 @@ public class FcmPushSender implements PushNotificationSender {
         if (mensaje.categoria() != null) {
             data.put("categoria", mensaje.categoria());
         }
-        // Data-only: si va notification+data, en background Android muestra el tray del sistema
-        // y NO llama onMessageReceived → sin PendingIntent (tap no abre MainActivity).
-        // El cliente (MycarFirebaseMessagingService) ya construye la notificación con intent.
+        // notification+data: en app muerta/background el SO muestra la bandeja (data-only
+        // se pierde en varios OEM). Tap abre MainActivity con los extras data.
+        // En foreground onMessageReceived sigue recibiendo data y pinta la notif local.
         Message msg = Message.builder()
                 .setToken(mensaje.token())
                 .putAllData(data)
                 .setAndroidConfig(AndroidConfig.builder()
                         .setPriority(AndroidConfig.Priority.HIGH)
+                        .setNotification(AndroidNotification.builder()
+                                .setTitle(titulo)
+                                .setBody(cuerpo)
+                                .setChannelId(CANAL_ALERTAS)
+                                .setSound("default")
+                                .setDefaultVibrateTimings(true)
+                                .build())
                         .build())
                 .build();
         try {

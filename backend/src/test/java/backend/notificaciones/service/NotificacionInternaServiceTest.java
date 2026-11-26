@@ -20,8 +20,11 @@ class NotificacionInternaServiceTest {
         dao = mock(NotificacionJdbcDao.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<AlertaPushControlJdbcDao> pushControl = mock(ObjectProvider.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<backend.alertas.dao.AlertasJdbcDao> alertas = mock(ObjectProvider.class);
         when(pushControl.getIfAvailable()).thenReturn(null);
-        servicio = new NotificacionInternaService(dao, pushControl);
+        when(alertas.getIfAvailable()).thenReturn(null);
+        servicio = new NotificacionInternaService(dao, pushControl, alertas);
     }
 
     private static NotificacionJdbcDao.AlertaContexto ctx(long id, String estado) {

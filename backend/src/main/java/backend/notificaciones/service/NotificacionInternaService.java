@@ -1,11 +1,14 @@
 package backend.notificaciones.service;
 
+import backend.alertas.dao.AlertasJdbcDao;
 import backend.notificaciones.api.dto.ContratoNotificaciones;
 import backend.notificaciones.dao.NotificacionJdbcDao;
 import backend.notificaciones.model.ErrorNotificaciones;
 import backend.push.dao.AlertaPushControlJdbcDao;
 import java.util.Locale;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,19 +20,26 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class NotificacionInternaService {
+    private static final Logger log = LoggerFactory.getLogger(NotificacionInternaService.class);
     private static final Set<String> CATEGORIAS = Set.of(
             "TODAS", "MANTENIMIENTO", "SOAT", "KILOMETRAJE", "LICENCIA");
     private static final Set<String> PESTANAS = Set.of("PENDIENTES", "HISTORIAL");
     private static final Set<String> FILTROS_LECTURA = Set.of("TODAS", "NO_LEIDAS", "LEIDAS");
     private static final Set<String> ACTIVAS = Set.of("PROXIMA", "PENDIENTE", "VENCIDA");
+    private static final Set<String> EVALUABLES = Set.of(
+            "PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA");
 
     private final NotificacionJdbcDao dao;
     private final ObjectProvider<AlertaPushControlJdbcDao> pushControl;
+    private final ObjectProvider<AlertasJdbcDao> alertas;
 
     public NotificacionInternaService(
-            NotificacionJdbcDao dao, ObjectProvider<AlertaPushControlJdbcDao> pushControl) {
+            NotificacionJdbcDao dao,
+            ObjectProvider<AlertaPushControlJdbcDao> pushControl,
+            ObjectProvider<AlertasJdbcDao> alertas) {
         this.dao = dao;
         this.pushControl = pushControl;
+        this.alertas = alertas;
     }
 
     /** RF22 / RF23 / reconciliación RF24: crea o actualiza aviso según estado de alerta. */
@@ -120,14 +130,57 @@ public class NotificacionInternaService {
                 marcadas, dao.contarNoLeidas(usuario), dao.contarLeidas(usuario));
     }
 
-    /** Detalle vigente (relee alerta/KM); no muta LEÍDA. */
-    @Transactional(readOnly = true)
+    /**
+     * Detalle vigente (relee alerta/KM); no muta LEÍDA.
+     * Antes de armar el chip de estado ejecuta RF23 del vehículo/licencia vinculados,
+     * para que «Ver alerta» no muestre PROGRAMADA/PENDIENTE cuando el listado ya es VENCIDA/REALIZADA.
+     */
+    @Transactional
     public ContratoNotificaciones.DetalleNotificacionDto consultarDetalle(long usuario, long idNotificacion) {
         var raw = dao.obtenerDetalleRaw(usuario, idNotificacion)
                 .orElseThrow(() -> new ErrorNotificaciones(
                         "NOTIFICACION_NO_ENCONTRADA", "No se pudo cargar esta notificación."));
+        sincronizarAntesDeDetalle(usuario, raw);
+        raw = dao.obtenerDetalleRaw(usuario, idNotificacion)
+                .orElseThrow(() -> new ErrorNotificaciones(
+                        "NOTIFICACION_NO_ENCONTRADA", "No se pudo cargar esta notificación."));
+        // Si la alerta pasó a REALIZADA/ANULADA, alinear gestión del aviso.
+        if (raw.idAlerta() != null && raw.estadoAlerta() != null) {
+            String est = raw.estadoAlerta().toUpperCase(Locale.ROOT);
+            if ("REALIZADA".equals(est) && "PENDIENTE".equalsIgnoreCase(raw.estadoGestion())) {
+                dao.marcarGestionSiActiva(raw.idAlerta(), "ATENDIDA");
+                raw = dao.obtenerDetalleRaw(usuario, idNotificacion).orElse(raw);
+            } else if ("ANULADA".equals(est) && "PENDIENTE".equalsIgnoreCase(raw.estadoGestion())) {
+                dao.desactivarPendientesDeAlerta(raw.idAlerta());
+                raw = dao.obtenerDetalleRaw(usuario, idNotificacion).orElse(raw);
+            }
+        }
         return DetalleNotificacionAssembler.ensamblar(raw, java.time.LocalDate.now(
                 java.time.ZoneId.of("America/Lima")));
+    }
+
+    private void sincronizarAntesDeDetalle(long usuario, NotificacionJdbcDao.DetalleRaw raw) {
+        var jdbc = alertas.getIfAvailable();
+        if (jdbc == null) {
+            return;
+        }
+        String cat = raw.categoria() == null ? "" : raw.categoria().toUpperCase(Locale.ROOT);
+        try {
+            if ("LICENCIA".equals(cat)) {
+                jdbc.sincronizarLicencia(usuario);
+                sincronizarAvisosLicenciaUsuario(usuario);
+                return;
+            }
+            if (raw.idVehiculo() != null && raw.idVehiculo() > 0
+                    && ("MANTENIMIENTO".equals(cat) || "SOAT".equals(cat)
+                    || (raw.estadoAlerta() != null && EVALUABLES.contains(raw.estadoAlerta().toUpperCase(Locale.ROOT))))) {
+                jdbc.sincronizar(raw.idVehiculo(), usuario);
+                sincronizarAvisosVehiculo(raw.idVehiculo());
+            }
+        } catch (RuntimeException ex) {
+            // No tumbar el detalle si el sync falla; se muestra el estado almacenado.
+            log.warn("Sync RF23 previo a detalle de notificación omitido: {}", ex.toString());
+        }
     }
 
     private void sincronizarContexto(NotificacionJdbcDao.AlertaContexto ctx) {

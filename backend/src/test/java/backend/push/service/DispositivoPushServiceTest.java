@@ -27,7 +27,7 @@ class DispositivoPushServiceTest {
         PushNotificationSender sender = mock(PushNotificationSender.class);
         when(sender.proveedor()).thenReturn("FCM");
         when(preferencias.consultar(12L)).thenReturn(Optional.of(
-                new ContratoPreferenciasNotificacion.PreferenciasResponse(true, true, true, "NO_SOLICITADO")));
+                new ContratoPreferenciasNotificacion.PreferenciasResponse(true, true, true, "DENEGADO")));
         servicio = new DispositivoPushService(dao, sender, preferencias);
     }
 
@@ -36,6 +36,7 @@ class DispositivoPushServiceTest {
         UUID inst = UUID.fromString("643bf983-8f74-41bb-9488-1fbaaf49065b");
         servicio.registrar(12L, inst, "fcm", "token-abc");
         verify(dao).upsert(eq(12L), eq(inst), eq("FCM"), eq("token-abc"));
+        // Segundo dispositivo con token activo debe poder recibir aunque RF48 estuviera DENEGADO.
         verify(preferencias).actualizarSoloPermiso(eq(12L), eq("CONCEDIDO"));
     }
 

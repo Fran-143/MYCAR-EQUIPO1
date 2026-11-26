@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.mycar.app.features.sesion.domain.PoliticaRedLocal
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
@@ -27,6 +28,8 @@ import com.mycar.app.ui.theme.MyCarTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.features.autenticacion.ui.AuthGate
 import com.mycar.app.features.sesion.viewmodel.SesionVehiculosViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var solicitudesVehiculos by mutableIntStateOf(0)
@@ -41,7 +44,17 @@ class MainActivity : ComponentActivity() {
     }
     private val permisoNotificaciones = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* RF48 actualiza permiso vía Preferencias; aquí solo concedemos el OS. */ }
+    ) { granted ->
+        if (granted) {
+            com.mycar.app.features.push.MycarPushChannels.asegurarCanalAlertas(this)
+            // Login suele ocurrir antes del diálogo OS: re-registrar token + RF48 ya.
+            lifecycleScope.launch(Dispatchers.IO) {
+                com.mycar.app.features.push.data.PushTokenSync.registrarSiSesionActiva(
+                    applicationContext, forzar = true
+                )
+            }
+        }
+    }
     private fun necesitaPermisoRedLocal() = PoliticaRedLocal.requierePermiso(
         BuildConfig.DEBUG, Build.VERSION.SDK_INT, BuildConfig.API_BASE_URL)
     private fun comprobarRedLocal() {
@@ -50,23 +63,49 @@ class MainActivity : ComponentActivity() {
     }
     private fun aplicarIntentPush(intent: Intent?) {
         if (intent == null) return
-        if (intent.getBooleanExtra("abrir_vehiculos", false)) solicitudesVehiculos++
-        if (intent.getBooleanExtra("abrir_desde_push", false)) {
-            solicitudesNotificaciones++
-            pushIdVehiculo = intent.getLongExtra("id_vehiculo", -1L).takeIf { it > 0 }
-            pushIdAlerta = intent.getLongExtra("id_alerta", -1L).takeIf { it > 0 }
-            pushIdNotificacion = intent.getLongExtra("id_notificacion", -1L).takeIf { it > 0 }
-            pushCategoria = intent.getStringExtra("categoria_push")
-                ?: intent.getStringExtra("destino_push")?.takeIf { it in listOf("MANTENIMIENTO", "SOAT", "LICENCIA", "KILOMETRAJE") }
-            intent.getStringExtra("categoria")?.let { pushCategoria = it }
+        if (intent.getBooleanExtra("abrir_vehiculos", false) ||
+            intent.getStringExtra("abrir_vehiculos") == "true"
+        ) {
+            solicitudesVehiculos++
         }
+        // FCM en bandeja del sistema entrega extras como String; no siempre trae abrir_desde_push.
+        val desdePush = intent.getBooleanExtra("abrir_desde_push", false)
+            || intent.getStringExtra("abrir_desde_push") == "true"
+            || !intent.getStringExtra("id_notificacion").isNullOrBlank()
+            || intent.hasExtra("id_notificacion")
+            || !intent.getStringExtra("destino_push").isNullOrBlank()
+            || !intent.getStringExtra("destino").isNullOrBlank()
+        if (desdePush) {
+            solicitudesNotificaciones++
+            pushIdVehiculo = intent.extraLong("id_vehiculo")
+            pushIdAlerta = intent.extraLong("id_alerta")
+            pushIdNotificacion = intent.extraLong("id_notificacion")
+            pushCategoria = intent.getStringExtra("categoria_push")
+                ?: intent.getStringExtra("categoria")
+                ?: intent.getStringExtra("destino_push")?.takeIf {
+                    it in listOf("MANTENIMIENTO", "SOAT", "LICENCIA", "KILOMETRAJE")
+                }
+        }
+    }
+
+    private fun Intent.extraLong(key: String): Long? {
+        val fromLong = getLongExtra(key, -1L).takeIf { it > 0 }
+        if (fromLong != null) return fromLong
+        return getStringExtra(key)?.toLongOrNull()?.takeIf { it > 0 }
+            ?: getIntExtra(key, -1).takeIf { it > 0 }?.toLong()
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        // APK general: permitir capturas/grabación (evidencias). Hotfix sidecar conserva FLAG_SECURE.
+        if (BuildConfig.APPLICATION_ID.endsWith(".hotfix")) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
         enableEdgeToEdge()
         aplicarIntentPush(intent)
         comprobarRedLocal()
+        com.mycar.app.features.push.MycarPushChannels.asegurarCanalAlertas(this)
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED) {
@@ -99,6 +138,15 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         comprobarRedLocal()
+        // Segundo dispositivo / permiso concedido en Ajustes: reintentar registro FCM.
+        if (Build.VERSION.SDK_INT < 33 ||
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                com.mycar.app.features.push.data.PushTokenSync.registrarSiSesionActiva(applicationContext)
+            }
+        }
     }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

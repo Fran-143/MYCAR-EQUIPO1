@@ -40,20 +40,21 @@ public class DispositivoPushService {
             throw new IllegalArgumentException("proveedor no soportado");
         }
         dao.upsert(usuario, instalacion, prov, token.trim());
-        // Registrar un dispositivo implica poder recibir: no dejar RF48 en NO_SOLICITADO.
-        // No pisa DENEGADO explícito del usuario.
-        promoverPermisoSiPendiente(usuario);
+        // Registrar un dispositivo (p. ej. segundo celular) implica poder recibir.
+        // Si el usuario denegó en otro aparato pero este sí registra token, promover a CONCEDIDO.
+        promoverPermisoParaEnvio(usuario);
         // Tras recuperar token activo, reencolar omisiones recientes por sin_tokens (misma TX).
         dao.reencolarOmitidosSinTokens(usuario);
     }
 
-    private void promoverPermisoSiPendiente(long usuario) {
+    private void promoverPermisoParaEnvio(long usuario) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
         if (pref == null) {
             return;
         }
-        if ("NO_SOLICITADO".equalsIgnoreCase(pref.permisoDispositivo())) {
+        String actual = pref.permisoDispositivo();
+        if (!"CONCEDIDO".equalsIgnoreCase(actual)) {
             preferencias.actualizarSoloPermiso(usuario, "CONCEDIDO");
         }
     }

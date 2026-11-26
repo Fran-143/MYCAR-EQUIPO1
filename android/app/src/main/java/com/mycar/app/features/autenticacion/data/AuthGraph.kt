@@ -32,7 +32,9 @@ object AuthGraph {
                 registrationPolicy = privacyPolicy(),
                 clearPrivateData = { com.mycar.app.features.sesion.data.DatosPrivadosSesion.limpiar(app) },
                 onSessionReady = { access, installation ->
-                    com.mycar.app.features.push.data.PushTokenSync.registrarTrasSesion(access, installation)
+                    com.mycar.app.features.push.data.PushTokenSync.registrarTrasSesion(
+                        app, access, installation, forzar = true
+                    )
                 },
                 onSessionClosing = { access, installation ->
                     com.mycar.app.features.push.data.PushTokenSync.desvincularAlCerrar(access, installation)

@@ -45,8 +45,8 @@ public class SincronizarAlertasService {
     @Transactional
     public ContratoRf22.ListaResponse listarMisAlertas(long usuario, long vehiculo) {
         if (vehiculo <= 0) throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no encontrado.");
-        exigirVehiculo(usuario, vehiculo);
-        int cambios = sincronizarSeguro(vehiculo, usuario);
+        verificarVehiculo(usuario, vehiculo);
+        int cambios = sincronizarSeguro(vehiculo, usuario, false);
         return new ContratoRf22.ListaResponse(cambios, alertas.listar(vehiculo));
     }
 
@@ -54,7 +54,7 @@ public class SincronizarAlertasService {
     @Transactional
     public ContratoRf22.ListaResponse listarMisAlertasLicencia(long usuario) {
         if (usuario <= 0) throw new ErrorAlertas("SESION_NO_VALIDADA", "Sesión no válida.");
-        int cambios = sincronizarLicenciaSeguro(usuario);
+        int cambios = sincronizarLicenciaSeguro(usuario, false);
         return new ContratoRf22.ListaResponse(cambios, alertas.listarLicencia(usuario));
     }
 
@@ -64,7 +64,7 @@ public class SincronizarAlertasService {
         if (usuario <= 0 || idAlerta <= 0) {
             throw new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible.");
         }
-        sincronizarLicenciaSeguro(usuario);
+        sincronizarLicenciaSeguro(usuario, true);
         var base = alertas.obtenerDetalleLicenciaPropio(usuario, idAlerta)
                 .orElseThrow(() -> new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible."));
         var acciones = new ContratoRf22.AccionesDetalleDto(false, false);
@@ -86,8 +86,8 @@ public class SincronizarAlertasService {
         if (vehiculo <= 0 || idAlerta <= 0) {
             throw new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible.");
         }
-        exigirVehiculo(usuario, vehiculo);
-        sincronizarSeguro(vehiculo, usuario);
+        verificarVehiculo(usuario, vehiculo);
+        sincronizarSeguro(vehiculo, usuario, true);
         var soat = alertas.obtenerDetalleSoatPropio(usuario, vehiculo, idAlerta);
         if (soat.isPresent()) {
             var base = soat.get();
@@ -197,9 +197,34 @@ public class SincronizarAlertasService {
         }
     }
 
-    private int sincronizarSeguro(long vehiculo, long usuario) {
+    /** Lecturas (listado/detalle): sin FOR UPDATE; el sync SQL ya serializa alertas. */
+    private void verificarVehiculo(long usuario, long vehiculo) {
         try {
+            alertas.verificarVehiculoPropioActivo(usuario, vehiculo);
+        } catch (EmptyResultDataAccessException ex) {
+            throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible.");
+        }
+    }
+
+    /**
+     * Debounce solo en listados. Detalle siempre fuerza sync (forzar=true).
+     * Tras actualizar KM el hook ya sincroniza; el debounce evita N syncs al abrir «Todos».
+     */
+    private static final long SYNC_DEBOUNCE_MS = 12_000L;
+    private final java.util.concurrent.ConcurrentHashMap<Long, Long> ultimoSyncVehiculoMs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<Long, Long> ultimoSyncLicenciaMs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private int sincronizarSeguro(long vehiculo, long usuario, boolean forzar) {
+        try {
+            long ahora = System.currentTimeMillis();
+            Long previo = ultimoSyncVehiculoMs.get(vehiculo);
+            if (!forzar && previo != null && ahora - previo < SYNC_DEBOUNCE_MS) {
+                return 0;
+            }
             int cambios = alertas.sincronizar(vehiculo, usuario);
+            ultimoSyncVehiculoMs.put(vehiculo, ahora);
             // RF23: sincronizar avisos internos idempotentes tras transiciones reales.
             if (notificaciones != null) {
                 var n = notificaciones.getIfAvailable();
@@ -244,9 +269,15 @@ public class SincronizarAlertasService {
         }
     }
 
-    private int sincronizarLicenciaSeguro(long usuario) {
+    private int sincronizarLicenciaSeguro(long usuario, boolean forzar) {
         try {
+            long ahora = System.currentTimeMillis();
+            Long previo = ultimoSyncLicenciaMs.get(usuario);
+            if (!forzar && previo != null && ahora - previo < SYNC_DEBOUNCE_MS) {
+                return 0;
+            }
             int cambios = alertas.sincronizarLicencia(usuario);
+            ultimoSyncLicenciaMs.put(usuario, ahora);
             if (notificaciones != null) {
                 var n = notificaciones.getIfAvailable();
                 if (n != null) {

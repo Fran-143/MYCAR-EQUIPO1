@@ -70,7 +70,7 @@ public class DispositivoPushJdbcDao {
     }
 
     /**
-     * Reencola omisiones recientes por falta de token (misma ventana de día Lima).
+     * Reencola omisiones recientes por falta de token o RF48 off (48 h).
      * No reabre ENVIADO ni otras omisiones.
      */
     public int reencolarOmitidosSinTokens(long usuario) {
@@ -82,7 +82,7 @@ public class DispositivoPushJdbcDao {
                     actualizado_utc = clock_timestamp()
                 WHERE id_usuario = ?
                   AND estado = 'OMITIDO'
-                  AND ultimo_error = 'sin_tokens'
+                  AND ultimo_error IN ('sin_tokens', 'rf48_off')
                   AND actualizado_utc >= (clock_timestamp() - INTERVAL '48 hours')
                 """, usuario);
     }
