@@ -318,7 +318,8 @@ public class PlanesService {
                             "No es posible activar Premium porque la operación de prueba no está confirmada.");
                 }
             }
-            props.getSandbox().vigenciaOrThrow();
+            // Sandbox: vigencia opcional (ILIMITADA = sin auto-corte).
+            props.getSandbox().vigenciaOpcional();
         } else if ("PRUEBA_GRATUITA".equals(sol.modalidad())) {
             // La solicitud actual ya consume la única prueba; no revalidar count>=1.
             validarPruebaGratuitaConfigurada();
@@ -326,9 +327,6 @@ public class PlanesService {
             throw new ErrorPlanes("DATOS_INVALIDOS", "Modalidad no soportada.");
         }
 
-        Duration vigencia = "PRUEBA_GRATUITA".equals(sol.modalidad())
-                ? props.getPruebaGratuita().vigenciaOrThrow()
-                : props.getSandbox().vigenciaOrThrow();
         String origen = "PRUEBA_GRATUITA".equals(sol.modalidad())
                 ? "SANDBOX_LOCAL"
                 : (sol.proveedorOperacion() == null ? "SANDBOX_LOCAL" : sol.proveedorOperacion());
@@ -346,7 +344,13 @@ public class PlanesService {
             dao.registrarEvento(sol.idUsuario(), actual.idSuscripcion(), sol.idOperacionPago(),
                     "SUSCRIPCION_VENCIDA_POR_UPGRADE", "prev=" + actual.planCodigo());
         }
-        Instant fin = Instant.now().plus(vigencia);
+        Instant fin;
+        if ("PRUEBA_GRATUITA".equals(sol.modalidad())) {
+            fin = Instant.now().plus(props.getPruebaGratuita().vigenciaOrThrow());
+        } else {
+            // PAGO_SANDBOX: sin fin_utc si ILIMITADA → solo admin puede apagar.
+            fin = props.getSandbox().vigenciaOpcional().map(d -> Instant.now().plus(d)).orElse(null);
+        }
         long idNueva = dao.insertarSuscripcion(
                 sol.idUsuario(), sol.idPlan(), origen, sol.modalidad(), fin, sol.idOperacionPago());
 
@@ -363,7 +367,7 @@ public class PlanesService {
                 "PREMIUM_ACTIVADO", "modalidad=" + sol.modalidad() + ";fin=" + fin);
         return new ContratoPlanes.DecisionResponse(
                 codigo, "APROBADA", "Solicitud aprobada. Premium activado.",
-                fin.toString(), sol.modalidad());
+                fin == null ? null : fin.toString(), sol.modalidad());
     }
 
     /**
@@ -534,10 +538,13 @@ public class PlanesService {
         String motivoNo = null;
         boolean puede = "PENDIENTE_APROBACION".equals(sol.estado());
         try {
-            Duration d = "PRUEBA_GRATUITA".equals(sol.modalidad())
-                    ? props.getPruebaGratuita().vigenciaOrThrow()
-                    : props.getSandbox().vigenciaOrThrow();
-            vigenciaTxt = d.toString();
+            if ("PRUEBA_GRATUITA".equals(sol.modalidad())) {
+                vigenciaTxt = props.getPruebaGratuita().vigenciaOrThrow().toString();
+            } else {
+                vigenciaTxt = props.getSandbox().vigenciaOpcional()
+                        .map(Duration::toString)
+                        .orElse("ILIMITADA (hasta que admin apague)");
+            }
         } catch (ErrorPlanes e) {
             vigenciaTxt = null;
             puede = false;
@@ -750,7 +757,6 @@ public class PlanesService {
             throw new ErrorPlanes("CONFIGURACION_PENDIENTE",
                     "Contratación simulada deshabilitada en el plan PREMIUM.");
         }
-        Duration vigencia = props.getSandbox().vigenciaOrThrow();
         String codigo = nuevoCodigoSolicitud("PSS");
         try {
             dao.crearSolicitud(codigo, idUsuario, plan.idPlan(), "PAGO_SANDBOX",
@@ -770,7 +776,8 @@ public class PlanesService {
                 dao.registrarEvento(idUsuario, actual.idSuscripcion(), null,
                         "SUSCRIPCION_VENCIDA_POR_UPGRADE", "prev=" + actual.planCodigo());
             }
-            Instant fin = Instant.now().plus(vigencia);
+            Instant fin = props.getSandbox().vigenciaOpcional()
+                    .map(d -> Instant.now().plus(d)).orElse(null);
             long idNueva = dao.insertarSuscripcion(
                     idUsuario, sol.idPlan(), "SANDBOX_LOCAL", "PAGO_SANDBOX", fin, null);
             int decided = dao.decidirSolicitud(
@@ -842,7 +849,13 @@ public class PlanesService {
         if (plan.periodicidad() == null || plan.periodicidad().isBlank()) {
             throw new ErrorPlanes("CONFIGURACION_PENDIENTE", "Falta periodicidad en plan PREMIUM.");
         }
-        props.getSandbox().vigenciaOrThrow();
+        // Vigencia sandbox: Duration o ILIMITADA (ambas válidas).
+        String vig = props.getSandbox().getVigencia();
+        if (vig == null || vig.isBlank()) {
+            throw new ErrorPlanes("CONFIGURACION_PENDIENTE",
+                    "Falta mycar.planes.sandbox.vigencia (Duration o ILIMITADA).");
+        }
+        props.getSandbox().vigenciaOpcional(); // valida Duration si aplica
     }
 
     private ContratoPlanes.PlanDto toPlanDto(PlanRow p, boolean sandboxOk, boolean pruebaOk) {
@@ -862,7 +875,12 @@ public class PlanesService {
                     || props.getSandbox().getVigencia().isBlank()) {
                 motivoSandbox = "CONFIGURACION_PENDIENTE: mycar.planes.sandbox.vigencia";
             } else {
-                listoSandbox = true;
+                try {
+                    props.getSandbox().vigenciaOpcional();
+                    listoSandbox = true;
+                } catch (ErrorPlanes e) {
+                    motivoSandbox = e.getMessage();
+                }
             }
             if (!pruebaOk) {
                 motivoPrueba = "CONFIGURACION_PENDIENTE: prueba gratuita (enabled/vigencia/max-por-usuario)";

@@ -1,6 +1,8 @@
 package backend.planes;
 
 import java.time.Duration;
+import java.util.Locale;
+import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "mycar.planes")
@@ -51,7 +53,31 @@ public class PlanesProperties {
         }
 
         public Duration vigenciaOrThrow() {
-            return parseDuration(vigencia, "mycar.planes.sandbox.vigencia");
+            return vigenciaOpcional()
+                    .orElseThrow(() -> new backend.planes.model.ErrorPlanes(
+                            "CONFIGURACION_PENDIENTE",
+                            "mycar.planes.sandbox.vigencia es ILIMITADA; no hay duración fija."));
+        }
+
+        /**
+         * Vacío / ILIMITADA / NONE → Optional.empty() (sin vencimiento automático).
+         * Duration ISO-8601 → Optional.of(duration).
+         */
+        public Optional<Duration> vigenciaOpcional() {
+            if (vigencia == null || vigencia.isBlank()) {
+                return Optional.empty();
+            }
+            String raw = vigencia.strip();
+            String upper = raw.toUpperCase(Locale.ROOT);
+            if ("ILIMITADA".equals(upper) || "NONE".equals(upper) || "INFINITA".equals(upper)
+                    || "0".equals(raw)) {
+                return Optional.empty();
+            }
+            return Optional.of(parseDuration(raw, "mycar.planes.sandbox.vigencia"));
+        }
+
+        public boolean esIlimitada() {
+            return vigenciaOpcional().isEmpty();
         }
     }
 

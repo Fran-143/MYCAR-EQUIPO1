@@ -734,13 +734,19 @@ public class PlanesJdbcDao {
                 WHERE 1=1
                 """);
         java.util.ArrayList<Object> args = new java.util.ArrayList<>();
-        if (filtroEstado != null && !filtroEstado.isBlank() && !"TODAS".equalsIgnoreCase(filtroEstado)) {
-            if ("PENDIENTES".equalsIgnoreCase(filtroEstado)) {
-                inner.append(" AND ss.estado IN ('PENDIENTE_PAGO','PENDIENTE_APROBACION') ");
-            } else {
-                inner.append(" AND ss.estado = ? ");
-                args.add(filtroEstado.strip().toUpperCase());
-            }
+        // Cola operativa: solo pendientes (resueltas viven en pestaña Suscripciones).
+        String filtro = (filtroEstado == null || filtroEstado.isBlank()
+                || "TODAS".equalsIgnoreCase(filtroEstado)
+                || "PENDIENTES".equalsIgnoreCase(filtroEstado))
+                ? "PENDIENTES"
+                : filtroEstado.strip().toUpperCase();
+        if ("PENDIENTES".equals(filtro)) {
+            inner.append(" AND ss.estado IN ('PENDIENTE_PAGO','PENDIENTE_APROBACION') ");
+        } else if ("HISTORIAL".equals(filtro)) {
+            inner.append(" AND ss.estado IN ('APROBADA','RECHAZADA','CANCELADA') ");
+        } else {
+            inner.append(" AND ss.estado = ? ");
+            args.add(filtro);
         }
         if (q != null && !q.isBlank()) {
             inner.append("""
