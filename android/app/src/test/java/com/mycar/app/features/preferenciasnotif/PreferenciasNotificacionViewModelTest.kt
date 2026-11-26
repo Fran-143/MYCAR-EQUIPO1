@@ -18,6 +18,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlin.coroutines.resume
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PreferenciasNotificacionViewModelTest {
@@ -123,11 +124,38 @@ class PreferenciasNotificacionViewModelTest {
         assertEquals("No pudimos guardar tus preferencias", vm.estado.value.mensajeError)
     }
 
+    @Test
+    fun autoGuardar_segundoSwitchMientrasGuarda_persisteAmbos() = runTest {
+        repo.actual = PreferenciasExternas(false, false, false, PermisoDispositivo.CONCEDIDO)
+        permisoOs = PermisoDispositivo.CONCEDIDO
+        repo.bloquearGuardarHastaSenal = true
+        val vm = vm()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.cambiarMantenimiento(true)
+        assertTrue(vm.estado.value.guardando)
+        vm.cambiarSoat(true)
+        assertTrue(vm.estado.value.soat)
+
+        repo.liberarGuardar()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.estado.value.guardando)
+        assertTrue(vm.estado.value.mantenimiento)
+        assertTrue(vm.estado.value.soat)
+        assertTrue(repo.ultimoGuardado!!.mantenimiento)
+        assertTrue(repo.ultimoGuardado!!.soat)
+        assertTrue(repo.guardados >= 2)
+    }
+
     private class FakeRepo : PreferenciasNotificacionRepository {
         var actual = PreferenciasExternas(true, true, true, PermisoDispositivo.NO_SOLICITADO)
         var ultimoGuardado: PreferenciasExternas? = null
         var ultimoPermisoPatch: PermisoDispositivo? = null
         var fallarGuardar = false
+        var guardados = 0
+        var bloquearGuardarHastaSenal = false
+        private var liberar: (() -> Unit)? = null
 
         override suspend fun consultar(): PreferenciasExternas = actual
 
@@ -137,10 +165,22 @@ class PreferenciasNotificacionViewModelTest {
             kilometraje: Boolean,
             permisoDispositivo: PermisoDispositivo
         ): PreferenciasExternas {
-            if (fallarGuardar) throw ErrorPreferencias.Red("fail")
+            if (fallarGuardar) throw ErrorPreferencias.Red("")
+            if (bloquearGuardarHastaSenal) {
+                kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                    liberar = { cont.resume(Unit) }
+                }
+                bloquearGuardarHastaSenal = false
+            }
             actual = PreferenciasExternas(mantenimiento, soat, kilometraje, permisoDispositivo)
             ultimoGuardado = actual
+            guardados++
             return actual
+        }
+
+        fun liberarGuardar() {
+            liberar?.invoke()
+            liberar = null
         }
 
         override suspend fun actualizarPermisoDispositivo(permiso: PermisoDispositivo): PreferenciasExternas {

@@ -223,7 +223,7 @@ private fun PreferenciasNotificacionScreen(
                 titulo = "Mantenimiento",
                 descripcion = "Avisos externos sobre servicios y recordatorios de mantenimiento.",
                 valor = estado.mantenimiento,
-                enabled = !estado.guardando,
+                enabled = !estado.cargando,
                 onChange = onMantenimiento
             )
             TarjetaPreferencia(
@@ -231,7 +231,7 @@ private fun PreferenciasNotificacionScreen(
                 titulo = "SOAT",
                 descripcion = "Recordatorios externos de vencimiento y renovación del SOAT.",
                 valor = estado.soat,
-                enabled = !estado.guardando,
+                enabled = !estado.cargando,
                 onChange = onSoat
             )
             Surface(shape = RoundedCornerShape(16.dp), color = MyCarTile) {
