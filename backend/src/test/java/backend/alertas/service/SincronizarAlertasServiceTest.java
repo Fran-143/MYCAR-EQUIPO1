@@ -23,12 +23,12 @@ class SincronizarAlertasServiceTest {
         when(dao.listar(3L)).thenReturn(List.of());
         var r = servicio.listarMisAlertas(9L, 3L);
         assertEquals(2, r.alertasSincronizadas());
-        verify(dao).exigirVehiculoPropioActivo(9L, 3L);
+        verify(dao).verificarVehiculoPropioActivo(9L, 3L);
         verify(dao).sincronizar(3L, 9L);
     }
 
     @Test void vehiculoAjenoEs404() {
-        doThrow(new EmptyResultDataAccessException(1)).when(dao).exigirVehiculoPropioActivo(9L, 3L);
+        doThrow(new EmptyResultDataAccessException(1)).when(dao).verificarVehiculoPropioActivo(9L, 3L);
         var ex = assertThrows(ErrorAlertas.class, () -> servicio.listarMisAlertas(9L, 3L));
         assertEquals("VEHICULO_NO_ENCONTRADO", ex.codigo());
         verify(dao, never()).sincronizar(anyLong(), anyLong());

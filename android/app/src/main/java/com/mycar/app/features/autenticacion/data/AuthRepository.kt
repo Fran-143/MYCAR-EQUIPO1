@@ -272,6 +272,17 @@ class AuthRepository(
         else vault?.tokens?.let { AuthenticatedContext(it.idSesion, generation) }
     }
 
+    /**
+     * Credenciales mínimas para re-registrar FCM (permiso OS / onNewToken) sin renovar sesión.
+     * null si no hay sesión autenticada con access token.
+     */
+    fun peekPushCredentials(): Pair<String, String>? = synchronized(localLock) {
+        if (cleanupBlocked || mutableSession.value.phase != SessionPhase.AUTHENTICATED) return null
+        val tokens = vault?.tokens ?: return null
+        if (tokens.accessToken.isBlank()) return null
+        tokens.accessToken to load().installation
+    }
+
     /** Único emisor para los clientes del equipo. Serializa renovación; jamás reintenta su POST. */
     suspend fun authorization(context: AuthenticatedContext): String = withContext(Dispatchers.IO) {
         mutex.withLock {

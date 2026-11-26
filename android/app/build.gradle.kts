@@ -8,6 +8,25 @@ plugins {
 fun legalConfigString(value: String) = "\"" +
     value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
 
+fun loadKeystoreProperties(): Map<String, String>? {
+    val override = providers.gradleProperty("mycar.keystoreProperties").orNull
+    val candidates = listOfNotNull(
+        override?.let { file(it) },
+        rootProject.file("keystore.properties"),
+        file("${System.getenv("LOCALAPPDATA")}/MyCar/release-signing/keystore.properties")
+    )
+    val propsFile = candidates.firstOrNull { it.isFile } ?: return null
+    return propsFile.readLines()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+        .associate { line ->
+            val idx = line.indexOf('=')
+            line.substring(0, idx).trim() to line.substring(idx + 1).trim()
+        }
+}
+
+val releaseKeystoreProps = loadKeystoreProperties()
+
 android {
     namespace = "com.mycar.app"
 
@@ -19,17 +38,34 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 59
-        versionName = "1.2.35-rf26-rf62-general-v59"
+        // 85 / 1.0.13: consistencia estado alertas (detalle/notif) + carga «Todos» en paralelo.
+        versionCode = 85
+        versionName = "1.0.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // Release conserva el documento externo. La política local académica se selecciona únicamente en debug.
-        buildConfigField("String", "PRIVACY_SOURCE", legalConfigString("external"))
+        // Política académica v1.0 embebida (local-academic) en release y debug.
+        // Override: -Pmycar.privacy.source=external + URL/versión externas.
+        buildConfigField("String", "PRIVACY_SOURCE",
+            legalConfigString(providers.gradleProperty("mycar.privacy.source").getOrElse("local-academic")))
         buildConfigField("String", "PRIVACY_VERSION",
             legalConfigString(providers.gradleProperty("mycar.privacy.version").getOrElse("")))
         buildConfigField("String", "PRIVACY_DOCUMENT_URL",
             legalConfigString(providers.gradleProperty("mycar.privacy.documentUrl").getOrElse("")))
         buildConfigField("boolean", "LOCAL_TEST_TOOLS", "false")
+    }
+
+    signingConfigs {
+        create("release") {
+            val props = releaseKeystoreProps
+            if (props != null) {
+                val storePath = props["storeFile"]
+                    ?: error("keystore.properties sin storeFile")
+                storeFile = file(storePath)
+                storePassword = props["storePassword"]
+                keyAlias = props["keyAlias"]
+                keyPassword = props["keyPassword"]
+            }
+        }
     }
 
     buildTypes {
@@ -61,12 +97,17 @@ android {
                 "\"${providers.gradleProperty("mycar.apiBaseUrl").getOrElse("https://mycar-backend-1dxi.onrender.com/")}\""
             )
 
+            if (releaseKeystoreProps != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+
+            // AGP optimization sobre kotlin.** provocaba IllegalAccessError en runtime
+            // (kotlin.text.* inaccesible desde clase ofuscada en MainActivity.onCreate).
+            // Se conserva minify/recursos estándar; no se optimiza el paquete kotlin.
             optimization {
                 enable = true
                 packageScope = setOf(
-                    "androidx.**",
-                    "kotlin.**",
-                    "kotlinx.**"
+                    "androidx.**"
                 )
             }
         }
@@ -91,6 +132,8 @@ dependencies {
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    // Requerido por lintVitalRelease: registerForActivityResult exige Fragment ≥ 1.3.0
+    implementation("androidx.fragment:fragment-ktx:1.8.6")
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui)

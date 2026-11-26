@@ -5,9 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.mycar.app.features.alertas.domain.AlertasRepository
 import com.mycar.app.features.alertas.domain.DatosAlerta
 import com.mycar.app.features.alertas.domain.SolicitudAtenderAlerta
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.time.LocalDate
 
 enum class FaseAlertas { CARGANDO, LISTO, ERROR, VACIO }
@@ -35,6 +40,12 @@ data class EstadoAlertas(
     /** Mapa idAlerta → idVehiculo (útil con «Todos mis vehículos»). */
     val alertaPorVehiculo: Map<Long, Long> = emptyMap(),
     val filtro: FiltroAlertas = FiltroAlertas.TODAS,
+    /**
+     * null = prioridad por estado (VENCIDA→…→PROGRAMADA).
+     * true = solo Recientes (más nuevo primero, ignora prioridad).
+     * false = solo Antiguos (más viejo primero, ignora prioridad).
+     */
+    val ordenRecientes: Boolean? = null,
     val mensaje: String? = null,
     val avisoAccion: String? = null,
     val ocupadoAccion: Boolean = false,
@@ -116,7 +127,7 @@ class AlertasViewModel(
     fun cambiarFiltro(filtro: FiltroAlertas) {
         val s = mutable.value
         if (s.ambito != AmbitoAlertas.VEHICULOS) return
-        val visibles = filtrar(s.alertas, filtro)
+        val visibles = filtrarYOrdenar(s.alertas, filtro, s.ordenRecientes)
         mutable.value = s.copy(
             filtro = filtro,
             visibles = visibles,
@@ -128,6 +139,17 @@ class AlertasViewModel(
             mensaje = if (visibles.isEmpty() && s.fase != FaseAlertas.ERROR && s.fase != FaseAlertas.CARGANDO)
                 EstadoAlertas.MENSAJE_SIN_ALERTAS_VEHICULO else s.mensaje
         )
+    }
+
+    /**
+     * null = prioridad por defecto; true = Recientes; false = Antiguos.
+     * Recientes/Antiguos sustituyen la prioridad de estado.
+     */
+    fun ordenar(recientes: Boolean?) {
+        val s = mutable.value
+        if (s.ambito != AmbitoAlertas.VEHICULOS || s.ordenRecientes == recientes) return
+        val visibles = filtrarYOrdenar(s.alertas, s.filtro, recientes)
+        mutable.value = s.copy(ordenRecientes = recientes, visibles = visibles)
     }
 
     /** G108: al volver de programar, filtro Todas. */
@@ -260,7 +282,7 @@ class AlertasViewModel(
                 // Anti-carrera: ignorar si cambió vehículo o llegó otra generación.
                 if (s.vehiculoId != id || s.generacion != gen) return@launch
                 val sinAnuladas = lista.filter { it.estado != "ANULADA" }
-                val visibles = filtrar(sinAnuladas, s.filtro)
+                val visibles = filtrarYOrdenar(sinAnuladas, s.filtro, s.ordenRecientes)
                 mutable.value = s.copy(
                     sincronizadas = sync,
                     alertas = sinAnuladas,
@@ -286,11 +308,21 @@ class AlertasViewModel(
         mutable.value = mutable.value.copy(generacion = gen)
         viewModelScope.launch {
             try {
+                val resultados = coroutineScope {
+                    val limite = Semaphore(4)
+                    vehiculos.map { (idVehiculo, _) ->
+                        async {
+                            limite.withPermit {
+                                idVehiculo to repository.listar(idVehiculo)
+                            }
+                        }
+                    }.awaitAll()
+                }
                 var syncTotal = 0
                 val acumuladas = LinkedHashMap<Long, DatosAlerta>()
                 val mapa = LinkedHashMap<Long, Long>()
-                for ((idVehiculo, _) in vehiculos) {
-                    val (sync, lista) = repository.listar(idVehiculo)
+                for ((idVehiculo, par) in resultados) {
+                    val (sync, lista) = par
                     syncTotal += sync
                     lista.filter { it.estado != "ANULADA" }.forEach { a ->
                         if (!acumuladas.containsKey(a.id)) {
@@ -302,7 +334,7 @@ class AlertasViewModel(
                 val s = mutable.value
                 if (s.vehiculoId != EstadoAlertas.ID_TODOS_VEHICULOS || s.generacion != gen) return@launch
                 val sinAnuladas = acumuladas.values.toList()
-                val visibles = filtrar(sinAnuladas, s.filtro)
+                val visibles = filtrarYOrdenar(sinAnuladas, s.filtro, s.ordenRecientes)
                 mutable.value = s.copy(
                     sincronizadas = syncTotal,
                     alertas = sinAnuladas,
@@ -323,10 +355,56 @@ class AlertasViewModel(
     }
 
     companion object {
+        /** Prioridad visual: VENCIDA → PENDIENTE → PRÓXIMA → PROGRAMADA → resto. */
+        fun prioridadEstado(estado: String): Int = when (estado) {
+            "VENCIDA" -> 0
+            "PENDIENTE" -> 1
+            "PROXIMA" -> 2
+            "PROGRAMADA" -> 3
+            "REALIZADA" -> 4
+            else -> 5
+        }
+
         fun filtrar(lista: List<DatosAlerta>, filtro: FiltroAlertas): List<DatosAlerta> {
             val base = lista.filter { it.estado != "ANULADA" }
             val estado = filtro.estadoApi ?: return base
             return base.filter { it.estado == estado }
+        }
+
+        fun filtrarYOrdenar(
+            lista: List<DatosAlerta>,
+            filtro: FiltroAlertas,
+            recientes: Boolean?
+        ): List<DatosAlerta> {
+            val filtradas = filtrar(lista, filtro)
+            return when (recientes) {
+                // Recientes: la recién creada (id mayor) primero; sin prioridad de estado.
+                true -> filtradas.sortedWith(
+                    compareByDescending<DatosAlerta> { it.id }
+                        .thenComparator { a, b -> -compararFechaObjetivo(a.fechaObjetivo, b.fechaObjetivo) }
+                )
+                // Antiguos: más vieja primero.
+                false -> filtradas.sortedWith(
+                    compareBy<DatosAlerta> { it.id }
+                        .thenComparator { a, b -> compararFechaObjetivo(a.fechaObjetivo, b.fechaObjetivo) }
+                )
+                // Por defecto: VENCIDA → PENDIENTE → PRÓXIMA → PROGRAMADA.
+                null -> filtradas.sortedWith(
+                    compareBy<DatosAlerta> { prioridadEstado(it.estado) }
+                        .thenByDescending { it.id }
+                )
+            }
+        }
+
+        private fun compararFechaObjetivo(a: String?, b: String?): Int {
+            val fa = a?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            val fb = b?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            return when {
+                fa == null && fb == null -> 0
+                fa == null -> 1
+                fb == null -> -1
+                else -> fa.compareTo(fb)
+            }
         }
     }
 }

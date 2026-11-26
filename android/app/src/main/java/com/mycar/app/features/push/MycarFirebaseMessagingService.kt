@@ -1,27 +1,41 @@
 package com.mycar.app.features.push
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
-import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.mycar.app.MainActivity
 import com.mycar.app.R
+import com.mycar.app.features.push.data.PushTokenSync
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Recibe push FCM y abre MainActivity con extras de destino (DETALLE_ALERTA / bandeja).
- * onNewToken: el re-registro ocurre en el próximo login/validateSession.
+ * onNewToken: re-registra al backend si la sesión sigue abierta (segundo dispositivo / rotación).
  */
 class MycarFirebaseMessagingService : FirebaseMessagingService() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onCreate() {
+        super.onCreate()
+        MycarPushChannels.asegurarCanalAlertas(this)
+    }
 
     override fun onNewToken(token: String) {
-        // Persistencia del token en backend requiere JWT; se sincroniza al autenticar.
+        scope.launch {
+            runCatching { PushTokenSync.onTokenRotado(applicationContext, token) }
+                .onFailure { Log.i(TAG, "onNewToken sync: ${it.message}") }
+        }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
+        MycarPushChannels.asegurarCanalAlertas(this)
         val data = message.data
         val titulo = message.notification?.title ?: data["titulo"] ?: "MyCar"
         val cuerpo = message.notification?.body ?: data["cuerpo"] ?: ""
@@ -40,26 +54,27 @@ class MycarFirebaseMessagingService : FirebaseMessagingService() {
             if (idNotificacion != null) putExtra("id_notificacion", idNotificacion)
             if (!categoria.isNullOrBlank()) putExtra("categoria", categoria)
         }
+        val requestCode = (idNotificacion ?: idAlerta ?: (System.currentTimeMillis() and 0x7fffffff)).toInt()
         val pending = PendingIntent.getActivity(
             this,
-            (idNotificacion ?: idAlerta ?: 0L).toInt(),
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val channelId = "mycar_alertas"
-        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(channelId, "Alertas MyCar", NotificationManager.IMPORTANCE_DEFAULT)
-            )
-        }
-        val notif = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher)
+        val notif = NotificationCompat.Builder(this, MycarPushChannels.ALERTAS_ID)
+            .setSmallIcon(R.drawable.ic_stat_mycar)
             .setContentTitle(titulo)
             .setContentText(cuerpo)
             .setContentIntent(pending)
             .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .build()
-        nm.notify((idNotificacion ?: System.currentTimeMillis()).toInt(), notif)
+        NotificationManagerCompat.from(this)
+            .notify((idNotificacion ?: System.currentTimeMillis()).toInt(), notif)
+    }
+
+    companion object {
+        private const val TAG = "MycarFcm"
     }
 }

@@ -4,39 +4,49 @@ import backend.alertas.api.dto.ContratoRf22;
 import backend.alertas.dao.AlertasJdbcDao;
 import backend.alertas.model.ErrorAlertas;
 import backend.notificaciones.service.NotificacionInternaService;
+import backend.push.service.RecordatorioPushService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Set;
 
 /** RF23: sincroniza antes del listado (función PostgreSQL). RF24: detalle con sync puntual. */
 @Service
 public class SincronizarAlertasService {
+    private static final Logger log = LoggerFactory.getLogger(SincronizarAlertasService.class);
     private static final Set<String> ATENDIBLES = Set.of("PROXIMA", "PENDIENTE", "VENCIDA");
     private static final Set<String> ANULABLES = Set.of("PROGRAMADA", "PROXIMA", "PENDIENTE", "VENCIDA");
 
     private final AlertasJdbcDao alertas;
     private final ObjectProvider<NotificacionInternaService> notificaciones;
+    private final ObjectProvider<RecordatorioPushService> pushRecordatorios;
 
     public SincronizarAlertasService(AlertasJdbcDao alertas) {
-        this(alertas, null);
+        this(alertas, null, null);
     }
 
     @Autowired
     public SincronizarAlertasService(
-            AlertasJdbcDao alertas, ObjectProvider<NotificacionInternaService> notificaciones) {
+            AlertasJdbcDao alertas,
+            ObjectProvider<NotificacionInternaService> notificaciones,
+            ObjectProvider<RecordatorioPushService> pushRecordatorios) {
         this.alertas = alertas;
         this.notificaciones = notificaciones;
+        this.pushRecordatorios = pushRecordatorios;
     }
 
     @Transactional
     public ContratoRf22.ListaResponse listarMisAlertas(long usuario, long vehiculo) {
         if (vehiculo <= 0) throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no encontrado.");
-        exigirVehiculo(usuario, vehiculo);
-        int cambios = sincronizarSeguro(vehiculo, usuario);
+        verificarVehiculo(usuario, vehiculo);
+        int cambios = sincronizarSeguro(vehiculo, usuario, false);
         return new ContratoRf22.ListaResponse(cambios, alertas.listar(vehiculo));
     }
 
@@ -44,7 +54,7 @@ public class SincronizarAlertasService {
     @Transactional
     public ContratoRf22.ListaResponse listarMisAlertasLicencia(long usuario) {
         if (usuario <= 0) throw new ErrorAlertas("SESION_NO_VALIDADA", "Sesión no válida.");
-        int cambios = sincronizarLicenciaSeguro(usuario);
+        int cambios = sincronizarLicenciaSeguro(usuario, false);
         return new ContratoRf22.ListaResponse(cambios, alertas.listarLicencia(usuario));
     }
 
@@ -54,7 +64,7 @@ public class SincronizarAlertasService {
         if (usuario <= 0 || idAlerta <= 0) {
             throw new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible.");
         }
-        sincronizarLicenciaSeguro(usuario);
+        sincronizarLicenciaSeguro(usuario, true);
         var base = alertas.obtenerDetalleLicenciaPropio(usuario, idAlerta)
                 .orElseThrow(() -> new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible."));
         var acciones = new ContratoRf22.AccionesDetalleDto(false, false);
@@ -76,8 +86,8 @@ public class SincronizarAlertasService {
         if (vehiculo <= 0 || idAlerta <= 0) {
             throw new ErrorAlertas("ALERTA_NO_ENCONTRADA", "La alerta no está disponible.");
         }
-        exigirVehiculo(usuario, vehiculo);
-        sincronizarSeguro(vehiculo, usuario);
+        verificarVehiculo(usuario, vehiculo);
+        sincronizarSeguro(vehiculo, usuario, true);
         var soat = alertas.obtenerDetalleSoatPropio(usuario, vehiculo, idAlerta);
         if (soat.isPresent()) {
             var base = soat.get();
@@ -187,9 +197,34 @@ public class SincronizarAlertasService {
         }
     }
 
-    private int sincronizarSeguro(long vehiculo, long usuario) {
+    /** Lecturas (listado/detalle): sin FOR UPDATE; el sync SQL ya serializa alertas. */
+    private void verificarVehiculo(long usuario, long vehiculo) {
         try {
+            alertas.verificarVehiculoPropioActivo(usuario, vehiculo);
+        } catch (EmptyResultDataAccessException ex) {
+            throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible.");
+        }
+    }
+
+    /**
+     * Debounce solo en listados. Detalle siempre fuerza sync (forzar=true).
+     * Tras actualizar KM el hook ya sincroniza; el debounce evita N syncs al abrir «Todos».
+     */
+    private static final long SYNC_DEBOUNCE_MS = 12_000L;
+    private final java.util.concurrent.ConcurrentHashMap<Long, Long> ultimoSyncVehiculoMs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<Long, Long> ultimoSyncLicenciaMs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private int sincronizarSeguro(long vehiculo, long usuario, boolean forzar) {
+        try {
+            long ahora = System.currentTimeMillis();
+            Long previo = ultimoSyncVehiculoMs.get(vehiculo);
+            if (!forzar && previo != null && ahora - previo < SYNC_DEBOUNCE_MS) {
+                return 0;
+            }
             int cambios = alertas.sincronizar(vehiculo, usuario);
+            ultimoSyncVehiculoMs.put(vehiculo, ahora);
             // RF23: sincronizar avisos internos idempotentes tras transiciones reales.
             if (notificaciones != null) {
                 var n = notificaciones.getIfAvailable();
@@ -197,15 +232,52 @@ public class SincronizarAlertasService {
                     n.sincronizarAvisosVehiculo(vehiculo);
                 }
             }
+            if (cambios > 0) {
+                programarEncoladoPushTrasCommit();
+            }
             return cambios;
         } catch (EmptyResultDataAccessException ex) {
             throw new ErrorAlertas("VEHICULO_NO_ENCONTRADO", "Vehículo no disponible.");
         }
     }
 
-    private int sincronizarLicenciaSeguro(long usuario) {
+    /** Tras transiciones reales: encola push (despacho FCM en ventana / worker). */
+    private void programarEncoladoPushTrasCommit() {
+        if (pushRecordatorios == null) {
+            return;
+        }
+        Runnable accion = () -> {
+            var push = pushRecordatorios.getIfAvailable();
+            if (push == null) {
+                return;
+            }
+            try {
+                push.encolarCandidatosTrasEvaluacion();
+            } catch (RuntimeException ex) {
+                log.warn("Encolado push tras sync omitido: {}", ex.toString());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    accion.run();
+                }
+            });
+        } else {
+            accion.run();
+        }
+    }
+
+    private int sincronizarLicenciaSeguro(long usuario, boolean forzar) {
         try {
+            long ahora = System.currentTimeMillis();
+            Long previo = ultimoSyncLicenciaMs.get(usuario);
+            if (!forzar && previo != null && ahora - previo < SYNC_DEBOUNCE_MS) {
+                return 0;
+            }
             int cambios = alertas.sincronizarLicencia(usuario);
+            ultimoSyncLicenciaMs.put(usuario, ahora);
             if (notificaciones != null) {
                 var n = notificaciones.getIfAvailable();
                 if (n != null) {
