@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ValidadorTaller {
-    /** Máximo 9 dígitos (1–9), no exactamente nueve. */
-    private static final Pattern TELEFONO_1_A_9 = Pattern.compile("^[0-9]{1,9}$");
+    /** Celular Perú: 9 dígitos y siempre empieza con 9. */
+    private static final Pattern TELEFONO_MOVIL_PE = Pattern.compile("^9[0-9]{8}$");
     private final jakarta.validation.Validator emailValidator =
             Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -24,20 +24,31 @@ public class ValidadorTaller {
         return n;
     }
 
-    /** Opcional; si se informa: solo dígitos, máximo 9 (^[0-9]{1,9}$). */
+    /**
+     * Opcional; si se informa: celular Perú (9 dígitos, empieza con 9).
+     * Acepta entrada con prefijo 51 / +51 / 0 y la normaliza a 9 dígitos nacionales.
+     */
     public String telefonoOpcional(String telefono) {
         if (telefono == null || telefono.isBlank()) return null;
-        String bruto = telefono.strip();
-        if (!bruto.chars().allMatch(Character::isDigit)) {
-            throw new IllegalArgumentException("El teléfono solo admite dígitos (0-9)");
+        String digitos = telefono.strip().chars()
+                .filter(Character::isDigit)
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                .toString();
+        if (digitos.length() >= 11 && digitos.startsWith("51")) {
+            digitos = digitos.substring(2);
+        } else if (digitos.length() == 10 && digitos.startsWith("0")) {
+            digitos = digitos.substring(1);
         }
-        if (bruto.length() > 9) {
-            throw new IllegalArgumentException("El teléfono admite máximo 9 dígitos");
-        }
-        if (!TELEFONO_1_A_9.matcher(bruto).matches()) {
+        if (!TELEFONO_MOVIL_PE.matcher(digitos).matches()) {
+            if (digitos.length() != 9) {
+                throw new IllegalArgumentException("Ingresa 9 dígitos (celular Perú)");
+            }
+            if (!digitos.startsWith("9")) {
+                throw new IllegalArgumentException("El celular debe empezar con 9");
+            }
             throw new IllegalArgumentException("El teléfono ingresado no es válido");
         }
-        return bruto;
+        return digitos;
     }
 
     public String correoOpcional(String correo) {

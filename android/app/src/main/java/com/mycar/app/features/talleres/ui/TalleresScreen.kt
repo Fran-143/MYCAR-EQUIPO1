@@ -259,7 +259,7 @@ private fun TarjetaTaller(t: Taller, onClick: () -> Unit, onFavorito: () -> Unit
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(t.nombre, fontWeight = FontWeight.SemiBold, color = Azul)
                     BadgeOrigen(t.esAsociado)
-                    t.telefono?.let {
+                    ValidadorFormularioTaller.formatearTelefonoUi(t.telefono)?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6881A5))
                     }
                     t.direccion?.let {
@@ -309,11 +309,12 @@ fun DetalleTallerScreen(
 ) {
     var confirmar by remember { mutableStateOf(false) }
     Column(modifier.fillMaxSize().background(if (embebidoEnHistorial) Color.Transparent else Fondo).testTag("rf34.detalle")) {
+        // Siempre statusBars: embebido oculta MycarCabeceraApp al abrir detalle (BUG-01).
         Surface(color = Color.White, shadowElevation = 1.dp) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .then(if (embebidoEnHistorial) Modifier else Modifier.statusBarsPadding())
+                    .statusBarsPadding()
                     .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -350,11 +351,11 @@ fun DetalleTallerScreen(
             mensaje?.let { Text(it, color = Celeste) }
             Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 1.dp) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    taller.telefono?.let {
+                    ValidadorFormularioTaller.formatearTelefonoUi(taller.telefono)?.let { telUi ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Phone, null, tint = Celeste)
                             Spacer(Modifier.width(10.dp))
-                            Text(it, color = Azul)
+                            Text(telUi, color = Azul)
                         }
                     }
                     taller.direccion?.let {
@@ -456,38 +457,47 @@ fun FormularioTallerScreen(
     embebidoEnHistorial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var nombre by remember(editando) { mutableStateOf(editando?.nombre.orEmpty()) }
-    var telefono by remember(editando) { mutableStateOf(editando?.telefono.orEmpty()) }
+    var nombre by remember(editando) {
+        mutableStateOf(ValidadorFormularioTaller.normalizarNombre(editando?.nombre.orEmpty()))
+    }
+    var telefono by remember(editando) {
+        mutableStateOf(ValidadorFormularioTaller.digitosTelefono(editando?.telefono.orEmpty()))
+    }
     var correo by remember(editando) { mutableStateOf(editando?.correo.orEmpty()) }
-    var direccion by remember(editando) { mutableStateOf(editando?.direccion.orEmpty()) }
+    var direccion by remember(editando) {
+        mutableStateOf(ValidadorFormularioTaller.normalizarDireccion(editando?.direccion.orEmpty()))
+    }
     var notas by remember(editando) { mutableStateOf(editando?.notas.orEmpty()) }
     var tieneWhatsapp by remember(editando) { mutableStateOf(editando?.tieneWhatsapp == true) }
     var confirmarDescartar by remember { mutableStateOf(false) }
     var tocados by remember(editando) { mutableStateOf(setOf<String>()) }
     var intentoGuardar by remember(editando) { mutableStateOf(false) }
 
-    val inicialNombre = editando?.nombre.orEmpty()
-    val inicialTel = editando?.telefono.orEmpty()
-    val inicialCorreo = editando?.correo.orEmpty()
-    val inicialDir = editando?.direccion.orEmpty()
-    val inicialNotas = editando?.notas.orEmpty()
-    val inicialWa = editando?.tieneWhatsapp == true
-    val hayCambios = nombre != inicialNombre || telefono != inicialTel || correo != inicialCorreo ||
-        direccion != inicialDir || notas != inicialNotas || tieneWhatsapp != inicialWa
+    LaunchedEffect(telefono) {
+        if (telefono.length != 9 || !telefono.startsWith("9")) tieneWhatsapp = false
+    }
 
-    LaunchedEffect(telefono) { if (telefono.isBlank()) tieneWhatsapp = false }
-
-    val telDigitos = ValidadorFormularioTaller.digitosTelefono(telefono)
-    val errores = ValidadorFormularioTaller.errores(nombre, telDigitos, correo, notas)
+    val errores = ValidadorFormularioTaller.errores(nombre, telefono, correo, direccion, notas)
+    val puedeGuardar = !ocupado && ValidadorFormularioTaller.puedeGuardar(
+        nombre, telefono, correo, direccion, notas, tieneWhatsapp, editando
+    )
+    val hayCambios = editando == null || ValidadorFormularioTaller.hayCambiosReales(
+        nombre, telefono, correo, direccion, notas, tieneWhatsapp, editando
+    )
 
     fun mostrarError(campo: String) = intentoGuardar || campo in tocados
 
-    Column(modifier.fillMaxSize().background(Fondo)) {
+    // Siempre statusBars: embebido oculta MycarCabeceraApp al abrir formulario (BUG-01).
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(if (embebidoEnHistorial) Color.Transparent else Fondo)
+    ) {
         Surface(color = Color.White, shadowElevation = 1.dp) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .then(if (embebidoEnHistorial) Modifier else Modifier.statusBarsPadding())
+                    .statusBarsPadding()
                     .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -511,46 +521,79 @@ fun FormularioTallerScreen(
             mensaje?.let { Text(it, color = Color(0xFFC62828)) }
             OutlinedTextField(
                 value = nombre,
-                onValueChange = { nombre = it; tocados = tocados + "nombre" },
+                onValueChange = {
+                    nombre = it.uppercase()
+                    tocados = tocados + "nombre"
+                },
                 label = { Text("Nombre del taller *") },
+                placeholder = { Text("TALLER SAN MIGUEL") },
                 isError = mostrarError("nombre") && errores.containsKey("nombre"),
                 supportingText = {
                     if (mostrarError("nombre")) errores["nombre"]?.let { Text(it) }
                 },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                 modifier = Modifier.fillMaxWidth().testTag("rf34.nombre"),
                 shape = RoundedCornerShape(12.dp)
             )
             OutlinedTextField(
                 value = telefono,
-                onValueChange = { telefono = it.filter { c -> c.isDigit() || c == '+' || c == ' ' }.take(15); tocados = tocados + "telefono" },
-                label = { Text("Teléfono de contacto (opcional)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                onValueChange = { raw ->
+                    // Prefijo +51 fijo en UI; solo se editan los 9 dígitos nacionales.
+                    val digits = ValidadorFormularioTaller.digitosTelefono(raw).take(9)
+                    telefono = digits
+                    tocados = tocados + "telefono"
+                },
+                label = { Text("Celular de contacto (opcional)") },
+                placeholder = { Text("987654321") },
+                prefix = { Text("+51 ", color = Azul, fontWeight = FontWeight.SemiBold) },
+                isError = mostrarError("telefono") && errores.containsKey("telefono"),
+                supportingText = {
+                    if (mostrarError("telefono")) errores["telefono"]?.let { Text(it) }
+                    else Text("9 dígitos, debe empezar con 9", color = Color(0xFF6881A5))
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("rf34.telefono"),
                 shape = RoundedCornerShape(12.dp)
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val telValido = telefono.length == 9 && telefono.startsWith("9")
                 Checkbox(
                     checked = tieneWhatsapp,
-                    onCheckedChange = { if (telefono.isNotBlank()) tieneWhatsapp = it },
-                    enabled = telefono.isNotBlank(),
+                    onCheckedChange = { if (telValido) tieneWhatsapp = it },
+                    enabled = telValido,
                     modifier = Modifier.testTag("rf34.whatsapp")
                 )
                 Text("Este número también tiene WhatsApp", color = Azul)
             }
             OutlinedTextField(
                 value = direccion,
-                onValueChange = { direccion = it },
+                onValueChange = {
+                    direccion = it.uppercase()
+                    tocados = tocados + "direccion"
+                },
                 label = { Text("Dirección (opcional)") },
+                placeholder = { Text("AV. LOS OLIVOS 123") },
+                isError = mostrarError("direccion") && errores.containsKey("direccion"),
+                supportingText = {
+                    if (mostrarError("direccion")) errores["direccion"]?.let { Text(it) }
+                },
                 modifier = Modifier.fillMaxWidth().testTag("rf34.direccion"),
                 shape = RoundedCornerShape(12.dp)
             )
             OutlinedTextField(
                 value = correo,
-                onValueChange = { correo = it },
+                onValueChange = {
+                    correo = it
+                    tocados = tocados + "correo"
+                },
                 label = { Text("Correo (opcional)") },
+                placeholder = { Text("taller@correo.com") },
+                isError = mostrarError("correo") && errores.containsKey("correo"),
+                supportingText = {
+                    if (mostrarError("correo")) errores["correo"]?.let { Text(it) }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("rf34.correo"),
@@ -570,24 +613,29 @@ fun FormularioTallerScreen(
                 Button(
                     onClick = {
                         intentoGuardar = true
-                        if (errores.isEmpty() && nombre.isNotBlank()) {
-                            onGuardar(
-                                DatosTallerFormulario(
-                                    nombre.trim(),
-                                    telDigitos.ifBlank { null },
-                                    correo.ifBlank { null },
-                                    direccion.ifBlank { null },
-                                    notas.ifBlank { null },
-                                    tieneWhatsapp && telDigitos.isNotBlank()
-                                )
+                        if (!puedeGuardar) return@Button
+                        val tel = ValidadorFormularioTaller.digitosTelefono(telefono)
+                        onGuardar(
+                            DatosTallerFormulario(
+                                ValidadorFormularioTaller.normalizarNombre(nombre),
+                                tel.ifBlank { null },
+                                ValidadorFormularioTaller.normalizarCorreo(correo).ifBlank { null },
+                                ValidadorFormularioTaller.normalizarDireccion(direccion).ifBlank { null },
+                                ValidadorFormularioTaller.normalizarNotas(notas).ifBlank { null },
+                                tieneWhatsapp && tel.isNotBlank() && tel.length <= 9
                             )
-                        }
+                        )
                     },
-                    enabled = !ocupado && nombre.isNotBlank() && errores.isEmpty(),
+                    enabled = puedeGuardar,
                     modifier = Modifier.fillMaxWidth().testTag("rf34.guardar"),
                     colors = ButtonDefaults.buttonColors(containerColor = Azul),
                     shape = RoundedCornerShape(12.dp)
-                ) { Text(if (editando == null) "Guardar taller" else "Guardar cambios") }
+                ) {
+                    Text(
+                        if (editando == null) "Guardar taller"
+                        else "Guardar edición"
+                    )
+                }
                 TextButton(
                     onClick = { if (hayCambios) confirmarDescartar = true else onCancelar() },
                     modifier = Modifier.fillMaxWidth().testTag("rf34.cancelar")
@@ -711,7 +759,9 @@ fun CatalogoAsociadoScreen(
                                     }
                                 }
                             }
-                            g.telefono?.let { Text(it, color = Color(0xFF6881A5)) }
+                            ValidadorFormularioTaller.formatearTelefonoUi(g.telefono)?.let {
+                                Text(it, color = Color(0xFF6881A5))
+                            }
                             g.direccion?.let { Text(it, color = Color(0xFF6881A5)) }
                             if (!g.contactoAutorizado) {
                                 Text(

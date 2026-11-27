@@ -15,19 +15,19 @@ class ValidadorTallerTest {
         assertThrows(IllegalArgumentException.class, () -> v.nombreObligatorio(null));
     }
 
-    @Test void telefonoOpcionalHasta9Digitos() {
+    @Test void telefonoCelularPeruNormalizaYValida() {
         assertEquals("945612378", v.telefonoOpcional("945612378"));
-        assertEquals("123", v.telefonoOpcional("123"));
-        assertEquals("12345678", v.telefonoOpcional("12345678"));
         assertEquals("977665544", v.telefonoOpcional(" 977665544 "));
+        assertEquals("987654321", v.telefonoOpcional("+51 987 654 321"));
+        assertEquals("987654321", v.telefonoOpcional("51987654321"));
         assertNull(v.telefonoOpcional("  "));
     }
 
     @Test void telefonoInvalidoRechaza() {
         assertThrows(IllegalArgumentException.class, () -> v.telefonoOpcional("abc"));
-        assertThrows(IllegalArgumentException.class, () -> v.telefonoOpcional("+51999888777"));
+        assertThrows(IllegalArgumentException.class, () -> v.telefonoOpcional("187654321"));
+        assertThrows(IllegalArgumentException.class, () -> v.telefonoOpcional("98765432"));
         assertThrows(IllegalArgumentException.class, () -> v.telefonoOpcional("9998887770"));
-        assertThrows(IllegalArgumentException.class, () -> v.telefonoOpcional("977-665-544"));
         assertThrows(IllegalArgumentException.class, () -> v.telefonoOpcional("12ab"));
     }
 

@@ -4,7 +4,9 @@ data class SoatDocumentoRefDto(
     val objectKey: String,
     val contentType: String? = null,
     val tamanoBytes: Int? = null,
-    val nombreOriginal: String? = null
+    val nombreOriginal: String? = null,
+    /** Backend Jackson: "cifrado". Multipart siempre cifra el archivo. */
+    val cifrado: Boolean? = null
 )
 
 data class SoatDto(

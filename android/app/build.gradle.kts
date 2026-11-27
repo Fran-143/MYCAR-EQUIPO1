@@ -38,9 +38,9 @@ android {
         applicationId = "com.mycar.app"
         minSdk = 26
         targetSdk = 37
-        // 87 / 1.0.15: prefs notif cola de guardado (2 switches) + FCM al conceder.
-        versionCode = 87
-        versionName = "1.0.15"
+        // 89 / 1.0.17: teléfono PE +51, layout TIVe, fix subida/guardado SOAT.
+        versionCode = 89
+        versionName = "1.0.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Política académica v1.0 embebida (local-academic) en release y debug.
