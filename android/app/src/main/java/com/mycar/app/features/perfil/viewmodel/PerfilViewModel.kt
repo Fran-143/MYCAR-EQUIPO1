@@ -389,11 +389,20 @@ class PerfilViewModel(
 
     /**
      * Al reabrir Perfil desde cabecera/navegación: hub (no subpantalla stale).
-     * No pisa PLANES/LICENCIA si ya se abrieron en este frame (perfilAbrir*).
+     * No pisa módulos a los que el usuario ya entró (carrera LaunchedEffect vs tap Soporte/Planes/…).
      */
     fun resetAlAbrir() {
         val pant = _estado.value.pantalla
-        if (pant == PantallaPerfil.PLANES || pant == PantallaPerfil.LICENCIA) return
+        if (pant in setOf(
+                PantallaPerfil.PLANES,
+                PantallaPerfil.LICENCIA,
+                PantallaPerfil.SOPORTE,
+                PantallaPerfil.NOTIFICACIONES_EXTERNAS,
+                PantallaPerfil.RECORDATORIOS_KM
+            )
+        ) {
+            return
+        }
         _estado.value = _estado.value.copy(
             pantalla = PantallaPerfil.HUB,
             exitoDatos = false,

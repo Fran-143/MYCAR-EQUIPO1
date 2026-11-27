@@ -10,10 +10,12 @@ import backend.notificaciones.api.dto.ContratoPreferenciasNotificacion;
 import backend.notificaciones.dao.PreferenciaNotificacionJdbcDao;
 import backend.push.PushNotificationSender;
 import backend.push.dao.DispositivoPushJdbcDao;
+import backend.recordatorioskm.dao.RecordatorioKmJdbcDao;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 class DispositivoPushServiceTest {
     DispositivoPushJdbcDao dao;
@@ -28,7 +30,8 @@ class DispositivoPushServiceTest {
         when(sender.proveedor()).thenReturn("FCM");
         when(preferencias.consultar(12L)).thenReturn(Optional.of(
                 new ContratoPreferenciasNotificacion.PreferenciasResponse(true, true, true, "DENEGADO")));
-        servicio = new DispositivoPushService(dao, sender, preferencias);
+        servicio = new DispositivoPushService(
+                dao, sender, preferencias, mock(RecordatorioKmJdbcDao.class), mock(JdbcTemplate.class));
     }
 
     @Test

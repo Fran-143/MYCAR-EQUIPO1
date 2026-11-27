@@ -29,7 +29,9 @@ object PushTokenSync {
     private const val PREFS = "mycar_push"
     private const val KEY_PENDING_TOKEN = "pending_fcm_token"
     private const val KEY_LAST_REG_MS = "last_fcm_reg_ms"
-    private const val MIN_REG_INTERVAL_MS = 90_000L
+    private const val MIN_REG_INTERVAL_MS = 45_000L
+    /** Tras invalidación FCM en servidor, forzar re-registro periódico en resume. */
+    private const val FORCE_REG_INTERVAL_MS = 3 * 60 * 60_000L
     const val FCM_TOKEN_TIMEOUT_MS = 15_000L
 
     suspend fun registrarTrasSesion(
@@ -38,13 +40,15 @@ object PushTokenSync {
         installation: String,
         forzar: Boolean = false
     ) {
-        if (!forzar && !debeReintentarRegistro(context)) {
+        val forzarPorAntiguedad = !forzar && debeForzarPorAntiguedad(context)
+        val forzarEfectivo = forzar || forzarPorAntiguedad
+        if (!forzarEfectivo && !debeReintentarRegistro(context)) {
             Log.i(TAG, "registro omitido: debounce")
             return
         }
         try {
             // Con forzar: regenerar token (segundo dispositivo / token stale que FCM ya invalidó).
-            if (forzar) {
+            if (forzarEfectivo && forzar) {
                 runCatching { regenerarTokenFcm() }
             }
             // Preferir token vivo de FCM; el pendiente solo cubre rotación antes del login.
@@ -103,6 +107,75 @@ object PushTokenSync {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val last = prefs.getLong(KEY_LAST_REG_MS, 0L)
         return System.currentTimeMillis() - last >= MIN_REG_INTERVAL_MS
+    }
+
+    private fun debeForzarPorAntiguedad(context: Context): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val last = prefs.getLong(KEY_LAST_REG_MS, 0L)
+        return last == 0L || System.currentTimeMillis() - last >= FORCE_REG_INTERVAL_MS
+    }
+
+    /**
+     * Prueba FCM genérica (MANTENIMIENTO) — Perfil → Notificaciones externas.
+     * Re-registra token antes de enviar.
+     */
+    suspend fun probarPush(context: Context): String {
+        registrarSiSesionActiva(context, forzar = true)
+        val creds = com.mycar.app.features.autenticacion.data.AuthGraph.repository(context)
+            .peekPushCredentials()
+            ?: return "Sin sesión activa."
+        return withContext(Dispatchers.IO) {
+            try {
+                val api = ClientesSesion.publico(BuildConfig.API_BASE_URL).create(PushApi::class.java)
+                val resp = api.probar("Bearer ${creds.first}")
+                val body = resp.body()
+                when {
+                    resp.isSuccessful && body != null ->
+                        if (body.ok) "Push enviado (${body.enviados}/${body.tokens} dispositivos)."
+                        else if (body.tokens == 0) "Sin token FCM registrado. Abre la app con permiso de notificaciones."
+                        else "FCM no entregó (enviados=${body.enviados}, inválidos=${body.invalidos}, errores=${body.errores})."
+                    resp.code() == 401 -> "Sesión no válida."
+                    resp.code() == 503 -> "FCM no configurado en el servidor."
+                    else -> "Error HTTP ${resp.code()} al probar push."
+                }
+            } catch (e: Exception) {
+                e.message ?: "No se pudo probar el push."
+            }
+        }
+    }
+
+    /**
+     * Prueba recordatorio KM: crea aviso en bandeja + push FCM (categoría KILOMETRAJE).
+     */
+    suspend fun probarPushKm(context: Context): String {
+        registrarSiSesionActiva(context, forzar = true)
+        val creds = com.mycar.app.features.autenticacion.data.AuthGraph.repository(context)
+            .peekPushCredentials()
+            ?: return "Sin sesión activa."
+        return withContext(Dispatchers.IO) {
+            try {
+                val api = ClientesSesion.publico(BuildConfig.API_BASE_URL).create(PushApi::class.java)
+                val resp = api.probarKm("Bearer ${creds.first}")
+                val body = resp.body()
+                when {
+                    resp.isSuccessful && body != null -> {
+                        val bandeja = if (body.bandejaCreada) "Bandeja OK" else "Bandeja no creada"
+                        val push = when {
+                            body.enviados > 0 -> "Push OK (${body.enviados}/${body.tokens})"
+                            body.tokens == 0 -> "Sin token FCM"
+                            else -> "Push falló (inv=${body.invalidos}, err=${body.errores})"
+                        }
+                        "$bandeja · $push · notif=${body.idNotificacion ?: "-"}"
+                    }
+                    resp.code() == 400 -> "Necesitas un vehículo activo para la prueba KM."
+                    resp.code() == 401 -> "Sesión no válida."
+                    resp.code() == 503 -> "FCM no configurado en el servidor."
+                    else -> "Error HTTP ${resp.code()} al probar KM."
+                }
+            } catch (e: Exception) {
+                e.message ?: "No se pudo probar el recordatorio KM."
+            }
+        }
     }
 
     private fun marcarRegistroOk(context: Context) {

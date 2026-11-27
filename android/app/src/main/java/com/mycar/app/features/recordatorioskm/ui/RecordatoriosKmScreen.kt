@@ -56,10 +56,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,6 +73,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mycar.app.features.fotos.domain.FotoPersonalizadaRepository
 import com.mycar.app.features.fotos.ui.ImagenVehiculoPredeterminada
 import com.mycar.app.features.fotos.ui.MiniaturaFotoVehiculo
+import com.mycar.app.features.push.data.PushTokenSync
 import com.mycar.app.features.recordatorioskm.domain.FrecuenciaKm
 import com.mycar.app.features.recordatorioskm.domain.RecordatoriosKmRepository
 import com.mycar.app.features.recordatorioskm.domain.VehiculoRecordatorioKm
@@ -85,6 +88,9 @@ import com.mycar.app.ui.theme.MyCarTile
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun RecordatoriosKmRoute(
@@ -97,6 +103,10 @@ fun RecordatoriosKmRoute(
     val vm: RecordatoriosKmViewModel = viewModel(factory = RecordatoriosKmViewModel.factory(repository))
     val estado by vm.estado.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var probando by remember { mutableStateOf(false) }
+    var mensajePrueba by remember { mutableStateOf<String?>(null) }
     DisposableEffect(lifecycleOwner, vm) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) vm.cargar()
@@ -119,6 +129,20 @@ fun RecordatoriosKmRoute(
         onCerrarExito = vm::cerrarModalExito,
         onSeguirEditando = vm::seguirEditando,
         onSalirSinGuardar = vm::salirSinGuardar,
+        probando = probando,
+        mensajePrueba = mensajePrueba,
+        onProbar = {
+            if (probando) return@RecordatoriosKmScreen
+            scope.launch {
+                probando = true
+                mensajePrueba = null
+                val msg = withContext(Dispatchers.IO) {
+                    PushTokenSync.probarPushKm(context.applicationContext)
+                }
+                mensajePrueba = msg
+                probando = false
+            }
+        },
         modifier = modifier
     )
 }
@@ -135,6 +159,9 @@ fun RecordatoriosKmScreen(
     onCerrarExito: () -> Unit,
     onSeguirEditando: () -> Unit,
     onSalirSinGuardar: () -> Unit,
+    probando: Boolean = false,
+    mensajePrueba: String? = null,
+    onProbar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -271,6 +298,51 @@ fun RecordatoriosKmScreen(
                         onFrecuencia = { onFrecuencia(v.idVehiculo, it) },
                         onGuardar = { onGuardar(v.idVehiculo) }
                     )
+                }
+                Surface(shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 1.dp) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            "Prueba de verificación",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MyCarNavy
+                        )
+                        Text(
+                            "Crea un aviso en Notificaciones y envía un push FCM de kilometraje a este dispositivo.",
+                            color = MyCarMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        mensajePrueba?.let {
+                            Text(
+                                it,
+                                color = if (it.contains("OK", ignoreCase = true)) MyCarStatusActivo
+                                else Color(0xFFC62828),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Button(
+                            onClick = onProbar,
+                            enabled = !probando && !estado.guardandoGlobal,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
+                        ) {
+                            if (probando) {
+                                CircularProgressIndicator(
+                                    Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(Modifier.size(10.dp))
+                            }
+                            Text(
+                                if (probando) "Enviando prueba…" else "Probar notificación y push",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(24.dp))
             }

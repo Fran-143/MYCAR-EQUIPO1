@@ -446,19 +446,29 @@ fun MyCarNavigation(
                             }
                             val perfilVm: PerfilViewModel = viewModel(key = "perfil-${cuenta.ciclo}", factory = factoryPerfil)
                             val estadoPerfilCabecera by perfilVm.estado.collectAsStateWithLifecycle()
-                            // Un solo efecto: evita que resetAlAbrir pise abrirPlanes/Licencia (redirect a hub/inicio).
+                            // Solo al entrar a Perfil (no en cada recomposición): evita pisar Soporte/Planes
+                            // si el usuario toca el módulo antes de que corra el efecto.
+                            var perfilEntradaLista by remember(cuenta.ciclo) { mutableStateOf(false) }
                             LaunchedEffect(cuenta.ciclo, secundariaNombre, perfilAbrirPlanes, perfilAbrirLicencia) {
-                                if (secundariaNombre != SecundariaMyCar.PERFIL.name) return@LaunchedEffect
+                                if (secundariaNombre != SecundariaMyCar.PERFIL.name) {
+                                    perfilEntradaLista = false
+                                    return@LaunchedEffect
+                                }
                                 when {
                                     perfilAbrirPlanes -> {
                                         perfilVm.abrirPlanes()
                                         perfilAbrirPlanes = false
+                                        perfilEntradaLista = true
                                     }
                                     perfilAbrirLicencia -> {
                                         perfilVm.abrirLicencia()
                                         perfilAbrirLicencia = false
+                                        perfilEntradaLista = true
                                     }
-                                    else -> perfilVm.resetAlAbrir()
+                                    !perfilEntradaLista -> {
+                                        perfilVm.resetAlAbrir()
+                                        perfilEntradaLista = true
+                                    }
                                 }
                             }
                             LaunchedEffect(estadoPerfilCabecera.perfil?.iniciales, estadoPerfilCabecera.fotoBytes) {
