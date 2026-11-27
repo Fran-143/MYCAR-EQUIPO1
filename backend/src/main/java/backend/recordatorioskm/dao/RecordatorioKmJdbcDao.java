@@ -159,6 +159,9 @@ public class RecordatorioKmJdbcDao {
                 JOIN mycar.config_recordatorio_km_usuario u ON u.id_usuario = v.id_usuario
                 WHERE u.estado_recordatorios = 'ACTIVO'
                   AND v.estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
+                  AND COALESCE(c.estado, 'ACTIVO') = 'ACTIVO'
+                  AND c.frecuencia IS NOT NULL
                   AND c.proximo_envio_utc IS NOT NULL
                   AND c.proximo_envio_utc <= ?
                 ORDER BY c.proximo_envio_utc, v.id_vehiculo
@@ -198,6 +201,21 @@ public class RecordatorioKmJdbcDao {
                 SET ultimo_envio_utc = ?
                 WHERE id_vehiculo = ?
                 """, Timestamp.from(cuando), idVehiculo);
+    }
+
+    /**
+     * Tras emitir (o intentar) un ciclo: registra último envío y programa el siguiente
+     * según la frecuencia guardada en el select (DIARIO / INTERDIARIO / …).
+     */
+    public void marcarEnvioYProgramarSiguiente(long idVehiculo, Instant cuando, Instant proximoEnvio) {
+        jdbc.update("""
+                UPDATE mycar.config_recordatorio_km
+                SET ultimo_envio_utc = ?,
+                    proximo_envio_utc = ?
+                WHERE id_vehiculo = ?
+                """, Timestamp.from(cuando),
+                proximoEnvio == null ? null : Timestamp.from(proximoEnvio),
+                idVehiculo);
     }
 
     private static Instant toInstant(Object value) {

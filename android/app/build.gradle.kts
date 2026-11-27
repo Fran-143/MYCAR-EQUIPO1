@@ -39,8 +39,8 @@ android {
         minSdk = 26
         targetSdk = 37
         // 89 / 1.0.17: teléfono PE +51, layout TIVe, fix subida/guardado SOAT.
-        versionCode = 92
-        versionName = "1.0.20"
+        versionCode = 93
+        versionName = "1.0.21"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Política académica v1.0 embebida (local-academic) en release y debug.

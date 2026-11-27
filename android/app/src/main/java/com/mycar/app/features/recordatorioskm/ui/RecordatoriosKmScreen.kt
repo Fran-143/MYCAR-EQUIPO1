@@ -310,7 +310,7 @@ fun RecordatoriosKmScreen(
                             color = MyCarNavy
                         )
                         Text(
-                            "Crea un aviso en Notificaciones y envía un push FCM de kilometraje a este dispositivo.",
+                            "Solo verifica bandeja + push en este celular. No cambia la frecuencia del select ni el calendario real de recordatorios.",
                             color = MyCarMuted,
                             style = MaterialTheme.typography.bodySmall
                         )
