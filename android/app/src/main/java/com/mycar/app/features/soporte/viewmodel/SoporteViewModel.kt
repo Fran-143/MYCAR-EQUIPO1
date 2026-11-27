@@ -553,8 +553,18 @@ class SoporteViewModel(
 
     private fun manejar(e: Exception, pantalla: PantallaSoporte = PantallaSoporte.ERROR) {
         val fallo = e as? FalloRegistroVehiculo
-        if (fallo?.codigo == "SESION_NO_VALIDA" || fallo?.estadoHttp == 401) {
-            _estado.value = _estado.value.copy(pantalla = PantallaSoporte.SESION, mensaje = fallo.mensajeServidor)
+        // 401 / SESION_* no implica logout inmediato: cold start o carrera de renovación.
+        // Mostrar ERROR recuperable; "Iniciar sesión" queda solo en PantallaSoporte.SESION
+        // si el usuario lo elige tras reintentar.
+        if (fallo?.codigo == "SESION_NO_VALIDA"
+            || fallo?.codigo == "SESION_INVALIDA"
+            || fallo?.estadoHttp == 401
+        ) {
+            _estado.value = _estado.value.copy(
+                pantalla = PantallaSoporte.ERROR,
+                mensaje = fallo.mensajeServidor?.takeIf { it.isNotBlank() }
+                    ?: "No se pudo validar la petición. Tu sesión puede seguir activa: pulsa Reintentar."
+            )
             return
         }
         val timeout = e is SocketTimeoutException

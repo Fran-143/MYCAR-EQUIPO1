@@ -71,8 +71,10 @@ public class FcmPushSender implements PushNotificationSender {
             return ResultadoEnvio.ENVIADO;
         } catch (FirebaseMessagingException e) {
             MessagingErrorCode code = e.getMessagingErrorCode();
+            // Solo UNREGISTERED / SENDER_ID_MISMATCH invalidan el token de forma permanente.
+            // INVALID_ARGUMENT suele ser payload mal formado: NO desactivar el token
+            // (antes esto cortaba todos los push tras el primer fallo de mensaje).
             if (code == MessagingErrorCode.UNREGISTERED
-                    || code == MessagingErrorCode.INVALID_ARGUMENT
                     || code == MessagingErrorCode.SENDER_ID_MISMATCH) {
                 log.info("FCM token inválido permanente: {}", code);
                 return ResultadoEnvio.TOKEN_INVALIDO;

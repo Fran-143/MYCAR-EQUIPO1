@@ -105,15 +105,17 @@ fun SoporteRoute(
             PantallaSoporte.EXITO_INCIDENCIA -> ExitoIncidencia(estado, vm)
             PantallaSoporte.ERROR -> {
                 Text(estado.mensaje ?: "No se pudo cargar el centro de soporte.", color = Color(0xFFC62828))
-                SoatBotonSecundario("Reintentar", vm::cargarCentro)
+                SoatBotonPrincipal("Reintentar", vm::cargarCentro)
+                SoatBotonSecundario("Volver", onVolver)
             }
             PantallaSoporte.SESION -> {
                 Text(
-                    estado.mensaje ?: "Tu sesión expiró o no se pudo validar. Puedes reintentar o volver a iniciar sesión.",
+                    estado.mensaje
+                        ?: "No se pudo validar la sesión para Soporte. Reintenta; si el resto de la app funciona, no hace falta cerrar sesión.",
                     color = MyCarMuted
                 )
                 SoatBotonPrincipal("Reintentar", vm::cargarCentro)
-                SoatBotonSecundario("Iniciar sesión", onSesionInvalida)
+                SoatBotonSecundario("Ir a inicio de sesión", onSesionInvalida)
             }
         }
     }
