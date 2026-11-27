@@ -117,10 +117,12 @@ object PushTokenSync {
 
     /**
      * Prueba FCM genérica (MANTENIMIENTO) — Perfil → Notificaciones externas.
-     * Re-registra token antes de enviar.
+     * Re-registra token SIN borrarlo (deleteToken invalidaba FCM antes del envío).
      */
     suspend fun probarPush(context: Context): String {
-        registrarSiSesionActiva(context, forzar = true)
+        registrarSiSesionActiva(context, forzar = false)
+        // Si no hubo registro reciente, forzar upsert del token vivo (sin deleteToken).
+        registrarTrasSesionSinRegenerar(context)
         val creds = com.mycar.app.features.autenticacion.data.AuthGraph.repository(context)
             .peekPushCredentials()
             ?: return "Sin sesión activa."
@@ -130,10 +132,20 @@ object PushTokenSync {
                 val resp = api.probar("Bearer ${creds.first}")
                 val body = resp.body()
                 when {
-                    resp.isSuccessful && body != null ->
-                        if (body.ok) "Push enviado (${body.enviados}/${body.tokens} dispositivos)."
-                        else if (body.tokens == 0) "Sin token FCM registrado. Abre la app con permiso de notificaciones."
-                        else "FCM no entregó (enviados=${body.enviados}, inválidos=${body.invalidos}, errores=${body.errores})."
+                    resp.isSuccessful && body != null -> {
+                        if (body.ok) {
+                            mostrarNotificacionLocalPrueba(
+                                context,
+                                "MyCar — prueba FCM",
+                                "Notificación de verificación en tu dispositivo."
+                            )
+                            "Push enviado (${body.enviados}/${body.tokens}). Revisa la sombra del sistema."
+                        } else if (body.tokens == 0) {
+                            "Sin token FCM registrado. Activa el permiso de notificaciones y reabre la app."
+                        } else {
+                            "FCM no entregó (enviados=${body.enviados}, inválidos=${body.invalidos}, errores=${body.errores})."
+                        }
+                    }
                     resp.code() == 401 -> "Sesión no válida."
                     resp.code() == 503 -> "FCM no configurado en el servidor."
                     else -> "Error HTTP ${resp.code()} al probar push."
@@ -148,7 +160,8 @@ object PushTokenSync {
      * Prueba recordatorio KM: crea aviso en bandeja + push FCM (categoría KILOMETRAJE).
      */
     suspend fun probarPushKm(context: Context): String {
-        registrarSiSesionActiva(context, forzar = true)
+        registrarSiSesionActiva(context, forzar = false)
+        registrarTrasSesionSinRegenerar(context)
         val creds = com.mycar.app.features.autenticacion.data.AuthGraph.repository(context)
             .peekPushCredentials()
             ?: return "Sin sesión activa."
@@ -161,7 +174,14 @@ object PushTokenSync {
                     resp.isSuccessful && body != null -> {
                         val bandeja = if (body.bandejaCreada) "Bandeja OK" else "Bandeja no creada"
                         val push = when {
-                            body.enviados > 0 -> "Push OK (${body.enviados}/${body.tokens})"
+                            body.enviados > 0 -> {
+                                mostrarNotificacionLocalPrueba(
+                                    context,
+                                    "Prueba — actualiza el kilometraje",
+                                    "Aviso de prueba de recordatorio de kilometraje. Revisa tu bandeja en MyCar."
+                                )
+                                "Push OK (${body.enviados}/${body.tokens})"
+                            }
                             body.tokens == 0 -> "Sin token FCM"
                             else -> "Push falló (inv=${body.invalidos}, err=${body.errores})"
                         }
@@ -175,6 +195,54 @@ object PushTokenSync {
             } catch (e: Exception) {
                 e.message ?: "No se pudo probar el recordatorio KM."
             }
+        }
+    }
+
+    /** Upsert del token FCM actual sin deleteToken (evita carrera que deja tokens=0). */
+    private suspend fun registrarTrasSesionSinRegenerar(context: Context) {
+        val creds = com.mycar.app.features.autenticacion.data.AuthGraph.repository(context)
+            .peekPushCredentials() ?: return
+        try {
+            val fcm = obtenerTokenFcm() ?: tokenPendiente(context) ?: return
+            val api = ClientesSesion.publico(BuildConfig.API_BASE_URL).create(PushApi::class.java)
+            val resp = api.registrar(
+                "Bearer ${creds.first}",
+                RegistrarTokenRequest(creds.second, "FCM", fcm)
+            )
+            resp.errorBody()?.close()
+            if (resp.isSuccessful) {
+                limpiarTokenPendiente(context)
+                marcarRegistroOk(context)
+                Log.i(TAG, "registro token OK (probar, sin regenerar)")
+            }
+            sincronizarPermisoOsSiConcedido(creds.first, context)
+        } catch (e: Exception) {
+            Log.i(TAG, "registro probar omitido: ${e.message}")
+        }
+    }
+
+    private fun mostrarNotificacionLocalPrueba(context: Context, titulo: String, cuerpo: String) {
+        try {
+            com.mycar.app.features.push.MycarPushChannels.asegurarCanalAlertas(context)
+            val nm = androidx.core.app.NotificationManagerCompat.from(context)
+            if (!nm.areNotificationsEnabled()) {
+                Log.i(TAG, "notif local omitida: permiso denegado")
+                return
+            }
+            val notif = androidx.core.app.NotificationCompat.Builder(
+                context,
+                com.mycar.app.features.push.MycarPushChannels.ALERTAS_ID
+            )
+                .setSmallIcon(com.mycar.app.R.drawable.ic_stat_mycar)
+                .setContentTitle(titulo)
+                .setContentText(cuerpo)
+                .setAutoCancel(true)
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
+                .build()
+            nm.notify((System.currentTimeMillis() and 0x7fffffff).toInt(), notif)
+        } catch (e: Exception) {
+            Log.i(TAG, "notif local omitida: ${e.message}")
         }
     }
 

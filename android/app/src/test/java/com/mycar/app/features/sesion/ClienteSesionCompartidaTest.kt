@@ -38,12 +38,32 @@ class ClienteSesionCompartidaTest {
         result.body()?.close()
         assertEquals(201, result.code()); assertEquals(1, count.get()); assertEquals("Bearer fixture", header())
     }
-    @Test fun un401NoReenviaElPostYNotificaAlCiclo() = conServidor(401) { base, count, _ ->
+    @Test fun un401ConMismoBearerNoReintentaYNotificaAlCiclo() = conServidor(401) { base, count, _ ->
         var invalidations = 0
+        // Mismo bearer tras el 401 → no hay token nuevo; un solo POST y se notifica caducidad.
         val client = ClienteVehiculosAutenticado(base, autorizacion = { "Bearer fixture" }, alCaducar = { invalidations++ })
         val result = client.retrofit.create(Probe::class.java).registrar(emptyMap()).execute()
         result.errorBody()?.close()
         assertEquals(401, result.code()); assertEquals(1, count.get()); assertEquals(1, invalidations)
+    }
+
+    @Test fun un401ConBearerRenovadoReintentaUnaVez() = conServidor(401) { base, count, _ ->
+        var invalidations = 0
+        var n = 0
+        val client = ClienteVehiculosAutenticado(
+            base,
+            autorizacion = {
+                n++
+                if (n == 1) "Bearer viejo" else "Bearer nuevo"
+            },
+            alCaducar = { invalidations++ }
+        )
+        // Servidor siempre 401: primer POST + reintento con bearer nuevo, luego caduca.
+        val result = client.retrofit.create(Probe::class.java).registrar(emptyMap()).execute()
+        result.errorBody()?.close()
+        assertEquals(401, result.code())
+        assertEquals(2, count.get())
+        assertEquals(1, invalidations)
     }
     @Test fun falloTemporalNoSeConvierteEn401NiEnviaElPost() = conServidor(201) { base, count, _ ->
         var invalidations = 0
@@ -59,9 +79,18 @@ class ClienteSesionCompartidaTest {
         assertEquals(401, result.code()); assertEquals(0, count.get()); assertEquals(1, invalidations)
     }
     @Test fun clienteCerradoNoPuedeEnviarOtroRegistro() = conServidor(201) { base, count, _ ->
-        val client = ClienteVehiculosAutenticado(base, autorizacion = { "Bearer fixture" })
+        var invalidations = 0
+        val client = ClienteVehiculosAutenticado(
+            base,
+            autorizacion = { "Bearer fixture" },
+            alCaducar = { invalidations++ }
+        )
         client.cancelar()
-        assertThrows(IOException::class.java) { client.retrofit.create(Probe::class.java).registrar(emptyMap()).execute() }
+        // Ciclo cerrado: 401 sintético sin tocar el servidor.
+        val result = client.retrofit.create(Probe::class.java).registrar(emptyMap()).execute()
+        result.errorBody()?.close()
+        assertEquals(401, result.code())
         assertEquals(0, count.get())
+        assertEquals(1, invalidations)
     }
 }

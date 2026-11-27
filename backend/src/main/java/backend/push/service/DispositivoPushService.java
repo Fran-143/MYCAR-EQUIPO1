@@ -156,11 +156,13 @@ public class DispositivoPushService {
         int invalidos = 0;
         int errores = 0;
         for (var t : tokens) {
+            // Mismo shape que push de producción (BANDEJA + data), para no provocar
+            // INVALID_ARGUMENT por destino poco habitual en el cliente.
             ResultadoEnvio r = sender.enviar(new MensajePush(
                     t.token(),
                     titulo,
                     cuerpo,
-                    "ACTUALIZAR_KILOMETRAJE",
+                    "BANDEJA",
                     null,
                     idNotif,
                     idVehiculo,
