@@ -50,18 +50,22 @@ public class DispositivoPushController {
     }
 
     @PostMapping("/probar")
-    public ContratoPush.ProbarResponse probar(Authentication auth) {
+    public ContratoPush.ProbarResponse probar(
+            Authentication auth, @RequestBody(required = false) ContratoPush.ProbarRequest body) {
         try {
-            return servicio.probar(usuario(auth));
+            return servicio.probar(usuario(auth), body);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
         }
     }
 
     @PostMapping("/probar-km")
-    public ContratoPush.ProbarKmResponse probarKm(Authentication auth) {
+    public ContratoPush.ProbarKmResponse probarKm(
+            Authentication auth, @RequestBody(required = false) ContratoPush.ProbarRequest body) {
         try {
-            return servicio.probarKm(usuario(auth));
+            return servicio.probarKm(usuario(auth), body);
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (IllegalStateException e) {

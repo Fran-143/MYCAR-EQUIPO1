@@ -18,6 +18,13 @@ public final class ContratoPush {
         }
     }
 
+    /**
+     * Opcional: token FCM vivo del dispositivo que pulsó "Probar".
+     * Si viene, se hace upsert antes del envío (evita tokens=0 tras fallos de red).
+     */
+    public record ProbarRequest(UUID idInstalacion, String token) {
+    }
+
     /** Solo tokens del usuario autenticado — prueba controlada, no broadcast. */
     public record ProbarResponse(boolean ok, int tokens, int enviados, int invalidos, int errores) {
     }
