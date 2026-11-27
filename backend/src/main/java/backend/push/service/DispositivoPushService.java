@@ -81,10 +81,11 @@ public class DispositivoPushService {
      * No hace broadcast ni usa outbox (verificación FCM controlada).
      */
     @Transactional
-    public ContratoPush.ProbarResponse probar(long usuario) {
+    public ContratoPush.ProbarResponse probar(long usuario, ContratoPush.ProbarRequest body) {
         if ("NONE".equals(sender.proveedor())) {
             throw new IllegalStateException("FCM no configurado (sin credenciales SA)");
         }
+        asegurarTokenDePrueba(usuario, body);
         promoverPermisoParaEnvio(usuario);
         var tokens = dao.listarActivos(usuario, sender.proveedor());
         int enviados = 0;
@@ -117,7 +118,7 @@ public class DispositivoPushService {
      * Omite outbox/ventana para poder evidenciar en cualquier horario.
      */
     @Transactional
-    public ContratoPush.ProbarKmResponse probarKm(long usuario) {
+    public ContratoPush.ProbarKmResponse probarKm(long usuario, ContratoPush.ProbarRequest body) {
         if ("NONE".equals(sender.proveedor())) {
             throw new IllegalStateException("FCM no configurado (sin credenciales SA)");
         }
@@ -150,14 +151,13 @@ public class DispositivoPushService {
                 LIMIT 1
                 """, rs -> rs.next() ? rs.getLong(1) : null, clave);
 
+        asegurarTokenDePrueba(usuario, body);
         promoverPermisoParaEnvio(usuario);
         var tokens = dao.listarActivos(usuario, sender.proveedor());
         int enviados = 0;
         int invalidos = 0;
         int errores = 0;
         for (var t : tokens) {
-            // Mismo shape que push de producción (BANDEJA + data), para no provocar
-            // INVALID_ARGUMENT por destino poco habitual en el cliente.
             ResultadoEnvio r = sender.enviar(new MensajePush(
                     t.token(),
                     titulo,
@@ -176,12 +176,15 @@ public class DispositivoPushService {
                 case ERROR_TEMPORAL, OMITIDO -> errores++;
             }
         }
-        boolean ok = bandeja && (enviados > 0 || tokens.isEmpty());
-        // Sin tokens: bandeja cuenta como evidencia parcial; ok=false si FCM falló con tokens.
-        if (!tokens.isEmpty()) {
-            ok = bandeja && enviados > 0;
-        }
+        boolean ok = bandeja && enviados > 0;
         return new ContratoPush.ProbarKmResponse(
                 ok, bandeja, idNotif, idVehiculo, tokens.size(), enviados, invalidos, errores);
+    }
+
+    private void asegurarTokenDePrueba(long usuario, ContratoPush.ProbarRequest body) {
+        if (body == null || body.idInstalacion() == null || !StringUtils.hasText(body.token())) {
+            return;
+        }
+        registrar(usuario, body.idInstalacion(), "FCM", body.token().trim());
     }
 }

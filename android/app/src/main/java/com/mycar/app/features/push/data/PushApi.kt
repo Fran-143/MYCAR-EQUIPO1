@@ -34,6 +34,12 @@ class ProbarKmPushResponse(
     val errores: Int = 0
 )
 
+/** Token vivo del dispositivo para upsert + envío en la misma petición de prueba. */
+class ProbarPushBody(
+    val idInstalacion: String? = null,
+    val token: String? = null
+)
+
 interface PushApi {
     @POST("api/v1/dispositivos-push/registrar")
     suspend fun registrar(
@@ -49,11 +55,13 @@ interface PushApi {
 
     @POST("api/v1/dispositivos-push/probar")
     suspend fun probar(
-        @Header("Authorization") bearer: String
+        @Header("Authorization") bearer: String,
+        @Body body: ProbarPushBody = ProbarPushBody()
     ): Response<ProbarPushResponse>
 
     @POST("api/v1/dispositivos-push/probar-km")
     suspend fun probarKm(
-        @Header("Authorization") bearer: String
+        @Header("Authorization") bearer: String,
+        @Body body: ProbarPushBody = ProbarPushBody()
     ): Response<ProbarKmPushResponse>
 }

@@ -30,6 +30,7 @@ public class SoporteJdbcDao {
                 LEFT JOIN mycar.tive t ON t.id_vehiculo = v.id_vehiculo
                 WHERE v.id_usuario = ?
                   AND upper(v.estado_vehiculo) = 'ACTIVO'
+                  AND COALESCE(v.estado_registro, 'VIGENTE') = 'VIGENTE'
                 ORDER BY v.es_principal DESC, v.placa
                 """, (rs, n) -> new ContratoSoporte.VehiculoElegibleDto(
                 rs.getLong("id_vehiculo"),
@@ -89,6 +90,7 @@ public class SoporteJdbcDao {
         Integer n = jdbc.queryForObject("""
                 SELECT COUNT(*)::int FROM mycar.vehiculo
                 WHERE numero_vin = ? AND id_vehiculo <> ?
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
                 """, Integer.class, vin, excluirVehiculo);
         return n != null && n > 0;
     }
