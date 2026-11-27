@@ -37,8 +37,16 @@ class RemoteSoatRepository(
     override suspend fun registrar(idVehiculo: Long, solicitud: SoatMutacionDto): SoatDto {
         val r = api.registrar(idVehiculo, solicitud.copy(idSoatAnterior = null, accionDocumento = null))
         if (!r.isSuccessful) throw fallo(r)
-        val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
-        if (body.idSoat <= 0) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        val body = r.body() ?: throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "No recibimos confirmación del SOAT."
+        )
+        if (body.idSoat <= 0) throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "No recibimos confirmación del SOAT."
+        )
         return exigirActual(idVehiculo)
     }
 
@@ -46,8 +54,16 @@ class RemoteSoatRepository(
         val payload = solicitud.copy(idOperacion = null, idSoatAnterior = null)
         val r = api.corregir(idVehiculo, idSoat, payload)
         if (!r.isSuccessful) throw fallo(r)
-        val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
-        if (body.idSoat != idSoat) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        val body = r.body() ?: throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "No recibimos confirmación del SOAT."
+        )
+        if (body.idSoat != idSoat) throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "No recibimos confirmación del SOAT."
+        )
         return exigirActual(idVehiculo)
     }
 
@@ -57,15 +73,27 @@ class RemoteSoatRepository(
         }
         val r = api.renovar(idVehiculo, solicitud.copy(accionDocumento = null))
         if (!r.isSuccessful) throw fallo(r)
-        val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
-        if (body.idSoatNuevo <= 0) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        val body = r.body() ?: throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "No recibimos confirmación del SOAT."
+        )
+        if (body.idSoatNuevo <= 0) throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "No recibimos confirmación del SOAT."
+        )
         return exigirActual(idVehiculo)
     }
 
     override suspend fun recordatorio(idVehiculo: Long, idSoat: Long, activo: Boolean): SoatDto {
         val r = api.recordatorio(idVehiculo, idSoat, SoatRecordatorioDto(activo))
         if (!r.isSuccessful) throw fallo(r)
-        r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        r.body() ?: throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "No se pudo actualizar el recordatorio."
+        )
         return exigirActual(idVehiculo)
     }
 
@@ -75,41 +103,79 @@ class RemoteSoatRepository(
         contentType: String,
         nombreOriginal: String
     ): SoatDocumentoRefDto = withContext(Dispatchers.IO) {
-        // 1) Intento multipart (backend nuevo). 2) Fallback presign (Render actual).
-        val multipart = runCatching {
-            val media = contentType.toMediaType()
+        val tipo = normalizarContentType(contentType)
+        // 1) Multipart (funciona con storage fake y supabase; cifra en servidor).
+        val multipartResp = runCatching {
+            val media = tipo.toMediaType()
             val filePart = MultipartBody.Part.createFormData(
                 "file", nombreOriginal, bytes.toRequestBody(media)
             )
-            val r = api.subirDocumentoMultipart(
+            api.subirDocumentoMultipart(
                 idVehiculo,
                 filePart,
-                contentType.toRequestBody("text/plain".toMediaType()),
+                tipo.toRequestBody("text/plain".toMediaType()),
                 nombreOriginal.toRequestBody("text/plain".toMediaType())
             )
-            if (r.isSuccessful) {
-                r.body()?.takeIf { it.objectKey.isNotBlank() }
-            } else null
-        }.getOrNull()
-        if (multipart != null) return@withContext multipart
+        }.getOrElse { ex ->
+            throw FalloRegistroVehiculo(
+                "SUBIDA_DOCUMENTO_FALLIDA",
+                mensajeServidor = ex.message?.takeIf { it.isNotBlank() }
+                    ?: "No se pudo preparar la subida del documento."
+            )
+        }
+        if (multipartResp.isSuccessful) {
+            val body = multipartResp.body()?.takeIf { it.objectKey.isNotBlank() }
+                ?: throw FalloRegistroVehiculo(
+                    "RESPUESTA_INVALIDA",
+                    multipartResp.code(),
+                    mensajeServidor = "No se recibió la referencia del documento."
+                )
+            // Multipart siempre cifra; conservar flag para el POST de registro.
+            return@withContext body.copy(cifrado = body.cifrado ?: true)
+        }
+        // Solo caer a presign si el endpoint multipart no existe en ese deploy.
+        if (multipartResp.code() !in setOf(404, 405, 501)) {
+            throw fallo(multipartResp)
+        }
 
         val tamano = bytes.size.coerceAtLeast(1)
         val presign = exitoso(
-            api.presignUpload(idVehiculo, SoatPresignSolicitudDto(contentType, tamano, nombreOriginal))
+            api.presignUpload(idVehiculo, SoatPresignSolicitudDto(tipo, tamano, nombreOriginal))
         ) { it.uploadUrl.isNotBlank() && it.objectKey.isNotBlank() }
-        val body = bytes.toRequestBody(contentType.toMediaType())
-        val builder = Request.Builder().url(presign.uploadUrl).put(body)
+        val url = presign.uploadUrl
+        if (!url.startsWith("http://", ignoreCase = true) &&
+            !url.startsWith("https://", ignoreCase = true)
+        ) {
+            // p.ej. fake://upload/... — OkHttp no puede PUT ahí; multipart debió usarse.
+            throw FalloRegistroVehiculo(
+                "SUBIDA_DOCUMENTO_FALLIDA",
+                mensajeServidor = "No se pudo subir el documento al almacenamiento. Reintenta o continúa sin adjunto."
+            )
+        }
+        val body = bytes.toRequestBody(tipo.toMediaType())
+        val builder = Request.Builder().url(url).put(body)
         presign.headers?.forEach { (k, v) -> builder.header(k, v) }
         val resp = http.newCall(builder.build()).execute()
-        if (!resp.isSuccessful) throw FalloRegistroVehiculo("SUBIDA_DOCUMENTO_FALLIDA", resp.code)
-        SoatDocumentoRefDto(presign.objectKey, contentType, tamano, nombreOriginal)
+        if (!resp.isSuccessful) {
+            throw FalloRegistroVehiculo(
+                "SUBIDA_DOCUMENTO_FALLIDA",
+                resp.code,
+                mensajeServidor = "No se pudo subir el documento (HTTP ${resp.code})."
+            )
+        }
+        // Presign sube bytes en claro; el servidor no marca cifrado.
+        SoatDocumentoRefDto(presign.objectKey, tipo, tamano, nombreOriginal, cifrado = false)
     }
 
     override suspend fun descargarDocumento(idVehiculo: Long, idSoat: Long): ByteArray =
         withContext(Dispatchers.IO) {
             val r = api.descargarDocumento(idVehiculo, idSoat)
             if (!r.isSuccessful) throw fallo(r)
-            val body = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+            val body = r.body() ?: throw FalloRegistroVehiculo(
+                "RESPUESTA_INVALIDA",
+                r.code(),
+                mensajeServidor = "Documento vacío."
+            )
             val bytes = body.bytes()
             val ct = body.contentType()?.toString().orEmpty()
             // Render actual: application/json con downloadUrl firmada.
@@ -120,19 +186,41 @@ class RemoteSoatRepository(
                     Gson().fromJson(String(bytes), SoatDocumentoDescargaDto::class.java)
                 }.getOrNull()
                 val url = parsed?.downloadUrl?.takeIf { it.isNotBlank() }
-                    ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+                    ?: throw FalloRegistroVehiculo(
+                        "RESPUESTA_INVALIDA",
+                        r.code(),
+                        mensajeServidor = "URL de descarga no disponible."
+                    )
                 val resp = http.newCall(Request.Builder().url(url).get().build()).execute()
-                if (!resp.isSuccessful) throw FalloRegistroVehiculo("DESCARGA_FALLIDA", resp.code)
+                if (!resp.isSuccessful) {
+                    throw FalloRegistroVehiculo(
+                        "DESCARGA_FALLIDA",
+                        resp.code,
+                        mensajeServidor = "No se pudo descargar el documento."
+                    )
+                }
                 return@withContext resp.body?.bytes()
-                    ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
+                    ?: throw FalloRegistroVehiculo(
+                        "RESPUESTA_INVALIDA",
+                        mensajeServidor = "Documento vacío."
+                    )
             }
-            if (bytes.isEmpty()) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+            if (bytes.isEmpty()) {
+                throw FalloRegistroVehiculo(
+                    "RESPUESTA_INVALIDA",
+                    r.code(),
+                    mensajeServidor = "Documento vacío."
+                )
+            }
             bytes
         }
 
     private suspend fun exigirActual(idVehiculo: Long): SoatDto {
         val consulta = consultar(idVehiculo)
-        return consulta.actual ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA")
+        return consulta.actual ?: throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            mensajeServidor = "El SOAT se guardó pero no pudimos mostrarlo. Vuelve a consultar."
+        )
     }
 
     private fun normalizar(c: SoatConsultaResponse): SoatConsultaResponse {
@@ -147,10 +235,28 @@ class RemoteSoatRepository(
         )
     }
 
+    private fun normalizarContentType(raw: String): String {
+        val base = raw.trim().lowercase().substringBefore(';').trim()
+        return when (base) {
+            "image/jpg" -> "image/jpeg"
+            else -> base.ifBlank { "application/octet-stream" }
+        }
+    }
+
     private inline fun <T> exitoso(r: retrofit2.Response<T>, validar: (T) -> Boolean): T {
         if (!r.isSuccessful) throw fallo(r)
-        val cuerpo = r.body() ?: throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
-        if (!validar(cuerpo)) throw FalloRegistroVehiculo("RESPUESTA_INVALIDA", r.code())
+        val cuerpo = r.body() ?: throw FalloRegistroVehiculo(
+            "RESPUESTA_INVALIDA",
+            r.code(),
+            mensajeServidor = "Respuesta vacía del servidor."
+        )
+        if (!validar(cuerpo)) {
+            throw FalloRegistroVehiculo(
+                "RESPUESTA_INVALIDA",
+                r.code(),
+                mensajeServidor = "Respuesta incompleta del servidor."
+            )
+        }
         return cuerpo
     }
 
@@ -160,11 +266,17 @@ class RemoteSoatRepository(
         }.getOrNull()
         val codigo = parsed?.codigo ?: if (r.code() == 401) "SESION_NO_VALIDA" else "ERROR_HTTP"
         val porCampo = parsed?.campos.orEmpty()
+        val mensaje = parsed?.mensaje?.takeIf { it.isNotBlank() }
+            ?: when (r.code()) {
+                401 -> "Sesión no válida. Vuelve a iniciar sesión."
+                413 -> "El archivo es demasiado grande."
+                else -> "No pudimos completar la operación (HTTP ${r.code()})."
+            }
         return FalloRegistroVehiculo(
             codigo = codigo,
             estadoHttp = r.code(),
             campos = porCampo.keys,
-            mensajeServidor = parsed?.mensaje,
+            mensajeServidor = mensaje,
             erroresPorCampo = porCampo
         )
     }

@@ -171,18 +171,32 @@ fun FilaTiveSensibles(
     visible: Boolean,
     onToggle: () -> Unit
 ) {
+    // Etiqueta arriba (una línea) + valor abajo: evita wrap letra-a-letra con códigos largos.
     Row(
         Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Icon(icono, null, tint = MyCarMuted, modifier = Modifier.size(20.dp))
-        Text(etiqueta, color = MyCarMuted, modifier = Modifier.weight(1f))
-        Text(
-            if (visible) valorCompleto else valorEnmascarado,
-            fontWeight = FontWeight.Medium,
-            color = MyCarNavy
+        Icon(
+            icono,
+            null,
+            tint = MyCarMuted,
+            modifier = Modifier.padding(top = 2.dp).size(20.dp)
         )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                etiqueta,
+                color = MyCarMuted,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
+            )
+            Text(
+                if (visible) valorCompleto else valorEnmascarado,
+                fontWeight = FontWeight.Medium,
+                color = MyCarNavy,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
         IconButton(onClick = onToggle) {
             Icon(
                 imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,

@@ -356,10 +356,23 @@ abstract class SoatFormViewModelBase(
                     errores = if (porCampo.isNotEmpty()) porCampo else _estado.value.errores,
                     // Si el fallo tiene campos, no saturar con mensaje genérico arriba.
                     mensaje = if (porCampo.isNotEmpty()) null
-                    else fallo?.mensajeServidor ?: "No pudimos guardar el SOAT. Inténtalo de nuevo",
+                    else mensajeErrorGuardado(fallo, e),
                     paso = if (porCampo.isNotEmpty()) PasoSoatForm.FORMULARIO else _estado.value.paso
                 )
             }
+        }
+    }
+
+    private fun mensajeErrorGuardado(fallo: FalloRegistroVehiculo?, e: Exception): String {
+        fallo?.mensajeServidor?.takeIf { it.isNotBlank() }?.let { return it }
+        return when (fallo?.codigo) {
+            "SUBIDA_DOCUMENTO_FALLIDA", "DOCUMENTO_NO_ENCONTRADO", "DOCUMENTO_DEMASIADO_GRANDE",
+            "DOCUMENTO_NO_AUTORIZADO", "STORAGE_NO_CONFIGURADO", "CIFRADO_NO_CONFIGURADO" ->
+                "No se pudo subir o validar el documento del SOAT. Reintenta o continúa sin adjunto."
+            "SOAT_ACTUAL_EXISTE" -> "Este vehículo ya tiene un SOAT vigente."
+            "SESION_NO_VALIDA", "SESION_REQUERIDA" -> "Sesión no válida. Vuelve a iniciar sesión."
+            else -> e.message?.takeIf { it.isNotBlank() && it.length < 160 }
+                ?: "No pudimos guardar el SOAT. Inténtalo de nuevo"
         }
     }
 

@@ -120,6 +120,14 @@ public class SoatService {
         } catch (ErrorSoat ex) {
             throw ex;
         } catch (DataAccessException ex) {
+            // Conservar causa en mensaje de ops; al cliente se expone texto estable.
+            String detalle = ex.getMostSpecificCause() != null
+                    ? ex.getMostSpecificCause().getMessage()
+                    : ex.getMessage();
+            if (detalle != null && detalle.toLowerCase(java.util.Locale.ROOT).contains("documento")) {
+                throw new ErrorSoat("SOAT_GUARDAR_FALLIDO",
+                        "No pudimos guardar el documento del SOAT. Revisa el archivo e inténtalo de nuevo");
+            }
             throw new ErrorSoat("SOAT_GUARDAR_FALLIDO", "No pudimos guardar el SOAT. Inténtalo de nuevo");
         }
     }
