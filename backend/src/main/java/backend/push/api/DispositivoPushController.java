@@ -58,6 +58,17 @@ public class DispositivoPushController {
         }
     }
 
+    @PostMapping("/probar-km")
+    public ContratoPush.ProbarKmResponse probarKm(Authentication auth) {
+        try {
+            return servicio.probarKm(usuario(auth));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
+        }
+    }
+
     private long usuario(Authentication auth) {
         if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
             throw new SesionAlertasNoValidada();

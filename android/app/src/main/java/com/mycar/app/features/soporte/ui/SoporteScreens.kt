@@ -56,9 +56,8 @@ fun SoporteRoute(
         }
     )
     val estado by vm.estado.collectAsState()
-    LaunchedEffect(estado.pantalla) {
-        if (estado.pantalla == PantallaSoporte.SESION) onSesionInvalida()
-    }
+    // No expulsar a inicio en automático: si la API falla por red/cold start, mostrar error
+    // y Reintentar. Solo SESIÓN con acción explícita (botón) invalida la sesión.
     val salir = estado.pantalla in setOf(
         PantallaSoporte.CENTRO, PantallaSoporte.CARGANDO, PantallaSoporte.ERROR, PantallaSoporte.SESION
     )
@@ -108,7 +107,14 @@ fun SoporteRoute(
                 Text(estado.mensaje ?: "No se pudo cargar el centro de soporte.", color = Color(0xFFC62828))
                 SoatBotonSecundario("Reintentar", vm::cargarCentro)
             }
-            PantallaSoporte.SESION -> Text("Sesión requerida.", color = MyCarMuted)
+            PantallaSoporte.SESION -> {
+                Text(
+                    estado.mensaje ?: "Tu sesión expiró o no se pudo validar. Puedes reintentar o volver a iniciar sesión.",
+                    color = MyCarMuted
+                )
+                SoatBotonPrincipal("Reintentar", vm::cargarCentro)
+                SoatBotonSecundario("Iniciar sesión", onSesionInvalida)
+            }
         }
     }
 }

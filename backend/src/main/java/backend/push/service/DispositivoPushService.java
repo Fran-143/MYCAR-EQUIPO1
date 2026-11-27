@@ -6,8 +6,11 @@ import backend.push.PushNotificationSender.MensajePush;
 import backend.push.PushNotificationSender.ResultadoEnvio;
 import backend.push.api.dto.ContratoPush;
 import backend.push.dao.DispositivoPushJdbcDao;
+import backend.recordatorioskm.dao.RecordatorioKmJdbcDao;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -17,14 +20,20 @@ public class DispositivoPushService {
     private final DispositivoPushJdbcDao dao;
     private final PushNotificationSender sender;
     private final PreferenciaNotificacionJdbcDao preferencias;
+    private final RecordatorioKmJdbcDao recordatoriosKm;
+    private final JdbcTemplate jdbc;
 
     public DispositivoPushService(
             DispositivoPushJdbcDao dao,
             @Lazy PushNotificationSender sender,
-            PreferenciaNotificacionJdbcDao preferencias) {
+            PreferenciaNotificacionJdbcDao preferencias,
+            RecordatorioKmJdbcDao recordatoriosKm,
+            JdbcTemplate jdbc) {
         this.dao = dao;
         this.sender = sender;
         this.preferencias = preferencias;
+        this.recordatoriosKm = recordatoriosKm;
+        this.jdbc = jdbc;
     }
 
     @Transactional
@@ -76,6 +85,7 @@ public class DispositivoPushService {
         if ("NONE".equals(sender.proveedor())) {
             throw new IllegalStateException("FCM no configurado (sin credenciales SA)");
         }
+        promoverPermisoParaEnvio(usuario);
         var tokens = dao.listarActivos(usuario, sender.proveedor());
         int enviados = 0;
         int invalidos = 0;
@@ -100,5 +110,76 @@ public class DispositivoPushService {
             }
         }
         return new ContratoPush.ProbarResponse(enviados > 0, tokens.size(), enviados, invalidos, errores);
+    }
+
+    /**
+     * Prueba recordatorio KM: inserta en bandeja (categoría KILOMETRAJE) y FCM directo.
+     * Omite outbox/ventana para poder evidenciar en cualquier horario.
+     */
+    @Transactional
+    public ContratoPush.ProbarKmResponse probarKm(long usuario) {
+        if ("NONE".equals(sender.proveedor())) {
+            throw new IllegalStateException("FCM no configurado (sin credenciales SA)");
+        }
+        Long idVehiculo = jdbc.query("""
+                SELECT id_vehiculo FROM mycar.vehiculo
+                WHERE id_usuario = ?
+                  AND estado_vehiculo = 'ACTIVO'
+                  AND COALESCE(estado_registro, 'VIGENTE') = 'VIGENTE'
+                ORDER BY id_vehiculo
+                LIMIT 1
+                """, rs -> rs.next() ? rs.getLong(1) : null, usuario);
+        if (idVehiculo == null) {
+            throw new IllegalArgumentException("Necesitas un vehículo activo para probar recordatorios KM");
+        }
+        recordatoriosKm.asegurarConfigUsuario(usuario);
+        jdbc.update("""
+                UPDATE mycar.config_recordatorio_km_usuario
+                SET estado_recordatorios = 'ACTIVO'
+                WHERE id_usuario = ? AND estado_recordatorios <> 'ACTIVO'
+                """, usuario);
+
+        String clave = "KM:TEST:" + usuario + ":" + Instant.now().toEpochMilli();
+        String titulo = "Prueba — actualiza el kilometraje";
+        String cuerpo = "Aviso de prueba de recordatorio de kilometraje. Revisa tu bandeja en MyCar.";
+        boolean bandeja = recordatoriosKm.insertarNotificacionKm(
+                usuario, idVehiculo, titulo, cuerpo, clave);
+        Long idNotif = jdbc.query("""
+                SELECT id_notificacion FROM mycar.notificacion
+                WHERE clave_idempotencia = ?
+                LIMIT 1
+                """, rs -> rs.next() ? rs.getLong(1) : null, clave);
+
+        promoverPermisoParaEnvio(usuario);
+        var tokens = dao.listarActivos(usuario, sender.proveedor());
+        int enviados = 0;
+        int invalidos = 0;
+        int errores = 0;
+        for (var t : tokens) {
+            ResultadoEnvio r = sender.enviar(new MensajePush(
+                    t.token(),
+                    titulo,
+                    cuerpo,
+                    "ACTUALIZAR_KILOMETRAJE",
+                    null,
+                    idNotif,
+                    idVehiculo,
+                    "KILOMETRAJE"));
+            switch (r) {
+                case ENVIADO -> enviados++;
+                case TOKEN_INVALIDO -> {
+                    invalidos++;
+                    dao.desactivarPorToken(sender.proveedor(), t.token());
+                }
+                case ERROR_TEMPORAL, OMITIDO -> errores++;
+            }
+        }
+        boolean ok = bandeja && (enviados > 0 || tokens.isEmpty());
+        // Sin tokens: bandeja cuenta como evidencia parcial; ok=false si FCM falló con tokens.
+        if (!tokens.isEmpty()) {
+            ok = bandeja && enviados > 0;
+        }
+        return new ContratoPush.ProbarKmResponse(
+                ok, bandeja, idNotif, idVehiculo, tokens.size(), enviados, invalidos, errores);
     }
 }

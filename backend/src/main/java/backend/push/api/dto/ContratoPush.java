@@ -21,4 +21,19 @@ public final class ContratoPush {
     /** Solo tokens del usuario autenticado — prueba controlada, no broadcast. */
     public record ProbarResponse(boolean ok, int tokens, int enviados, int invalidos, int errores) {
     }
+
+    /**
+     * Prueba RF43: crea aviso en bandeja (KILOMETRAJE) y envía FCM a tokens del usuario.
+     * No usa outbox ni ventana horaria (verificación inmediata).
+     */
+    public record ProbarKmResponse(
+            boolean ok,
+            boolean bandejaCreada,
+            Long idNotificacion,
+            Long idVehiculo,
+            int tokens,
+            int enviados,
+            int invalidos,
+            int errores) {
+    }
 }

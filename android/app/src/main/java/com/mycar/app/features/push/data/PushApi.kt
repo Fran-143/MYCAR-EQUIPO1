@@ -15,6 +15,25 @@ class DesvincularTokenRequest(val idInstalacion: String)
 
 class OkPushResponse(val ok: Boolean = false)
 
+class ProbarPushResponse(
+    val ok: Boolean = false,
+    val tokens: Int = 0,
+    val enviados: Int = 0,
+    val invalidos: Int = 0,
+    val errores: Int = 0
+)
+
+class ProbarKmPushResponse(
+    val ok: Boolean = false,
+    val bandejaCreada: Boolean = false,
+    val idNotificacion: Long? = null,
+    val idVehiculo: Long? = null,
+    val tokens: Int = 0,
+    val enviados: Int = 0,
+    val invalidos: Int = 0,
+    val errores: Int = 0
+)
+
 interface PushApi {
     @POST("api/v1/dispositivos-push/registrar")
     suspend fun registrar(
@@ -27,4 +46,14 @@ interface PushApi {
         @Header("Authorization") bearer: String,
         @Body body: DesvincularTokenRequest
     ): Response<Unit>
+
+    @POST("api/v1/dispositivos-push/probar")
+    suspend fun probar(
+        @Header("Authorization") bearer: String
+    ): Response<ProbarPushResponse>
+
+    @POST("api/v1/dispositivos-push/probar-km")
+    suspend fun probarKm(
+        @Header("Authorization") bearer: String
+    ): Response<ProbarKmPushResponse>
 }

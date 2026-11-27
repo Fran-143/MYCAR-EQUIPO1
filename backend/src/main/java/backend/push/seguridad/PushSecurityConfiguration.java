@@ -41,6 +41,8 @@ public class PushSecurityConfiguration {
                         .authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/dispositivos-push/probar")
                         .authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/dispositivos-push/probar-km")
+                        .authenticated()
                         .anyRequest().denyAll())
                 .addFilterBefore(new SessionBearerFilter(sesiones, json), AnonymousAuthenticationFilter.class)
                 .build();
