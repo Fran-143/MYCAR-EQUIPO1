@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mycar.app.features.alertas.data.ProgramarAlertaDto
 import com.mycar.app.features.alertas.domain.AlertasRepository
 import com.mycar.app.features.alertas.domain.CriterioAlerta
+import com.mycar.app.features.alertas.domain.FechaObjetivoAlerta
 import com.mycar.app.features.alertas.domain.ReferenciaMantenimientoAlerta
 import com.mycar.app.features.alertas.domain.ResultadoOperacionIncierto
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,12 @@ data class BorradorAlerta(
     val origenCalculo: String = "DESDE_HOY",
     val unidadTiempo: String = "MESES",
     val cantidadTiempo: String = "6",
+    /** Intervalo km (API). Se sincroniza con [kmObjetivoTexto]. */
     val intervaloKm: String = "5000",
+    /** Fecha objetivo ISO elegida en calendario (espejo del intervalo). */
+    val fechaObjetivoIso: String = "",
+    /** Km objetivo absoluto (como en mantenimiento); deriva [intervaloKm]. */
+    val kmObjetivoTexto: String = "",
     val servicioOtro: String = "",
     val idReferencia: Long? = null
 )
@@ -43,6 +49,8 @@ data class EstadoProgramarAlerta(
     val resumen: ResumenAlerta? = null,
     val preview: ResumenAlerta? = null,
     val cargando: Boolean = true,
+    /** Recarga de mantenimientos de referencia (DESDE_MANTENIMIENTO). */
+    val cargandoReferencias: Boolean = false,
     val enviando: Boolean = false,
     val exito: Long? = null,
     val errores: Map<String, String> = emptyMap(),
@@ -81,15 +89,25 @@ class ProgramarAlertaViewModel(
     fun cargar() {
         viewModelScope.launch {
             val id = mutable.value.idVehiculo
+            val b0 = mutable.value.borrador
             mutable.value = mutable.value.copy(
                 cargando = true, mensaje = null, exito = null, enviando = false,
                 paso = PasoProgramar.FORMULARIO, resumen = null, preview = null, basesCambiaron = false
             )
             try {
-                val ctx = repository.contexto(id)
-                val b = mutable.value.borrador
+                val ctx = repository.contexto(
+                    id,
+                    b0.codigoTipo.takeIf { it.isNotBlank() },
+                    b0.servicioOtro.takeIf { b0.codigoTipo == "OTRO" && it.isNotBlank() }
+                )
+                val b = sincronizarBorradorConBases(
+                    mutable.value.borrador,
+                    mutable.value.borrador,
+                    ctx
+                )
                 mutable.value = mutable.value.copy(
                     contexto = ctx,
+                    borrador = b,
                     cargando = false,
                     preview = calcularPreview(b, ctx)
                 )
@@ -105,8 +123,9 @@ class ProgramarAlertaViewModel(
     fun actualizar(cambio: (BorradorAlerta) -> BorradorAlerta) {
         if (mutable.value.enviando || mutable.value.exito != null) return
         if (mutable.value.paso == PasoProgramar.EXITO) return
-        val b = cambio(mutable.value.borrador)
+        val prev = mutable.value.borrador
         val ctx = mutable.value.contexto
+        val b = sincronizarBorradorConBases(prev, cambio(prev), ctx)
         mutable.value = mutable.value.copy(
             borrador = b,
             errores = emptyMap(),
@@ -117,6 +136,160 @@ class ProgramarAlertaViewModel(
             preview = if (ctx != null) calcularPreview(b, ctx) else null,
             basesCambiaron = false
         )
+        // Referencias del backend solo llegan con codigoTipo: recargar al cambiar origen/tipo/servicio.
+        val tipoCambio = b.codigoTipo != prev.codigoTipo ||
+            (b.codigoTipo == "OTRO" && b.servicioOtro.trim() != prev.servicioOtro.trim())
+        val cambioOrigenAMant = b.origenCalculo == "DESDE_MANTENIMIENTO" &&
+            prev.origenCalculo != "DESDE_MANTENIMIENTO"
+        val necesitaRefs = b.origenCalculo == "DESDE_MANTENIMIENTO" &&
+            (cambioOrigenAMant || tipoCambio || ctx?.referencias.isNullOrEmpty())
+        if (necesitaRefs) {
+            recargarReferencias()
+        } else if (tipoCambio && b.codigoTipo.isNotBlank()) {
+            // Mantener refs al día aunque el origen sea DESDE_HOY (por si cambia después).
+            recargarReferencias()
+        }
+    }
+
+    /**
+     * Espejo fecha ↔ semanas/meses y km objetivo ↔ intervalo (mismo criterio RF17).
+     * Prioriza el campo que el usuario acaba de editar.
+     */
+    private fun sincronizarBorradorConBases(
+        prev: BorradorAlerta,
+        b: BorradorAlerta,
+        ctx: com.mycar.app.features.alertas.domain.ContextoProgramarAlerta?
+    ): BorradorAlerta {
+        if (ctx == null) return b
+        var out = b
+        val refs = referenciasElegibles(out, ctx)
+        val ref = if (out.origenCalculo == "DESDE_MANTENIMIENTO") {
+            refs.firstOrNull { it.id == out.idReferencia }
+        } else null
+        val fechaBase = when (out.origenCalculo) {
+            "DESDE_MANTENIMIENTO" -> ref?.fecha?.take(10)
+            else -> ctx.fechaServidor.take(10)
+        }
+        val kmBase = when {
+            !CriterioAlerta.usaKm(out.criterio) -> null
+            out.origenCalculo == "DESDE_MANTENIMIENTO" -> ref?.kmServicio
+            else -> ctx.kmActual
+        }
+
+        if (CriterioAlerta.usaTiempo(out.criterio) && fechaBase != null) {
+            val base = runCatching { LocalDate.parse(fechaBase) }.getOrNull()
+            if (base != null) {
+                val calendarioCambio = out.fechaObjetivoIso != prev.fechaObjetivoIso
+                val intervaloCambio = out.cantidadTiempo != prev.cantidadTiempo
+                    || out.unidadTiempo != prev.unidadTiempo
+                    || out.origenCalculo != prev.origenCalculo
+                    || out.idReferencia != prev.idReferencia
+                    || out.criterio != prev.criterio
+                when {
+                    calendarioCambio && out.fechaObjetivoIso.isNotBlank() -> {
+                        val obj = runCatching { LocalDate.parse(out.fechaObjetivoIso.take(10)) }.getOrNull()
+                        if (obj != null && obj.isAfter(base)) {
+                            val (u, c) = FechaObjetivoAlerta.unidadCantidadDesdeFechas(base, obj)
+                            out = out.copy(
+                                unidadTiempo = u,
+                                cantidadTiempo = c.toString(),
+                                fechaObjetivoIso = obj.toString()
+                            )
+                        } else if (out.fechaObjetivoIso.isBlank()) {
+                            // quitó fecha: dejar intervalo
+                        }
+                    }
+                    intervaloCambio || out.fechaObjetivoIso.isBlank() -> {
+                        val cant = out.cantidadTiempo.toIntOrNull()
+                        if (cant != null && cant > 0) {
+                            out = out.copy(
+                                fechaObjetivoIso = FechaObjetivoAlerta
+                                    .fechaObjetivoDesde(base, out.unidadTiempo, cant).toString()
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (!CriterioAlerta.usaTiempo(out.criterio)) {
+            out = out.copy(fechaObjetivoIso = "")
+        }
+
+        if (CriterioAlerta.usaKm(out.criterio) && kmBase != null) {
+            val kmObjCambio = out.kmObjetivoTexto != prev.kmObjetivoTexto
+            val intervaloKmCambio = out.intervaloKm != prev.intervaloKm
+                || out.origenCalculo != prev.origenCalculo
+                || out.idReferencia != prev.idReferencia
+                || out.criterio != prev.criterio
+            when {
+                kmObjCambio && out.kmObjetivoTexto.isNotBlank() -> {
+                    val kmObj = out.kmObjetivoTexto.toIntOrNull()
+                    if (kmObj != null && kmObj > kmBase) {
+                        out = out.copy(intervaloKm = (kmObj - kmBase).toString())
+                    }
+                }
+                intervaloKmCambio || out.kmObjetivoTexto.isBlank() -> {
+                    val intervalo = out.intervaloKm.toIntOrNull()
+                    if (intervalo != null && intervalo > 0) {
+                        out = out.copy(
+                            kmObjetivoTexto = sumarKmSeguro(kmBase, intervalo)?.toString().orEmpty()
+                        )
+                    }
+                }
+            }
+        } else if (!CriterioAlerta.usaKm(out.criterio)) {
+            out = out.copy(kmObjetivoTexto = "")
+        }
+        return out
+    }
+
+    /** Recarga contexto con codigoTipo/servicioOtro para poblar mantenimientos anteriores. */
+    fun recargarReferencias() {
+        viewModelScope.launch {
+            val id = mutable.value.idVehiculo
+            val b = mutable.value.borrador
+            if (b.codigoTipo.isBlank()) {
+                if (b.origenCalculo == "DESDE_MANTENIMIENTO") {
+                    mutable.value = mutable.value.copy(
+                        mensaje = "Selecciona primero el tipo de servicio para listar mantenimientos."
+                    )
+                }
+                return@launch
+            }
+            if (b.codigoTipo == "OTRO" && b.servicioOtro.isBlank()) {
+                if (b.origenCalculo == "DESDE_MANTENIMIENTO") {
+                    mutable.value = mutable.value.copy(
+                        mensaje = "Describe el servicio OTRO para listar mantenimientos."
+                    )
+                }
+                return@launch
+            }
+            mutable.value = mutable.value.copy(cargandoReferencias = true, mensaje = null)
+            try {
+                val ctx = repository.contexto(
+                    id,
+                    b.codigoTipo,
+                    b.servicioOtro.takeIf { b.codigoTipo == "OTRO" && it.isNotBlank() }
+                )
+                val actual = mutable.value.borrador
+                // Si el usuario cambió el borrador mientras cargaba, no pisar con datos viejos.
+                if (actual.codigoTipo != b.codigoTipo ||
+                    (actual.codigoTipo == "OTRO" && actual.servicioOtro.trim() != b.servicioOtro.trim())
+                ) {
+                    mutable.value = mutable.value.copy(cargandoReferencias = false)
+                    return@launch
+                }
+                mutable.value = mutable.value.copy(
+                    contexto = ctx,
+                    cargandoReferencias = false,
+                    preview = calcularPreview(actual, ctx)
+                )
+            } catch (e: Exception) {
+                mutable.value = mutable.value.copy(
+                    cargandoReferencias = false,
+                    mensaje = e.message ?: "No se pudieron cargar los mantenimientos de referencia"
+                )
+            }
+        }
     }
 
     fun volverFormulario() {
@@ -182,7 +355,12 @@ class ProgramarAlertaViewModel(
         mutable.value = s.copy(enviando = true, mensaje = null, idOperacion = idOperacion)
         viewModelScope.launch {
             try {
-                val ctx = repository.contexto(idVehiculo)
+                val bPre = mutable.value.borrador
+                val ctx = repository.contexto(
+                    idVehiculo,
+                    bPre.codigoTipo.takeIf { it.isNotBlank() },
+                    bPre.servicioOtro.takeIf { bPre.codigoTipo == "OTRO" && it.isNotBlank() }
+                )
                 val b = mutable.value.borrador
                 val esperado = calcularPreview(b, ctx)
                 if (esperado == null || esperado.fechaBase != resumen.fechaBase
@@ -226,8 +404,12 @@ class ProgramarAlertaViewModel(
                 val msg = e.message.orEmpty()
                 if (msg.contains("BASES_CAMBIARON") || msg.contains("cambió") || msg.contains("cambio")) {
                     try {
-                        val ctx = repository.contexto(idVehiculo)
                         val b = mutable.value.borrador
+                        val ctx = repository.contexto(
+                            idVehiculo,
+                            b.codigoTipo.takeIf { it.isNotBlank() },
+                            b.servicioOtro.takeIf { b.codigoTipo == "OTRO" && it.isNotBlank() }
+                        )
                         mutable.value = mutable.value.copy(
                             enviando = false, contexto = ctx, basesCambiaron = true,
                             paso = PasoProgramar.REVISION,
@@ -288,11 +470,11 @@ class ProgramarAlertaViewModel(
         fun referenciasElegibles(
             b: BorradorAlerta,
             ctx: com.mycar.app.features.alertas.domain.ContextoProgramarAlerta
-        ): List<ReferenciaMantenimientoAlerta> =
-            ctx.referencias.filter {
-                it.codigoTipo == b.codigoTipo &&
-                    (b.codigoTipo != "OTRO" || it.servicioOtro == b.servicioOtro)
-            }
+        ): List<ReferenciaMantenimientoAlerta> {
+            if (b.codigoTipo.isBlank()) return emptyList()
+            // El backend ya filtra por tipo (+ OTRO normalizado). Aquí solo alineamos código.
+            return ctx.referencias.filter { it.codigoTipo == b.codigoTipo }
+        }
 
         fun calcularPreview(
             b: BorradorAlerta,
@@ -362,8 +544,8 @@ class ProgramarAlertaViewModel(
             }
             if (CriterioAlerta.usaTiempo(b.criterio) && b.cantidadTiempo.toIntOrNull()?.let { it > 0 } != true)
                 put("cantidadTiempo", "Indica una cantidad de tiempo válida")
-            if (CriterioAlerta.usaTiempo(b.criterio) && b.unidadTiempo !in setOf("SEMANAS", "MESES"))
-                put("unidadTiempo", "Elige semanas o meses")
+            if (CriterioAlerta.usaTiempo(b.criterio) && b.unidadTiempo !in setOf("DIAS", "SEMANAS", "MESES"))
+                put("unidadTiempo", "Elige días, semanas o meses")
             if (CriterioAlerta.usaKm(b.criterio) && b.intervaloKm.toIntOrNull()?.let { it > 0 } != true)
                 put("intervaloKm", "Indica un intervalo de kilómetros válido")
             if (CriterioAlerta.usaKm(b.criterio) && b.origenCalculo == "DESDE_HOY" && kmActual == null)
@@ -379,11 +561,7 @@ class ProgramarAlertaViewModel(
 
         fun calcularFechaObjetivo(fechaBase: String, unidad: String, cantidad: Int): String {
             val base = LocalDate.parse(fechaBase.take(10))
-            val obj = when (unidad) {
-                "SEMANAS" -> base.plusWeeks(cantidad.toLong())
-                else -> base.plusMonths(cantidad.toLong())
-            }
-            return obj.toString()
+            return FechaObjetivoAlerta.fechaObjetivoDesde(base, unidad, cantidad).toString()
         }
     }
 }

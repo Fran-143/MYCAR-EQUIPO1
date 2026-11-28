@@ -50,6 +50,8 @@ import com.mycar.app.features.alertas.viewmodel.BorradorAlerta
 import com.mycar.app.features.alertas.viewmodel.PasoProgramar
 import com.mycar.app.features.alertas.viewmodel.ProgramarAlertaViewModel
 import com.mycar.app.features.alertas.viewmodel.ResumenAlerta
+import com.mycar.app.features.mantenimiento.domain.ValidacionFormularioMantenimiento
+import com.mycar.app.features.mantenimiento.ui.FechaMantenimiento
 import com.mycar.app.ui.theme.MyCarBlue
 import com.mycar.app.ui.theme.MyCarNavy
 import com.mycar.app.ui.theme.MyCarSky
@@ -85,6 +87,7 @@ fun ProgramarAlertaRoute(
         onConfirmar = vm::confirmar,
         onVolverFormulario = vm::volverFormulario,
         onRecargar = vm::cargar,
+        onRecargarReferencias = vm::recargarReferencias,
         onVolver = onVolver,
         onExitoVolver = onExito,
         onIrInicio = onIrInicio,
@@ -102,6 +105,7 @@ fun ProgramarAlertaScreen(
     onConfirmar: () -> Unit,
     onVolverFormulario: () -> Unit,
     onRecargar: () -> Unit,
+    onRecargarReferencias: () -> Unit = {},
     onVolver: () -> Unit,
     onExitoVolver: () -> Unit,
     onIrInicio: () -> Unit = onExitoVolver,
@@ -111,32 +115,55 @@ fun ProgramarAlertaScreen(
         PasoProgramar.EXITO -> PantallaExitoAlerta(estado.exito, onExitoVolver, onIrInicio, modifier)
         PasoProgramar.REVISION -> PantallaRevisionAlerta(estado, onConfirmar, onVolverFormulario, modifier)
         PasoProgramar.FORMULARIO -> PantallaFormularioAlerta(
-            estado, vehiculos, onActualizar, onCambiarVehiculo, onRevisar, onRecargar, onVolver, modifier
+            estado, vehiculos, onActualizar, onCambiarVehiculo, onRevisar, onRecargar,
+            onRecargarReferencias, onVolver, modifier
         )
     }
 }
 
 @Composable
 private fun PantallaExitoAlerta(
-    idAlerta: Long?,
+    @Suppress("UNUSED_PARAMETER") idAlerta: Long?,
     onVerAlertas: () -> Unit,
     onIrInicio: () -> Unit,
     modifier: Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
-    Column(modifier.fillMaxSize().background(scheme.background)) {
-        CabeceraProgramar(
-            titulo = "¡Alerta programada!",
-            subtitulo = if (idAlerta != null) "La alerta #$idAlerta quedó registrada."
-            else "La alerta quedó registrada.",
-            icono = Icons.Filled.CheckCircle
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(scheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(28.dp))
+        Surface(shape = CircleShape, color = MyCarTile) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = Color(0xFF146943),
+                modifier = Modifier.padding(20.dp).size(56.dp)
+            )
+        }
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "Alerta programada",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MyCarNavy
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Tu recordatorio quedó registrado. Podrás consultarlo y atenderlo desde Mis alertas.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = scheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         Spacer(Modifier.weight(1f))
         Column(
-            Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+            Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             BotonPrimario(
@@ -283,6 +310,7 @@ private fun PantallaFormularioAlerta(
     onCambiarVehiculo: (Long) -> Unit,
     onRevisar: () -> Unit,
     onRecargar: () -> Unit,
+    onRecargarReferencias: () -> Unit,
     onVolver: () -> Unit,
     modifier: Modifier
 ) {
@@ -323,6 +351,7 @@ private fun PantallaFormularioAlerta(
         Column(
             Modifier
                 .padding(padding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -480,28 +509,50 @@ private fun PantallaFormularioAlerta(
                         style = MaterialTheme.typography.labelLarge,
                         color = scheme.onSurface
                     )
-                    if (refs.isEmpty()) {
-                        Text(
-                            "No hay mantenimientos registrados para este vehículo y servicio.",
+                    when {
+                        b.codigoTipo.isBlank() -> Text(
+                            "Elige primero el tipo de servicio para cargar mantenimientos.",
                             color = scheme.error
                         )
-                    } else {
-                        val seleccion = refs.firstOrNull { it.id == b.idReferencia }
-                        SelectorSimple(
-                            etiqueta = seleccion?.let {
-                                etiquetaMantenimiento(nombreServicio(it, tipos), it)
-                            } ?: "Seleccionar mantenimiento",
-                            opciones = refs.map {
-                                it.id.toString() to etiquetaMantenimiento(nombreServicio(it, tipos), it)
-                            },
-                            seleccionado = b.idReferencia?.toString().orEmpty(),
-                            enabled = editable
-                        ) { id -> onActualizar { it.copy(idReferencia = id.toLongOrNull()) } }
-                        Text(
-                            "Se muestra el nombre del servicio, la fecha y el kilometraje del mantenimiento.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onSurfaceVariant
-                        )
+                        estado.cargandoReferencias -> {
+                            LinearProgressIndicator(
+                                Modifier.fillMaxWidth(),
+                                color = scheme.primary
+                            )
+                            Text(
+                                "Cargando mantenimientos…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = scheme.onSurfaceVariant
+                            )
+                        }
+                        refs.isEmpty() -> {
+                            Text(
+                                "No hay mantenimientos registrados para este vehículo y servicio.",
+                                color = scheme.error
+                            )
+                            TextButton(
+                                onClick = onRecargarReferencias,
+                                enabled = editable
+                            ) { Text("Reintentar carga") }
+                        }
+                        else -> {
+                            val seleccion = refs.firstOrNull { it.id == b.idReferencia }
+                            SelectorSimple(
+                                etiqueta = seleccion?.let {
+                                    etiquetaMantenimiento(nombreServicio(it, tipos), it)
+                                } ?: "Seleccionar mantenimiento",
+                                opciones = refs.map {
+                                    it.id.toString() to etiquetaMantenimiento(nombreServicio(it, tipos), it)
+                                },
+                                seleccionado = b.idReferencia?.toString().orEmpty(),
+                                enabled = editable
+                            ) { id -> onActualizar { it.copy(idReferencia = id.toLongOrNull()) } }
+                            Text(
+                                "Formato: servicio · fecha · kilometraje.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = scheme.onSurfaceVariant
+                            )
+                        }
                     }
                     estado.errores["idReferencia"]?.let {
                         Text(it, color = scheme.error, style = MaterialTheme.typography.bodySmall)
@@ -510,7 +561,7 @@ private fun PantallaFormularioAlerta(
             }
 
             if (CriterioAlerta.usaTiempo(b.criterio) || CriterioAlerta.usaKm(b.criterio)) {
-                SeccionProgramar(paso++, "Intervalo", Icons.Outlined.Schedule) {
+                SeccionProgramar(paso++, "Cuándo avisar", Icons.Outlined.Schedule) {
                     if (CriterioAlerta.usaTiempo(b.criterio)) {
                         Text(
                             "Intervalo de tiempo",
@@ -520,7 +571,7 @@ private fun PantallaFormularioAlerta(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
                                 b.cantidadTiempo,
-                                { v -> onActualizar { it.copy(cantidadTiempo = v) } },
+                                { v -> onActualizar { it.copy(cantidadTiempo = v.filter { ch -> ch.isDigit() }.take(4)) } },
                                 modifier = Modifier.weight(1f),
                                 enabled = editable,
                                 label = { Text("Cantidad") },
@@ -532,28 +583,92 @@ private fun PantallaFormularioAlerta(
                                 colors = coloresCampo()
                             )
                             SelectorSimple(
-                                etiqueta = if (b.unidadTiempo == "SEMANAS") "Semanas" else "Meses",
-                                opciones = listOf("SEMANAS" to "Semanas", "MESES" to "Meses"),
+                                etiqueta = when (b.unidadTiempo) {
+                                    "DIAS" -> "Días"
+                                    "SEMANAS" -> "Semanas"
+                                    else -> "Meses"
+                                },
+                                opciones = listOf(
+                                    "DIAS" to "Días",
+                                    "SEMANAS" to "Semanas",
+                                    "MESES" to "Meses"
+                                ),
                                 seleccionado = b.unidadTiempo,
                                 enabled = editable,
                                 modifier = Modifier.weight(1f)
-                            ) { u -> onActualizar { it.copy(unidadTiempo = u) } }
+                            ) { u ->
+                                onActualizar {
+                                    it.copy(
+                                        unidadTiempo = u,
+                                        cantidadTiempo = if (u == "DIAS" && it.cantidadTiempo.toIntOrNull()
+                                                ?.let { n -> n > 0 } != true) "1" else it.cantidadTiempo
+                                    )
+                                }
+                            }
                         }
+                        Text(
+                            "Semanas y meses (también días). La fecha objetivo se recalcula desde la base.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val minFecha = estado.contexto?.fechaServidor?.take(10)?.let { hoyIso ->
+                            runCatching { LocalDate.parse(hoyIso).plusDays(1).toString() }.getOrNull()
+                        }
+                        FechaMantenimiento(
+                            label = "Fecha objetivo (calendario)",
+                            value = b.fechaObjetivoIso,
+                            enabled = editable,
+                            maximo = null,
+                            onValue = { v -> onActualizar { it.copy(fechaObjetivoIso = v) } },
+                            opcional = true,
+                            error = estado.errores["fechaObjetivo"],
+                            minimo = minFecha
+                        )
+                        Text(
+                            "Solo fechas futuras (después de hoy), igual que en mantenimiento.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant
+                        )
                     }
                     if (CriterioAlerta.usaKm(b.criterio)) {
+                        Spacer(Modifier.height(4.dp))
                         OutlinedTextField(
-                            b.intervaloKm,
-                            { v -> onActualizar { it.copy(intervaloKm = v) } },
-                            label = { Text("Intervalo de kilometraje (km)") },
+                            b.kmObjetivoTexto,
+                            { v ->
+                                onActualizar {
+                                    it.copy(
+                                        kmObjetivoTexto = ValidacionFormularioMantenimiento.filtrarKmEntero(v)
+                                    )
+                                }
+                            },
+                            label = { Text("Kilometraje objetivo") },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = editable,
-                            isError = estado.errores.containsKey("intervaloKm"),
-                            supportingText = estado.errores["intervaloKm"]?.let { { Text(it) } },
+                            isError = estado.errores.containsKey("intervaloKm")
+                                || estado.errores.containsKey("kmObjetivo"),
+                            supportingText = {
+                                Text(
+                                    estado.errores["kmObjetivo"]
+                                        ?: estado.errores["intervaloKm"]
+                                        ?: "Como en mantenimiento: km absoluto mayor al de la base."
+                                )
+                            },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
-                            colors = coloresCampo()
+                            colors = coloresCampo(),
+                            placeholder = {
+                                Text("Máximo ${ValidacionFormularioMantenimiento.MAX_KM_ENTERO} km")
+                            }
                         )
+                        if (b.intervaloKm.isNotBlank()) {
+                            Text(
+                                "Intervalo derivado: ${b.intervaloKm} km desde la base",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = scheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
