@@ -95,12 +95,21 @@ public class NotificacionInternaService {
         String categoria = normalizarCategoria(categoriaRaw);
         String filtroLectura = normalizarFiltroLectura(filtroLecturaRaw);
         dao.conciliarVigencia(usuario);
+        // Una sola fuente: título/cuerpo = estado actual de alerta (mismo que el chip).
+        alinearTextosConEstadoAlerta(usuario);
         int pendientesGestion = dao.contarPendientes(usuario);
         int noLeidas = dao.contarNoLeidas(usuario);
         int leidas = dao.contarLeidas(usuario);
         var lista = dao.listar(usuario, pestana, categoria, filtroLectura);
         return new ContratoNotificaciones.BandejaResponse(
                 pestana, categoria, filtroLectura, pendientesGestion, noLeidas, leidas, lista);
+    }
+
+    /** Reescribe avisos PENDIENTE para que no digan «pendiente» si la alerta ya es VENCIDA (o viceversa). */
+    private void alinearTextosConEstadoAlerta(long usuario) {
+        for (var ctx : dao.listarAlertasConAvisoPendienteUsuario(usuario)) {
+            sincronizarContexto(ctx);
+        }
     }
 
     @Transactional

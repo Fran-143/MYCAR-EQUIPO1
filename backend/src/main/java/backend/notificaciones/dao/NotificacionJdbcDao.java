@@ -58,6 +58,37 @@ public class NotificacionJdbcDao {
                 rs.getString("etiqueta")), vehiculo);
     }
 
+    /**
+     * Alertas con aviso PENDIENTE del usuario: para realinear título/cuerpo con a.estado
+     * (evita chip VENCIDA + título «pendiente»).
+     */
+    public List<AlertaContexto> listarAlertasConAvisoPendienteUsuario(long usuario) {
+        return jdbc.query("""
+                SELECT a.id_alerta, a.id_vehiculo, COALESCE(v.id_usuario, a.id_usuario) AS id_usuario,
+                       a.estado, a.categoria, v.placa,
+                       CASE WHEN a.categoria = 'SOAT' THEN 'SOAT'
+                            WHEN a.categoria = 'LICENCIA' THEN 'LICENCIA'
+                            ELSE COALESCE(NULLIF(btrim(a.servicio_otro), ''), tm.nombre, 'Mantenimiento')
+                       END AS etiqueta
+                FROM mycar.notificacion n
+                JOIN mycar.alerta a ON a.id_alerta = n.id_alerta
+                LEFT JOIN mycar.vehiculo v ON v.id_vehiculo = a.id_vehiculo
+                LEFT JOIN mycar.tipo_mantenimiento tm ON tm.id_tipo_mantenimiento = a.id_tipo_mantenimiento
+                WHERE n.id_usuario = ?
+                  AND n.estado_gestion = 'PENDIENTE'
+                  AND n.id_alerta IS NOT NULL
+                  AND a.estado IN ('PROXIMA','PENDIENTE','VENCIDA','REALIZADA','ANULADA')
+                ORDER BY a.id_alerta
+                """, (rs, n) -> new AlertaContexto(
+                rs.getLong("id_alerta"),
+                (Long) rs.getObject("id_vehiculo"),
+                rs.getLong("id_usuario"),
+                rs.getString("estado"),
+                rs.getString("categoria"),
+                rs.getString("placa"),
+                rs.getString("etiqueta")), usuario);
+    }
+
     /** Alertas LICENCIA del usuario para reconciliar avisos internos. */
     public List<AlertaContexto> listarAlertasLicenciaUsuarioParaAvisos(long usuario) {
         return jdbc.query("""
