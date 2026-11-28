@@ -52,9 +52,13 @@ class RecordatorioPushElegibilidadTest {
     }
 
     @Test
-    void maxUnoPorDiaLocal() {
-        Control hoyYa = new Control(1L, "PENDIENTE", hoy, "ENTRADA_ESTADO", null);
-        assertNull(svc.evaluar(alerta("VENCIDA"), hoyYa, hoy));
+    void entradaVencidaAunqueHuboPushPendienteHoy() {
+        // Coherencia: si el km hace pasar a VENCIDA el mismo día, debe haber push de entrada.
+        Control hoyPendiente = new Control(1L, "PENDIENTE", hoy, "ENTRADA_ESTADO", null);
+        assertEquals(Motivo.ENTRADA_ESTADO, svc.evaluar(alerta("VENCIDA"), hoyPendiente, hoy).motivo());
+        // Recordatorio del mismo estado: sí tope 1/día.
+        Control hoyVencida = new Control(1L, "VENCIDA", hoy, "ENTRADA_ESTADO", null);
+        assertNull(svc.evaluar(alerta("VENCIDA"), hoyVencida, hoy));
     }
 
     @Test

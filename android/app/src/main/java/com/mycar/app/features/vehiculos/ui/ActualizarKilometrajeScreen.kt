@@ -29,6 +29,7 @@ fun ActualizarKilometrajeRoute(
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onActualizado: () -> Unit,
+    onIrInicio: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val vm: ActualizarKilometrajeViewModel = viewModel(
@@ -41,7 +42,9 @@ fun ActualizarKilometrajeRoute(
     ActualizarKilometrajeScreen(
         estado, vm::cambiarKm, vm::irVistaPrevia, vm::volverEdicion,
         vm::confirmar, vm::cargarContexto, onVolver, onIniciarSesion,
-        onContinuarExito = { onActualizado(); onVolver() }, modifier
+        onContinuarExito = { onActualizado(); onVolver() },
+        onIrInicioExito = { onActualizado(); onIrInicio() },
+        modifier
     )
 }
 
@@ -56,6 +59,7 @@ fun ActualizarKilometrajeScreen(
     onVolver: () -> Unit,
     onIniciarSesion: () -> Unit,
     onContinuarExito: () -> Unit,
+    onIrInicioExito: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -186,6 +190,9 @@ fun ActualizarKilometrajeScreen(
                             )
                         }
                     }
+                    estado.mensaje?.let {
+                        Text(it, color = Color(0xFFC62828), style = MaterialTheme.typography.bodyMedium)
+                    }
                     Button(
                         onClick = onConfirmar,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
@@ -230,7 +237,12 @@ fun ActualizarKilometrajeScreen(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MyCarNavy)
-                    ) { Text("Volver al detalle", fontWeight = FontWeight.SemiBold) }
+                    ) { Text("Continuar", fontWeight = FontWeight.SemiBold) }
+                    OutlinedButton(
+                        onClick = onIrInicioExito,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) { Text("Ir a inicio") }
                 }
             }
         }

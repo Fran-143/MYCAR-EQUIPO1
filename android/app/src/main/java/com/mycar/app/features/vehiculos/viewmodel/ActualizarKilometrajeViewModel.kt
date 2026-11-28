@@ -8,6 +8,8 @@ import com.mycar.app.features.vehiculos.data.ContextoKilometrajeDto
 import com.mycar.app.features.vehiculos.data.SolicitudActualizarKmDto
 import com.mycar.app.features.vehiculos.domain.ActualizarKilometrajeRepository
 import com.mycar.app.features.vehiculos.domain.FalloRegistroVehiculo
+import com.mycar.app.features.vehiculos.domain.KilometrajeTexto
+import java.math.RoundingMode
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,16 +55,17 @@ class ActualizarKilometrajeViewModel(
     }
 
     fun cambiarKm(texto: String) {
+        val filtrado = KilometrajeTexto.filtrarEntrada(texto)
         val actual = _estado.value
-        if (texto == actual.kmNuevoTexto) return
+        if (filtrado == actual.kmNuevoTexto) return
         val pendiente = actual.idOperacion
         if (pendiente == null) {
-            _estado.value = actual.copy(kmNuevoTexto = texto, errores = emptyMap())
+            _estado.value = actual.copy(kmNuevoTexto = filtrado, errores = emptyMap())
             return
         }
         // Resultado incierto: no descartar idOperacion en silencio; reconciliar primero.
         viewModelScope.launch {
-            reconciliarAntesDeCambiarKm(pendiente, texto)
+            reconciliarAntesDeCambiarKm(pendiente, filtrado)
         }
     }
 
@@ -109,24 +112,43 @@ class ActualizarKilometrajeViewModel(
         }
     }
 
+    /** Solo UI local: no llama red. Continuar → confirmación. */
     fun irVistaPrevia() {
         val ctx = _estado.value.contexto ?: return
-        val km = _estado.value.kmNuevoTexto.trim().toIntOrNull()
-        val errores = mutableMapOf<String, String>()
-        if (km == null || km <= 0) errores["kmNuevo"] = "Ingresa un kilometraje entero mayor que cero."
-        else if (km <= ctx.kmActual) errores["kmNuevo"] = "Debe ser mayor que ${ctx.kmActual} km."
-        if (errores.isNotEmpty()) {
-            _estado.value = _estado.value.copy(errores = errores)
+        val texto = _estado.value.kmNuevoTexto
+        val error = KilometrajeTexto.mensajeError(texto, ctx.kmActual)
+        if (error != null) {
+            _estado.value = _estado.value.copy(errores = mapOf("kmNuevo" to error))
             return
         }
-        _estado.value = _estado.value.copy(paso = PasoKm.VISTA_PREVIA, errores = emptyMap())
+        val kmEntero = kmEnteroParaApi(texto)
+        if (kmEntero == null) {
+            _estado.value = _estado.value.copy(
+                errores = mapOf("kmNuevo" to "Ingresa un kilometraje válido.")
+            )
+            return
+        }
+        if (kmEntero <= ctx.kmActual) {
+            _estado.value = _estado.value.copy(
+                errores = mapOf(
+                    "kmNuevo" to "Debe ser mayor que ${KilometrajeTexto.formatear(ctx.kmActual)} km."
+                )
+            )
+            return
+        }
+        _estado.value = _estado.value.copy(
+            paso = PasoKm.VISTA_PREVIA,
+            kmNuevoTexto = kmEntero.toString(),
+            errores = emptyMap(),
+            mensaje = null
+        )
     }
 
     fun volverEdicion() { _estado.value = _estado.value.copy(paso = PasoKm.EDICION) }
 
     fun confirmar() {
         val ctx = _estado.value.contexto ?: return
-        val km = _estado.value.kmNuevoTexto.trim().toIntOrNull() ?: return
+        val km = kmEnteroParaApi(_estado.value.kmNuevoTexto) ?: return
         // Conserva idOperacion en reintentos de la misma confirmación (sin duplicar identidad).
         val op = _estado.value.idOperacion ?: UUID.randomUUID().also {
             _estado.value = _estado.value.copy(idOperacion = it)
@@ -147,8 +169,42 @@ class ActualizarKilometrajeViewModel(
                     recuperarOperacion(op)
                     return@launch
                 }
+                // Timeout/red: si la op pudo confirmarse en servidor, reconciliar a EXITO.
+                if (pareceTimeoutORed(e)) {
+                    recuperarOperacionTrasTimeout(op)
+                    return@launch
+                }
                 manejarError(e, reintentar = ::confirmar)
             }
+        }
+    }
+
+    private suspend fun recuperarOperacionTrasTimeout(op: UUID) {
+        try {
+            when (repository.operacion(op).estado) {
+                "CONFIRMADA" -> {
+                    val km = repository.operacion(op).resultado?.kmActual
+                    _estado.value = _estado.value.copy(
+                        paso = PasoKm.EXITO,
+                        kmConfirmado = km,
+                        idOperacion = null,
+                        mensaje = null
+                    )
+                }
+                "EN_PROCESO" -> _estado.value = _estado.value.copy(
+                    paso = PasoKm.ERROR,
+                    mensaje = "El servidor sigue procesando. Espera unos segundos y pulsa Reintentar."
+                )
+                else -> _estado.value = _estado.value.copy(
+                    paso = PasoKm.VISTA_PREVIA,
+                    mensaje = "No hubo respuesta a tiempo. Revisa la conexión y vuelve a confirmar."
+                )
+            }
+        } catch (_: Exception) {
+            _estado.value = _estado.value.copy(
+                paso = PasoKm.VISTA_PREVIA,
+                mensaje = "No hubo respuesta a tiempo. Puedes volver a confirmar; la operación se reutiliza."
+            )
         }
     }
 
@@ -203,6 +259,10 @@ class ActualizarKilometrajeViewModel(
                 paso = PasoKm.ERROR,
                 mensaje = "La operación sigue en proceso. Espera unos segundos y reintenta sin cambiar el km."
             )
+            pareceTimeoutORed(e) -> _estado.value = _estado.value.copy(
+                paso = PasoKm.VISTA_PREVIA,
+                mensaje = "No hubo respuesta a tiempo. Vuelve a confirmar; si ya se guardó, verás el éxito."
+            )
             else -> _estado.value = _estado.value.copy(
                 paso = PasoKm.ERROR,
                 mensaje = detalle
@@ -215,6 +275,26 @@ class ActualizarKilometrajeViewModel(
     companion object {
         fun factory(idVehiculo: Long, repository: ActualizarKilometrajeRepository) = viewModelFactory {
             initializer { ActualizarKilometrajeViewModel(idVehiculo, repository) }
+        }
+
+        /** API RF14 usa entero; redondea a unidad. */
+        fun kmEnteroParaApi(texto: String): Int? {
+            val bd = KilometrajeTexto.parsear(KilometrajeTexto.normalizarConCeros(texto) ?: return null)
+                ?: return null
+            return runCatching {
+                bd.setScale(0, RoundingMode.HALF_UP).intValueExact()
+            }.getOrNull()?.takeIf { it > 0 }
+        }
+
+        fun pareceTimeoutORed(e: Exception): Boolean {
+            val m = (e.message ?: "").lowercase()
+            val causa = (e.cause?.message ?: "").lowercase()
+            return m.contains("timeout") || m.contains("timed out") || m.contains("failed to connect")
+                || m.contains("unable to resolve") || m.contains("connection reset")
+                || causa.contains("timeout") || causa.contains("timed out")
+                || e is java.net.SocketTimeoutException
+                || e is java.io.InterruptedIOException
+                || e.cause is java.net.SocketTimeoutException
         }
     }
 }
