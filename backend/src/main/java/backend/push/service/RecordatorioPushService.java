@@ -102,8 +102,7 @@ public class RecordatorioPushService {
     }
 
     /**
-     * Tras RF23 COMPLETO o sync de vehículo: solo encola (idempotente).
-     * No envía FCM aquí; OutboxPushWorker / cron despachan en ventana.
+     * Tras RF23 COMPLETO (cron): solo encola. El cron 05:00 / worker despachan en ventana.
      */
     public ResultadoProgramado encolarCandidatosTrasEvaluacion() {
         if (!enCurso.compareAndSet(false, true)) {
@@ -117,11 +116,27 @@ public class RecordatorioPushService {
         }
     }
 
+    /**
+     * Tras sync interactivo (vencence / cambia estado al momento): encola y envía FCM ya.
+     * No espera la ventana 05:00–21:59: la entrada a VENCIDA/PROXIMA/PENDIENTE avisa al instante.
+     */
+    public ResultadoProgramado encolarYDespacharTrasCambio() {
+        if (!enCurso.compareAndSet(false, true)) {
+            log.info("Despacho push omitido: ejecución en curso");
+            return new ResultadoProgramado(true, 0, 0, 0, 0);
+        }
+        try {
+            return encolarYDespachar(true);
+        } finally {
+            enCurso.set(false);
+        }
+    }
+
+    /**
+     * Tras RF14: entrada de estado de mantenimiento → FCM inmediato (también de noche).
+     */
     @Transactional
     public int encolarInmediatosPorKm(long idVehiculo) {
-        if (!forzarVentana && !ventana.enVentanaInmediataKm()) {
-            return 0;
-        }
         LocalDate hoy = ventana.hoyLima();
         int encolados = 0;
         for (AlertaActiva a : alertas.listarActivasVehiculo(idVehiculo)) {
@@ -149,7 +164,11 @@ public class RecordatorioPushService {
             }
         }
         if (encolados > 0) {
-            outbox.procesarLote(loteDespacho);
+            // Despacho al momento (sin gate nocturno): la vencida por km avisa ya.
+            int n;
+            do {
+                n = outbox.procesarLote(loteDespacho);
+            } while (n > 0);
         }
         return encolados;
     }

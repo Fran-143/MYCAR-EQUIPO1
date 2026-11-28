@@ -11,8 +11,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Tras RF14: sincroniza estados/bandeja y, si hay ventana ≥05:00 Lima,
- * encola push inmediato solo por entrada de estado (no recordatorios periódicos).
+ * Tras RF14: sincroniza estados/bandeja y envía push inmediato por entrada de estado
+ * (VENCIDA/PROXIMA/PENDIENTE), también fuera de la ventana diurna.
  */
 @Component
 public class KilometrajePushHook {

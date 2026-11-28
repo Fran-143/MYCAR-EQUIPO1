@@ -241,7 +241,7 @@ public class SincronizarAlertasService {
         }
     }
 
-    /** Tras transiciones reales: encola push (despacho FCM en ventana / worker). */
+    /** Tras transiciones reales (p. ej. pasa a VENCIDA): FCM al momento. */
     private void programarEncoladoPushTrasCommit() {
         if (pushRecordatorios == null) {
             return;
@@ -252,9 +252,12 @@ public class SincronizarAlertasService {
                 return;
             }
             try {
-                push.encolarCandidatosTrasEvaluacion();
+                var r = push.encolarYDespacharTrasCambio();
+                log.info(
+                        "Push tras sync: evaluadas={} encolados={} enviados={}",
+                        r.alertasEvaluadas(), r.encolados(), r.enviados());
             } catch (RuntimeException ex) {
-                log.warn("Encolado push tras sync omitido: {}", ex.toString());
+                log.warn("Encolado/despacho push tras sync omitido: {}", ex.toString());
             }
         };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
