@@ -3,6 +3,7 @@ package backend.push.service;
 import backend.notificaciones.dao.PreferenciaNotificacionJdbcDao;
 import backend.push.dao.AlertaPushControlJdbcDao;
 import backend.push.dao.AlertaPushControlJdbcDao.Control;
+import backend.push.dao.DispositivoPushJdbcDao;
 import backend.push.dao.RecordatorioPushJdbcDao;
 import backend.push.dao.RecordatorioPushJdbcDao.AlertaActiva;
 import backend.push.dao.RecordatorioPushJdbcDao.NotifKmElegible;
@@ -23,10 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Política push consolidada:
- * MANTENIMIENTO — PROXIMA 1×; PENDIENTE 1× + cada 3d; VENCIDA 1× + cada 3d.
+ * MANTENIMIENTO — PROXIMA 1×; PENDIENTE 1× + cada 3d; VENCIDA 1× + diario.
  * SOAT — hitos −30/−7/−1/+1 y semanal si VENCIDA.
  * KILOMETRAJE — según RF43 (no kilometraje_on); agrupación por categoría.
- * Agrupación 05:00: usuario + categoría + fecha Lima → 1 push si ≥2 avisos.
+ * Encolado: puede ocurrir tras RF23 / sync (sin depender solo del cron 05:00).
+ * Despacho FCM: solo dentro de 05:00–21:59 Lima (salvo forzar-ventana).
+ * Agrupación: usuario + categoría + fecha Lima → 1 push si ≥2 avisos.
  * LICENCIA: sin emisor push dedicado en esta versión (documentado).
  */
 @Service
@@ -53,6 +56,7 @@ public class RecordatorioPushService {
     private final AlertaPushControlJdbcDao control;
     private final OutboxPushService outbox;
     private final PreferenciaNotificacionJdbcDao preferencias;
+    private final DispositivoPushJdbcDao dispositivos;
     private final VentanaPushLima ventana;
     private final int loteDespacho;
     private final boolean forzarVentana;
@@ -63,6 +67,7 @@ public class RecordatorioPushService {
             AlertaPushControlJdbcDao control,
             OutboxPushService outbox,
             PreferenciaNotificacionJdbcDao preferencias,
+            DispositivoPushJdbcDao dispositivos,
             VentanaPushLima ventana,
             @Value("${mycar.fcm.worker-lote:25}") int loteDespacho,
             @Value("${mycar.fcm.forzar-ventana:false}") boolean forzarVentana) {
@@ -70,32 +75,68 @@ public class RecordatorioPushService {
         this.control = control;
         this.outbox = outbox;
         this.preferencias = preferencias;
+        this.dispositivos = dispositivos;
         this.ventana = ventana;
         this.loteDespacho = loteDespacho;
         this.forzarVentana = forzarVentana;
     }
 
+    /**
+     * Cron 05:00 Lima: encola candidatos y despacha dentro de ventana.
+     * Fuera de ventana solo encola (el drain del worker enviará al abrir la ventana).
+     */
     public ResultadoProgramado ejecutarVentanaProgramada() {
         if (!enCurso.compareAndSet(false, true)) {
             log.info("Recordatorios omitidos: ejecución en curso");
             return new ResultadoProgramado(true, 0, 0, 0, 0);
         }
         try {
-            if (!forzarVentana && !ventana.enVentanaDespacho()) {
-                log.info("Fuera de ventana 05:00-21:59 Lima; no se encola ni despacha");
-                return new ResultadoProgramado(false, 0, 0, 0, 0);
+            boolean despachar = forzarVentana || ventana.enVentanaDespacho();
+            if (!despachar) {
+                log.info("Fuera de ventana 05:00-21:59 Lima; se encola y se difiere el despacho FCM");
             }
-            return encolarYDespachar();
+            return encolarYDespachar(despachar);
         } finally {
             enCurso.set(false);
         }
     }
 
+    /**
+     * Tras RF23 COMPLETO (cron): solo encola. El cron 05:00 / worker despachan en ventana.
+     */
+    public ResultadoProgramado encolarCandidatosTrasEvaluacion() {
+        if (!enCurso.compareAndSet(false, true)) {
+            log.info("Encolado push omitido: ejecución en curso");
+            return new ResultadoProgramado(true, 0, 0, 0, 0);
+        }
+        try {
+            return encolarYDespachar(false);
+        } finally {
+            enCurso.set(false);
+        }
+    }
+
+    /**
+     * Tras sync interactivo (vencence / cambia estado al momento): encola y envía FCM ya.
+     * No espera la ventana 05:00–21:59: la entrada a VENCIDA/PROXIMA/PENDIENTE avisa al instante.
+     */
+    public ResultadoProgramado encolarYDespacharTrasCambio() {
+        if (!enCurso.compareAndSet(false, true)) {
+            log.info("Despacho push omitido: ejecución en curso");
+            return new ResultadoProgramado(true, 0, 0, 0, 0);
+        }
+        try {
+            return encolarYDespachar(true);
+        } finally {
+            enCurso.set(false);
+        }
+    }
+
+    /**
+     * Tras RF14: entrada de estado de mantenimiento → FCM inmediato (también de noche).
+     */
     @Transactional
     public int encolarInmediatosPorKm(long idVehiculo) {
-        if (!forzarVentana && !ventana.enVentanaInmediataKm()) {
-            return 0;
-        }
         LocalDate hoy = ventana.hoyLima();
         int encolados = 0;
         for (AlertaActiva a : alertas.listarActivasVehiculo(idVehiculo)) {
@@ -123,12 +164,16 @@ public class RecordatorioPushService {
             }
         }
         if (encolados > 0) {
-            outbox.procesarLote(loteDespacho);
+            // Despacho al momento (sin gate nocturno): la vencida por km avisa ya.
+            int n;
+            do {
+                n = outbox.procesarLote(loteDespacho);
+            } while (n > 0);
         }
         return encolados;
     }
 
-    private ResultadoProgramado encolarYDespachar() {
+    private ResultadoProgramado encolarYDespachar(boolean despacharFcm) {
         LocalDate hoy = ventana.hoyLima();
         Map<ClaveGrupo, List<Candidato>> grupos = new LinkedHashMap<>();
         int evaluadas = 0;
@@ -194,15 +239,17 @@ public class RecordatorioPushService {
         }
 
         int enviados = 0;
-        int n;
-        do {
-            n = outbox.procesarLote(loteDespacho);
-            enviados += n;
-        } while (n > 0);
+        if (despacharFcm) {
+            int n;
+            do {
+                n = outbox.procesarLote(loteDespacho);
+                enviados += n;
+            } while (n > 0);
+        }
 
         log.info(
-                "Push agrupado evaluadas={} grupos={} encolados={} enviados={} rf48omit={}",
-                evaluadas, grupos.size(), encolados, enviados, omitidosRf48);
+                "Push agrupado evaluadas={} grupos={} encolados={} enviados={} rf48omit={} despachar={}",
+                evaluadas, grupos.size(), encolados, enviados, omitidosRf48, despacharFcm);
         return new ResultadoProgramado(false, evaluadas, encolados, enviados, omitidosRf48);
     }
 
@@ -278,7 +325,7 @@ public class RecordatorioPushService {
                 .isPresent() ? 1 : 0;
     }
 
-    /** Null = no elegible hoy. VENCIDA mantenimiento: cada 3 días (no diario). */
+    /** Null = no elegible hoy. VENCIDA mantenimiento: recordatorio diario (máx. 1/día). */
     Elegibilidad evaluarMantenimiento(AlertaActiva a, Control c, LocalDate hoy) {
         String estado = a.estado();
         if (c != null && c.fechaUltimoEnvioLima() != null && c.fechaUltimoEnvioLima().equals(hoy)) {
@@ -307,7 +354,7 @@ public class RecordatorioPushService {
                 if (ciclo == null || !"VENCIDA".equals(ciclo)) {
                     yield new Elegibilidad(Motivo.ENTRADA_ESTADO);
                 }
-                if (ultimo != null && ChronoUnit.DAYS.between(ultimo, hoy) >= 3) {
+                if (ultimo != null && ChronoUnit.DAYS.between(ultimo, hoy) >= 1) {
                     yield new Elegibilidad(Motivo.RECORDATORIO);
                 }
                 yield null;
@@ -382,17 +429,13 @@ public class RecordatorioPushService {
     private boolean prefMantOk(long usuario) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
-        return pref != null
-                && pref.mantenimiento()
-                && "CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo());
+        return pref != null && pref.mantenimiento() && permisoPermiteEnvio(usuario, pref.permisoDispositivo());
     }
 
     private boolean prefSoatOk(long usuario) {
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
-        return pref != null
-                && pref.soat()
-                && "CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo());
+        return pref != null && pref.soat() && permisoPermiteEnvio(usuario, pref.permisoDispositivo());
     }
 
     /** Push KM: interruptor RF43 + permiso dispositivo. Ignora kilometraje_on heredado. */
@@ -402,7 +445,21 @@ public class RecordatorioPushService {
         }
         preferencias.asegurarFila(usuario);
         var pref = preferencias.consultar(usuario).orElse(null);
-        return pref != null && "CONCEDIDO".equalsIgnoreCase(pref.permisoDispositivo());
+        return pref != null && permisoPermiteEnvio(usuario, pref.permisoDispositivo());
+    }
+
+    /**
+     * DENEGADO bloquea. CONCEDIDO permite.
+     * NO_SOLICITADO con tokens activos: cualquier celular ya registrado recibe (multi-dispositivo).
+     */
+    private boolean permisoPermiteEnvio(long usuario, String permiso) {
+        if ("DENEGADO".equalsIgnoreCase(permiso)) {
+            return false;
+        }
+        if ("CONCEDIDO".equalsIgnoreCase(permiso)) {
+            return true;
+        }
+        return !dispositivos.listarActivos(usuario, "FCM").isEmpty();
     }
 
     static String claveIndividual(String prefijo, long idAlerta, LocalDate hoy, Motivo motivo) {
