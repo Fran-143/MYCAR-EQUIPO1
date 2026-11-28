@@ -154,7 +154,8 @@ public class RecordatorioPushService {
             if (el == null || el.motivo() != Motivo.ENTRADA_ESTADO) {
                 continue;
             }
-            String clave = claveIndividual("MANT", a.idAlerta(), hoy, Motivo.INMEDIATO_KM);
+            // Incluye estado: PENDIENTE y VENCIDA el mismo día no colisionan en idempotencia.
+            String clave = claveIndividual("MANT", a.idAlerta(), hoy, Motivo.INMEDIATO_KM, a.estado());
             if (outbox.encolarAhora(
                     a.idUsuario(), a.idAlerta(), "MANTENIMIENTO",
                     tituloMant(a.estado(), a.etiquetaServicio()),
@@ -164,11 +165,8 @@ public class RecordatorioPushService {
             }
         }
         if (encolados > 0) {
-            // Despacho al momento (sin gate nocturno): la vencida por km avisa ya.
-            int n;
-            do {
-                n = outbox.procesarLote(loteDespacho);
-            } while (n > 0);
+            // Un lote basta: el worker sigue drenando. Evita colgar el hilo post-RF14.
+            outbox.procesarLote(loteDespacho);
         }
         return encolados;
     }
@@ -258,7 +256,7 @@ public class RecordatorioPushService {
             AlertaActiva a = cand.alerta();
             String cat = a.categoria();
             String pref = "SOAT".equals(cat) ? "SOAT" : "MANT";
-            String clave = claveIndividual(pref, a.idAlerta(), hoy, cand.motivo());
+            String clave = claveIndividual(pref, a.idAlerta(), hoy, cand.motivo(), a.estado());
             String titulo;
             String cuerpo;
             if ("SOAT".equals(cat)) {
@@ -325,14 +323,17 @@ public class RecordatorioPushService {
                 .isPresent() ? 1 : 0;
     }
 
-    /** Null = no elegible hoy. VENCIDA mantenimiento: recordatorio diario (máx. 1/día). */
+    /**
+     * Null = no elegible hoy.
+     * Entrada a un estado peor (p. ej. PENDIENTE→VENCIDA) avisa aunque ya hubiera push hoy:
+     * así push y bandeja coinciden con el estado real de la alerta.
+     * Recordatorios periódicos sí respetan tope 1/día (VENCIDA) o cada 3d (PENDIENTE).
+     */
     Elegibilidad evaluarMantenimiento(AlertaActiva a, Control c, LocalDate hoy) {
         String estado = a.estado();
-        if (c != null && c.fechaUltimoEnvioLima() != null && c.fechaUltimoEnvioLima().equals(hoy)) {
-            return null;
-        }
         String ciclo = c == null ? null : c.estadoCiclo();
         LocalDate ultimo = c == null ? null : c.fechaUltimoEnvioLima();
+        boolean yaHoy = ultimo != null && ultimo.equals(hoy);
 
         return switch (estado) {
             case "PROXIMA" -> {
@@ -345,6 +346,9 @@ public class RecordatorioPushService {
                 if (ciclo == null || !"PENDIENTE".equals(ciclo)) {
                     yield new Elegibilidad(Motivo.ENTRADA_ESTADO);
                 }
+                if (yaHoy) {
+                    yield null;
+                }
                 if (ultimo != null && ChronoUnit.DAYS.between(ultimo, hoy) >= 3) {
                     yield new Elegibilidad(Motivo.RECORDATORIO);
                 }
@@ -353,6 +357,9 @@ public class RecordatorioPushService {
             case "VENCIDA" -> {
                 if (ciclo == null || !"VENCIDA".equals(ciclo)) {
                     yield new Elegibilidad(Motivo.ENTRADA_ESTADO);
+                }
+                if (yaHoy) {
+                    yield null;
                 }
                 if (ultimo != null && ChronoUnit.DAYS.between(ultimo, hoy) >= 1) {
                     yield new Elegibilidad(Motivo.RECORDATORIO);
@@ -379,12 +386,10 @@ public class RecordatorioPushService {
         if (a.fechaObjetivo() == null) {
             return null;
         }
-        if (c != null && c.fechaUltimoEnvioLima() != null && c.fechaUltimoEnvioLima().equals(hoy)) {
-            return null;
-        }
         long diasHasta = ChronoUnit.DAYS.between(hoy, a.fechaObjetivo());
         String ciclo = c == null ? null : c.estadoCiclo();
         LocalDate ultimo = c == null ? null : c.fechaUltimoEnvioLima();
+        boolean yaHoy = ultimo != null && ultimo.equals(hoy);
 
         return switch (a.estado()) {
             case "PROXIMA" -> {
@@ -399,17 +404,18 @@ public class RecordatorioPushService {
                     // Hito 7 días (entrada PENDIENTE)
                     yield new Elegibilidad(Motivo.HITO_SOAT);
                 }
-                // Hito 1 día antes
-                if (diasHasta == 1 && (ultimo == null || !ultimo.equals(hoy))) {
-                    if (ultimo == null || ChronoUnit.DAYS.between(ultimo, hoy) >= 1) {
-                        yield new Elegibilidad(Motivo.HITO_SOAT);
-                    }
+                // Hito 1 día antes (mismo ciclo PENDIENTE)
+                if (diasHasta == 1 && !yaHoy) {
+                    yield new Elegibilidad(Motivo.HITO_SOAT);
                 }
                 yield null;
             }
             case "VENCIDA" -> {
                 if (ciclo == null || !"VENCIDA".equals(ciclo)) {
                     yield new Elegibilidad(Motivo.HITO_SOAT);
+                }
+                if (yaHoy) {
+                    yield null;
                 }
                 if (ultimo != null && ChronoUnit.DAYS.between(ultimo, hoy) >= 7) {
                     yield new Elegibilidad(Motivo.RECORDATORIO);
@@ -462,8 +468,10 @@ public class RecordatorioPushService {
         return !dispositivos.listarActivos(usuario, "FCM").isEmpty();
     }
 
-    static String claveIndividual(String prefijo, long idAlerta, LocalDate hoy, Motivo motivo) {
-        return prefijo + ":" + idAlerta + ":" + hoy + ":" + motivo.name();
+    static String claveIndividual(
+            String prefijo, long idAlerta, LocalDate hoy, Motivo motivo, String estado) {
+        String est = estado == null || estado.isBlank() ? "NA" : estado;
+        return prefijo + ":" + idAlerta + ":" + hoy + ":" + motivo.name() + ":" + est;
     }
 
     private static String etiquetaVehiculo(NotifKmElegible n) {

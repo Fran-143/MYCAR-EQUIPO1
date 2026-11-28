@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class RecordatorioPushElegibilidadTest {
     private final RecordatorioPushService svc = new RecordatorioPushService(
-            null, null, null, null, null, 25, true);
+            null, null, null, null, null, null, 25, true);
     private final LocalDate hoy = LocalDate.of(2026, 11, 12);
 
     private static AlertaActiva alerta(String estado) {
@@ -41,12 +41,10 @@ class RecordatorioPushElegibilidadTest {
     }
 
     @Test
-    void vencidaCada3DiasSinRafaga() {
+    void vencidaRecordatorioDiarioSinRafaga() {
         assertEquals(Motivo.ENTRADA_ESTADO, svc.evaluar(alerta("VENCIDA"), null, hoy).motivo());
         Control ayer = new Control(1L, "VENCIDA", hoy.minusDays(1), "ENTRADA_ESTADO", null);
-        assertNull(svc.evaluar(alerta("VENCIDA"), ayer, hoy));
-        Control d3 = new Control(1L, "VENCIDA", hoy.minusDays(3), "ENTRADA_ESTADO", null);
-        assertEquals(Motivo.RECORDATORIO, svc.evaluar(alerta("VENCIDA"), d3, hoy).motivo());
+        assertEquals(Motivo.RECORDATORIO, svc.evaluar(alerta("VENCIDA"), ayer, hoy).motivo());
         Control hoyYa = new Control(1L, "VENCIDA", hoy, "RECORDATORIO", null);
         assertNull(svc.evaluar(alerta("VENCIDA"), hoyYa, hoy));
         Control viejo = new Control(1L, "VENCIDA", hoy.minusDays(10), "RECORDATORIO", null);
@@ -54,9 +52,13 @@ class RecordatorioPushElegibilidadTest {
     }
 
     @Test
-    void maxUnoPorDiaLocal() {
-        Control hoyYa = new Control(1L, "PENDIENTE", hoy, "ENTRADA_ESTADO", null);
-        assertNull(svc.evaluar(alerta("VENCIDA"), hoyYa, hoy));
+    void entradaVencidaAunqueHuboPushPendienteHoy() {
+        // Coherencia: si el km hace pasar a VENCIDA el mismo día, debe haber push de entrada.
+        Control hoyPendiente = new Control(1L, "PENDIENTE", hoy, "ENTRADA_ESTADO", null);
+        assertEquals(Motivo.ENTRADA_ESTADO, svc.evaluar(alerta("VENCIDA"), hoyPendiente, hoy).motivo());
+        // Recordatorio del mismo estado: sí tope 1/día.
+        Control hoyVencida = new Control(1L, "VENCIDA", hoy, "ENTRADA_ESTADO", null);
+        assertNull(svc.evaluar(alerta("VENCIDA"), hoyVencida, hoy));
     }
 
     @Test
