@@ -50,7 +50,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,7 +75,6 @@ import com.mycar.app.ui.theme.MyCarTeal
 import com.mycar.app.ui.theme.MyCarTile
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
@@ -134,9 +132,6 @@ fun PreferenciasNotificacionRoute(
     }
     val vm: PreferenciasNotificacionViewModel = viewModel(factory = factory)
     val estado by vm.estado.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-    var probando by remember { mutableStateOf(false) }
-    var mensajePrueba by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(estado.sesionInvalida) { if (estado.sesionInvalida) onSesionInvalida() }
 
     PreferenciasNotificacionScreen(
@@ -145,20 +140,6 @@ fun PreferenciasNotificacionRoute(
         onMantenimiento = vm::cambiarMantenimiento,
         onSoat = vm::cambiarSoat,
         onGuardar = vm::guardar,
-        probando = probando,
-        mensajePrueba = mensajePrueba,
-        onProbarPush = {
-            if (probando) return@PreferenciasNotificacionScreen
-            scope.launch {
-                probando = true
-                mensajePrueba = null
-                val msg = withContext(Dispatchers.IO) {
-                    PushTokenSync.probarPush(context.applicationContext)
-                }
-                mensajePrueba = msg
-                probando = false
-            }
-        },
         modifier = modifier
     )
 }
@@ -171,9 +152,6 @@ private fun PreferenciasNotificacionScreen(
     onMantenimiento: (Boolean) -> Unit,
     onSoat: (Boolean) -> Unit,
     onGuardar: () -> Unit,
-    probando: Boolean = false,
-    mensajePrueba: String? = null,
-    onProbarPush: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -312,45 +290,6 @@ private fun PreferenciasNotificacionScreen(
                 ) {
                     Text("Activar permiso de notificaciones", fontWeight = FontWeight.SemiBold)
                 }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Verificación FCM",
-                fontWeight = FontWeight.SemiBold,
-                color = MyCarNavy
-            )
-            Text(
-                "Envía un push de prueba solo a tus dispositivos registrados.",
-                color = MyCarMuted,
-                style = MaterialTheme.typography.bodySmall
-            )
-            mensajePrueba?.let {
-                Text(
-                    it,
-                    color = if (it.contains("enviado", ignoreCase = true)) MyCarStatusActivo
-                    else Color(0xFFC62828),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            Button(
-                onClick = onProbarPush,
-                enabled = !probando && !estado.guardando,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MyCarTeal)
-            ) {
-                if (probando) {
-                    CircularProgressIndicator(
-                        Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(Modifier.size(10.dp))
-                }
-                Text(
-                    if (probando) "Enviando…" else "Enviar push de prueba",
-                    fontWeight = FontWeight.SemiBold
-                )
             }
             Spacer(Modifier.height(16.dp))
         }

@@ -11,7 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * EA3: emite notificaciones internas de kilometraje según la frecuencia del select
- * (config_recordatorio_km.frecuencia). No crea alertas. No altera el botón de prueba FCM.
+ * (config_recordatorio_km.frecuencia). No crea alertas. El encolado FCM lo hace el
+ * controlador/cron o el job diario tras {@link #evaluarPendientes()}.
  */
 @Service
 public class EvaluacionRecordatoriosKmService {
