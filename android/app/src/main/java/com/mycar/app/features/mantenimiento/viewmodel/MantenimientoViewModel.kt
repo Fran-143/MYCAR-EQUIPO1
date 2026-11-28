@@ -4,12 +4,16 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
+import com.mycar.app.features.alertas.data.ProgramarAlertaDto
+import com.mycar.app.features.alertas.domain.AlertasRepository
 import com.mycar.app.features.alertas.domain.RepuestoAtencionAlerta
+import com.mycar.app.features.alertas.domain.ResultadoOperacionIncierto
 import com.mycar.app.features.alertas.domain.SolicitudAtenderAlerta
 import com.mycar.app.features.mantenimiento.data.*
 import com.mycar.app.features.mantenimiento.domain.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -17,15 +21,33 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.util.UUID
 
-/** Tras RF17, datos para abrir RF22 con referencia al mantenimiento recién creado. */
+/** Datos de recomendación RF17 para crear alerta vinculada (sin UI de RF22). */
 data class OfertaProgramarAlerta(
     val idVehiculo: Long,
     val idMantenimiento: Long,
     val codigoTipo: String,
     val servicioOtro: String?,
+    val fechaServicio: String,
     val kmServicio: Int,
     val proximaFecha: String?,
     val proximoKm: Int?
+)
+
+/** Resumen dinámico de la pantalla «Mantenimiento registrado». */
+data class ResumenConfirmacionRf17(
+    val placa: String?,
+    val marcaModelo: String?,
+    val tallerNombre: String?,
+    val sinTaller: Boolean,
+    val tipoNombre: String?,
+    val observaciones: String?,
+    val repuestos: List<RepuestoRf17Dto>,
+    val proximaFecha: String?,
+    val proximoKm: Int?,
+    val alertaCreada: Boolean,
+    val mensajeAlerta: String? = null,
+    /** Vehículo de la alerta creada (para abrir Mis alertas en el listado correcto). */
+    val idVehiculoAlerta: Long? = null
 )
 
 data class MantenimientoUiState(
@@ -39,9 +61,10 @@ data class MantenimientoUiState(
     val erroresEditor: Map<String,String> = emptyMap(), val confirmarSalida: Boolean = false,
     val vehiculoPendiente: Long? = null, val recuperacionBloqueada: Boolean = false,
     val requiereSesion: Boolean = false,
-    /** true si el usuario eligió «Guardar y programar alerta». */
+    /** true si el usuario eligió «Sí, crear alerta». */
     val programarAlertaTrasExito: Boolean = false,
     val ofertaProgramarAlerta: OfertaProgramarAlerta? = null,
+    val resumenConfirmacion: ResumenConfirmacionRf17? = null,
     /** RF24: formulario abierto desde alerta (oculta próxima / oferta RF22). */
     val desdeAlerta: ContextoDesdeAlerta? = null
 ) {
@@ -61,7 +84,8 @@ class MantenimientoViewModel(
     private val vehiculoInicial: Long?,
     private val desdeAlerta: ContextoDesdeAlerta? = null,
     private val atenderAlerta: AtenderAlertaDesdeFormulario? = null,
-    private val talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null
+    private val talleresRepository: com.mycar.app.features.talleres.domain.TalleresRepository? = null,
+    private val alertasRepository: AlertasRepository? = null
 ) : ViewModel() {
     private val gson = Gson()
     private val mutable = MutableStateFlow(MantenimientoUiState(desdeAlerta = desdeAlerta))
@@ -415,19 +439,151 @@ class MantenimientoViewModel(
             throw ErrorMantenimientoRemoto("RESPUESTA_INVALIDA", "La respuesta no confirma esta solicitud", true)
         withContext(Dispatchers.IO) { archivo.borrar() }
         saved.remove<String>("rf17.borrador")
+        val vehiculo = mutable.value.contexto?.vehiculos?.firstOrNull { it.idVehiculo == b.idVehiculo }
+        val tipo = mutable.value.contexto?.tipos?.firstOrNull { it.codigo == b.codigoTipo }
+        val taller = b.idTaller?.let { id -> mutable.value.talleresActivos.firstOrNull { it.id == id } }
         val oferta = if (mutable.value.programarAlertaTrasExito) OfertaProgramarAlerta(
             idVehiculo = requireNotNull(b.idVehiculo),
             idMantenimiento = requireNotNull(r.idMantenimiento),
             codigoTipo = b.codigoTipo,
             servicioOtro = b.servicioOtro.takeIf { it.isNotBlank() },
+            fechaServicio = requireNotNull(r.fechaServicio ?: b.fecha.takeIf { it.isNotBlank() }),
             kmServicio = requireNotNull(b.km.toIntOrNull() ?: r.kmServicio),
             proximaFecha = b.proximaFecha.takeIf { it.isNotBlank() },
             proximoKm = b.proximoKm.toIntOrNull()
         ) else null
+        var alertaCreada = false
+        var mensajeAlerta: String? = null
+        var idVehiculoAlerta: Long? = null
+        if (oferta != null) {
+            val alertas = alertasRepository
+            if (alertas == null) {
+                mensajeAlerta = "El mantenimiento se guardó. No fue posible crear la alerta automática."
+            } else {
+                try {
+                    crearAlertaDesdeRecomendacion(alertas, oferta)
+                    alertaCreada = true
+                    idVehiculoAlerta = oferta.idVehiculo
+                    mensajeAlerta = "Se creó la alerta preventiva. Ya está disponible en Mis alertas."
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    mensajeAlerta = e.message?.takeIf { it.isNotBlank() }
+                        ?: "El mantenimiento se guardó, pero no se pudo crear la alerta. Corrige la recomendación o guárdala solo."
+                }
+            }
+        }
+        val resumen = ResumenConfirmacionRf17(
+            placa = vehiculo?.placa,
+            marcaModelo = listOfNotNull(vehiculo?.marca, vehiculo?.modelo)
+                .joinToString(" ").ifBlank { null },
+            tallerNombre = taller?.nombre,
+            sinTaller = b.idTaller == null,
+            tipoNombre = when {
+                b.codigoTipo == "OTRO" -> b.servicioOtro.takeIf { it.isNotBlank() } ?: "OTRO"
+                else -> tipo?.nombre ?: b.codigoTipo
+            },
+            observaciones = b.observaciones.takeIf { it.isNotBlank() },
+            repuestos = ValidacionFormularioMantenimiento.solicitud(b).repuestos,
+            proximaFecha = b.proximaFecha.takeIf { it.isNotBlank() },
+            proximoKm = b.proximoKm.toIntOrNull(),
+            alertaCreada = alertaCreada,
+            mensajeAlerta = mensajeAlerta,
+            idVehiculoAlerta = idVehiculoAlerta
+        )
         mutable.value = mutable.value.copy(
             enviando = false, incierto = false, resultado = r, mensaje = null,
-            ofertaProgramarAlerta = oferta
+            ofertaProgramarAlerta = null,
+            resumenConfirmacion = resumen
         )
+    }
+
+    /**
+     * RF17-EA02: crea la alerta con servicios RF22 existentes, sin abrir su pantalla.
+     * Criterio: solo fecha → POR_TIEMPO; solo km → POR_KILOMETRAJE; ambos → AMBOS.
+     *
+     * La próxima fecha del formulario debe quedar exactamente como fecha_objetivo.
+     * Preferimos SEMANAS/MESES si coinciden; si no, DIAS (V52 en backend).
+     */
+    private suspend fun crearAlertaDesdeRecomendacion(
+        alertas: AlertasRepository,
+        oferta: OfertaProgramarAlerta
+    ) {
+        val fechaBase = LocalDate.parse(soloFechaIso(oferta.fechaServicio))
+        val proxima = oferta.proximaFecha?.let { LocalDate.parse(soloFechaIso(it)) }
+        val intervaloKm = oferta.proximoKm?.let { pk -> (pk - oferta.kmServicio).takeIf { it > 0 } }
+        if (proxima != null && !proxima.isAfter(fechaBase)) {
+            error("La fecha recomendada debe ser posterior a la fecha del mantenimiento.")
+        }
+        if (oferta.proximoKm != null && intervaloKm == null) {
+            error("El kilometraje recomendado debe ser superior al del servicio.")
+        }
+        val tiempo = proxima?.let { unidadCantidadDesdeFechas(fechaBase, it) }
+        val criterio = when {
+            tiempo != null && intervaloKm != null -> "AMBOS"
+            intervaloKm != null -> "POR_KILOMETRAJE"
+            tiempo != null -> "POR_TIEMPO"
+            else -> error("Indica una próxima fecha y/o kilometraje recomendado.")
+        }
+        if (tiempo != null) {
+            val fechaObjetivo = fechaObjetivoDesde(fechaBase, tiempo.first, tiempo.second)
+            if (proxima != null && fechaObjetivo != proxima) {
+                error("No se pudo alinear la fecha objetivo con la recomendación. Revisa la próxima fecha.")
+            }
+            val hoy = mutable.value.contexto?.fechaServidor
+                ?.let { runCatching { LocalDate.parse(soloFechaIso(it)) }.getOrNull() }
+                ?: LocalDate.now()
+            if (!fechaObjetivo.isAfter(hoy)) {
+                error("La próxima fecha debe ser posterior a hoy para crear la alerta.")
+            }
+        }
+        val dto = ProgramarAlertaDto(
+            idOperacion = UUID.randomUUID().toString(),
+            codigoTipoMantenimiento = oferta.codigoTipo,
+            criterio = criterio,
+            origenCalculo = "DESDE_MANTENIMIENTO",
+            unidadTiempo = tiempo?.first,
+            cantidadTiempo = tiempo?.second,
+            intervaloKm = intervaloKm,
+            servicioOtro = oferta.servicioOtro?.takeIf { oferta.codigoTipo == "OTRO" },
+            idMantenimientoReferencia = oferta.idMantenimiento,
+            fechaBaseConfirmada = if (tiempo != null) fechaBase.toString() else null,
+            kmBaseConfirmado = if (intervaloKm != null) oferta.kmServicio else null,
+            idLecturaConfirmada = null
+        )
+        try {
+            alertas.programar(oferta.idVehiculo, dto)
+        } catch (e: ResultadoOperacionIncierto) {
+            confirmarProgramacionIncierta(alertas, e.idOperacion)
+        }
+    }
+
+    private suspend fun confirmarProgramacionIncierta(alertas: AlertasRepository, idOperacion: String) {
+        repeat(6) {
+            delay(700)
+            when (val estado = alertas.operacion(idOperacion).estado) {
+                "CONFIRMADA" -> return
+                "EN_PROCESO" -> Unit
+                else -> error("No se pudo confirmar la alerta ($estado). Revisa Mis alertas o vuelve a intentar.")
+            }
+        }
+        error("La alerta sigue en proceso. Revisa Mis alertas en unos segundos.")
+    }
+
+    companion object {
+        /** ISO yyyy-MM-dd aunque el API envíe datetime. */
+        fun soloFechaIso(raw: String): String {
+            val s = raw.trim().take(10)
+            LocalDate.parse(s)
+            return s
+        }
+
+        fun fechaObjetivoDesde(base: LocalDate, unidad: String, cantidad: Int): LocalDate =
+            com.mycar.app.features.alertas.domain.FechaObjetivoAlerta.fechaObjetivoDesde(base, unidad, cantidad)
+
+        /** Delega en [FechaObjetivoAlerta] (misma regla RF17/RF22). */
+        fun unidadCantidadDesdeFechas(base: LocalDate, objetivo: LocalDate): Pair<String, Int> =
+            com.mycar.app.features.alertas.domain.FechaObjetivoAlerta.unidadCantidadDesdeFechas(base, objetivo)
     }
     fun finalizarConfirmacion() {
         if (mutable.value.resultado == null) return

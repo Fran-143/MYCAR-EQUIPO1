@@ -175,17 +175,40 @@ class ActualizarKilometrajeViewModel(
 
     private fun manejarError(e: Exception, reintentar: () -> Unit) {
         val fallo = e as? FalloRegistroVehiculo
+        val detalle = fallo?.mensajeServidor?.takeIf { it.isNotBlank() }
+            ?: e.message?.takeIf { it.isNotBlank() && it != fallo?.codigo }
         when {
-            fallo?.estadoHttp == 401 -> _estado.value = _estado.value.copy(paso = PasoKm.SESION, mensaje = "Inicia sesión para continuar.")
-            fallo?.codigo == "KILOMETRAJE_NO_DISPONIBLE" -> _estado.value = _estado.value.copy(paso = PasoKm.SIN_LECTURA, mensaje = "No hay lectura disponible.")
-            fallo?.codigo == "KM_OBSOLETO" -> {
-                _estado.value = _estado.value.copy(paso = PasoKm.ERROR, mensaje = "El kilometraje cambió. Recarga e inténtalo otra vez.")
-            }
-            fallo?.codigo == "KM_NO_SUPERIOR" -> _estado.value = _estado.value.copy(
-                paso = PasoKm.EDICION, errores = mapOf("kmNuevo" to "Debe ser mayor al kilometraje vigente.")
+            fallo?.estadoHttp == 401 -> _estado.value = _estado.value.copy(
+                paso = PasoKm.SESION,
+                mensaje = "Inicia sesión para continuar."
             )
-            fallo?.codigo == "VEHICULO_INACTIVO" -> _estado.value = _estado.value.copy(paso = PasoKm.INACTIVO, mensaje = "Vehículo inactivo.")
-            else -> _estado.value = _estado.value.copy(paso = PasoKm.ERROR, mensaje = "No se pudo completar la actualización.")
+            fallo?.codigo == "KILOMETRAJE_NO_DISPONIBLE" -> _estado.value = _estado.value.copy(
+                paso = PasoKm.SIN_LECTURA,
+                mensaje = detalle ?: "No hay lectura disponible."
+            )
+            fallo?.codigo == "KM_OBSOLETO" -> _estado.value = _estado.value.copy(
+                paso = PasoKm.ERROR,
+                mensaje = detalle
+                    ?: "El kilometraje cambió en otro dispositivo. Pulsa Reintentar para recargar y vuelve a confirmar."
+            )
+            fallo?.codigo == "KM_NO_SUPERIOR" -> _estado.value = _estado.value.copy(
+                paso = PasoKm.EDICION,
+                errores = mapOf("kmNuevo" to (detalle ?: "Debe ser mayor al kilometraje vigente."))
+            )
+            fallo?.codigo == "VEHICULO_INACTIVO" -> _estado.value = _estado.value.copy(
+                paso = PasoKm.INACTIVO,
+                mensaje = detalle ?: "Vehículo inactivo."
+            )
+            fallo?.codigo == "OPERACION_EN_PROCESO" -> _estado.value = _estado.value.copy(
+                paso = PasoKm.ERROR,
+                mensaje = "La operación sigue en proceso. Espera unos segundos y reintenta sin cambiar el km."
+            )
+            else -> _estado.value = _estado.value.copy(
+                paso = PasoKm.ERROR,
+                mensaje = detalle
+                    ?: (fallo?.codigo?.let { "No se pudo completar ($it)." }
+                        ?: "No se pudo completar la actualización. Revisa la conexión e inténtalo de nuevo.")
+            )
         }
     }
 

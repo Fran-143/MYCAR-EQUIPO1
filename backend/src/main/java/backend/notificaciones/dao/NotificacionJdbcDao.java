@@ -221,7 +221,16 @@ public class NotificacionJdbcDao {
                   AND n.estado_gestion %s
                   AND (? OR n.categoria = ?)
                   AND (? OR n.leida = ?)
-                ORDER BY n.fecha_emision_utc DESC, n.id_notificacion DESC
+                ORDER BY CASE a.estado
+                           WHEN 'VENCIDA' THEN 0
+                           WHEN 'PENDIENTE' THEN 1
+                           WHEN 'PROXIMA' THEN 2
+                           WHEN 'PROGRAMADA' THEN 3
+                           WHEN 'REALIZADA' THEN 4
+                           ELSE 5
+                         END,
+                         n.fecha_emision_utc DESC,
+                         n.id_notificacion DESC
                 """.formatted(pendientes ? "= 'PENDIENTE'" : "IN ('ATENDIDA','CERRADA')");
         return jdbc.query(sql, (rs, n) -> new ContratoNotificaciones.NotificacionDto(
                 rs.getLong("id_notificacion"),
